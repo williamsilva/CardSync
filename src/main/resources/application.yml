@@ -1,6 +1,6 @@
 spring:
   application:
-    name: cardsync-security
+    name: cardsync
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
