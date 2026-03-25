@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS cs_password_history_aud (
   updated_by_id BINARY(16) NULL,
 
   user_id BINARY(16) NULL,
-  password_hash VARCHAR(120) NULL,
+  password_hash VARCHAR(255) NULL,
 
   PRIMARY KEY (id, rev),
   CONSTRAINT fk_cs_password_history_aud_rev FOREIGN KEY (rev) REFERENCES revinfo (rev)
@@ -60,8 +60,8 @@ CREATE TABLE cs_invite_token (
     FOREIGN KEY (user_id) REFERENCES cs_users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- cs_invite_token_AUD
-CREATE TABLE cs_invite_token_AUD (
+-- cs_invite_token_aud
+CREATE TABLE cs_invite_token_aud (
   id BINARY(16) NOT NULL,
 
   -- envers
@@ -79,11 +79,11 @@ CREATE TABLE cs_invite_token_AUD (
   expires_at TIMESTAMP(6) NULL,
   used_at TIMESTAMP(6) NULL,
 
-  CONSTRAINT pk_cs_invite_tokens_AUD PRIMARY KEY (id, REV),
-  CONSTRAINT fk_cs_invite_tokens_AUD_rev FOREIGN KEY (REV) REFERENCES revinfo(rev)
+  CONSTRAINT pk_cs_invite_tokens_aud PRIMARY KEY (id, REV),
+  CONSTRAINT fk_cs_invite_tokens_aud_rev FOREIGN KEY (REV) REFERENCES revinfo(rev)
 ) ENGINE=InnoDB;
-CREATE INDEX ix_cs_invite_tokens_AUD_rev ON cs_invite_token_AUD(REV);
-CREATE INDEX ix_cs_invite_tokens_AUD_user_rev ON cs_invite_token_AUD(user_id, REV);
+CREATE INDEX ix_cs_invite_tokens_aud_rev ON cs_invite_token_aud(REV);
+CREATE INDEX ix_cs_invite_tokens_aud_user_rev ON cs_invite_token_aud(user_id, REV);
 
 -- cs_reset_token
 CREATE TABLE cs_reset_token (
@@ -107,8 +107,8 @@ CREATE TABLE cs_reset_token (
     FOREIGN KEY (user_id) REFERENCES cs_users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- cs_reset_token_AUD
-CREATE TABLE cs_reset_token_AUD (
+-- cs_reset_token_aud
+CREATE TABLE cs_reset_token_aud (
   id BINARY(16) NOT NULL,
 
   -- envers
@@ -126,11 +126,11 @@ CREATE TABLE cs_reset_token_AUD (
   expires_at TIMESTAMP(6) NULL,
   used_at TIMESTAMP(6) NULL,
 
-  CONSTRAINT pk_cs_reset_token_AUD PRIMARY KEY (id, REV),
-  CONSTRAINT fk_cs_reset_token_AUD_rev FOREIGN KEY (REV) REFERENCES revinfo(rev)
+  CONSTRAINT pk_cs_reset_token_aud PRIMARY KEY (id, REV),
+  CONSTRAINT fk_cs_reset_token_aud_rev FOREIGN KEY (REV) REFERENCES revinfo(rev)
 ) ENGINE=InnoDB;
-CREATE INDEX ix_cs_reset_token_AUD_rev ON cs_reset_token_AUD(REV);
-CREATE INDEX ix_cs_reset_token_AUD_user_rev ON cs_reset_token_AUD(user_id, REV);
+CREATE INDEX ix_cs_reset_token_aud_rev ON cs_reset_token_aud(REV);
+CREATE INDEX ix_cs_reset_token_aud_user_rev ON cs_reset_token_aud(user_id, REV);
 
 CREATE TABLE cs_audit_event (
   id BINARY(16) NOT NULL,
