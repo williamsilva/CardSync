@@ -1,0 +1,324 @@
+{
+  "app": {
+    "title": "CardSync"
+  },
+  "cardsync": {
+    "login": {
+      "title": "CardSync - Inicio de sesión"
+    },
+    "brand": {
+      "subtitle": "Conciliación simplificada"
+    },
+    "expiredPassword": {
+      "title": "CardSync - Contraseña vencida",
+      "h1": "Contraseña vencida",
+      "subtitle": "Para continuar, cree una nueva contraseña para su cuenta.",
+      "newPasswordLabel": "Nueva contraseña",
+      "confirmPasswordLabel": "Confirmar nueva contraseña",
+      "submit": "Actualizar contraseña",
+      "backToLogin": "Volver al inicio de sesión",
+      "neutralError": "No fue posible cambiar la contraseña. Inténtelo nuevamente."
+    },
+    "passwordPolicy": {
+      "title": "Política de contraseña"
+    },
+    "generic": {
+      "errorTitle": "¡Ups!"
+    }
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "subtitle": "Inicia sesión para continuar",
+    "username": {
+      "label": "Usuario",
+      "placeholder": "tu@email.com"
+    },
+    "password": {
+      "label": "Contraseña",
+      "placeholder": "••••••••"
+    },
+    "submit": "Iniciar sesión",
+    "forgot": {
+      "label": "Olvidé mi contraseña",
+      "disabled": "Olvidé mi contraseña (no disponible cuando la contraseña ha vencido)"
+    },
+    "pwdExpiry": {
+      "prefix": "La contraseña vence en",
+      "suffix": "día(s)"
+    },
+    "expired": {
+      "redirectPrefix": "Serás redirigido en",
+      "redirectSuffix": "Si lo prefieres, haz clic en"
+    },
+    "risk": {
+      "title": "Seguridad:",
+      "remainingPrefix": "quedan",
+      "remainingSuffix": "intento(s) para el bloqueo",
+      "thresholdSuffix": "fallos"
+    },
+    "lockedTitle": "Cuenta bloqueada",
+    "lockedBody": "Tu cuenta fue bloqueada temporalmente. Inténtalo nuevamente más tarde.",
+    "expiredTitle": "Contraseña vencida",
+    "expiredBody": "Tu contraseña ha vencido. Actualízala para continuar.",
+    "error": "Usuario o contraseña inválidos.",
+    "locked": "Usuario bloqueado. Inténtalo nuevamente en unos momentos.",
+    "expiredPassword": "Tu contraseña ha vencido. Debes cambiarla.",
+    "welcome": "Bienvenido",
+    "expiredCta": "Cambiar contraseña",
+    "modal": {
+      "title": "Aviso"
+    },
+    "highLockRisk": "⚠ Alto riesgo de bloqueo",
+    "nextLockInfo": "El próximo bloqueo será de {duration}.",
+    "duration": {
+      "minute": {
+        "one": "minuto",
+        "other": "minutos"
+      },
+      "hour": {
+        "one": "hora",
+        "other": "horas"
+      }
+    },
+    "passwordExpiredModal": {
+      "title": "Contraseña vencida",
+      "message": "Tu contraseña ha vencido. Haz clic en OK para actualizarla."
+    },
+    "passwordExpiringModal": {
+      "title": "Tu contraseña vencerá pronto",
+      "message": "Tu contraseña vence en {days} día(s). Haz clic en OK para continuar."
+    }
+  },
+  "password": {
+    "placeholder": "••••••••",
+    "toggle": {
+      "ariaLabel": "Mostrar contraseña"
+    },
+    "policy": {
+      "invalid": "La contraseña no cumple con la política."
+    },
+    "reuse": {
+      "notAllowed": "La contraseña no puede repetir las últimas contraseñas."
+    },
+    "rule": {
+      "minLength": "Mínimo {0} caracteres",
+      "digit": "Al menos 1 número",
+      "upper": "Al menos 1 letra mayúscula",
+      "symbol": "Al menos 1 símbolo",
+      "lower": "Al menos 1 letra minúscula",
+      "noWhitespace": "Sin espacios",
+      "common": "No usar una contraseña común",
+      "noUsername": "No debe contener el usuario",
+      "noSequence": "Evitar secuencias (ej.: 123 / abc)",
+      "noRepetition": "Evitar repeticiones (ej.: aaa)",
+      "match": "Las contraseñas deben coincidir",
+      "history": "No reutilizar las últimas {0} contraseñas",
+      "sameAsCurrent": "La nueva contraseña debe ser diferente de la actual",
+      "hint": "La contraseña debe cumplir con todas las reglas anteriores."
+    }
+  },
+  "forget": {
+    "title": "CardSync - Olvidé mi contraseña",
+    "h1": "Olvidé mi contraseña",
+    "subtitle": "Informe su usuario. Si existe, enviaremos un correo con instrucciones.",
+    "sent": "Si el usuario existe, se ha enviado un correo con instrucciones.",
+    "username": {
+      "label": "Usuario",
+      "placeholder": "su@email.com"
+    },
+    "submit": "Enviar",
+    "backToLogin": "Volver al inicio de sesión"
+  },
+  "page": {
+    "title": {
+      "changePassword": "CardSync - Cambiar contraseña",
+      "setPassword": "CardSync - Definir contraseña",
+      "resetPassword": "CardSync - Restablecer contraseña",
+      "forgetPassword": "CardSync - Olvidé mi contraseña",
+      "success": "CardSync - Éxito",
+      "error": "CardSync - Error",
+      "inviteExpired": "Invitación vencida",
+      "resetExpired": "CardSync - Enlace de restablecimiento vencido"
+    }
+  },
+  "common": {
+    "backToLogin": "Volver al inicio de sesión",
+    "goToLogin": "Ir al inicio de sesión",
+    "backToHome": "Volver al inicio",
+    "oops": "Ups…",
+    "somethingWentWrong": "Algo no salió como se esperaba.",
+    "operationSuccess": "Operación completada con éxito.",
+    "successTitle": "Éxito",
+    "successProceedLogin": "Puede continuar al inicio de sesión.",
+    "correlationId": "CorrelationId:",
+    "ok": "OK"
+  },
+  "footer": {
+    "rights": "CardSync • Todos los derechos reservados"
+  },
+  "auth": {
+    "policy": {
+      "loading": "Cargando política…"
+    },
+    "resetExpired": {
+      "h1": "Enlace vencido",
+      "subtitle": "Su enlace para restablecer la contraseña ya no es válido.",
+      "alertTitle": "Enlace de restablecimiento vencido o inválido.",
+      "alertBody": "Solicite un nuevo enlace para restablecer su contraseña.",
+      "requestNew": "Solicitar nuevo enlace"
+    },
+    "change": {
+      "h1": "Cambiar contraseña",
+      "subtitle": "Actualice su contraseña siguiendo la política",
+      "currentPassword": "Contraseña actual",
+      "newPassword": "Nueva contraseña",
+      "confirmPassword": "Confirmar nueva contraseña",
+      "submit": "Cambiar contraseña",
+      "success": "Contraseña cambiada con éxito.",
+      "error": "No fue posible cambiar la contraseña. Verifique la contraseña actual e inténtelo nuevamente."
+    },
+    "set": {
+      "h1": "Definir contraseña",
+      "subtitle": "Cree su contraseña para completar el primer acceso",
+      "welcomeTitle": "¡Bienvenido!",
+      "welcomeBody": "Defina una contraseña para completar su primer acceso.",
+      "newPassword": "Nueva contraseña",
+      "confirmPassword": "Confirmar nueva contraseña",
+      "submit": "Guardar contraseña",
+      "invalid": "Enlace inválido o vencido.",
+      "hint": "Solicite al soporte que reenvíe la invitación."
+    },
+    "reset": {
+      "h1": "Restablecer contraseña",
+      "subtitle": "Defina una nueva contraseña para continuar",
+      "almostThereTitle": "¡Casi listo!",
+      "almostThereBody": "Cree una nueva contraseña siguiendo la política.",
+      "requestNewPrefix": "Solicite un nuevo restablecimiento en",
+      "forgotLink": "Olvidé mi contraseña",
+      "requestNewSuffix": ".",
+      "newPassword": "Nueva contraseña",
+      "confirmPassword": "Confirmar nueva contraseña",
+      "submit": "Guardar nueva contraseña",
+      "invalid": "Enlace inválido o vencido.",
+      "hint": "Solicite un nuevo restablecimiento en el enlace anterior."
+    },
+    "inviteExpired": {
+      "h1": "Enlace vencido",
+      "subtitle": "Su invitación para el primer acceso ya no es válida.",
+      "alertTitle": "Invitación vencida o inválida.",
+      "alertBody": "Solicite un nuevo enlace para definir su contraseña.",
+      "resend": "Enviar nuevo enlace"
+    }
+  },
+  "mail": {
+    "layout": {
+      "brandSubtitle": "Conciliación simplificada",
+      "securityBadge": "Seguridad de la cuenta",
+      "heroSubtitle": "Su acceso a CardSync con más seguridad, claridad y confianza.",
+      "greetingPrefix": "Hola,",
+      "importantTitle": "Importante",
+      "validityPrefix": "Este enlace es válido por",
+      "copyLinkHint": "Si el botón no funciona, copie y pegue este enlace en su navegador:",
+      "footerLeft": "Plataforma segura para conciliación financiera, gestión de acceso y operaciones con mayor control.",
+      "automatic": "Este es un correo automático.",
+      "doNotReply": "No responda a este mensaje.",
+      "copyright": "© CardSync · Todos los derechos reservados"
+    },
+    "reset": {
+      "title": "Restablecimiento de contraseña",
+      "actionText": "Restablecer mi contraseña",
+      "subject": "CardSync - Restablecimiento de contraseña",
+      "bodyLine1": "Hemos recibido una solicitud para restablecer la contraseña de su cuenta de CardSync.",
+      "bodyLine2": "Para continuar de forma segura, haga clic en el botón de abajo y elija una nueva contraseña.",
+      "footerNote": "Si no solicitó este restablecimiento, ignore este correo y su cuenta permanecerá protegida."
+    },
+    "firstPassword": {
+      "title": "Defina su contraseña",
+      "subject": "CardSync - Defina su contraseña",
+      "actionText": "Definir mi contraseña",
+      "bodyLine1": "Su acceso a CardSync ha sido creado con éxito.",
+      "bodyLine2": "Para completar su registro y activar su cuenta, haga clic en el botón de abajo para definir su primera contraseña.",
+      "footerNote": "Si no solicitó este acceso, ignore este correo."
+    },
+    "duration": {
+      "day": "{0} día",
+      "days": "{0} días",
+      "hour": "{0} hora",
+      "hours": "{0} horas",
+      "minute": "{0} minuto",
+      "minutes": "{0} minutos",
+      "fewMinutes": "unos minutos",
+      "and": "y"
+    }
+  },
+  "error": {
+    "internal": "Error interno. Inténtelo nuevamente.",
+    "validation": "Datos inválidos. Verifique los campos.",
+    "business": "No fue posible completar la operación.",
+    "NOT_FOUND": "Recurso no encontrado.",
+    "SESSION_EXPIRED": "Su sesión ha expirado. Inicie sesión nuevamente.",
+    "ACCESS_DENIED": "No tiene permiso para ejecutar esta acción.",
+    "USER_DOCUMENT_ALREADY_EXISTS": "Ya existe un usuario con este documento.",
+    "USER_USERNAME_ALREADY_EXISTS": "Ya existe un usuario con este nombre de usuario.",
+    "USER_NOT_FOUND": "Usuario no encontrado.",
+    "USER_DELETE_SELF_NOT_ALLOWED": "No puede eliminar su propio usuario.",
+    "USER_DELETE_PROTECTED_NOT_ALLOWED": "Este usuario está protegido y no puede ser eliminado.",
+    "GROUP_REQUIRED": "Seleccione al menos un grupo.",
+    "GROUP_NOT_FOUND": "Grupo no encontrado.",
+    "INVALID_EMAIL": "Ingrese un correo válido.",
+    "DOCUMENT_REQUIRED": "El documento es obligatorio.",
+    "NAME_REQUIRED": "El nombre es obligatorio.",
+    "INVITE_RESEND_NOT_ALLOWED": "No fue posible reenviar la invitación.",
+    "INVITE_RESEND_USER_INACTIVE": "No es posible reenviar la invitación a un usuario inactivo.",
+    "INVITE_RESEND_USER_ALREADY_ACTIVE": "La invitación solo puede reenviarse a un usuario pendiente de definir contraseña.",
+    "PASSWORD_CURRENT_INVALID": "La contraseña actual es incorrecta.",
+    "PASSWORD_POLICY_INVALID": "La nueva contraseña no cumple con la política definida.",
+    "USER_ACTIVATE_INVALID_STATUS": "El usuario no puede activarse desde el estado actual",
+    "USER_ACTIVATE_PROTECTED_NOT_ALLOWED": "El usuario protegido no puede activarse",
+    "USER_DEACTIVATE_SELF_NOT_ALLOWED": "No puede desactivar su propio usuario",
+    "USER_DEACTIVATE_PROTECTED_NOT_ALLOWED": "El usuario protegido no puede desactivarse",
+    "USER_DEACTIVATE_INVALID_STATUS": "El usuario no puede desactivarse desde el estado actual",
+    "USER_BULK_IDS_REQUIRED": "Informe al menos un id de usuario",
+    "USER_UPDATE_SUPPORT_NOT_ALLOWED": "Los usuarios del grupo SUPPORT no pueden ser editados.",
+    "USER_ACTIVATE_SUPPORT_NOT_ALLOWED": "Los usuarios del grupo SUPPORT no pueden ser activados.",
+    "USER_DEACTIVATE_SUPPORT_NOT_ALLOWED": "Los usuarios del grupo SUPPORT no pueden ser desactivados.",
+    "EMAIL_NOT_SEND": "Correo electrónico no enviado.",
+    "EMAIL_AUTHENTICATION_FAILED": "Error de autenticación de correo electrónico.",
+    "PASSWORD_RESET_RATE_LIMIT_EXCEEDED": "Se ha superado el límite de intentos de restablecimiento de contraseña.",
+    "403": {
+      "title": "403 — Acceso denegado.",
+      "subtitle": "No tiene permiso para acceder a esta página."
+    },
+    "404": {
+      "title": "404 — Página no encontrada.",
+      "subtitle": "La página a la que intentó acceder no existe o fue movida."
+    },
+    "500": {
+      "title": "500 — Error interno"
+    },
+    "GROUP_NAME_ALREADY_EXISTS": "Ya existe un grupo con este nombre.",
+    "GROUP_DELETE_SUPPORT_NOT_ALLOWED": "El grupo SUPPORT no puede eliminarse ni modificarse en esta operación.",
+    "GROUP_DELETE_IN_USE": "Este grupo tiene usuarios asociados y no puede eliminarse.",
+    "PERMISSION_NOT_FOUND": "No se encontraron uno o más permisos informados."
+  },
+  "success": {
+    "generic": {
+      "title": "Éxito",
+      "subtitle": "Operación completada con éxito.",
+      "alert": "Puede continuar."
+    },
+    "forgetPasswordSent": {
+      "title": "Correo enviado",
+      "subtitle": "Si la dirección existe, enviaremos un enlace de restablecimiento.",
+      "alert": "Revise su bandeja de entrada y spam."
+    },
+    "cta": {
+      "goToLogin": "Volver al inicio de sesión"
+    },
+    "inviteResent": {
+      "title": "Correo reenviado",
+      "subtitle": "Si la invitación aún está disponible, enviaremos un nuevo enlace.",
+      "alert": "Revise su bandeja de entrada y spam."
+    }
+  }
+}

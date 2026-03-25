@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('CardSync - 500', ~{::body})}">
+<body>
+  <h1 class="page-title"><span th:text="#{error.500.title}">500 — Erro interno</span></h1>
+  <p class="page-subtitle">Ocorreu um erro inesperado. Tente novamente em alguns instantes.</p>
+
+  <div th:if="${message}" class="alert warn mt-10">
+    <span th:text="${message}">Erro.</span>
+  </div>
+
+  <a class="btn primary" th:href="@{/login}" th:text="#{common.goToLogin}">Ir para login</a>
+  <div class="center">
+    <a class="link" th:href="@{/}" th:text="#{common.backToHome}">Voltar para a Home</a>
+  </div>
+
+  <div class="small mt-10 center">
+    <span><span th:text="#{common.correlationId}">CorrelationId:</span></span>
+    <span class="kbd" th:text="${correlationId}">-</span>
+  </div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: cardsync-security
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  jackson:
+    time-zone: UTC
+
+  messages:
+    basename: messages
+    encoding: UTF-8
+    thymeleaf:
+      encoding: UTF-8
+
+server:
+  port: ${PORT:9091}
+  forward-headers-strategy: framework
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+cardsync:
+  app:
+    business-zone: America/Sao_Paulo

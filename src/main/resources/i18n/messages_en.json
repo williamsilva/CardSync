@@ -1,0 +1,324 @@
+{
+  "app": {
+    "title": "CardSync"
+  },
+  "cardsync": {
+    "login": {
+      "title": "CardSync - Login"
+    },
+    "brand": {
+      "subtitle": "Simplified Reconciliation"
+    },
+    "expiredPassword": {
+      "title": "CardSync - Password expired",
+      "h1": "Password expired",
+      "subtitle": "To continue, create a new password for your account.",
+      "newPasswordLabel": "New password",
+      "confirmPasswordLabel": "Confirm new password",
+      "submit": "Update password",
+      "backToLogin": "Back to login",
+      "neutralError": "Could not change the password. Please try again."
+    },
+    "passwordPolicy": {
+      "title": "Password policy"
+    },
+    "generic": {
+      "errorTitle": "Oops!"
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Sign in to continue",
+    "username": {
+      "label": "Username",
+      "placeholder": "your@email.com"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "••••••••"
+    },
+    "submit": "Sign in",
+    "forgot": {
+      "label": "I forgot my password",
+      "disabled": "I forgot my password (unavailable when the password is expired)"
+    },
+    "pwdExpiry": {
+      "prefix": "Password expires in",
+      "suffix": "day(s)"
+    },
+    "expired": {
+      "redirectPrefix": "You will be redirected in",
+      "redirectSuffix": "If you prefer, click"
+    },
+    "risk": {
+      "title": "Security:",
+      "remainingPrefix": "remaining",
+      "remainingSuffix": "attempt(s) before lockout",
+      "thresholdSuffix": "failures"
+    },
+    "lockedTitle": "Account locked",
+    "lockedBody": "Your account has been temporarily locked. Please try again later.",
+    "expiredTitle": "Password expired",
+    "expiredBody": "Your password has expired. Update it to continue.",
+    "error": "Invalid username or password.",
+    "locked": "User is locked. Please try again shortly.",
+    "expiredPassword": "Your password has expired. You need to change it.",
+    "welcome": "Welcome",
+    "expiredCta": "Change password",
+    "modal": {
+      "title": "Notice"
+    },
+    "highLockRisk": "⚠ High risk of lockout",
+    "nextLockInfo": "The next lockout will last {duration}.",
+    "duration": {
+      "minute": {
+        "one": "minute",
+        "other": "minutes"
+      },
+      "hour": {
+        "one": "hour",
+        "other": "hours"
+      }
+    },
+    "passwordExpiredModal": {
+      "title": "Password expired",
+      "message": "Your password has expired. Click OK to update it."
+    },
+    "passwordExpiringModal": {
+      "title": "Your password will expire soon",
+      "message": "Your password will expire in {days} day(s). Click OK to continue."
+    }
+  },
+  "password": {
+    "placeholder": "••••••••",
+    "toggle": {
+      "ariaLabel": "Show password"
+    },
+    "policy": {
+      "invalid": "Password does not meet the policy."
+    },
+    "reuse": {
+      "notAllowed": "Password cannot repeat the most recent passwords."
+    },
+    "rule": {
+      "minLength": "Minimum {0} characters",
+      "digit": "At least 1 number",
+      "upper": "At least 1 uppercase letter",
+      "symbol": "At least 1 symbol",
+      "lower": "At least 1 lowercase letter",
+      "noWhitespace": "No spaces",
+      "common": "Do not use a common password",
+      "noUsername": "Must not contain the username",
+      "noSequence": "Avoid sequences (e.g. 123 / abc)",
+      "noRepetition": "Avoid repetition (e.g. aaa)",
+      "match": "Passwords must match",
+      "history": "Do not reuse the last {0} passwords",
+      "sameAsCurrent": "New password must be different from current password",
+      "hint": "The password must satisfy all the rules above."
+    }
+  },
+  "forget": {
+    "title": "CardSync - Forgot password",
+    "h1": "Forgot password",
+    "subtitle": "Enter your username. If it exists, we will send an email with instructions.",
+    "sent": "If the username exists, an email has been sent with instructions.",
+    "username": {
+      "label": "Username",
+      "placeholder": "your@email.com"
+    },
+    "submit": "Send",
+    "backToLogin": "Back to login"
+  },
+  "page": {
+    "title": {
+      "changePassword": "CardSync - Change password",
+      "setPassword": "CardSync - Set password",
+      "resetPassword": "CardSync - Password reset",
+      "forgetPassword": "CardSync - Forgot password",
+      "success": "CardSync - Success",
+      "error": "CardSync - Error",
+      "inviteExpired": "Invitation expired",
+      "resetExpired": "CardSync - Reset link expired"
+    }
+  },
+  "common": {
+    "backToLogin": "Back to login",
+    "goToLogin": "Go to login",
+    "backToHome": "Back to Home",
+    "oops": "Oops…",
+    "somethingWentWrong": "Something did not go as expected.",
+    "operationSuccess": "Operation completed successfully.",
+    "successTitle": "Success",
+    "successProceedLogin": "You may proceed to login.",
+    "correlationId": "CorrelationId:",
+    "ok": "OK"
+  },
+  "footer": {
+    "rights": "CardSync • All rights reserved"
+  },
+  "auth": {
+    "policy": {
+      "loading": "Loading policy…"
+    },
+    "resetExpired": {
+      "h1": "Link expired",
+      "subtitle": "Your password reset link is no longer valid.",
+      "alertTitle": "Expired or invalid reset link.",
+      "alertBody": "Request a new link to reset your password.",
+      "requestNew": "Request new link"
+    },
+    "change": {
+      "h1": "Change password",
+      "subtitle": "Update your password according to the policy",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Change password",
+      "success": "Password changed successfully.",
+      "error": "Could not change the password. Check your current password and try again."
+    },
+    "set": {
+      "h1": "Set password",
+      "subtitle": "Create your password to complete first access",
+      "welcomeTitle": "Welcome!",
+      "welcomeBody": "Set a password to complete your first access.",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Save password",
+      "invalid": "Invalid or expired link.",
+      "hint": "Ask support to resend the invitation."
+    },
+    "reset": {
+      "h1": "Password reset",
+      "subtitle": "Set a new password to continue",
+      "almostThereTitle": "Almost there!",
+      "almostThereBody": "Create a new password following the policy.",
+      "requestNewPrefix": "Request a new reset at",
+      "forgotLink": "Forgot password",
+      "requestNewSuffix": ".",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Save new password",
+      "invalid": "Invalid or expired link.",
+      "hint": "Request a new reset using the link above."
+    },
+    "inviteExpired": {
+      "h1": "Expired link",
+      "subtitle": "Your first-access invitation is no longer valid.",
+      "alertTitle": "Expired or invalid invitation.",
+      "alertBody": "Request a new link to set your password.",
+      "resend": "Send new link"
+    }
+  },
+  "mail": {
+    "layout": {
+      "brandSubtitle": "Reconciliation made simple",
+      "securityBadge": "Account security",
+      "heroSubtitle": "Your CardSync access with more security, clarity, and confidence.",
+      "greetingPrefix": "Hello,",
+      "importantTitle": "Important",
+      "validityPrefix": "This link is valid for",
+      "copyLinkHint": "If the button does not work, copy and paste this link into your browser:",
+      "footerLeft": "Secure platform for financial reconciliation, access management, and operations with more control.",
+      "automatic": "This is an automated email.",
+      "doNotReply": "Please do not reply to this message.",
+      "copyright": "© CardSync · All rights reserved"
+    },
+    "reset": {
+      "title": "Password reset",
+      "subject": "CardSync - Password reset",
+      "actionText": "Reset my password",
+      "bodyLine1": "We received a request to reset the password for your CardSync account.",
+      "bodyLine2": "To continue securely, click the button below and choose a new password.",
+      "footerNote": "If you did not request this reset, ignore this email and your account will remain protected."
+    },
+    "firstPassword": {
+      "title": "Set your password",
+      "subject": "CardSync - Set your password",
+      "actionText": "Set my password",
+      "bodyLine1": "Your CardSync access has been created successfully.",
+      "bodyLine2": "To complete your registration and activate your account, click the button below to set your first password.",
+      "footerNote": "If you did not request this access, ignore this email."
+    },
+    "duration": {
+      "day": "{0} day",
+      "days": "{0} days",
+      "hour": "{0} hour",
+      "hours": "{0} hours",
+      "minute": "{0} minute",
+      "minutes": "{0} minutes",
+      "fewMinutes": "a few minutes",
+      "and": "and"
+    }
+  },
+  "error": {
+    "internal": "Internal error. Please try again.",
+    "validation": "Invalid data. Check the fields.",
+    "business": "Could not complete the operation.",
+    "NOT_FOUND": "Resource not found.",
+    "SESSION_EXPIRED": "Your session has expired. Please sign in again.",
+    "ACCESS_DENIED": "You do not have permission to perform this action.",
+    "USER_DOCUMENT_ALREADY_EXISTS": "A user with this document already exists.",
+    "USER_USERNAME_ALREADY_EXISTS": "A user with this username already exists.",
+    "USER_NOT_FOUND": "User not found.",
+    "USER_DELETE_SELF_NOT_ALLOWED": "You cannot delete your own user.",
+    "USER_DELETE_PROTECTED_NOT_ALLOWED": "This user is protected and cannot be deleted.",
+    "GROUP_REQUIRED": "Select at least one group.",
+    "GROUP_NOT_FOUND": "Group not found.",
+    "INVALID_EMAIL": "Enter a valid email.",
+    "DOCUMENT_REQUIRED": "Document is required.",
+    "NAME_REQUIRED": "Name is required.",
+    "INVITE_RESEND_NOT_ALLOWED": "Could not resend the invitation.",
+    "INVITE_RESEND_USER_INACTIVE": "Cannot resend invitation to an inactive user.",
+    "INVITE_RESEND_USER_ALREADY_ACTIVE": "Invitation can only be resent for a user pending password setup.",
+    "PASSWORD_CURRENT_INVALID": "The current password is incorrect.",
+    "PASSWORD_POLICY_INVALID": "The new password does not meet the required policy.",
+    "USER_ACTIVATE_INVALID_STATUS": "The user cannot be activated from the current status",
+    "USER_ACTIVATE_PROTECTED_NOT_ALLOWED": "Protected user cannot be activated",
+    "USER_DEACTIVATE_SELF_NOT_ALLOWED": "You cannot deactivate your own user",
+    "USER_DEACTIVATE_PROTECTED_NOT_ALLOWED": "Protected user cannot be deactivated",
+    "USER_DEACTIVATE_INVALID_STATUS": "The user cannot be deactivated from the current status",
+    "USER_BULK_IDS_REQUIRED": "Please provide at least one user id",
+    "USER_UPDATE_SUPPORT_NOT_ALLOWED": "Users in the SUPPORT group cannot be edited.",
+    "USER_ACTIVATE_SUPPORT_NOT_ALLOWED": "Users in the SUPPORT group cannot be activated.",
+    "USER_DEACTIVATE_SUPPORT_NOT_ALLOWED": "Users in the SUPPORT group cannot be deactivated.",
+    "EMAIL_NOT_SEND": "Email not sent.",
+    "EMAIL_AUTHENTICATION_FAILED": "Email authentication failed.",
+    "PASSWORD_RESET_RATE_LIMIT_EXCEEDED": "Password reset rate limit exceeded.",
+    "403": {
+      "title": "403 — Access denied.",
+      "subtitle": "You do not have permission to access this page."
+    },
+    "404": {
+      "title": "404 — Page not found.",
+      "subtitle": "The page you tried to access does not exist or has been moved."
+    },
+    "500": {
+      "title": "500 — Internal error."
+    },
+    "GROUP_NAME_ALREADY_EXISTS": "A group with this name already exists.",
+    "GROUP_DELETE_SUPPORT_NOT_ALLOWED": "The SUPPORT group cannot be deleted or changed in this operation.",
+    "GROUP_DELETE_IN_USE": "This group has associated users and cannot be deleted.",
+    "PERMISSION_NOT_FOUND": "One or more informed permissions were not found."
+  },
+  "success": {
+    "generic": {
+      "title": "Success",
+      "subtitle": "Operation completed successfully.",
+      "alert": "You may proceed."
+    },
+    "forgetPasswordSent": {
+      "title": "Email sent",
+      "subtitle": "If the address exists, we will send a reset link.",
+      "alert": "Check your inbox and spam folder."
+    },
+    "cta": {
+      "goToLogin": "Back to login"
+    },
+    "inviteResent": {
+      "title": "Email resent",
+      "subtitle": "If the invitation is still available, we will send a new link.",
+      "alert": "Check your inbox and spam folder."
+    }
+  }
+}

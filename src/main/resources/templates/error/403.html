@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout('CardSync - 403', ~{::body})}">
+<body>
+  <h1 class="page-title"><span th:text="#{error.403.title}">403 — Acesso negado</span></h1>
+  <p class="page-subtitle"><span th:text="#{error.403.subtitle}">Você não tem permissão para acessar esta página.</span></p>
+
+  <a class="btn primary" th:href="@{/login}" th:text="#{common.goToLogin}">Ir para login</a>
+  <div class="center">
+    <a class="link" th:href="@{/}" th:text="#{common.backToHome}">Voltar para a Home</a>
+  </div>
+
+  <div class="small mt-10 center">
+    <span><span th:text="#{common.correlationId}">CorrelationId:</span></span>
+    <span class="kbd" th:text="${correlationId}">-</span>
+  </div>
+</body>
+</html>

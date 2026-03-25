@@ -1,0 +1,328 @@
+{
+  "app": {
+    "title": "CardSync"
+  },
+  "cardsync": {
+    "login": {
+      "title": "CardSync - Login"
+    },
+    "brand": {
+      "subtitle": "Conciliação Simplificada"
+    },
+    "expiredPassword": {
+      "title": "CardSync - Senha expirada",
+      "h1": "Senha expirada",
+      "subtitle": "Para continuar, crie uma nova senha para sua conta.",
+      "newPasswordLabel": "Nova senha",
+      "confirmPasswordLabel": "Confirmar nova senha",
+      "submit": "Atualizar senha",
+      "backToLogin": "Voltar para o login",
+      "neutralError": "Não foi possível trocar a senha. Tente novamente."
+    },
+    "passwordPolicy": {
+      "title": "Política de senha"
+    },
+    "generic": {
+      "errorTitle": "Ops!"
+    }
+  },
+  "login": {
+    "title": "Entrar",
+    "subtitle": "Faça login para continuar",
+    "username": {
+      "label": "Usuário",
+      "placeholder": "seu@email.com"
+    },
+    "password": {
+      "label": "Senha",
+      "placeholder": "••••••••"
+    },
+    "submit": "Entrar",
+    "forgot": {
+      "label": "Esqueci minha senha",
+      "disabled": "Esqueci minha senha (indisponível quando a senha está expirada)"
+    },
+    "pwdExpiry": {
+      "prefix": "Senha expira em",
+      "suffix": "dia(s)"
+    },
+    "expired": {
+      "redirectPrefix": "Você será redirecionado em",
+      "redirectSuffix": "Se preferir, clique em"
+    },
+    "risk": {
+      "title": "Segurança:",
+      "remainingPrefix": "faltam",
+      "remainingSuffix": "tentativa(s) para bloqueio",
+      "thresholdSuffix": "falhas"
+    },
+    "lockedTitle": "Conta bloqueada",
+    "lockedBody": "Sua conta foi bloqueada temporariamente. Tente novamente mais tarde.",
+    "expiredTitle": "Senha expirada",
+    "expiredBody": "Sua senha expirou. Atualize para continuar.",
+    "error": "Usuário ou senha inválidos.",
+    "locked": "Usuário bloqueado. Tente novamente em alguns instantes.",
+    "expiredPassword": "Sua senha expirou. Você precisa trocá-la.",
+    "welcome": "Bem-vindo",
+    "expiredCta": "Trocar senha",
+    "modal": {
+      "title": "Aviso"
+    },
+
+    "highLockRisk": "⚠ Risco alto de bloqueio",
+    "nextLockInfo": "Próximo bloqueio será de {duration}.",
+
+    "duration": {
+      "minute": {
+        "one": "minuto",
+        "other": "minutos"
+      },
+      "hour": {
+        "one": "hora",
+        "other": "horas"
+      }
+    },
+
+    "passwordExpiredModal": {
+      "title": "Senha expirada",
+      "message": "Sua senha expirou. Clique em OK para atualizar."
+    },
+
+    "passwordExpiringModal": {
+      "title": "Sua senha vai expirar",
+      "message": "Sua senha expira em {days} dia(s). Clique em OK para continuar."
+    }
+  },
+  "password": {
+    "placeholder": "••••••••",
+    "toggle": {
+      "ariaLabel": "Mostrar senha"
+    },
+    "policy": {
+      "invalid": "Senha não atende a política."
+    },
+    "reuse": {
+      "notAllowed": "Senha não pode repetir as últimas senhas."
+    },
+    "rule": {
+      "minLength": "Mínimo {0} caracteres",
+      "digit": "Ao menos 1 número",
+      "upper": "Ao menos 1 letra maiúscula",
+      "symbol": "Ao menos 1 símbolo",
+      "lower": "Ao menos 1 letra minúscula",
+      "noWhitespace": "Sem espaços",
+      "common": "Não usar senha comum",
+      "noUsername": "Não conter o usuário",
+      "noSequence": "Evitar sequência (ex: 123 / abc)",
+      "noRepetition": "Evitar repetição (ex: aaa)",
+      "match": "As senhas devem ser iguais",
+      "history": "Não reutilizar últimas {0} senhas",
+      "sameAsCurrent": "Nova senha diferente da atual",
+      "hint": "A senha deve atender todas as regras acima."
+    }
+  },
+  "forget": {
+    "title": "CardSync - Esqueci a senha",
+    "h1": "Esqueci a senha",
+    "subtitle": "Informe seu usuário. Se existir, enviaremos um e-mail com instruções.",
+    "sent": "Se o usuário existir, um e-mail foi enviado com instruções.",
+    "username": {
+      "label": "Usuário",
+      "placeholder": "seu@email.com"
+    },
+    "submit": "Enviar",
+    "backToLogin": "Voltar para o login"
+  },
+  "page": {
+    "title": {
+      "changePassword": "CardSync - Alterar senha",
+      "setPassword": "CardSync - Definir senha",
+      "resetPassword": "CardSync - Reset de senha",
+      "forgetPassword": "CardSync - Esqueci a senha",
+      "success": "CardSync - Sucesso",
+      "error": "CardSync - Erro",
+      "inviteExpired": "Convite expirado",
+      "resetExpired": "CardSync - Link de reset expirado"
+    }
+  },
+  "common": {
+    "backToLogin": "Voltar para o login",
+    "goToLogin": "Ir para login",
+    "backToHome": "Voltar para a Home",
+    "oops": "Ops…",
+    "somethingWentWrong": "Algo não saiu como esperado.",
+    "operationSuccess": "Operação concluída com sucesso.",
+    "successTitle": "Sucesso",
+    "successProceedLogin": "Você pode prosseguir para o login.",
+    "correlationId": "CorrelationId:",
+    "ok": "OK"
+  },
+  "footer": {
+    "rights": "CardSync • Todos os direitos reservados"
+  },
+  "auth": {
+    "policy": {
+      "loading": "Carregando política…"
+    },
+    "resetExpired": {
+      "h1": "Link expirado",
+      "subtitle": "Seu link de redefinição de senha não é mais válido.",
+      "alertTitle": "Link de reset expirado ou inválido.",
+      "alertBody": "Solicite um novo link para redefinir sua senha.",
+      "requestNew": "Solicitar novo link"
+    },
+    "change": {
+      "h1": "Alterar senha",
+      "subtitle": "Atualize sua senha seguindo a política",
+      "currentPassword": "Senha atual",
+      "newPassword": "Nova senha",
+      "confirmPassword": "Confirmar nova senha",
+      "submit": "Alterar senha",
+      "success": "Senha alterada com sucesso.",
+      "error": "Não foi possível alterar a senha. Verifique a senha atual e tente novamente."
+    },
+    "set": {
+      "h1": "Definir senha",
+      "subtitle": "Crie sua senha para concluir o primeiro acesso",
+      "welcomeTitle": "Bem-vindo!",
+      "welcomeBody": "Defina uma senha para concluir o primeiro acesso.",
+      "newPassword": "Nova senha",
+      "confirmPassword": "Confirmar nova senha",
+      "submit": "Salvar senha",
+      "invalid": "Link inválido ou expirado.",
+      "hint": "Peça ao suporte para reenviar o convite."
+    },
+    "reset": {
+      "h1": "Reset de senha",
+      "subtitle": "Defina uma nova senha para continuar",
+      "almostThereTitle": "Quase lá!",
+      "almostThereBody": "Crie uma nova senha seguindo a política.",
+      "requestNewPrefix": "Solicite um novo reset em",
+      "forgotLink": "Esqueci a senha",
+      "requestNewSuffix": ".",
+      "newPassword": "Nova senha",
+      "confirmPassword": "Confirmar nova senha",
+      "submit": "Salvar nova senha",
+      "invalid": "Link inválido ou expirado.",
+      "hint": "Solicite um novo reset no link acima."
+    },
+    "inviteExpired": {
+      "h1": "Link expirado",
+      "subtitle": "Seu convite para primeiro acesso não é mais válido.",
+      "alertTitle": "Convite expirado ou inválido.",
+      "alertBody": "Solicite um novo link para definir sua senha.",
+      "resend": "Enviar novo link"
+    }
+  },
+  "mail": {
+    "layout": {
+      "brandSubtitle": "Conciliação simplificada",
+      "securityBadge": "Segurança de conta",
+      "heroSubtitle": "Seu acesso ao CardSync com mais segurança, clareza e confiança.",
+      "greetingPrefix": "Olá,",
+      "importantTitle": "Importante",
+      "validityPrefix": "Este link é válido por",
+      "copyLinkHint": "Caso o botão não funcione, copie e cole este link no navegador:",
+      "footerLeft": "Plataforma segura para conciliação financeira, gestão de acesso e operações com mais controle.",
+      "automatic": "Este é um e-mail automático.",
+      "doNotReply": "Não responda esta mensagem.",
+      "copyright": "© CardSync · Todos os direitos reservados"
+    },
+    "reset": {
+      "title": "Redefinição de senha",
+      "subject": "CardSync - Redefinição de senha",
+      "actionText": "Redefinir minha senha",
+      "bodyLine1": "Recebemos uma solicitação para redefinir a senha da sua conta no CardSync.",
+      "bodyLine2": "Para continuar com segurança, clique no botão abaixo e escolha uma nova senha.",
+      "footerNote": "Se você não solicitou a redefinição, ignore este e-mail e sua conta continuará protegida."
+    },
+    "firstPassword": {
+      "title": "Defina sua senha",
+      "subject": "CardSync - Defina sua senha",
+      "actionText": "Definir minha senha",
+      "bodyLine1": "Seu acesso ao CardSync foi criado com sucesso.",
+      "bodyLine2": "Para concluir seu cadastro e ativar sua conta, clique no botão abaixo para definir sua primeira senha.",
+      "footerNote": "Se você não solicitou este acesso, ignore este e-mail."
+    },
+    "duration": {
+      "day": "{0} dia",
+      "days": "{0} dias",
+      "hour": "{0} hora",
+      "hours": "{0} horas",
+      "minute": "{0} minuto",
+      "minutes": "{0} minutos",
+      "fewMinutes": "alguns minutos",
+      "and": "e"
+    }
+  },
+  "error": {
+    "internal": "Erro interno. Tente novamente.",
+    "validation": "Dados inválidos. Verifique os campos.",
+    "business": "Não foi possível concluir a operação.",
+    "NOT_FOUND": "Recurso não encontrado.",
+    "SESSION_EXPIRED": "Sua sessão expirou. Faça login novamente.",
+    "ACCESS_DENIED": "Você não tem permissão para executar esta ação.",
+    "USER_DOCUMENT_ALREADY_EXISTS": "Já existe um usuário com este documento.",
+    "USER_USERNAME_ALREADY_EXISTS": "Já existe um usuário com este nome de usuário.",
+    "USER_NOT_FOUND": "Usuário não encontrado.",
+    "USER_DELETE_SELF_NOT_ALLOWED": "Você não pode excluir seu próprio usuário.",
+    "USER_DELETE_PROTECTED_NOT_ALLOWED": "Este usuário é protegido e não pode ser excluído.",
+    "GROUP_REQUIRED": "Selecione ao menos um grupo.",
+    "GROUP_NOT_FOUND": "Grupo não encontrado.",
+    "INVALID_EMAIL": "Informe um e-mail válido.",
+    "DOCUMENT_REQUIRED": "Documento é obrigatório.",
+    "NAME_REQUIRED": "Nome é obrigatório.",
+    "INVITE_RESEND_NOT_ALLOWED": "Não foi possível reenviar o convite.",
+    "INVITE_RESEND_USER_INACTIVE": "Não é possível reenviar convite para usuário inativo.",
+    "INVITE_RESEND_USER_ALREADY_ACTIVE": "O convite só pode ser reenviado para usuário pendente de senha.",
+    "PASSWORD_CURRENT_INVALID": "A senha atual informada está incorreta.",
+    "PASSWORD_POLICY_INVALID": "A nova senha não atende à política definida.",
+    "USER_ACTIVATE_INVALID_STATUS": "O usuário não pode ser ativado a partir do status atual.",
+    "USER_ACTIVATE_PROTECTED_NOT_ALLOWED": "Usuário protegido não pode ser ativado.",
+    "USER_DEACTIVATE_SELF_NOT_ALLOWED": "Você não pode desativar seu próprio usuário.",
+    "USER_DEACTIVATE_PROTECTED_NOT_ALLOWED": "Usuário protegido não pode ser desativado.",
+    "USER_DEACTIVATE_INVALID_STATUS": "O usuário não pode ser desativado a partir do status atual.",
+    "USER_BULK_IDS_REQUIRED": "Informe pelo menos um id de usuário.",
+    "USER_UPDATE_SUPPORT_NOT_ALLOWED": "Usuários do grupo SUPPORT não podem ser editados.",
+    "USER_ACTIVATE_SUPPORT_NOT_ALLOWED": "Usuários do grupo SUPPORT não podem ser ativados.",
+    "USER_DEACTIVATE_SUPPORT_NOT_ALLOWED": "Usuários do grupo SUPPORT não podem ser desativados.",
+    "EMAIL_NOT_SEND": "E-mail não enviado.",
+    "EMAIL_AUTHENTICATION_FAILED": "Falha de autenticação do e-mail.",
+    "PASSWORD_RESET_RATE_LIMIT_EXCEEDED": "Limite taxa de reset de senha excedido.",
+    "403": {
+      "title": "403 — Acesso negado.",
+      "subtitle": "Você não tem permissão para acessar esta página."
+    },
+    "404": {
+      "title": "404 — Página não encontrada",
+      "subtitle": "A página que você tentou acessar não existe ou foi movida."
+    },
+    "500": {
+      "title": "500 — Erro interno."
+    },
+    "GROUP_NAME_ALREADY_EXISTS": "Já existe um grupo com este nome.",
+    "GROUP_DELETE_SUPPORT_NOT_ALLOWED": "O grupo SUPPORT não pode ser excluído ou alterado nesta operação.",
+    "GROUP_DELETE_IN_USE": "Este grupo possui usuários associados e não pode ser excluído.",
+    "PERMISSION_NOT_FOUND": "Uma ou mais permissões informadas não foram encontradas."
+  },
+  "success": {
+    "generic": {
+      "title": "Sucesso",
+      "subtitle": "Operação concluída com sucesso.",
+      "alert": "Você pode prosseguir."
+    },
+    "forgetPasswordSent": {
+      "title": "E-mail enviado",
+      "subtitle": "Se o endereço existir, enviaremos um link de redefinição.",
+      "alert": "Verifique sua caixa de entrada e spam."
+    },
+    "cta": {
+      "goToLogin": "Voltar para o login"
+    },
+    "inviteResent": {
+      "title": "E-mail reenviado",
+      "subtitle": "Se o convite ainda estiver disponível, enviaremos um novo link.",
+      "alert": "Verifique sua caixa de entrada e spam."
+    }
+  }
+}

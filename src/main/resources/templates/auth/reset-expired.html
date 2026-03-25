@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(#{page.title.resetExpired}, ~{::body})}">
+<body>
+<h1 class="page-title" th:text="#{auth.resetExpired.h1}">Link expirado</h1>
+<p class="page-subtitle" th:text="#{auth.resetExpired.subtitle}">Seu link de reset não é mais válido.</p>
+
+<div class="alert bad">
+  <b th:text="#{auth.resetExpired.alertTitle}">Link de reset expirado ou inválido.</b>
+  <div class="small mt-6" th:text="#{auth.resetExpired.alertBody}">
+    Solicite um novo link de redefinição de senha.
+  </div>
+</div>
+
+<div class="form">
+  <div class="center">
+    <a class="btn primary" th:href="@{/forget-password}" th:text="#{auth.resetExpired.requestNew}">
+      Solicitar novo link
+    </a>
+  </div>
+
+  <div class="center mt-10">
+    <a class="link" th:href="@{/login}" th:text="#{common.backToLogin}">Voltar para o login</a>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(#{page.title.success}, ~{::body})}">
+<body th:with="m=${(param.m != null and !#lists.isEmpty(param.m)) ? param.m[0] : 'generic'},
+              titleKey=${'success.' + m + '.title'},
+              subtitleKey=${'success.' + m + '.subtitle'},
+              alertKey=${'success.' + m + '.alert'},
+              ctaHref=${(m == 'forgetPasswordSent') ? '/login' : '/login'},
+              ctaKey=${(m == 'forgetPasswordSent') ? 'success.cta.goToLogin' : 'common.goToLogin'}">
+  <h1 class="page-title" th:text="#{${titleKey}}">Sucesso</h1>
+  <p class="page-subtitle">
+    <span th:text="#{${subtitleKey}}">Operação concluída com sucesso.</span>
+  </p>
+
+  <div class="alert ok">
+    <span th:text="#{${alertKey}}">Você pode prosseguir.</span>
+  </div>
+
+  <div class="center">
+    <a class="btn primary" th:href="@{${ctaHref}}" th:text="#{${ctaKey}}">Ir para login</a>
+  </div>
+</body>
+</html>

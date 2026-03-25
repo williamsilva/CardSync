@@ -1,0 +1,190 @@
+spring:
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:${DB_URL}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD}}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  properties:
+    org.hibernate.envers.audit_table_suffix: _aud
+    org.hibernate.envers.revision_table_name: cs_revinfo
+
+  security:
+    oauth2:
+      client:
+        registration:
+          cardsync-bff:
+            provider: cardsync-as
+            client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
+            client-secret: ${CARDSYNC_BFF_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+        provider:
+          cardsync-as:
+            authorization-uri: ${CARDSYNC_ISSUER}/oauth2/authorize
+            token-uri: ${CARDSYNC_ISSUER}/oauth2/token
+            jwk-set-uri: ${CARDSYNC_ISSUER}/oauth2/jwks
+            user-info-uri: ${CARDSYNC_ISSUER}/userinfo
+            user-name-attribute: sub
+
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+          ssl:
+            enable: ${MAIL_SMTP_SSL:true}
+
+server:
+  ssl:
+    enabled: false
+  compression:
+    enabled: true
+
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+        same-site: LAX
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+cardsync:
+  email:
+    impl: ${CARDSYNC_EMAIL_IMPL:smtp}
+    from: ${CARDSYNC_EMAIL_FROM:CardSync <contato@cardsync.com.br>}
+    no-reply: ${CARDSYNC_EMAIL_NO_REPLY:No Reply <noreply@cardsync.com.br>}
+
+  security:
+    issuer: ${CARDSYNC_ISSUER}
+
+    password:
+      min-length: ${CARDSYNC_PASSWORD_MIN_LENGTH:8}
+      history-size: ${CARDSYNC_PASSWORD_HISTORY_SIZE:3}
+      fail-if-no-expiration-data: ${CARDSYNC_PASSWORD_FAIL_IF_NO_EXPIRATION_DATA:true}
+
+      rules:
+        digit: ${CARDSYNC_PASSWORD_RULE_DIGIT:true}
+        upper: ${CARDSYNC_PASSWORD_RULE_UPPER:true}
+        symbol: ${CARDSYNC_PASSWORD_RULE_SYMBOL:true}
+        lower: ${CARDSYNC_PASSWORD_RULE_LOWER:false}
+        noWhitespace: ${CARDSYNC_PASSWORD_RULE_NO_WHITESPACE:true}
+        common: ${CARDSYNC_PASSWORD_RULE_COMMON:true}
+        noUsername: ${CARDSYNC_PASSWORD_RULE_NO_USERNAME:true}
+        match: true
+        sameAsCurrent: true
+        history: true
+        noSequence: ${CARDSYNC_PASSWORD_RULE_NO_SEQUENCE:true}
+        noRepetition: ${CARDSYNC_PASSWORD_RULE_NO_REPETITION:true}
+
+      sequence-len: ${CARDSYNC_PASSWORD_SEQUENCE_LEN:4}
+      max-same-in-row: ${CARDSYNC_PASSWORD_MAX_SAME_IN_ROW:4}
+
+      tokens:
+        public-base-url: ${CARDSYNC_PUBLIC_BASE_URL}
+        invite-ttl: ${CARDSYNC_INVITE_TTL:PT24H}
+        reset-ttl: ${CARDSYNC_RESET_TTL:PT15M}
+        rate-limit:
+          enabled: ${CARDSYNC_RESET_RATE_LIMIT_ENABLED:true}
+          max-requests: ${CARDSYNC_RESET_RATE_LIMIT_MAX_REQUESTS:3}
+          window: ${CARDSYNC_RESET_RATE_LIMIT_WINDOW:PT15M}
+
+      expiration:
+        enabled: ${CARDSYNC_PASSWORD_EXPIRATION_ENABLED:true}
+        warn-days: ${CARDSYNC_PASSWORD_WARN_DAYS:10}
+        expire-days: ${CARDSYNC_PASSWORD_EXPIRE_DAYS:90}
+
+    login:
+      default-target: ${CARDSYNC_LOGIN_DEFAULT_TARGET:https://cardsync.com.br/}
+
+    cookies:
+      domain: ${CARDSYNC_COOKIE_DOMAIN:}
+      secure: ${CARDSYNC_COOKIE_SECURE:true}
+      same-site: ${CARDSYNC_COOKIE_SAMESITE:Lax}
+
+    lockout:
+      enabled: ${CARDSYNC_LOCKOUT_ENABLED:true}
+      extend-when-locked: ${CARDSYNC_LOCKOUT_EXTEND_WHEN_LOCKED:false}
+      rules:
+        - attempts: 5
+          duration: PT15M
+        - attempts: 10
+          duration: PT30M
+        - attempts: 15
+          duration: PT1H
+        - attempts: 20
+          duration: PT2H
+
+    auth-server:
+      dev-generate-key: false
+      keystore:
+        location: ${CARDSYNC_AUTH_KEYSTORE_LOCATION:}
+        password: ${CARDSYNC_AUTH_KEYSTORE_PASSWORD:}
+        key-alias: ${CARDSYNC_AUTH_KEYSTORE_ALIAS:}
+        key-password: ${CARDSYNC_AUTH_KEYSTORE_KEY_PASSWORD:}
+
+      client:
+        client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
+        client-secret: ${CARDSYNC_BFF_CLIENT_SECRET}
+        redirect-uri-dev: ${CARDSYNC_BFF_REDIRECT_URI_DEV:http://localhost:9091/login/oauth2/code/cardsync-bff}
+        redirect-uri-prod: ${CARDSYNC_BFF_REDIRECT_URI_PROD:https://api.cardsync.com.br/login/oauth2/code/cardsync-bff}
+        post-logout-redirect-uris:
+          - ${CARDSYNC_POST_LOGOUT_REDIRECT_URI_1:https://cardsync.com.br/}
+        scopes:
+          - openid
+          - profile
+
+    resource-server:
+      enable: ${CARDSYNC_RESOURCE_SERVER_ENABLED:true}
+      audience: ${CARDSYNC_RESOURCE_SERVER_AUDIENCE:cardsync-api}
+
+    web:
+      spa-base-url: ${CARDSYNC_SPA_BASE_URL:https://cardsync.com.br}
+      allowed-origins:
+        - ${CARDSYNC_ALLOWED_ORIGIN_1:https://cardsync.com.br}
+
+    protected-usernames:
+      - owner
+      - system

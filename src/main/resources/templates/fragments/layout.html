@@ -1,0 +1,46 @@
+<!doctype html>
+<html th:lang="${#locale.toString().replace('_', '-')}" xmlns:th="http://www.thymeleaf.org"
+      th:fragment="layout(title, content)">
+
+<head th:replace="~{fragments/head :: head(${title})}"></head>
+
+<body class="auth-body">
+
+<div class="auth-bg"></div>
+
+<div class="auth-shell">
+  <div class="auth-card">
+
+    <div class="auth-header">
+
+      <div class="auth-brand">
+        <div class="brand-mark" aria-hidden="true">
+          <img class="brand-logo" th:src="@{/assets/cardsync-mark.svg}" alt=""/>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">CardSync</div>
+          <div class="brand-sub" th:text="#{cardsync.brand.subtitle}">Conciliação Simplificada</div>
+        </div>
+      </div>
+
+      <!-- badges no header (lado direito) - apenas no login -->
+      <div th:if="${pageId} == 'login'" class="auth-badges">
+        <span id="lockout-risk-badge" class="badge danger d-none">
+          <!--<span class="badge-icon">⚠</span>-->
+          <span class="badge-text"></span>
+        </span>
+      </div>
+
+    </div>
+
+    <div class="auth-content">
+      <th:block th:replace="${content}"></th:block>
+    </div>
+
+    <footer th:replace="~{fragments/footer :: footer}"></footer>
+
+  </div>
+</div>
+
+</body>
+</html>

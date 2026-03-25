@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(#{cardsync.login.title}, ~{::body})}">
+<body>
+
+<h1 class="page-title">
+  <span th:text="#{login.welcome}">Bem-vindo</span>
+  <span class="wave" aria-hidden="true">👋</span>
+</h1>
+<p class="page-subtitle" th:text="#{login.subtitle}">Entre com suas credenciais para continuar</p>
+
+<!-- BOOT (sem script inline) -->
+<div id="cs-boot" class="d-none"
+     th:attr="
+       data-locked=${locked},
+       data-has-error=${hasError},
+       data-expired-password=${expiredPassword},
+       data-failed-attempts=${failedAttempts},
+       data-remaining-attempts=${remainingAttempts},
+       data-next-threshold=${nextThreshold},
+       data-next-lock-duration-seconds=${nextLockDurationSeconds},
+       data-blocked-until-epoch-ms=${blockedUntilEpochMs},
+       data-warn-days=${warnDays},
+       data-default-target=${defaultTarget},
+       data-username=${username}">
+</div>
+
+<!-- i18n strings for JS (CSP-safe) -->
+<div id="cs-i18n" class="d-none"
+     th:attr="
+       data-modal-title=#{login.modal.title},
+       data-modal-ok=#{common.ok},
+       data-forgot-disabled=#{login.forgot.disabled},
+
+       data-high-lock-risk=#{login.highLockRisk},
+       data-next-lock-info=#{login.nextLockInfo},
+
+       data-duration-minute-one=#{login.duration.minute.one},
+       data-duration-minute-other=#{login.duration.minute.other},
+       data-duration-hour-one=#{login.duration.hour.one},
+       data-duration-hour-other=#{login.duration.hour.other},
+
+       data-password-expired-title=#{login.passwordExpiredModal.title},
+       data-password-expired-message=#{login.passwordExpiredModal.message},
+       data-password-expiring-title=#{login.passwordExpiringModal.title},
+       data-password-expiring-message=#{login.passwordExpiringModal.message}">
+</div>
+
+<!-- Card central (aparece somente após clicar em Entrar e receber status) -->
+<div id="pwd-expiry-card" class="alert alert-warning d-none" role="alert">
+  <div class="d-flex justify-content-center text-center w-100">
+    <div>
+      <b>
+        <span th:text="#{login.pwdExpiry.prefix}">Senha expira em</span>
+        <span id="pwd-days">0</span>
+        <span th:text="#{login.pwdExpiry.suffix}">dia(s)</span>
+      </b>
+    </div>
+  </div>
+</div>
+
+<!-- config (warn-at-days) vindo do server -->
+<span id="pwd-warn-at" class="d-none" th:attr="data-warn-at=${warnDays}"></span>
+
+<!-- Modal: senha expirada / aviso -->
+<div id="cs-modal" class="cs-modal" aria-hidden="true">
+  <div class="cs-modal-backdrop"></div>
+
+  <div class="cs-modal-card" role="dialog" aria-modal="true" aria-labelledby="cs-modal-title">
+    <div class="cs-modal-head">
+      <div class="cs-modal-icon" id="cs-modal-icon">⚠</div>
+      <div class="cs-modal-titles">
+        <div class="cs-modal-title" id="cs-modal-title" th:text="#{login.modal.title}">Aviso</div>
+        <div class="cs-modal-sub" id="cs-modal-sub">Mensagem</div>
+      </div>
+    </div>
+
+    <div class="cs-modal-actions">
+      <button id="cs-modal-ok" class="btn primary" type="button" th:text="#{common.ok}">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="login-locked" class="alert warn" th:classappend="${locked} ? ' show' : ''">
+  <b>
+    <span th:text="#{login.lockedTitle}">Conta bloqueada</span>
+    <span id="lock-icon" class="lock-icon"></span>
+  </b>
+  <span th:text="#{login.lockedBody}">Sua conta foi bloqueada temporariamente. Tente novamente mais tarde.</span>
+  <span id="countdown"></span>
+</div>
+
+<div id="login-expired" class="alert warn" th:classappend="${expiredPassword} ? ' show' : ''">
+  <b th:text="#{login.expiredTitle}">Senha expirada</b>
+  <span th:text="#{login.expiredBody}">Sua senha expirou. Atualize para continuar.</span>
+
+  <!-- ⏳ Redirect 20s + barra visual -->
+  <div class="mt-10 small center" id="expired-redirect-msg">
+    <span th:text="#{login.expired.redirectPrefix}">Você será redirecionado em</span>
+    <b><span id="expired-redirect-secs">20</span>s</b>.
+    <span th:text="#{login.expired.redirectSuffix}">Se preferir, clique em</span>
+    <b th:text="#{login.expiredCta}">Trocar senha</b>.
+  </div>
+
+  <div class="expired-bar mt-6" aria-hidden="true">
+    <div id="expired-bar-fill" class="expired-bar-fill"></div>
+  </div>
+
+  <div class="center mt-10">
+    <a class="link" th:href="@{/password/expired}" th:text="#{login.expiredCta}">Trocar senha</a>
+  </div>
+</div>
+
+<div id="login-error" class="alert bad center" th:classappend="${hasError} ? ' show' : ''" th:text="#{login.error}">
+  Usuário ou senha inválidos.
+</div>
+
+<!-- Card de risco (aparece quando houve falha e não está locked) -->
+<div id="login-remaining" class="alert risk"
+     th:classappend="${!locked and failedAttempts != null and failedAttempts > 0} ? ' show' : ''">
+
+  <div class="risk-header">
+    <span>⚠ <b th:text="#{login.risk.title}">Segurança:</b></span>
+    <span>
+      <span th:text="#{login.risk.remainingPrefix}">faltam</span>
+      <b id="remainingAttemptsVal" th:text="${remainingAttempts}">0</b>
+      <span th:text="#{login.risk.remainingSuffix}">tentativa(s) para bloqueio</span>
+      <span>
+        (
+        <b id="nextThresholdVal" th:text="${nextThreshold}">0</b>
+        <span th:text="#{login.risk.thresholdSuffix}">falhas</span>
+        )
+      </span>
+    </span>
+  </div>
+
+  <div class="risk-bar">
+    <div id="risk-progress" class="risk-progress"></div>
+  </div>
+
+  <div id="risk-next-info" class="risk-next-info"></div>
+</div>
+
+<form class="form" th:action="@{/login}" method="post" autocomplete="on">
+  <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+  <div>
+    <label class="field-label" for="username" th:text="#{login.username.label}">Usuário</label>
+    <div class="ig">
+      <div class="ig-left" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Z" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M20 20a8 8 0 1 0-16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <input class="ig-input" id="username" name="username" type="text"
+             th:value="${username}" autocomplete="username" inputmode="email" required
+             th:placeholder="#{login.username.placeholder}" placeholder="seu@email.com"/>
+    </div>
+  </div>
+
+  <div>
+    <label class="field-label" for="password" th:text="#{login.password.label}">Senha</label>
+    <div class="ig">
+      <div class="ig-left" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M17 11V8a5 5 0 0 0-10 0v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M7 11h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <input class="ig-input" id="password" name="password" type="password"
+             autocomplete="current-password" required
+             th:placeholder="#{login.password.placeholder}" placeholder="••••••••"/>
+      <div class="ig-right">
+        <button class="icon-btn" type="button" tabindex="-1"
+                data-toggle="password" data-target="password"
+                th:attr="aria-label=#{password.toggle.ariaLabel}"
+                aria-label="Mostrar senha" aria-pressed="false">
+
+          <!-- eye closed (default) -->
+          <svg class="eye-closed-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 15a3 3 0 1 0-3-3 3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+
+          <!-- eye open (when active) -->
+          <svg class="eye-open-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M12 15a3 3 0 1 0-3-3 3 3 0 0 0 3 3Z" stroke="currentColor" stroke-width="1.8"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn primary" type="submit" th:text="#{login.submit}">Entrar</button>
+
+  <div class="center">
+    <!--
+      IMPORTANTE:
+      - No primeiro render (server-side), a condição abaixo esconde o link quando expiredPassword=true.
+      - No modo AJAX, o estado pode mudar após a resposta do /login; por isso o JS também alterna os elementos.
+    -->
+    <a id="forgot-link" class="link"
+       th:if="${!expiredPassword}"
+       th:href="@{/forget-password}"
+       th:text="#{login.forgot.label}">Esqueci minha senha</a>
+
+    <span id="forgot-disabled" class="small"
+          th:if="${expiredPassword}">
+      <span th:text="#{login.forgot.disabled}">Esqueci minha senha (indisponível quando a senha está expirada)</span>
+    </span>
+  </div>
+</form>
+
+<script th:src="@{/js/login-ajax.js}"></script>
+<script th:src="@{/js/password-toggle.js}"></script>
+
+</body>
+</html>

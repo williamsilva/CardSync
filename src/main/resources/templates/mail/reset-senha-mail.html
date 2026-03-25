@@ -1,0 +1,20 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale}"
+      th:replace="~{mail/_layout :: layout(
+        #{mail.reset.title},
+        ${resetUrl},
+        #{mail.reset.actionText},
+        ${validity},
+        #{mail.reset.footerNote}
+      )}">
+<th:block th:fragment="content">
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:1.85;color:#cbd5e1;"
+     th:text="#{mail.reset.bodyLine1}">
+    Recebemos uma solicitação para redefinir a senha da sua conta no CardSync.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:15px;line-height:1.85;color:#cbd5e1;"
+     th:text="#{mail.reset.bodyLine2}">
+    Para continuar com segurança, clique no botão abaixo e escolha uma nova senha.
+  </p>
+</th:block>
+</html>

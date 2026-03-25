@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(#{page.title.inviteExpired}, ~{::body})}">
+<body>
+  <h1 class="page-title" th:text="#{auth.inviteExpired.h1}">Link expirado</h1>
+  <p class="page-subtitle" th:text="#{auth.inviteExpired.subtitle}">Seu convite não é mais válido.</p>
+
+  <div class="alert bad">
+    <b th:text="#{auth.inviteExpired.alertTitle}">Convite expirado ou inválido.</b>
+    <div class="small mt-6" th:text="#{auth.inviteExpired.alertBody}">Você pode solicitar um novo link para definir sua senha.</div>
+  </div>
+
+  <form class="form" method="post" th:action="@{|/password/set/expired/${userId}/resend|}">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+    <button class="btn primary" type="submit" th:text="#{auth.inviteExpired.resend}">Enviar novo link</button>
+
+    <div class="center mt-10">
+      <a class="link" th:href="@{/login}" th:text="#{common.backToLogin}">Voltar para o login</a>
+    </div>
+  </form>
+</body>
+</html>

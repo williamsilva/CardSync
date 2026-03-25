@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR"
+      xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(#{page.title.error}, ~{::body})}">
+<body>
+  <h1 class="page-title" th:text="#{common.oops}">Ops…</h1>
+  <p class="page-subtitle" th:text="#{common.somethingWentWrong}">Algo não saiu como esperado.</p>
+
+  <div class="alert bad" th:text="#{error.internal}">
+    <span th:text="#{error.internal}">Erro interno. Tente novamente.</span>
+  </div>
+
+  <div class="center">
+    <a class="btn primary" th:href="@{/login}" th:text="#{common.backToLogin}">Voltar para login</a>
+  </div>
+</body>
+</html>

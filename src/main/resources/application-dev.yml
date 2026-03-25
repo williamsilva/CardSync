@@ -1,0 +1,199 @@
+spring:
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+
+  datasource:
+    password: ${DB_PASSWORD:root}
+    username: ${DB_USERNAME:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}/${DB_DATABASE:cardsync}?createDatabaseIfNotExist=true&serverTimezone=UTC
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        format_sql: true
+    open-in-view: false
+
+  properties:
+    org.hibernate.envers.audit_table_suffix: _aud
+    org.hibernate.envers.revision_table_name: cs_revinfo
+    # mantém o nome padrão do campo de revisão (REV) e revtype (REVTYPE)
+    # org.hibernate.envers.revision_field_name: REV
+    # org.hibernate.envers.revision_type_field_name: REVTYPE
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  security:
+    oauth2:
+      client:
+        registration:
+          cardsync-bff:
+            provider: cardsync-as
+            client-id: ${cardsync.security.authserver.client.client-id}
+            client-secret: ${cardsync.security.authserver.client.client-secret}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+        provider:
+          cardsync-as:
+            authorization-uri: ${cardsync.security.issuer}/oauth2/authorize
+            token-uri: ${cardsync.security.issuer}/oauth2/token
+            jwk-set-uri: ${cardsync.security.issuer}/oauth2/jwks
+            user-info-uri: ${cardsync.security.issuer}/userinfo
+            user-name-attribute: sub
+
+server:
+  port: 9091
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: false # dev; em prod true
+        same-site: LAX
+
+# Swagger (será restringido no prod)
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+cardsync:
+  email:
+    impl: fake
+    from: CardSync <contato@cardsync.com.br>
+    no-reply: No Reply <noreply@cardsync.com.br>
+    sandbox:
+      to: noreply@cardsync.com.br
+  security:
+    issuer: ${CARDSYNC_ISSUER:http://localhost:9091}
+    password:
+      min-length: 8
+      history-size: 3
+      fail-if-no-expiration-data: false
+      # quais regras validar (todas opcionais e expansíveis)
+      rules:
+        digit: true
+        upper: true
+        symbol: true
+        lower: true
+        noWhitespace: true
+        common: true
+        noUsername: true
+        # regras sintéticas (server-driven)
+        match: true
+        sameAsCurrent: true
+        history: true
+        # recomendado: bloquear sequências (ex: 123 / abc)
+        noSequence: true
+        noRepetition: true
+
+      # parâmetros de regras
+      sequence-len: 3
+      max-same-in-row: 3
+      common-passwords:
+        - "123456"
+        - "123456789"
+        - "qwerty"
+        - "password"
+        - "senha123"
+      tokens:
+        # Base pública usada nos links enviados por e-mail (opcional)
+        public-base-url: ${CARDSYNC_PUBLIC_BASE_URL:http://localhost:9091}
+        # convite / primeira senha (default 1 dia)
+        invite-ttl: ${CARDSYNC_INVITE_TTL:PT24H}
+        # reset de senha (default 15 min)
+        reset-ttl: ${CARDSYNC_RESET_TTL:PT15M}
+        rate-limit:
+          enabled: true
+          max-requests: 3
+          window: 15m
+
+      expiration:
+        enabled: true
+        warn-days: 5
+        expire-days: 10
+
+    login:
+      default-target: "http://localhost:4200/"
+
+    cookies:
+      domain: ${CARDSYNC_COOKIE_DOMAIN:}
+      secure: ${CARDSYNC_COOKIE_SECURE:false}
+      same-site: ${CARDSYNC_COOKIE_SAMESITE:Lax}
+
+    lockout:
+      enabled: true
+      extend-when-locked: false
+      # Patamares progressivos (OBRIGATÓRIO)
+      rules:
+        - attempts: 5
+          duration: PT1M
+        - attempts: 10
+          duration: PT2M
+        - attempts: 15
+          duration: PT3M
+        - attempts: 20
+          duration: PT2H
+
+    auth-server:
+      dev-generate-key: false
+      keystore:
+        location: classpath:keystore/cardsync-dev.jks
+        password: changeit
+        key-alias: cardsync
+        key-password: changeit
+
+      client:
+        client-id: cardsync-bff
+        client-secret: ${CARDSYNC_BFF_CLIENT_SECRET:changeit-dev}
+        # Redirect URIs OFICIAIS
+        redirect-uri-dev: http://localhost:9091/login/oauth2/code/cardsync-bff
+        redirect-uri-prod: https://api.cardsync.com.br/login/oauth2/code/cardsync-bff
+        post-logout-redirect-uris:
+          - http://localhost:4200/
+          - https://cardsync.com.br/
+        scopes:
+          - openid
+          - profile
+    resource-server:
+      enable: true
+      audience: cardsync-api
+    web:
+      spa-base-url: "http://localhost:4200"
+      allowed-origins:
+        - "http://localhost:4200"
+
+    protected-usernames:
+      - owner
+      - system
+
+#logging:
+  #level:
+    #org.springframework.boot.autoconfigure.session: DEBUG
+    #org.springframework.session: DEBUG
+    #org.springframework.web: DEBUG
+    #org.springframework.data: DEBUG
+    #org.springframework.security: DEBUG
+    #org.springframework.data.jpa.repository.query: DEBUG
+
+

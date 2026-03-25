@@ -1,0 +1,10 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="footer">
+
+  <div class="auth-footer">
+    <span>
+      © <span th:text="${#temporals.format(#temporals.createNow(), 'yyyy')}">2026</span>
+      <span th:text="#{footer.rights}">CardSync • Todos os direitos reservados</span>
+    </span>
+  </div>
+
+</th:block>

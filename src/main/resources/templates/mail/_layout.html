@@ -1,0 +1,154 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale}">
+<body th:fragment="layout(title, actionUrl, actionText, validityText, footerNote)"
+      style="margin:0;padding:0;background:#08111f;font-family:Arial,Helvetica,sans-serif;color:#e5eefc;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+       style="width:100%;background:radial-gradient(circle at top, #152238 0%, #0b1220 38%, #060b14 100%);padding:32px 12px;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+             style="max-width:700px;background:rgba(15,23,42,0.96);border:1px solid rgba(148,163,184,0.16);border-radius:26px;overflow:hidden;box-shadow:0 22px 70px rgba(0,0,0,0.50);">
+
+        <tr>
+          <td style="padding:30px 34px 22px 34px;background:radial-gradient(circle at top right, rgba(59,130,246,0.30), transparent 34%),radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 30%),linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.92));border-bottom:1px solid rgba(148,163,184,0.12);">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+              <tr>
+                <td align="left" valign="middle">
+                  <table role="presentation" cellspacing="0" cellpadding="0">
+                    <tr>
+                      <td valign="middle" style="padding-right:14px;">
+                        <img th:if="${logoCid != null and !#strings.isEmpty(logoCid)}"
+                             th:src="${logoCid}"
+                             alt="CardSync"
+                             style="display:block;max-height:44px;max-width:160px;border:0;outline:none;text-decoration:none;" />
+                        <div th:if="${logoCid == null or #strings.isEmpty(logoCid)}"
+                             style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#2563eb,#38bdf8);color:#ffffff;font-size:18px;font-weight:700;line-height:46px;text-align:center;box-shadow:0 8px 24px rgba(37,99,235,0.35);">
+                          CS
+                        </div>
+                      </td>
+
+                      <td valign="middle">
+                        <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.1;">
+                          CardSync
+                        </div>
+                        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd;margin-top:4px;"
+                             th:text="#{mail.layout.brandSubtitle}">
+                          Conciliação simplificada
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+
+                <td align="right" valign="middle">
+                  <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:rgba(37,99,235,0.14);border:1px solid rgba(96,165,250,0.22);color:#bfdbfe;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;"
+                       th:text="#{mail.layout.securityBadge}">
+                    Segurança de conta
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            <h1 style="margin:26px 0 8px 0;font-size:30px;line-height:1.15;font-weight:700;color:#ffffff;"
+                th:text="${title}">
+              Título
+            </h1>
+
+            <p style="margin:0;font-size:14px;line-height:1.7;color:#94a3b8;"
+               th:text="#{mail.layout.heroSubtitle}">
+              Seu acesso ao CardSync com mais segurança, clareza e confiança.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:34px 34px 18px 34px;">
+            <p style="margin:0 0 18px 0;font-size:16px;line-height:1.8;color:#e2e8f0;">
+              <span th:text="#{mail.layout.greetingPrefix}">Olá,</span>
+              <strong style="color:#ffffff;" th:text="${name}">Usuário</strong>!
+            </p>
+
+            <th:block th:replace="~{::content}"></th:block>
+
+            <table role="presentation" cellspacing="0" cellpadding="0"
+                   style="margin:30px auto 24px auto;">
+              <tr>
+                <td align="center" style="border-radius:18px;">
+                  <a th:href="${actionUrl}"
+                     style="display:inline-block;padding:16px 32px;border-radius:18px;background:linear-gradient(135deg,#2563eb,#38bdf8);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;box-shadow:0 12px 28px rgba(37,99,235,0.35);"
+                     th:text="${actionText}">
+                    Ação
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <div style="margin:0 0 22px 0;padding:16px 18px;border-radius:16px;background:rgba(37,99,235,0.10);border:1px solid rgba(96,165,250,0.22);">
+              <div style="margin:0 0 8px 0;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;"
+                   th:text="#{mail.layout.importantTitle}">
+                Importante
+              </div>
+
+              <div style="margin:0;font-size:14px;line-height:1.7;color:#dbeafe;">
+                <span th:text="#{mail.layout.validityPrefix}">Este link é válido por</span>
+                <strong style="color:#ffffff;" th:text="${validityText}">algum tempo</strong>.
+              </div>
+            </div>
+
+            <div style="margin:0 0 12px 0;font-size:13px;line-height:1.7;color:#94a3b8;"
+                 th:text="#{mail.layout.copyLinkHint}">
+              Caso o botão não funcione, copie e cole este link no navegador:
+            </div>
+
+            <div style="margin:0 0 26px 0;padding:14px 16px;border-radius:14px;background:rgba(2,6,23,0.55);border:1px solid rgba(148,163,184,0.14);word-break:break-word;">
+              <a th:href="${actionUrl}"
+                 style="color:#60a5fa;text-decoration:none;font-size:13px;line-height:1.7;"
+                 th:text="${actionUrl}">
+                Link
+              </a>
+            </div>
+
+            <div style="padding-top:18px;border-top:1px solid rgba(148,163,184,0.14);font-size:13px;line-height:1.8;color:#94a3b8;"
+                 th:text="${footerNote}">
+              Rodapé
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:0 34px 30px 34px;background:rgba(2,6,23,0.32);">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+                   style="border-top:1px solid rgba(148,163,184,0.10);padding-top:20px;">
+              <tr>
+                <td align="left" valign="top" style="padding-right:12px;">
+                  <div style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:6px;">
+                    CardSync
+                  </div>
+                  <div style="font-size:12px;line-height:1.7;color:#64748b;"
+                       th:text="#{mail.layout.footerLeft}">
+                    Plataforma segura para conciliação financeira, gestão de acesso e operações com mais controle.
+                  </div>
+                </td>
+
+                <td align="right" valign="top" style="padding-left:12px;">
+                  <div style="font-size:12px;line-height:1.8;color:#64748b;text-align:right;">
+                    <span th:text="#{mail.layout.automatic}">Este é um e-mail automático.</span><br>
+                    <span th:text="#{mail.layout.doNotReply}">Não responda esta mensagem.</span>
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            <div style="margin-top:18px;text-align:center;font-size:11px;line-height:1.7;color:#475569;"
+                 th:text="#{mail.layout.copyright}">
+              © CardSync · Todos os direitos reservados
+            </div>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

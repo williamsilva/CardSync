@@ -1,0 +1,15 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="head(title)">
+
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <title th:text="${title}">CardSync</title>
+
+  <!-- CSRF metas -->
+  <meta name="_csrf" th:content="${_csrf != null ? _csrf.token : ''}"/>
+  <meta name="_csrf_header" th:content="${_csrf != null ? _csrf.headerName : ''}"/>
+  <meta name="_csrf_param" th:content="${_csrf != null ? _csrf.parameterName : ''}"/>
+
+  <link rel="stylesheet" th:href="@{/css/auth.css}"/>
+
+</th:block>
