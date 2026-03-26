@@ -158,7 +158,7 @@ cardsync:
     auth-server:
       dev-generate-key: false
       keystore:
-        location: classpath:keystore/cardsync-dev.jks
+        location: classpath:keystore/cardsync.jks
         password: changeit
         key-alias: cardsync
         key-password: changeit

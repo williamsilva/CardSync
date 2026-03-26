@@ -160,7 +160,7 @@ cardsync:
     auth-server:
       dev-generate-key: false
       keystore:
-        location: ${CARDSYNC_AUTH_KEYSTORE_LOCATION:}
+        location: classpath:keystore/cardsync.jks
         password: ${CARDSYNC_AUTH_KEYSTORE_PASSWORD:}
         key-alias: ${CARDSYNC_AUTH_KEYSTORE_ALIAS:}
         key-password: ${CARDSYNC_AUTH_KEYSTORE_KEY_PASSWORD:}
