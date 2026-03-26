@@ -385,7 +385,10 @@ public class SecurityConfig implements EnvironmentAware {
         "/password/set/**",
         "/password/expired",
         "/.well-known/**",
-        "/assets/**", "/css/**", "/js/**", "/images/**", "/webjars/**"
+        "/assets/**", "/css/**", "/js/**", "/images/**", "/webjars/**",
+        "/actuator/health",
+        "/actuator/health/**",
+        "/actuator/info"
       ).permitAll()
       .requestMatchers(HttpMethod.POST, "/login/password/status").permitAll()
       .anyRequest().authenticated()

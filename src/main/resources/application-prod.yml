@@ -89,7 +89,15 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: never
+      access: unrestricted
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    mail:
+      enabled: false
+    defaults:
+      enabled: true
 
 cardsync:
   email:
