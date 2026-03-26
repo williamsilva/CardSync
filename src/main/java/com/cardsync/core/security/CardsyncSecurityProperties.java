@@ -23,6 +23,9 @@ public class CardsyncSecurityProperties {
   private String issuer;
 
   @NotNull
+  private Cookies cookies;
+
+  @NotNull
   private Password password;
 
   @NotNull
@@ -172,6 +175,13 @@ public class CardsyncSecurityProperties {
     @NotNull
     private Tokens tokens = new Tokens();
 
+  }
+
+  @Data
+  public static class Cookies {
+    private String domain;
+    private boolean secure;
+    private String sameSite;
   }
 
 }

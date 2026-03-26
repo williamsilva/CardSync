@@ -22,8 +22,7 @@ public class AuthServerProperties {
   @Data
   public static class Client {
     private String clientId;
+    private String redirectUri;
     private String clientSecret;
-    private String redirectUriDev;
-    private String redirectUriProd;
   }
 }

@@ -176,10 +176,9 @@ cardsync:
       client:
         client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
         client-secret: ${CARDSYNC_BFF_CLIENT_SECRET}
-        redirect-uri-dev: ${CARDSYNC_BFF_REDIRECT_URI_DEV:http://localhost:9091/login/oauth2/code/cardsync-bff}
-        redirect-uri-prod: ${CARDSYNC_BFF_REDIRECT_URI_PROD:https://api.cardsync.com.br/login/oauth2/code/cardsync-bff}
+        redirect-uri: ${CARDSYNC_BFF_REDIRECT_URI:https://api.cardsync.com.br/login/oauth2/code/cardsync-bff}
         post-logout-redirect-uris:
-          - ${CARDSYNC_POST_LOGOUT_REDIRECT_URI_1:https://cardsync.com.br/}
+          - ${CARDSYNC_POST_LOGOUT_REDIRECT_URI:https://cardsync.com.br/}
         scopes:
           - openid
           - profile
@@ -191,7 +190,7 @@ cardsync:
     web:
       spa-base-url: ${CARDSYNC_SPA_BASE_URL:https://cardsync.com.br}
       allowed-origins:
-        - ${CARDSYNC_ALLOWED_ORIGIN_1:https://cardsync.com.br}
+        - ${CARDSYNC_ALLOWED_ORIGIN:https://cardsync.com.br}
 
     protected-usernames:
       - owner

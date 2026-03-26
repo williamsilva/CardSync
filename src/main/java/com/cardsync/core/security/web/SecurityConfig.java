@@ -423,6 +423,13 @@ public class SecurityConfig implements EnvironmentAware {
     repo.setCookieName("XSRF-TOKEN");
     repo.setHeaderName("X-XSRF-TOKEN");
     repo.setCookiePath("/");
+
+    repo.setCookieCustomizer(cookie -> {
+      cookie.domain(props.getCookies().getDomain());
+      cookie.secure(props.getCookies().isSecure());
+      cookie.sameSite(props.getCookies().getSameSite());
+    });
+
     return repo;
   }
 

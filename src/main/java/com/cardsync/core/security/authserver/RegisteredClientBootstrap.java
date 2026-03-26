@@ -38,8 +38,7 @@ public class RegisteredClientBootstrap {
       String secret = props.getAuthserver().getClient().getClientSecret();
 
       // Redirect URIs fixos e exatos (DEV/PROD)
-      String redirectDev = props.getAuthserver().getClient().getRedirectUriDev();
-      String redirectProd = props.getAuthserver().getClient().getRedirectUriProd();
+      String redirect = props.getAuthserver().getClient().getRedirectUri();
 
       TokenSettings tokenSettings = TokenSettings.builder()
         .accessTokenTimeToLive(Duration.ofMinutes(10))
@@ -58,8 +57,7 @@ public class RegisteredClientBootstrap {
         .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
         .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
         .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-        .redirectUri(redirectDev)
-        .redirectUri(redirectProd)
+        .redirectUri(redirect)
         .scope(OidcScopes.OPENID)
         .scope(OidcScopes.PROFILE)
         .tokenSettings(tokenSettings)

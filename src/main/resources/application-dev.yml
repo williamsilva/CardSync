@@ -165,13 +165,11 @@ cardsync:
 
       client:
         client-id: cardsync-bff
-        client-secret: ${CARDSYNC_BFF_CLIENT_SECRET:changeit-dev}
+        client-secret: changeit-dev
         # Redirect URIs OFICIAIS
-        redirect-uri-dev: http://localhost:9091/login/oauth2/code/cardsync-bff
-        redirect-uri-prod: https://api.cardsync.com.br/login/oauth2/code/cardsync-bff
+        redirect-uri: https://api.cardsync.com.br/login/oauth2/code/cardsync-bff
         post-logout-redirect-uris:
           - http://localhost:4200/
-          - https://cardsync.com.br/
         scopes:
           - openid
           - profile
