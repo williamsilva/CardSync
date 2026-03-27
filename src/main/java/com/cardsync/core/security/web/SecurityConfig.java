@@ -425,7 +425,10 @@ public class SecurityConfig implements EnvironmentAware {
     repo.setCookiePath("/");
 
     repo.setCookieCustomizer(cookie -> {
-      cookie.domain(props.getCookies().getDomain());
+      String domain = props.getCookies().getDomain();
+      if (domain != null && !domain.isBlank()) {
+        cookie.domain(domain);
+      }
       cookie.secure(props.getCookies().isSecure());
       cookie.sameSite(props.getCookies().getSameSite());
     });

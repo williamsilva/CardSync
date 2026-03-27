@@ -84,6 +84,7 @@ cardsync:
     no-reply: No Reply <noreply@cardsync.com.br>
     sandbox:
       to: noreply@cardsync.com.br
+
   security:
     issuer: ${CARDSYNC_ISSUER:http://localhost:9091}
     password:
@@ -173,9 +174,12 @@ cardsync:
         scopes:
           - openid
           - profile
+
+
     resource-server:
       enable: true
       audience: cardsync-api
+
     web:
       spa-base-url: "http://localhost:4200"
       allowed-origins:

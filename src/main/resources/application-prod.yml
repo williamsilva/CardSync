@@ -6,9 +6,9 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${SPRING_DATASOURCE_URL:${DB_URL}}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USER}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD}}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
 
   jpa:
     hibernate:
@@ -50,10 +50,10 @@ spring:
             user-name-attribute: sub
 
   mail:
-    host: ${MAIL_HOST:}
+    host: ${MAIL_HOST}
     port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
@@ -101,9 +101,9 @@ management:
 
 cardsync:
   email:
-    impl: ${CARDSYNC_EMAIL_IMPL:smtp}
-    from: ${CARDSYNC_EMAIL_FROM:CardSync <contato@cardsync.com.br>}
-    no-reply: ${CARDSYNC_EMAIL_NO_REPLY:No Reply <noreply@cardsync.com.br>}
+    impl: ${CARDSYNC_EMAIL_IMPL}
+    from: ${CARDSYNC_EMAIL_FROM}
+    no-reply: ${CARDSYNC_EMAIL_NO_REPLY}
 
   security:
     issuer: ${CARDSYNC_ISSUER}
@@ -148,7 +148,7 @@ cardsync:
       default-target: ${CARDSYNC_LOGIN_DEFAULT_TARGET:https://cardsync.com.br/}
 
     cookies:
-      domain: ${CARDSYNC_COOKIE_DOMAIN:}
+      domain: ${CARDSYNC_COOKIE_DOMAIN}
       secure: ${CARDSYNC_COOKIE_SECURE:true}
       same-site: ${CARDSYNC_COOKIE_SAMESITE:Lax}
 
