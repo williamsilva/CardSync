@@ -58,11 +58,14 @@ spring:
       mail:
         debug: ${MAIL_DEBUG:false}
         smtp:
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT}
+          timeout: ${MAIL_SMTP_TIMEOUT}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT}
           auth: ${MAIL_SMTP_AUTH:true}
           starttls:
-            enable: ${MAIL_SMTP_STARTTLS:false}
+            enable: ${MAIL_SMTP_STARTTLS}
           ssl:
-            enable: ${MAIL_SMTP_SSL:true}
+            enable: ${MAIL_SMTP_SSL}
 
 server:
   ssl:
