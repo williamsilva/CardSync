@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PasswordTokenService extends CsDefaultSecurityMethod {
 
   private static final String INLINE_LOGO_CID = "cardsync-logo";
-  private static final String INLINE_LOGO_PATH = "static/assets/cardsync-logo-mail.png";
+  private static final String INLINE_LOGO_PATH = "static/assets/cardsync-logo.png";
   private static final String INLINE_LOGO_CONTENT_TYPE = "image/png";
 
   private final Clock clock;
