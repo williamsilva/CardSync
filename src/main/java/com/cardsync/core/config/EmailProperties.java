@@ -13,19 +13,21 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties("cardsync.email")
 public class EmailProperties {
 
-  private String from;
-  private String noReply;
+  private String fromName;
+  private String fromEmail;
 
   private Impl impl = Impl.FAKE;
-  private Sandbox sandbox = new Sandbox();
-
-  public enum Impl {
-    SMTP, FAKE, SANDBOX
-  }
+  private final Brevo brevo = new Brevo();
 
   @Getter
   @Setter
-  public class Sandbox {
-    private String to;
+  public static class Brevo {
+    private String apiKey;
+    private String baseUrl;
   }
+
+  public enum Impl {
+    SMTP, FAKE, BREVO
+  }
+
 }

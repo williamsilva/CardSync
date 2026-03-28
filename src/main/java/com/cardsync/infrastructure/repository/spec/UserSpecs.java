@@ -3,6 +3,7 @@ package com.cardsync.infrastructure.repository.spec;
 import com.cardsync.domain.filter.UsersFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.UserAllowedFields;
+import com.cardsync.domain.model.GroupEntity;
 import com.cardsync.domain.model.UserEntity;
 import com.cardsync.domain.model.enums.StatusUserEnum;
 import java.time.OffsetDateTime;
@@ -11,6 +12,7 @@ import java.util.Objects;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
+import jakarta.persistence.criteria.CriteriaQuery;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -66,8 +68,21 @@ public class UserSpecs {
           .or(textContains("document", gf))
       );
     }
-
+    spec = spec.and(orderByName());
     return spec;
+  }
+
+  private Specification<UserEntity> orderByName() {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        query.orderBy(cb.asc(root.get("name")));
+      }
+      return cb.conjunction();
+    };
+  }
+
+  private boolean isCountQuery(CriteriaQuery<?> query) {
+    return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 
   private Specification<UserEntity> textContains(String field, String value) {

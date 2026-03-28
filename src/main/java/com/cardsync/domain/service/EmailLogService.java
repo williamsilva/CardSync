@@ -16,6 +16,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -46,7 +47,7 @@ public class EmailLogService {
     repository.save(e);
   }
 
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void logError( EmailLogEventTypeEnum eventType, String recipient, String subject,
     String template, UserEntity requestedBy, Exception ex) {
     EmailLogEntity e = new EmailLogEntity();

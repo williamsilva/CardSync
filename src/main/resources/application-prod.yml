@@ -102,8 +102,11 @@ management:
 cardsync:
   email:
     impl: ${CARDSYNC_EMAIL_IMPL}
-    from: ${CARDSYNC_EMAIL_FROM}
-    no-reply: ${CARDSYNC_EMAIL_NO_REPLY}
+    from-name: ${CARDSYNC_EMAIL_FROM_NAME}
+    from-email: ${CARDSYNC_EMAIL_FROM_EMAIL}
+    brevo:
+      base-url: ${BREVO_BASE_URL}
+      api-key: ${BREVO_API_KEY}
 
   security:
     issuer: ${CARDSYNC_ISSUER}

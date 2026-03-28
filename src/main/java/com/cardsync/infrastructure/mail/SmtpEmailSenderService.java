@@ -143,7 +143,7 @@ public class SmtpEmailSenderService implements EmailSenderService {
 
     helper.setText(body, true);
     helper.setSubject(message.getSubject());
-    helper.setFrom(emailProperties.getFrom());
+    helper.setFrom(emailProperties.getFromEmail());
     helper.setTo(message.getRecipients().toArray(new String[0]));
 
     if (message.getReplyTo() != null && !message.getReplyTo().isBlank()) {

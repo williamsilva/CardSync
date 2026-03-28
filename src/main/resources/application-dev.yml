@@ -79,11 +79,12 @@ management:
 
 cardsync:
   email:
-    impl: fake
-    from: CardSync <contato@cardsync.com.br>
-    no-reply: No Reply <noreply@cardsync.com.br>
-    sandbox:
-      to: noreply@cardsync.com.br
+    impl: brevo
+    from-name: CardSync
+    from-email: contato@cardsync.com.br
+    brevo:
+      base-url: ${BREVO_BASE_URL:https://api.brevo.com/v3}
+      api-key: ${BREVO_API_KEY:}
 
   security:
     issuer: ${CARDSYNC_ISSUER:http://localhost:9091}

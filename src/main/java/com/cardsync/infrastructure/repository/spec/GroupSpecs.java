@@ -7,6 +7,7 @@ import com.cardsync.domain.model.GroupEntity;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
+import jakarta.persistence.criteria.CriteriaQuery;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -52,8 +53,21 @@ public class GroupSpecs {
           .or(textContains("description", gf))
       );
     }
-
+    spec = spec.and(orderByName());
     return spec;
+  }
+
+  private Specification<GroupEntity> orderByName() {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        query.orderBy(cb.asc(root.get("name")));
+      }
+      return cb.conjunction();
+    };
+  }
+
+  private boolean isCountQuery(CriteriaQuery<?> query) {
+    return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 
   private Specification<GroupEntity> excludeSupportGroup() {

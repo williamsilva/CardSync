@@ -9,10 +9,9 @@ import com.cardsync.domain.model.enums.EmailLogStatusEnum;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
-
+import jakarta.persistence.criteria.CriteriaQuery;
 import java.time.OffsetDateTime;
 import java.util.Objects;
-
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +34,7 @@ public class EmailLogSpecs {
       )
     );
 
-    if (query.advanced()!=null) {
+    if (query.advanced() != null) {
       var a = query.advanced();
 
       spec = spec.and(textContains("subject", a.getSubject()));
@@ -64,8 +63,9 @@ public class EmailLogSpecs {
         }
       }
 
-      spec = spec.and(rangeOdt("sentAt", a.getSentAtFrom(), a.getSentAtTo()));
+      spec = spec.and(rangeOdt(a.getSentAtFrom(), a.getSentAtTo()));
     }
+    spec = spec.and(orderByCreatedAt());
 
     return spec;
   }
@@ -81,7 +81,7 @@ public class EmailLogSpecs {
       cb.like(cb.lower(root.get(field)), "%" + v + "%");
   }
 
-  private Specification<EmailLogEntity> rangeOdt(String field, String fromIso, String toIso) {
+  private Specification<EmailLogEntity> rangeOdt(String fromIso, String toIso) {
     OffsetDateTime from = (fromIso == null || fromIso.isBlank())
       ? null
       : dateFilterService.startOfBusinessDay(fromIso);
@@ -95,7 +95,7 @@ public class EmailLogSpecs {
     }
 
     return (root, query, cb) -> {
-      var p = root.get(field).as(OffsetDateTime.class);
+      var p = root.get("sentAt").as(OffsetDateTime.class);
 
       if (from != null && to != null) {
         return cb.between(p, from, to);
@@ -107,5 +107,18 @@ public class EmailLogSpecs {
 
       return cb.lessThanOrEqualTo(p, to);
     };
+  }
+
+  private Specification<EmailLogEntity> orderByCreatedAt() {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        query.orderBy(cb.desc(root.get("createdAt")));
+      }
+      return cb.conjunction();
+    };
+  }
+
+  private boolean isCountQuery(CriteriaQuery<?> query) {
+    return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 }
