@@ -5,16 +5,15 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+
+import lombok.*;
 import org.hibernate.envers.Audited;
 
 @Getter
 @Setter
 @Entity
 @Audited
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "cs_users")

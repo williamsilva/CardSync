@@ -1,7 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.mapper.model.UserModelAssembler;
-import com.cardsync.bff.controller.v1.representation.input.UserIdsInput;
+import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
 import com.cardsync.bff.controller.v1.representation.input.UserInput;
 import com.cardsync.bff.controller.v1.representation.model.UserModel;
 import com.cardsync.bff.controller.v1.representation.model.UserOptionModel;
@@ -87,14 +87,14 @@ public class UserController {
   @PostMapping("/activate")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @CheckSecurity.Security.Users.CanActiveOrInactiveUser
-  public void activateBulk(@Valid @RequestBody UserIdsInput body) {
+  public void activateBulk(@Valid @RequestBody ListIdsInput body) {
     service.activateBulk(body.ids());
   }
 
   @PostMapping("/deactivate")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @CheckSecurity.Security.Users.CanActiveOrInactiveUser
-  public void deactivateBulk(@Valid @RequestBody UserIdsInput body, Authentication authentication) {
+  public void deactivateBulk(@Valid @RequestBody ListIdsInput body, Authentication authentication) {
     service.deactivateBulk(body.ids(), authentication);
   }
 

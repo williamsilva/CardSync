@@ -45,6 +45,19 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_USERS_RESEND_INVITE);
   }
 
+  public boolean canUpdatePermissions() {
+    return hasAllWriteScope() && hasAuthority(PERM_GROUPS_MANAGEMENT_PERMISSION);
+  }
+
+  public boolean canUpdateUsers() {
+    return hasAllWriteScope() && hasAuthority(PERM_GROUPS_MANAGEMENT_USER);
+  }
+
+  public boolean canConsultAuditMail() {
+    return hasAllReadScope() && hasAuthority(PERM_AUDIT_MAIL_CONSULT);
+  }
+
+  /* Groups */
   public boolean canConsultGroups() {
     return hasAllReadScope() && hasAuthority(PERM_GROUPS_CONSULT);
   }
@@ -61,15 +74,24 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_GROUPS_DELETE);
   }
 
-  public boolean canUpdatePermissions() {
-    return hasAllWriteScope() && hasAuthority(PERM_GROUPS_MANAGEMENT_PERMISSION);
+  /* Companies */
+  public boolean canConsultCompanies() {
+    return hasAllReadScope() && hasAuthority(PERM_COMPANIES_CONSULT);
   }
 
-  public boolean canUpdateUsers() {
-    return hasAllWriteScope() && hasAuthority(PERM_GROUPS_MANAGEMENT_USER);
+  public boolean canCreateCompanies() {
+    return hasAllWriteScope() && hasAuthority(PERM_COMPANIES_CREATE);
   }
 
-  public boolean canConsultAuditMail() {
-    return hasAllReadScope() && hasAuthority(PERM_AUDIT_MAIL_CONSULT);
+  public boolean canChangeCompanies() {
+    return hasAllWriteScope() && hasAuthority(PERM_COMPANIES_CHANGE);
+  }
+
+  public boolean canDeleteCompanies() {
+    return hasAllWriteScope() && hasAuthority(PERM_COMPANIES_DELETE);
+  }
+
+  public boolean canActiveOrInactiveCompanies() {
+    return hasAllWriteScope() && hasAuthority(PERM_USERS_ACTIVE_OR_INACTIVE);
   }
 }

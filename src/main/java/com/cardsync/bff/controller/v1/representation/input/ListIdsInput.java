@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 
-public record UserIdsInput(
+public record ListIdsInput(
   @NotNull
   @NotEmpty
   List<UUID> ids

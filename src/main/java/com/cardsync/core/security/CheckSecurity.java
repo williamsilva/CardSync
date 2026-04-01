@@ -84,7 +84,35 @@ public @interface CheckSecurity {
       @PreAuthorize("@csSecurity.canUpdateUsers()")
       @interface CanUpdateUsers {}
     }
+
   }
+
+  @interface Companies {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultCompanies()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canCreateCompanies()")
+      @interface CanCreate {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canChangeCompanies()")
+      @interface CanChange {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canDeleteCompanies()")
+      @interface CanDelete {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveCompanies()")
+      @interface CanActiveOrInactive {}
+    }
 
   @interface Audit {
 

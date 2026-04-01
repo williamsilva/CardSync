@@ -12,7 +12,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     properties:
       hibernate:
         jdbc:
@@ -79,7 +79,7 @@ management:
 
 cardsync:
   email:
-    impl: brevo
+    impl: fake
     from-name: CardSync
     from-email: contato@cardsync.com.br
     brevo:

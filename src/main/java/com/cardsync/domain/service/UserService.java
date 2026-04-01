@@ -69,6 +69,7 @@ public class UserService {
 
     List<UserEntity> ordered = page.getContent().stream()
       .map(u -> detailedById.getOrDefault(u.getId(), u))
+      .filter(u -> !normalize(u.getUserName()).equals(normalize(SUPPORT_USER_NAME)))
       .toList();
 
     return new PageImpl<>(ordered, pageable, page.getTotalElements());
