@@ -192,11 +192,11 @@ cardsync:
 
 #logging:
   #level:
-    #org.springframework.boot.autoconfigure.session: DEBUG
-    #org.springframework.session: DEBUG
+    #org.hibernate.SQL: DEBUG
     #org.springframework.web: DEBUG
     #org.springframework.data: DEBUG
+    #org.hibernate.orm.jdbc.bind: TRACE
+    #org.springframework.session: DEBUG
     #org.springframework.security: DEBUG
     #org.springframework.data.jpa.repository.query: DEBUG
-
-
+    #org.springframework.boot.autoconfigure.session: DEBUG

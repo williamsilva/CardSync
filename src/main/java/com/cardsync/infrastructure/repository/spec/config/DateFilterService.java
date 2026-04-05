@@ -1,13 +1,14 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
 import com.cardsync.core.config.CardsyncAppProperties;
+import org.springframework.stereotype.Component;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
-import org.springframework.stereotype.Component;
 
 @Component
 public class DateFilterService {
@@ -18,7 +19,7 @@ public class DateFilterService {
     this.businessZone = props.getBusinessZone();
   }
 
-  public OffsetDateTime parseFlexible(String raw) {
+  public OffsetDateTime parseFlexibleToOffsetDateTime(String raw) {
     if (raw == null || raw.isBlank()) {
       return null;
     }
@@ -41,16 +42,6 @@ public class DateFilterService {
     } catch (DateTimeParseException ignored) {
       return null;
     }
-  }
-
-  public OffsetDateTime startOfBusinessDay(String raw) {
-    OffsetDateTime parsed = parseFlexible(raw);
-    return parsed == null ? null : startOfBusinessDay(parsed);
-  }
-
-  public OffsetDateTime endOfBusinessDay(String raw) {
-    OffsetDateTime parsed = parseFlexible(raw);
-    return parsed == null ? null : endOfBusinessDay(parsed);
   }
 
   public OffsetDateTime startOfBusinessDay(OffsetDateTime value) {
@@ -77,5 +68,9 @@ public class DateFilterService {
       .atStartOfDay(businessZone)
       .minusNanos(1)
       .toOffsetDateTime();
+  }
+
+  public ZoneId businessZone() {
+    return businessZone;
   }
 }

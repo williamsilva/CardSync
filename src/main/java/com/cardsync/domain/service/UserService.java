@@ -76,6 +76,15 @@ public class UserService {
   }
 
   @Transactional(readOnly = true)
+  public List<UserOptionModel> listOptionsFilter() {
+    return usersRepository
+      .findAll(Sort.by(Sort.Direction.ASC, "name", "userName"))
+      .stream()
+      .map(u -> new UserOptionModel(u.getId(), u.getName(), u.getUserName()))
+      .toList();
+  }
+
+  @Transactional(readOnly = true)
   public List<UserOptionModel> listOptions() {
     return usersRepository
       .findAllByUserNameNotIgnoreCase(SUPPORT_USER_NAME, Sort.by(Sort.Direction.ASC, "name", "userName"))

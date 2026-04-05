@@ -4,24 +4,31 @@ import com.cardsync.domain.filter.GroupsFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.GroupAllowedFields;
 import com.cardsync.domain.model.GroupEntity;
+import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
-import jakarta.persistence.criteria.CriteriaQuery;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
-import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Component
-public class GroupSpecs {
+public class GroupSpecs extends BaseSpecificationSupport<GroupEntity> {
 
   private static final String EXCLUDED_GROUP_NAME = "SUPPORT";
 
-  private final DateFilterService dateFilterService;
+  private final GroupAllowedFields groupAllowedFields;
+  private final SpecificationFactory specificationFactory;
 
-  public GroupSpecs(DateFilterService dateFilterService) {
-    this.dateFilterService = dateFilterService;
+  public GroupSpecs(
+    DateFilterService dateFilterService,
+    GroupAllowedFields groupAllowedFields,
+    SpecificationFactory specificationFactory
+    ) {
+    super(dateFilterService);
+    this.groupAllowedFields = groupAllowedFields;
+    this.specificationFactory = specificationFactory;
   }
 
   public Specification<GroupEntity> fromQuery(ListQueryDto<GroupsFilter> query) {
@@ -30,87 +37,45 @@ public class GroupSpecs {
     spec = spec.and(excludeSupportGroup());
 
     spec = spec.and(
-      SpecificationFactory.fromTableFilters(
+      specificationFactory.fromTableFilters(
         query.tableFilters(),
-        GroupAllowedFields.table()
+        groupAllowedFields.table()
       )
     );
 
     if (query.advanced() != null) {
       var a = query.advanced();
 
-      spec = spec.and(textContains("name", a.name()));
-      spec = spec.and(textContains("description", a.description()));
-
+      spec = spec.and(contains("name", a.name()));
+      spec = spec.and(contains("description", a.description()));
       spec = spec.and(rangeOdt("createdAt", a.createdAtFrom(), a.createdAtTo()));
-    }
-
-    if (query.globalFilter() != null && !query.globalFilter().trim().isEmpty()) {
-      String gf = query.globalFilter().trim();
 
       spec = spec.and(
-        textContains("name", gf)
-          .or(textContains("description", gf))
+        inPath(a.createdBy(), value -> {
+          try {
+            return UUID.fromString(value);
+          } catch (Exception e) {
+            return null;
+          }
+        }, "createdBy", "id")
       );
     }
-    spec = spec.and(orderByName());
+
+    if (!isBlank(query.globalFilter())) {
+      String gf = query.globalFilter();
+
+      spec = spec.and(
+        anyOf(
+          contains("name", gf)
+        )
+      );
+    }
+    spec = spec.and(orderByAsc("name"));
     return spec;
-  }
-
-  private Specification<GroupEntity> orderByName() {
-    return (root, query, cb) -> {
-      if (!isCountQuery(query)) {
-        query.orderBy(cb.asc(root.get("name")));
-      }
-      return cb.conjunction();
-    };
-  }
-
-  private boolean isCountQuery(CriteriaQuery<?> query) {
-    return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 
   private Specification<GroupEntity> excludeSupportGroup() {
     return (root, query, cb) ->
       cb.notEqual(cb.lower(root.get("name")), EXCLUDED_GROUP_NAME.toLowerCase());
-  }
-
-  private Specification<GroupEntity> textContains(String field, String value) {
-    if (value == null || value.trim().isEmpty()) {
-      return Specs.all();
-    }
-
-    String v = value.trim().toLowerCase();
-
-    return (root, query, cb) ->
-      cb.like(cb.lower(root.get(field)), "%" + v + "%");
-  }
-
-  private Specification<GroupEntity> rangeOdt(String field, String fromIso, String toIso) {
-    OffsetDateTime from = (fromIso == null || fromIso.isBlank())
-      ? null
-      : dateFilterService.startOfBusinessDay(fromIso);
-
-    OffsetDateTime to = (toIso == null || toIso.isBlank())
-      ? null
-      : dateFilterService.endOfBusinessDay(toIso);
-
-    if (from == null && to == null) {
-      return Specs.all();
-    }
-
-    return (root, query, cb) -> {
-      var p = root.get(field).as(OffsetDateTime.class);
-
-      if (from != null && to != null) {
-        return cb.between(p, from, to);
-      }
-
-      if (from != null) {
-        return cb.greaterThanOrEqualTo(p, from);
-      }
-
-      return cb.lessThanOrEqualTo(p, to);
-    };
   }
 }

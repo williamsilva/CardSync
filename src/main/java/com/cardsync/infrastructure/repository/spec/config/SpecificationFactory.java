@@ -5,17 +5,25 @@ import com.cardsync.domain.filter.query.FilterRuleDto;
 import com.cardsync.domain.filter.query.RangeValue;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Component;
+
 import java.time.OffsetDateTime;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
-import org.springframework.data.jpa.domain.Specification;
 
-public final class SpecificationFactory {
+@Slf4j
+@Component
+public class SpecificationFactory {
 
-  private SpecificationFactory() {}
+  private final DateFilterService dateFilterService;
 
-  public static <T> Specification<T> fromTableFilters(
+  public SpecificationFactory(DateFilterService dateFilterService) {
+    this.dateFilterService = dateFilterService;
+  }
+
+  public <T> Specification<T> fromTableFilters(
     Map<String, ColumnFilterDto> tableFilters,
     Map<String, FieldSpec<T, ?>> allowedFields
   ) {
@@ -40,13 +48,8 @@ public final class SpecificationFactory {
     return spec;
   }
 
-  private static <T> Specification<T> applyColumnFilter(
-    FieldSpec<T, ?> field,
-    ColumnFilterDto columnFilter
-  ) {
-    if (columnFilter == null
-      || columnFilter.constraints() == null
-      || columnFilter.constraints().isEmpty()) {
+  private <T> Specification<T> applyColumnFilter(FieldSpec<T, ?> field, ColumnFilterDto columnFilter) {
+    if (columnFilter == null || columnFilter.constraints() == null || columnFilter.constraints().isEmpty()) {
       return Specs.all();
     }
 
@@ -54,11 +57,9 @@ public final class SpecificationFactory {
       ? "and"
       : columnFilter.operator().trim().toLowerCase();
 
-    List<FilterRuleDto> rules = columnFilter.constraints();
-
     Specification<T> acc = null;
 
-    for (FilterRuleDto rule : rules) {
+    for (FilterRuleDto rule : columnFilter.constraints()) {
       Specification<T> ruleSpec = buildRule(field, rule);
 
       if (acc == null) {
@@ -73,11 +74,8 @@ public final class SpecificationFactory {
     return acc;
   }
 
-  @SuppressWarnings({ "unchecked", "rawtypes" })
-  private static <T> Specification<T> buildRule(
-    FieldSpec<T, ?> field,
-    FilterRuleDto rule
-  ) {
+  @SuppressWarnings({ "rawtypes", "unchecked" })
+  private <T> Specification<T> buildRule(FieldSpec<T, ?> field, FilterRuleDto rule) {
     String matchMode = (rule == null || rule.matchMode() == null || rule.matchMode().isBlank())
       ? "contains"
       : rule.matchMode().trim();
@@ -85,16 +83,14 @@ public final class SpecificationFactory {
     Object raw = rule == null ? null : rule.value();
 
     return (root, query, cb) -> {
-
       if (field.requiresDistinct()) {
         query.distinct(true);
       }
 
       Path path = field.path(root, query);
 
-      // between / range
-      RangeValue<?> range = Converters.toRangeOrNull(raw, field::convert);
-      if (range != null || "between".equals(matchMode)) {
+      if ("between".equals(matchMode)) {
+        RangeValue<?> range = Converters.toRangeOrNull(raw, field::convert);
         if (range == null) {
           return cb.conjunction();
         }
@@ -103,34 +99,30 @@ public final class SpecificationFactory {
         Object to = range.to();
 
         if (from instanceof OffsetDateTime fromOdt) {
-          from = DateFilterUtils.startOfBusinessDay(fromOdt);
+          from = dateFilterService.startOfBusinessDay(fromOdt);
         }
 
         if (to instanceof OffsetDateTime toOdt) {
-          to = DateFilterUtils.endOfBusinessDay(toOdt);
+          to = dateFilterService.endOfBusinessDay(toOdt);
         }
 
         if (from == null && to == null) {
           return cb.conjunction();
         }
 
-        Expression<? extends Comparable> expression = path.as(Comparable.class);
+        Expression expression = path.as(field.valueType());
 
-        Comparable fromValue = (Comparable) from;
-        Comparable toValue = (Comparable) to;
-
-        if (fromValue != null && toValue != null) {
-          return cb.between(expression, fromValue, toValue);
+        if (from != null && to != null) {
+          return cb.between(expression, (Comparable) from, (Comparable) to);
         }
 
-        if (fromValue != null) {
-          return cb.greaterThanOrEqualTo(expression, fromValue);
+        if (from != null) {
+          return cb.greaterThanOrEqualTo(expression, (Comparable) from);
         }
 
-        return cb.lessThanOrEqualTo(expression, toValue);
+        return cb.lessThanOrEqualTo(expression, (Comparable) to);
       }
 
-      // in
       if ("in".equals(matchMode)) {
         Collection<?> collection = Converters.toCollectionOrNull(raw);
         if (collection == null || collection.isEmpty()) {
@@ -138,15 +130,17 @@ public final class SpecificationFactory {
         }
 
         var inClause = cb.in(path);
+        boolean hasAnyValue = false;
 
         for (Object item : collection) {
           Object converted = field.convert(item);
           if (converted != null) {
             inClause.value(converted);
+            hasAnyValue = true;
           }
         }
 
-        return inClause;
+        return hasAnyValue ? inClause : cb.conjunction();
       }
 
       Object typed = field.convert(raw);
@@ -154,9 +148,6 @@ public final class SpecificationFactory {
         case null -> {
           return cb.conjunction();
         }
-
-
-        // string
         case String s -> {
           Expression<String> expression = cb.lower(path.as(String.class));
           String value = s.trim().toLowerCase();
@@ -172,47 +163,33 @@ public final class SpecificationFactory {
             default -> cb.like(expression, "%" + value + "%");
           };
         }
-
-
-        // OffsetDateTime
         case OffsetDateTime dt -> {
           Expression<OffsetDateTime> expression = path.as(OffsetDateTime.class);
 
           return switch (matchMode) {
-            case "dateBefore", "lt" -> cb.lessThan(expression, DateFilterUtils.startOfBusinessDay(dt));
-
-            case "dateAfter", "gt" -> cb.greaterThan(expression, DateFilterUtils.endOfBusinessDay(dt));
-
+            case "dateBefore", "lt" -> cb.lessThan(expression, dateFilterService.startOfBusinessDay(dt));
+            case "dateAfter", "gt" -> cb.greaterThan(expression, dateFilterService.endOfBusinessDay(dt));
             case "dateIs", "equals" -> {
-              OffsetDateTime start = DateFilterUtils.startOfBusinessDay(dt);
-              OffsetDateTime end = DateFilterUtils.endOfBusinessDay(dt);
-
+              OffsetDateTime start = dateFilterService.startOfBusinessDay(dt);
+              OffsetDateTime end = dateFilterService.endOfBusinessDay(dt);
               yield cb.and(
                 cb.greaterThanOrEqualTo(expression, start),
                 cb.lessThanOrEqualTo(expression, end)
               );
             }
-
             case "dateIsNot", "notEquals" -> {
-              OffsetDateTime start = DateFilterUtils.startOfBusinessDay(dt);
-              OffsetDateTime end = DateFilterUtils.endOfBusinessDay(dt);
-
+              OffsetDateTime start = dateFilterService.startOfBusinessDay(dt);
+              OffsetDateTime end = dateFilterService.endOfBusinessDay(dt);
               yield cb.or(
                 cb.lessThan(expression, start),
                 cb.greaterThan(expression, end)
               );
             }
-
-            case "gte" -> cb.greaterThanOrEqualTo(expression, DateFilterUtils.startOfBusinessDay(dt));
-
-            case "lte" -> cb.lessThanOrEqualTo(expression, DateFilterUtils.endOfBusinessDay(dt));
-
+            case "gte" -> cb.greaterThanOrEqualTo(expression, dateFilterService.startOfBusinessDay(dt));
+            case "lte" -> cb.lessThanOrEqualTo(expression, dateFilterService.endOfBusinessDay(dt));
             default -> cb.equal(expression, dt);
           };
         }
-
-
-        // number
         case Number n -> {
           Expression<Number> expression = path.as(Number.class);
 
@@ -229,7 +206,6 @@ public final class SpecificationFactory {
         }
       }
 
-      // boolean / enum / fallback
       return "notEquals".equals(matchMode)
         ? cb.notEqual(path, typed)
         : cb.equal(path, typed);

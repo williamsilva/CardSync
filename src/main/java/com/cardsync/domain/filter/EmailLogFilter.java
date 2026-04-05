@@ -7,18 +7,16 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-@Getter
-@Setter
-@ToString
-public class EmailLogFilter {
+public record EmailLogFilter (
+  String subject,
+  String template,
+  String recipient,
 
-  private String subject;
-  private String template;
-  private String recipient;
+  String sentAtTo,
+  String sentAtFrom,
 
-  private String sentAtTo;
-  private String sentAtFrom;
-
-  private List<EmailLogStatusEnum> status;
-  private List<EmailLogEventTypeEnum> eventType;
+  List<String> createdBy,
+   List<EmailLogStatusEnum> status,
+  List<EmailLogEventTypeEnum> eventType
+) {
 }

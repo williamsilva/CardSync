@@ -9,6 +9,7 @@ public record UsersFilter(
   String userName,
   String document,
 
+  List<String> createdBy,
   List<StatusUserEnum> status,
 
   String createdAtTo,

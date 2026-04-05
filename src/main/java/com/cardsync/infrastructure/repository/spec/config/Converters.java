@@ -4,11 +4,7 @@ import com.cardsync.domain.filter.query.RangeValue;
 
 import java.lang.reflect.Array;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 final class Converters {
@@ -90,7 +86,7 @@ final class Converters {
     return null;
   }
 
-  static OffsetDateTime toOffsetDateTimeOrNull(Object v) {
+  static OffsetDateTime toOffsetDateTimeOrNull(Object v, DateFilterService dateFilterService) {
     if (v == null) {
       return null;
     }
@@ -104,22 +100,10 @@ final class Converters {
       return null;
     }
 
-    return DateFilterUtils.parseFlexibleToOffsetDateTime(s);
+    return dateFilterService.parseFlexibleToOffsetDateTime(s);
   }
 
-  /**
-   * Converte enum por:
-   * - nome: "ACTIVE"
-   * - ordinal/code numérico: 1
-   * - string numérica: "1"
-   *
-   * Passe um codeExtractor quando o enum possuir getCode().
-   */
-  static <E extends Enum<E>> E toEnumOrNull(
-    Object v,
-    Class<E> enumClass,
-    Function<E, Integer> codeExtractor
-  ) {
+  static <E extends Enum<E>> E toEnumOrNull(Object v, Class<E> enumClass, Function<E, Integer> codeExtractor) {
     if (v == null) {
       return null;
     }
@@ -160,14 +144,6 @@ final class Converters {
     }
   }
 
-  /**
-   * Normaliza value em Collection<Object>.
-   * Aceita:
-   * - Collection
-   * - array
-   * - string separada por vírgula: "1,2,3"
-   * - valor único
-   */
   static Collection<?> toCollectionOrNull(Object v) {
     if (v == null) {
       return null;
@@ -199,32 +175,64 @@ final class Converters {
     return List.of(v);
   }
 
-  /**
-   * Extrai range vindo como:
-   * - RangeValue
-   * - Map {from,to}
-   * - valor único -> vira RangeValue(valor, valor)
-   */
-  @SuppressWarnings("unchecked")
   static <T> RangeValue<T> toRangeOrNull(Object v, Function<Object, T> converter) {
-    if (v == null) {
-      return null;
+    switch (v) {
+      case null -> {
+        return null;
+      }
+      case RangeValue<?> rv -> {
+        T from = rv.from()==null ? null:converter.apply(rv.from());
+        T to = rv.to()==null ? null:converter.apply(rv.to());
+
+        if (from==null && to==null) {
+          return null;
+        }
+
+        return new RangeValue<>(from, to);
+      }
+      case Map<?, ?> map -> {
+        Object rawFrom = map.get("from");
+        Object rawTo = map.get("to");
+
+        T from = rawFrom==null ? null:converter.apply(rawFrom);
+        T to = rawTo==null ? null:converter.apply(rawTo);
+
+        if (from==null && to==null) {
+          return null;
+        }
+
+        return new RangeValue<>(from, to);
+      }
+      case Collection<?> collection -> {
+        if (collection.isEmpty()) {
+          return null;
+        }
+
+        Object[] items = collection.toArray();
+        Object rawFrom = items[0];
+        Object rawTo = items.length > 1 ? items[1]:null;
+
+        T from = rawFrom==null ? null:converter.apply(rawFrom);
+        T to = rawTo==null ? null:converter.apply(rawTo);
+
+        if (from==null && to==null) {
+          return null;
+        }
+
+        return new RangeValue<>(from, to);
+      }
+      default -> {
+      }
     }
 
-    if (v instanceof RangeValue<?> rv) {
-      T from = rv.from() == null ? null : converter.apply(rv.from());
-      T to = rv.to() == null ? null : converter.apply(rv.to());
-
-      if (from == null && to == null) {
+    if (v.getClass().isArray()) {
+      int length = Array.getLength(v);
+      if (length == 0) {
         return null;
       }
 
-      return new RangeValue<>(from, to);
-    }
-
-    if (v instanceof Map<?, ?> map) {
-      Object rawFrom = map.get("from");
-      Object rawTo = map.get("to");
+      Object rawFrom = length > 0 ? Array.get(v, 0) : null;
+      Object rawTo = length > 1 ? Array.get(v, 1) : null;
 
       T from = rawFrom == null ? null : converter.apply(rawFrom);
       T to = rawTo == null ? null : converter.apply(rawTo);
@@ -242,5 +250,26 @@ final class Converters {
     }
 
     return new RangeValue<>(single, single);
+  }
+
+  static UUID toUuidOrNull(Object v) {
+    if (v == null) {
+      return null;
+    }
+
+    if (v instanceof UUID uuid) {
+      return uuid;
+    }
+
+    String s = toStringOrNull(v);
+    if (s == null) {
+      return null;
+    }
+
+    try {
+      return UUID.fromString(s);
+    } catch (Exception e) {
+      return null;
+    }
   }
 }

@@ -27,5 +27,6 @@ public class UserModel extends RepresentationModel<UserModel> {
   private OffsetDateTime blockedUntil;
   private OffsetDateTime passwordExpiresAt;
 
+  private UserMinimalModel createdBy;
   private List<GroupOptionModel> groups;
 }

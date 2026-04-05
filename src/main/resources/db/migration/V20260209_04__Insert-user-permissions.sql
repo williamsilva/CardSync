@@ -6,9 +6,11 @@ INSERT INTO cs_users (id, name, user_name, document,  created_at, updated_at, pa
 	('97d48756','William Silva', 'william@cardsync.com.br', '13582679799', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 5 DAY),
 	  '97d48756', '$2a$10$Le0LMZWPAhWqgkI8TbjqCOo1gCkhUplcCMZsMUS/scRl4dpgvGWAi');
 
-INSERT INTO cs_groups (id, name, description) VALUES
-  (UUID_TO_BIN(UUID()), 'SUPPORT', 'Suporte sistema'),
-  (UUID_TO_BIN(UUID()), 'ADMINISTRADOR', 'Administrador do sistema');
+INSERT INTO cs_groups (id, name, description, created_at, updated_at, created_by_id) VALUES
+  (UUID_TO_BIN(UUID()), 'SUPPORT', 'Suporte sistema', NOW(), NOW(),
+    (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+  (UUID_TO_BIN(UUID()), 'ADMINISTRADOR', 'Administrador do sistema', NOW(), NOW(),
+    (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br'));
 
 INSERT INTO cs_permissions (id, name, description) VALUES
    (UUID_TO_BIN(UUID()), 'SUPPORT', 'Suporte Sistema'),

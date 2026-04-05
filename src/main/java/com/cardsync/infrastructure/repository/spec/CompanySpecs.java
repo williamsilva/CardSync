@@ -6,153 +6,73 @@ import com.cardsync.domain.filter.spec.CompanyAllowedFields;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.TypeCompanyEnum;
+import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
-import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
-import java.time.OffsetDateTime;
-import java.util.Objects;
+import java.util.UUID;
 
 @Component
-public class CompanySpecs {
+public class CompanySpecs extends BaseSpecificationSupport<CompanyEntity> {
 
-  private final DateFilterService dateFilterService;
+  private final SpecificationFactory specificationFactory;
+  private final CompanyAllowedFields companyAllowedFields;
 
-  public CompanySpecs(DateFilterService dateFilterService) {
-    this.dateFilterService = dateFilterService;
+  public CompanySpecs(
+    DateFilterService dateFilterService,
+    SpecificationFactory specificationFactory,
+    CompanyAllowedFields companyAllowedFields
+  ) {
+    super(dateFilterService);
+    this.specificationFactory = specificationFactory;
+    this.companyAllowedFields = companyAllowedFields;
   }
 
   public Specification<CompanyEntity> fromQuery(ListQueryDto<CompanyFilter> query) {
     Specification<CompanyEntity> spec = Specs.all();
 
     spec = spec.and(
-      SpecificationFactory.fromTableFilters(
+      specificationFactory.fromTableFilters(
         query.tableFilters(),
-        CompanyAllowedFields.table()
+        companyAllowedFields.table()
       )
     );
 
     if (query.advanced() != null) {
       var a = query.advanced();
-      spec = spec.and(textContains("cnpj", a.cnpj()));
-      spec = spec.and(textContains("fantasyName", a.fantasyName()));
-      spec = spec.and(textContains("socialReason", a.socialReason()));
 
-      spec = spec.and(rangeOdt(a.createdAtFrom(), a.createdAtTo()));
-
-      // busca aninhada
-      spec = spec.and(textContainsPath(a.createdBy(), "createdBy", "name"));
-      spec = spec.and(textContainsPath(a.createdBy(), "createdBy", "userName"));
-
-      if (a.statusEnum() != null && !a.statusEnum().isEmpty()) {
-        var codes = a.statusEnum().stream()
-          .filter(Objects::nonNull)
-          .map(StatusEnum::getCode)
-          .toList();
-
-        if (!codes.isEmpty()) {
-          spec = spec.and((root, q2, cb) -> root.get("status").in(codes));
-        }
-      }
-
-      if (a.typeEnum() != null && !a.typeEnum().isEmpty()) {
-        var codes = a.typeEnum().stream()
-          .filter(Objects::nonNull)
-          .map(TypeCompanyEnum::getCode)
-          .toList();
-
-        if (!codes.isEmpty()) {
-          spec = spec.and((root, q2, cb) -> root.get("type").in(codes));
-        }
-      }
-    }
-
-    if (query.globalFilter() != null && !query.globalFilter().trim().isEmpty()) {
-      String gf = query.globalFilter().trim();
+      spec = spec.and(contains("cnpj", a.cnpj()));
+      spec = spec.and(contains("fantasyName", a.fantasyName()));
+      spec = spec.and(contains("socialReason", a.socialReason()));
+      spec = spec.and(rangeOdt("createdAt", a.createdAtFrom(), a.createdAtTo()));
 
       spec = spec.and(
-        textContains("cnpj", gf)
-          .or(textContains("fantasyName", gf))
-          .or(textContains("socialReason", gf))
-          .or(textContainsPath(gf, "createdBy", "name"))
-          .or(textContainsPath(gf, "createdBy", "userName"))
+        inPath(a.createdBy(), value -> {
+          try {
+            return UUID.fromString(value);
+          } catch (Exception e) {
+            return null;
+          }
+        }, "createdBy", "id")
+      );
+
+      spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
+      spec = spec.and(inCodes("type", a.typeEnum(), TypeCompanyEnum::getCode));
+    }
+
+    if (!isBlank(query.globalFilter())) {
+      String gf = query.globalFilter();
+
+      spec = spec.and(
+        anyOf(
+          contains("cnpj", gf)
+        )
       );
     }
-    spec = spec.and(orderBy());
 
-    return spec;
-  }
-
-  private Specification<CompanyEntity> textContains(String field, String value) {
-    if (value == null || value.trim().isEmpty()) {
-      return Specs.all();
-    }
-
-    String v = value.trim().toLowerCase();
-
-    return (root, query, cb) ->
-      cb.like(cb.lower(root.get(field)), "%" + v + "%");
-  }
-
-  private Specification<CompanyEntity> textContainsPath(String value, String association, String field) {
-    if (value == null || value.trim().isEmpty()) {
-      return Specs.all();
-    }
-
-    String v = value.trim().toLowerCase();
-
-    return (root, query, cb) -> {
-      Expression<String> path = cb.lower(getPath(root, association, field).as(String.class));
-      return cb.like(path, "%" + v + "%");
-    };
-  }
-
-  private Path<?> getPath(Root<CompanyEntity> root, String association, String field) {
-    From<?, ?> join = root.join(association, JoinType.LEFT);
-    return join.get(field);
-  }
-
-  private Specification<CompanyEntity> orderBy() {
-    return (root, query, cb) -> {
-      if (!isCountQuery(query)) {
-        query.orderBy(cb.asc(root.get("fantasyName")));
-      }
-      return cb.conjunction();
-    };
-  }
-
-  private boolean isCountQuery(CriteriaQuery<?> query) {
-    return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
-  }
-
-  private Specification<CompanyEntity> rangeOdt(String fromIso, String toIso) {
-    OffsetDateTime from = (fromIso == null || fromIso.isBlank())
-      ? null
-      : dateFilterService.startOfBusinessDay(fromIso);
-
-    OffsetDateTime to = (toIso == null || toIso.isBlank())
-      ? null
-      : dateFilterService.endOfBusinessDay(toIso);
-
-    if (from == null && to == null) {
-      return Specs.all();
-    }
-
-    return (root, query, cb) -> {
-      var p = root.get("createdAt").as(OffsetDateTime.class);
-
-      if (from != null && to != null) {
-        return cb.between(p, from, to);
-      }
-
-      if (from != null) {
-        return cb.greaterThanOrEqualTo(p, from);
-      }
-
-      return cb.lessThanOrEqualTo(p, to);
-    };
+    return spec.and(orderByAsc("fantasyName"));
   }
 }

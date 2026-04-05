@@ -3,6 +3,7 @@ package com.cardsync.bff.controller.v1.mapper.model;
 import com.cardsync.bff.controller.v1.GroupsController;
 import com.cardsync.bff.controller.v1.representation.model.GroupModel;
 import com.cardsync.bff.controller.v1.representation.model.PermissionOptionModel;
+import com.cardsync.bff.controller.v1.representation.model.UserMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.UserOptionModel;
 import com.cardsync.domain.model.GroupEntity;
 import java.util.Comparator;
@@ -21,9 +22,12 @@ public class GroupModelAssembler extends RepresentationModelAssemblerSupport<Gro
   @Override
   public GroupModel toModel(GroupEntity entity) {
     GroupModel model = createModelWithId(entity.getId(), entity);
+
     model.setId(entity.getId());
     model.setName(entity.getName());
+    model.setCreatedAt(entity.getCreatedAt());
     model.setDescription(entity.getDescription());
+    model.setCreatedBy(getUserMinimalModel(entity));
 
     List<PermissionOptionModel> permissions = entity.getPermissions() == null
       ? List.of()
@@ -39,11 +43,20 @@ public class GroupModelAssembler extends RepresentationModelAssemblerSupport<Gro
           .map(u -> new UserOptionModel(u.getId(), u.getName(), u.getUserName()))
           .toList();
 
+
     model.setPermissions(permissions);
     model.setUsers(users);
     model.setPermissionsCount(permissions.size());
     model.setUsersCount(users.size());
     return model;
+  }
+
+  private static UserMinimalModel getUserMinimalModel(GroupEntity entity) {
+    UserMinimalModel userMinimalModel = new UserMinimalModel();
+    userMinimalModel.setId(entity.getCreatedBy().getId());
+    userMinimalModel.setName(entity.getCreatedBy().getName());
+    userMinimalModel.setUserName(entity.getCreatedBy().getUserName());
+    return userMinimalModel;
   }
 
   @Override

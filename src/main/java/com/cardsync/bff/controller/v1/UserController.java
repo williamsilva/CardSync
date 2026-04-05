@@ -38,6 +38,12 @@ public class UserController {
     return service.listOptions();
   }
 
+  @GetMapping("/options-filter")
+  @CheckSecurity.Authenticated
+  public List<UserOptionModel> listOptionsFilter() {
+    return service.listOptionsFilter();
+  }
+
   @PostMapping("/search")
   @CheckSecurity.Security.Users.CanConsult
   public PagedModel<UserModel> search(@RequestBody ListQueryDto<UsersFilter> body) {

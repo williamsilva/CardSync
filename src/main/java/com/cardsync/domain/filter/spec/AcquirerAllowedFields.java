@@ -1,8 +1,7 @@
 package com.cardsync.domain.filter.spec;
 
-import com.cardsync.domain.model.CompanyEntity;
+import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
-import com.cardsync.domain.model.enums.TypeCompanyEnum;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.FieldSpec;
 import jakarta.persistence.criteria.JoinType;
@@ -11,20 +10,22 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 @Component
-public class CompanyAllowedFields {
+public class AcquirerAllowedFields {
 
   private final DateFilterService dateFilterService;
 
-  public CompanyAllowedFields(DateFilterService dateFilterService) {
+  public AcquirerAllowedFields(DateFilterService dateFilterService) {
     this.dateFilterService = dateFilterService;
   }
 
-  public Map<String, FieldSpec<CompanyEntity, ?>> table() {
+  public Map<String, FieldSpec<AcquirerEntity, ?>> table() {
     return Map.ofEntries(
       Map.entry("cnpj",
         FieldSpec.string("cnpj", (root, query) -> root.get("cnpj"))),
+
       Map.entry("fantasyName",
         FieldSpec.string("fantasyName", (root, query) -> root.get("fantasyName"))),
+
       Map.entry("socialReason",
         FieldSpec.string("socialReason", (root, query) -> root.get("socialReason"))),
 
@@ -35,18 +36,18 @@ public class CompanyAllowedFields {
         FieldSpec.joinedUuid("createdBy", (root, query) ->
           root.join("createdBy", JoinType.LEFT).get("id"))),
 
-      Map.entry("typeCompanyEnum",
+      Map.entry("status",
         FieldSpec.enumAsIntegerCode(
-          "type",
-          TypeCompanyEnum.class,
-          TypeCompanyEnum::getCode,
-          (root, query) -> root.get("type")
+          "status",
+          StatusEnum.class,
+          StatusEnum::getCode,
+          (root, query) -> root.get("status")
         )
       ),
 
       Map.entry("statusEnum",
         FieldSpec.enumAsIntegerCode(
-          "status",
+          "statusEnum",
           StatusEnum.class,
           StatusEnum::getCode,
           (root, query) -> root.get("status")
