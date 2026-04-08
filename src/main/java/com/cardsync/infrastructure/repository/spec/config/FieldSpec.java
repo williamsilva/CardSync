@@ -82,7 +82,7 @@ public record FieldSpec<T, V>(
     String name,
     BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver
   ) {
-    return new FieldSpec<>(name, UUID.class, pathResolver, Converters::toUuidOrNull, true);
+    return new FieldSpec<>(name, UUID.class, pathResolver, Converters::toUuidOrNull, false);
   }
 
   public static <T> FieldSpec<T, OffsetDateTime> offsetDateTime(

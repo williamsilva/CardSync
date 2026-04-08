@@ -12,6 +12,7 @@ import com.cardsync.infrastructure.repository.spec.AcquirerSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,12 @@ public class AcquirerService {
         ErrorCode.COMPANY_NOT_FOUND,
         "Acquirer not found for id " + acquirerId
       ));
+  }
+
+  @Transactional(readOnly = true)
+  public List<AcquirerEntity> listOptionsFilter() {
+    return acquirerRepository
+      .findAll(Sort.by(Sort.Direction.ASC, "fantasyName", "socialReason"));
   }
 
   @Transactional(readOnly = true)

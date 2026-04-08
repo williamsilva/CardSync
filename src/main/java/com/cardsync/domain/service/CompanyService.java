@@ -1,6 +1,7 @@
 package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.representation.input.CompanyInput;
+import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.CompanyFilter;
@@ -13,6 +14,7 @@ import com.cardsync.infrastructure.repository.spec.CompanySpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,12 @@ public class CompanyService {
         ErrorCode.COMPANY_NOT_FOUND,
         "Company not found for id " + companyId
       ));
+  }
+
+  @Transactional(readOnly = true)
+  public List<CompanyEntity> listOptionsFilter() {
+    return companyRepository
+      .findAll(Sort.by(Sort.Direction.ASC, "fantasyName", "socialReason"));
   }
 
   @Transactional(readOnly = true)

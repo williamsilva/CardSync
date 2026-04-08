@@ -26,7 +26,21 @@ public abstract class CsPermissions {
   protected static final String PERM_COMPANIES_CREATE = "PERM_COMPANIES_CREATE";
   protected static final String PERM_COMPANIES_DELETE = "PERM_COMPANIES_DELETE";
   protected static final String PERM_COMPANIES_CONSULT = "PERM_COMPANIES_CONSULT";
-  protected static final String COMPANIES_ACTIVE_OR_INACTIVE = "COMPANIES_ACTIVE_OR_INACTIVE";
+  protected static final String PERM_COMPANIES_ACTIVE_OR_INACTIVE = "PERM_COMPANIES_ACTIVE_OR_INACTIVE";
+
+  /* Permission for Acquirers */
+  protected static final String PERM_ACQUIRER_CHANGE = "PERM_ACQUIRER_CHANGE";
+  protected static final String PERM_ACQUIRER_CREATE = "PERM_ACQUIRER_CREATE";
+  protected static final String PERM_ACQUIRER_DELETE = "PERM_ACQUIRER_DELETE";
+  protected static final String PERM_ACQUIRER_CONSULT = "PERM_ACQUIRER_CONSULT";
+  protected static final String PERM_ACQUIRER_ACTIVE_OR_INACTIVE = "PERM_ACQUIRER_ACTIVE_OR_INACTIVE";
+
+  /* Permission for Establishments */
+  protected static final String PERM_ESTABLISHMENT_CHANGE = "PERM_ESTABLISHMENT_CHANGE";
+  protected static final String PERM_ESTABLISHMENT_CREATE = "PERM_ESTABLISHMENT_CREATE";
+  protected static final String PERM_ESTABLISHMENT_DELETE = "PERM_ESTABLISHMENT_DELETE";
+  protected static final String PERM_ESTABLISHMENT_CONSULT = "PERM_ESTABLISHMENT_CONSULT";
+  protected static final String PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE = "PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE";
 
   /* Permission for Audit */
   protected static final String PERM_AUDIT_MAIL_CONSULT = "PERM_AUDIT_MAIL_CONSULT";

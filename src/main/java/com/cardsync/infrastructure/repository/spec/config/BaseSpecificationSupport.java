@@ -190,6 +190,28 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
+  protected Specification<T> orderByAscPath(String... path) {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        From<?, ?> join = null;
+
+        for (int i = 0; i < path.length - 1; i++) {
+          join = (join == null)
+            ? root.join(path[i], JoinType.LEFT)
+            : join.join(path[i], JoinType.LEFT);
+        }
+
+        Path<?> leaf = (join == null)
+          ? root.get(path[path.length - 1])
+          : join.get(path[path.length - 1]);
+
+        query.orderBy(cb.asc(leaf));
+      }
+
+      return cb.conjunction();
+    };
+  }
+
   protected Specification<T> anyOf(Specification<T>... specs) {
     Specification<T> result = null;
 

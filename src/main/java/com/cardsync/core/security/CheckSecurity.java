@@ -87,32 +87,88 @@ public @interface CheckSecurity {
 
   }
 
-  @interface Companies {
+  @interface Register {
+    @interface Companies {
+        @Target(METHOD)
+        @Retention(RUNTIME)
+        @PreAuthorize("@csSecurity.canConsultCompanies()")
+        @interface CanConsult {}
+
+        @Target(METHOD)
+        @Retention(RUNTIME)
+        @PreAuthorize("@csSecurity.canCreateCompanies()")
+        @interface CanCreate {}
+
+        @Target(METHOD)
+        @Retention(RUNTIME)
+        @PreAuthorize("@csSecurity.canChangeCompanies()")
+        @interface CanChange {}
+
+        @Target(METHOD)
+        @Retention(RUNTIME)
+        @PreAuthorize("@csSecurity.canDeleteCompanies()")
+        @interface CanDelete {}
+
+        @Target(METHOD)
+        @Retention(RUNTIME)
+        @PreAuthorize("@csSecurity.canActiveOrInactiveCompanies()")
+        @interface CanActiveOrInactive {}
+      }
+
+    @interface Acquirers {
       @Target(METHOD)
       @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canConsultCompanies()")
+      @PreAuthorize("@csSecurity.canConsultAcquirers()")
       @interface CanConsult {}
 
       @Target(METHOD)
       @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canCreateCompanies()")
+      @PreAuthorize("@csSecurity.canCreateAcquirers()")
       @interface CanCreate {}
 
       @Target(METHOD)
       @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canChangeCompanies()")
+      @PreAuthorize("@csSecurity.canChangeAcquirers()")
       @interface CanChange {}
 
       @Target(METHOD)
       @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canDeleteCompanies()")
+      @PreAuthorize("@csSecurity.canDeleteAcquirers()")
       @interface CanDelete {}
 
       @Target(METHOD)
       @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canActiveOrInactiveCompanies()")
+      @PreAuthorize("@csSecurity.canActiveOrInactiveAcquirers()")
       @interface CanActiveOrInactive {}
     }
+
+    @interface Establishments {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultEstablishments()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canCreateEstablishments()")
+      @interface CanCreate {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canChangeEstablishments()")
+      @interface CanChange {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canDeleteEstablishments()")
+      @interface CanDelete {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveEstablishments()")
+      @interface CanActiveOrInactive {}
+    }
+  }
 
   @interface Audit {
 

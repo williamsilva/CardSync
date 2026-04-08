@@ -92,6 +92,48 @@ public class CsSecurity extends CsDefaultSecurityMethod {
   }
 
   public boolean canActiveOrInactiveCompanies() {
-    return hasAllWriteScope() && hasAuthority(PERM_USERS_ACTIVE_OR_INACTIVE);
+    return hasAllWriteScope() && hasAuthority(PERM_COMPANIES_ACTIVE_OR_INACTIVE);
+  }
+
+  /* Acquirers */
+  public boolean canConsultAcquirers() {
+    return hasAllReadScope() && hasAuthority(PERM_ACQUIRER_CONSULT);
+  }
+
+  public boolean canCreateAcquirers() {
+    return hasAllWriteScope() && hasAuthority(PERM_ACQUIRER_CREATE);
+  }
+
+  public boolean canChangeAcquirers() {
+    return hasAllWriteScope() && hasAuthority(PERM_ACQUIRER_CHANGE);
+  }
+
+  public boolean canDeleteAcquirers() {
+    return hasAllWriteScope() && hasAuthority(PERM_ACQUIRER_DELETE);
+  }
+
+  public boolean canActiveOrInactiveAcquirers() {
+    return hasAllWriteScope() && hasAuthority(PERM_ACQUIRER_ACTIVE_OR_INACTIVE);
+  }
+
+  /* Establishments */
+  public boolean canConsultEstablishments() {
+    return hasAllReadScope() && hasAuthority(PERM_ESTABLISHMENT_CONSULT);
+  }
+
+  public boolean canCreateEstablishments() {
+    return hasAllWriteScope() && hasAuthority(PERM_ESTABLISHMENT_CREATE);
+  }
+
+  public boolean canChangeEstablishments() {
+    return hasAllWriteScope() && hasAuthority(PERM_ESTABLISHMENT_CHANGE);
+  }
+
+  public boolean canDeleteEstablishments() {
+    return hasAllWriteScope() && hasAuthority(PERM_ESTABLISHMENT_DELETE);
+  }
+
+  public boolean canActiveOrInactiveEstablishments() {
+    return hasAllWriteScope() && hasAuthority(PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE);
   }
 }

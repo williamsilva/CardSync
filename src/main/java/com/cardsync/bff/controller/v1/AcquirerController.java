@@ -1,8 +1,10 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.mapper.model.AcquirerMinimalModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.AcquirerModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.AcquirerInput;
 import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.AcquirerFilter;
@@ -13,6 +15,7 @@ import com.cardsync.domain.service.AcquirerService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,17 +28,24 @@ public class AcquirerController {
 
   private final AcquirerService service;
   private final AcquirerModelAssembler modelAssembler;
+  private final AcquirerMinimalModelAssembler minimalModelAssembler;
   private final PagedResourcesAssembler<AcquirerEntity> pagedResourcesAssembler;
 
   @GetMapping("/{id}")
-  @CheckSecurity.Companies.CanConsult
+  @CheckSecurity.Register.Acquirers.CanConsult
   public AcquirerModel getById(@PathVariable UUID id) {
     AcquirerEntity entity = service.getById(id);
     return modelAssembler.toModel(entity);
   }
 
+  @GetMapping("/options-filter")
+  @CheckSecurity.Authenticated
+  public CollectionModel<AcquirerMinimalModel> listOptionsFilter() {
+    return minimalModelAssembler.toCollectionModel(service.listOptionsFilter());
+  }
+
   @PostMapping("/search")
-  @CheckSecurity.Companies.CanConsult
+  @CheckSecurity.Register.Acquirers.CanConsult
   public PagedModel<AcquirerModel> search(@RequestBody ListQueryDto<AcquirerFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
     var page = service.list(pageable, body);
@@ -43,51 +53,51 @@ public class AcquirerController {
   }
 
   @PostMapping
-  @CheckSecurity.Companies.CanCreate
+  @CheckSecurity.Register.Acquirers.CanCreate
   public AcquirerModel create(@Valid @RequestBody AcquirerInput body) {
     AcquirerEntity entity = service.create(body);
     return modelAssembler.toModel(entity);
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.Companies.CanCreate
+  @CheckSecurity.Register.Acquirers.CanCreate
   public AcquirerModel update(@PathVariable UUID id, @Valid @RequestBody AcquirerInput body) {
     AcquirerEntity entity = service.update(id, body);
     return modelAssembler.toModel(entity);
   }
 
   @PostMapping("/{id}/activate")
-  @CheckSecurity.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
   public void activate(@PathVariable UUID id) {
     service.activate(id);
   }
 
   @PostMapping("/{id}/deactivate")
-  @CheckSecurity.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
   public void deactivate(@PathVariable UUID id) {
     service.deactivate(id);
   }
 
   @PostMapping("/{id}/block")
-  @CheckSecurity.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
   public void block(@PathVariable UUID id) {
     service.block(id);
   }
 
   @PostMapping("/activate")
-  @CheckSecurity.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
   public void activateBulk(@Valid @RequestBody ListIdsInput body) {
     service.activateBulk(body.ids());
   }
 
   @PostMapping("/deactivate")
-  @CheckSecurity.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
   public void deactivateBulk(@Valid @RequestBody ListIdsInput body) {
     service.deactivateBulk(body.ids());
   }
 
   @PostMapping("/block")
-  @CheckSecurity.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
   public void blockBulk(@Valid @RequestBody ListIdsInput body) {
     service.blockBulk(body.ids());
   }
