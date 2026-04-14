@@ -30,7 +30,7 @@ CREATE TABLE cs_establishment (
    REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_cs_establishment_cnpj ON cs_establishment (pv_number);
+CREATE INDEX idx_cs_establishment_pv_number ON cs_establishment (pv_number);
 
 ALTER TABLE cs_establishment
     ADD CONSTRAINT uk_cs_establishment_pv_company_acquirer

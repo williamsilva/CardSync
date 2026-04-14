@@ -10,21 +10,24 @@ import java.util.UUID;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "cs_flag_company")
 @EqualsAndHashCode(of = {"flag", "company"})
+@Table(
+  name = "cs_flag_company",
+  uniqueConstraints = {
+    @UniqueConstraint(name = "uk_cs_flag_company_flag_company", columnNames = {"flag_id", "company_id"})
+  }
+)
 public class FlagCompanyEntity {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  // Relação Many-to-One para a entidade Flag
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "flag_id")
+  @JoinColumn(name = "flag_id", nullable = false)
   private FlagEntity flag;
 
-  // Relação Many-to-One para a entidade Company
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "company_id")
+  @JoinColumn(name = "company_id", nullable = false)
   private CompanyEntity company;
 }

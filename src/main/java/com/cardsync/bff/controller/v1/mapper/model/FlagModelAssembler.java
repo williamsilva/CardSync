@@ -1,0 +1,87 @@
+package com.cardsync.bff.controller.v1.mapper.model;
+
+import com.cardsync.bff.controller.v1.FlagController;
+import com.cardsync.bff.controller.v1.representation.model.FlagAcquirerRelationModel;
+import com.cardsync.bff.controller.v1.representation.model.FlagCompanyRelationModel;
+import com.cardsync.bff.controller.v1.representation.model.FlagModel;
+import com.cardsync.domain.model.FlagAcquirerEntity;
+import com.cardsync.domain.model.FlagCompanyEntity;
+import com.cardsync.domain.model.FlagEntity;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
+import org.springframework.stereotype.Component;
+
+import java.util.Comparator;
+
+@Component
+public class FlagModelAssembler extends RepresentationModelAssemblerSupport<FlagEntity, FlagModel> {
+
+  public FlagModelAssembler() {
+    super(FlagController.class, FlagModel.class);
+  }
+
+  @Override
+  public FlagModel toModel(FlagEntity entity) {
+    FlagModel model = createModelWithId(entity.getId(), entity);
+
+    model.setId(entity.getId());
+    model.setName(entity.getName());
+    model.setErpCode(entity.getErpCode());
+    model.setStatus(entity.getStatus() != null ? entity.getStatus().name() : null);
+
+    model.setCompanies(
+      entity.getFlagCompanies().stream()
+        .filter(item -> item.getCompany() != null)
+        .map(this::toCompanyRelationModel)
+        .sorted(Comparator.comparing(
+          FlagCompanyRelationModel::getFantasyName,
+          Comparator.nullsLast(String::compareToIgnoreCase)
+        ))
+        .toList()
+    );
+
+    model.setAcquirers(
+      entity.getFlagAcquirers().stream()
+        .filter(item -> item.getAcquirer() != null)
+        .map(this::toAcquirerRelationModel)
+        .sorted(Comparator.comparing(
+          FlagAcquirerRelationModel::getFantasyName,
+          Comparator.nullsLast(String::compareToIgnoreCase)
+        ))
+        .toList()
+    );
+
+    return model;
+  }
+
+  @Override
+  public CollectionModel<FlagModel> toCollectionModel(Iterable<? extends FlagEntity> entities) {
+    return super.toCollectionModel(entities);
+  }
+
+  private FlagCompanyRelationModel toCompanyRelationModel(FlagCompanyEntity item) {
+    var company = item.getCompany();
+
+    return FlagCompanyRelationModel.builder()
+      .cnpj(company.getCnpj())
+      .companyId(company.getId())
+      .fantasyName(company.getFantasyName())
+      .socialReason(company.getSocialReason())
+      .type(company.getType() != null ? company.getType().name() : null)
+      .status(company.getStatus() != null ? company.getStatus().name() : null)
+      .build();
+  }
+
+  private FlagAcquirerRelationModel toAcquirerRelationModel(FlagAcquirerEntity item) {
+    var acquirer = item.getAcquirer();
+
+    return FlagAcquirerRelationModel.builder()
+      .cnpj(acquirer.getCnpj())
+      .acquirerId( acquirer.getId())
+      .acquirerCode(item.getAcquirerCode())
+      .fantasyName( acquirer.getFantasyName())
+      .socialReason(acquirer.getSocialReason())
+      .status(acquirer.getStatus() != null ? acquirer.getStatus().name() : null)
+      .build();
+  }
+}

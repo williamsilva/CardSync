@@ -136,4 +136,46 @@ public class CsSecurity extends CsDefaultSecurityMethod {
   public boolean canActiveOrInactiveEstablishments() {
     return hasAllWriteScope() && hasAuthority(PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE);
   }
+
+  /* Flags */
+  public boolean canConsultFlags() {
+    return hasAllReadScope() && hasAuthority(PERM_FLAGS_CONSULT);
+  }
+
+  public boolean canCreateFlags() {
+    return hasAllWriteScope() && hasAuthority(PERM_FLAGS_CREATE);
+  }
+
+  public boolean canChangeFlags() {
+    return hasAllWriteScope() && hasAuthority(PERM_FLAGS_CHANGE);
+  }
+
+  public boolean canDeleteFlags() {
+    return hasAllWriteScope() && hasAuthority(PERM_FLAGS_DELETE);
+  }
+
+  public boolean canActiveOrInactiveFlags() {
+    return hasAllWriteScope() && hasAuthority(PERM_FLAGS_ACTIVE_OR_INACTIVE);
+  }
+
+  /* Contracts */
+  public boolean canConsultContracts() {
+    return hasAllReadScope() && hasAuthority(PERM_CONTRACTS_CONSULT);
+  }
+
+  public boolean canCreateContracts() {
+    return hasAllWriteScope() && hasAuthority(PERM_CONTRACTS_CREATE);
+  }
+
+  public boolean canChangeContracts() {
+    return hasAllWriteScope() && hasAuthority(PERM_CONTRACTS_CHANGE);
+  }
+
+  public boolean canDeleteContracts() {
+    return hasAllWriteScope() && hasAuthority(PERM_CONTRACTS_DELETE);
+  }
+
+  public boolean canActiveOrInactiveContracts() {
+    return hasAllWriteScope() && hasAuthority(PERM_CONTRACTS_ACTIVE_OR_INACTIVE);
+  }
 }

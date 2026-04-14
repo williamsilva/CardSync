@@ -42,6 +42,20 @@ public abstract class CsPermissions {
   protected static final String PERM_ESTABLISHMENT_CONSULT = "PERM_ESTABLISHMENT_CONSULT";
   protected static final String PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE = "PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE";
 
+  /* Permission for Establishments */
+  protected static final String PERM_FLAGS_CHANGE = "PERM_FLAGS_CHANGE";
+  protected static final String PERM_FLAGS_CREATE = "PERM_FLAGS_CREATE";
+  protected static final String PERM_FLAGS_DELETE = "PERM_FLAGS_DELETE";
+  protected static final String PERM_FLAGS_CONSULT = "PERM_FLAGS_CONSULT";
+  protected static final String PERM_FLAGS_ACTIVE_OR_INACTIVE = "PERM_FLAGS_ACTIVE_OR_INACTIVE";
+
+  /* Permission for Establishments */
+  protected static final String PERM_CONTRACTS_CHANGE = "PERM_CONTRACTS_CHANGE";
+  protected static final String PERM_CONTRACTS_CREATE = "PERM_CONTRACTS_CREATE";
+  protected static final String PERM_CONTRACTS_DELETE = "PERM_CONTRACTS_DELETE";
+  protected static final String PERM_CONTRACTS_CONSULT = "PERM_CONTRACTS_CONSULT";
+  protected static final String PERM_CONTRACTS_ACTIVE_OR_INACTIVE = "PERM_CONTRACTS_ACTIVE_OR_INACTIVE";
+
   /* Permission for Audit */
   protected static final String PERM_AUDIT_MAIL_CONSULT = "PERM_AUDIT_MAIL_CONSULT";
 }

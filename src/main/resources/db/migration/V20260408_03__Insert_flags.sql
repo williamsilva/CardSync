@@ -1,0 +1,45 @@
+INSERT INTO cs_flag (id, status, name, erp_code, text_color) VALUES
+	(UUID_TO_BIN(UUID()), '1', 'Mastercard', 1, '#dc2626'), (UUID_TO_BIN(UUID()), '1', 'Visa', 2, '#2563eb'),
+	(UUID_TO_BIN(UUID()), '1', 'American Express', 3, '#16a34a'), (UUID_TO_BIN(UUID()), '1', 'Diners Club', 4, ''),
+	(UUID_TO_BIN(UUID()), '1', 'Hipercard', 5, ''), (UUID_TO_BIN(UUID()), '1', 'Elo', 6, '#ca8a04'),
+	(UUID_TO_BIN(UUID()), '1', 'PicPay', 7, ''), (UUID_TO_BIN(UUID()), '1', 'JCB', 8, ''),
+	(UUID_TO_BIN(UUID()), '1', 'Banescard', 9, ''), (UUID_TO_BIN(UUID()), '1', 'Cabal', 10, ''),
+	(UUID_TO_BIN(UUID()), '1', 'Sorocred', 11, ''), (UUID_TO_BIN(UUID()), '1', 'CUP', 12, ''),
+	(UUID_TO_BIN(UUID()), '1', 'Credsystem (Mais)', 13, ''), (UUID_TO_BIN(UUID()), '1', 'Sicredi', 14, ''),
+	(UUID_TO_BIN(UUID()), '1', 'Avista', 15, ''), (UUID_TO_BIN(UUID()), '1', 'Credz', 16, ''),
+	(UUID_TO_BIN(UUID()), '1', 'Banricompras', 17, ''), (UUID_TO_BIN(UUID()), '1', 'Pix', 98, '#2563eb'),
+	(UUID_TO_BIN(UUID()), '1', 'Outras', 99, '#2563eb');
+
+INSERT INTO cs_flag_acquirer (id, acquirer_id, flag_id, acquirer_code) VALUES
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Mastercard'), '1'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Diners Club'), '2'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Visa'), '3'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Cabal'), '4'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Hipercard'), '5'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Sorocred'), '6'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'CUP'), '7'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Credsystem (Mais)'),'8'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Sicredi'), '9'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Avista'), 'A'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Elo'), 'E'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Banescard'), 'B'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'JCB'), 'J'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'American Express'), 'X'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Credz'), 'Z'),
+	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Outras'), '0');
+	
+INSERT INTO cs_flag_company (id, company_id, flag_id) VALUES
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Mastercard')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Diners Club')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Visa')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Cabal')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Hipercard')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Sorocred')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'CUP')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Credsystem (Mais)')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Sicredi')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Banescard')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Elo')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'JCB')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'American Express')),
+    (UUID_TO_BIN(UUID()), (SELECT id FROM cs_company WHERE cnpj = '39303847000180'), (SELECT id FROM cs_flag WHERE name = 'Credz'));

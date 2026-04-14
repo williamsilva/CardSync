@@ -35,6 +35,14 @@ public abstract class BaseSpecificationSupport<T> {
       cb.like(cb.lower(root.get(field).as(String.class)), like(normalized));
   }
 
+  protected <V> Specification<T> equalsTo(String field, V value) {
+    if (value == null) {
+      return alwaysTrue();
+    }
+
+    return (root, query, cb) -> cb.equal(root.get(field), value);
+  }
+
   protected Specification<T> containsPath(String value, String association, String field) {
     if (isBlank(value)) {
       return alwaysTrue();
@@ -69,6 +77,28 @@ public abstract class BaseSpecificationSupport<T> {
         : join.get(path[path.length - 1]);
 
       return cb.like(cb.lower(leaf.as(String.class)), like(normalized));
+    };
+  }
+
+  protected <V> Specification<T> equalsPath(V value, String... path) {
+    if (value == null) {
+      return alwaysTrue();
+    }
+
+    return (root, query, cb) -> {
+      From<?, ?> join = null;
+
+      for (int i = 0; i < path.length - 1; i++) {
+        join = (join == null)
+          ? root.join(path[i], JoinType.LEFT)
+          : join.join(path[i], JoinType.LEFT);
+      }
+
+      Path<?> leaf = (join == null)
+        ? root.get(path[path.length - 1])
+        : join.get(path[path.length - 1]);
+
+      return cb.equal(leaf, value);
     };
   }
 

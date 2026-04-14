@@ -1,16 +1,13 @@
 package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.StatusEnum;
-import jakarta.persistence.Entity;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Getter
 @Setter
@@ -18,18 +15,21 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "cs_flag")
-public class FlagEntity extends AuditableEntityBase {
+public class FlagEntity  {
+
+  @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
+  private UUID id;
 
   private String name;
   private Integer status;
   private Integer erpCode;
-  private String textColor;
 
-  @OneToMany(mappedBy = "flag")
-  private List<FlagAcquirerEntity> flagAcquirers = new ArrayList<>();
+  @OneToMany(mappedBy = "flag", cascade = CascadeType.ALL, orphanRemoval = true)
+  private Set<FlagAcquirerEntity> flagAcquirers = new LinkedHashSet<>();
 
-  @OneToMany(mappedBy = "flag")
-  private List<FlagCompanyEntity> flagCompanies = new ArrayList<>();
+  @OneToMany(mappedBy = "flag", cascade = CascadeType.ALL, orphanRemoval = true)
+  private Set<FlagCompanyEntity> flagCompanies = new LinkedHashSet<>();
 
   public StatusEnum getStatus() {
     return StatusEnum.fromCode(status);

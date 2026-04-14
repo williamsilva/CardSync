@@ -168,6 +168,60 @@ public @interface CheckSecurity {
       @PreAuthorize("@csSecurity.canActiveOrInactiveEstablishments()")
       @interface CanActiveOrInactive {}
     }
+
+    @interface Flags {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultFlags()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canCreateFlags()")
+      @interface CanCreate {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canChangeFlags()")
+      @interface CanChange {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canDeleteFlags()")
+      @interface CanDelete {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveFlags()")
+      @interface CanActiveOrInactive {}
+    }
+
+    @interface Contracts {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultContracts()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canCreateContracts()")
+      @interface CanCreate {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canChangeContracts()")
+      @interface CanChange {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canDeleteContracts()")
+      @interface CanDelete {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveContracts()")
+      @interface CanActiveOrInactive {}
+    }
   }
 
   @interface Audit {
