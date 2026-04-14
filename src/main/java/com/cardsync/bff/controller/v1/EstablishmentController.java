@@ -50,7 +50,7 @@ public class EstablishmentController {
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.Register.Establishments.CanCreate
+  @CheckSecurity.Register.Establishments.CanChange
   public EstablishmentModel update(@PathVariable UUID id, @Valid @RequestBody EstablishmentInput body) {
     EstablishmentEntity entity = service.update(id, body);
     return modelAssembler.toModel(entity);
@@ -65,7 +65,7 @@ public class EstablishmentController {
   @PostMapping("/{id}/deactivate")
   @CheckSecurity.Register.Establishments.CanActiveOrInactive
   public void deactivate(@PathVariable UUID id) {
-   service.deactivate(id);
+    service.deactivate(id);
   }
 
   @PostMapping("/{id}/block")

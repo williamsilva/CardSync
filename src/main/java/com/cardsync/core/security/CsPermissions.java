@@ -42,11 +42,12 @@ public abstract class CsPermissions {
   protected static final String PERM_ESTABLISHMENT_CONSULT = "PERM_ESTABLISHMENT_CONSULT";
   protected static final String PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE = "PERM_ESTABLISHMENT_ACTIVE_OR_INACTIVE";
 
-  /* Permission for Establishments */
+  /* Permission for Flags */
   protected static final String PERM_FLAGS_CHANGE = "PERM_FLAGS_CHANGE";
   protected static final String PERM_FLAGS_CREATE = "PERM_FLAGS_CREATE";
   protected static final String PERM_FLAGS_DELETE = "PERM_FLAGS_DELETE";
   protected static final String PERM_FLAGS_CONSULT = "PERM_FLAGS_CONSULT";
+  protected static final String PERM_FLAGS_MANAGE_RELATIONS = "PERM_FLAGS_MANAGE_RELATIONS";
   protected static final String PERM_FLAGS_ACTIVE_OR_INACTIVE = "PERM_FLAGS_ACTIVE_OR_INACTIVE";
 
   /* Permission for Establishments */

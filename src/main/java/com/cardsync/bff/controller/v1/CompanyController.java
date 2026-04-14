@@ -60,7 +60,7 @@ public class CompanyController {
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.Register.Companies.CanCreate
+  @CheckSecurity.Register.Companies.CanChange
   public CompanyModel update(@PathVariable UUID id, @Valid @RequestBody CompanyInput body) {
     CompanyEntity entity = service.update(id, body);
     return modelAssembler.toModel(entity);
@@ -75,7 +75,7 @@ public class CompanyController {
   @PostMapping("/{id}/deactivate")
   @CheckSecurity.Register.Companies.CanActiveOrInactive
   public void deactivate(@PathVariable UUID id) {
-   service.deactivate(id);
+    service.deactivate(id);
   }
 
   @PostMapping("/{id}/block")

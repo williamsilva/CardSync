@@ -194,6 +194,11 @@ public @interface CheckSecurity {
       @Retention(RUNTIME)
       @PreAuthorize("@csSecurity.canActiveOrInactiveFlags()")
       @interface CanActiveOrInactive {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canManageRelationsFlags()")
+      @interface CanManageRelations {}
     }
 
     @interface Contracts {

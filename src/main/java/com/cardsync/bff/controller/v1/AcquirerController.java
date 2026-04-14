@@ -60,7 +60,7 @@ public class AcquirerController {
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.Register.Acquirers.CanCreate
+  @CheckSecurity.Register.Acquirers.CanChange
   public AcquirerModel update(@PathVariable UUID id, @Valid @RequestBody AcquirerInput body) {
     AcquirerEntity entity = service.update(id, body);
     return modelAssembler.toModel(entity);

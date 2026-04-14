@@ -158,6 +158,10 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_FLAGS_ACTIVE_OR_INACTIVE);
   }
 
+  public boolean canManageRelationsFlags() {
+    return hasAllWriteScope() && hasAuthority(PERM_FLAGS_MANAGE_RELATIONS);
+  }
+
   /* Contracts */
   public boolean canConsultContracts() {
     return hasAllReadScope() && hasAuthority(PERM_CONTRACTS_CONSULT);

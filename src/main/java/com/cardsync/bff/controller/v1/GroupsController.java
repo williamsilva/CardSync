@@ -37,7 +37,7 @@ public class GroupsController {
   }
 
   @GetMapping("/{id}")
-  @CheckSecurity.Authenticated
+  @CheckSecurity.Security.Groups.CanConsult
   public GroupModel get(@PathVariable UUID id) {
     GroupEntity entity = service.getById(id);
     return groupModelAssembler.toModel(entity);

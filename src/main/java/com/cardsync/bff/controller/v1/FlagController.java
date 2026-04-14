@@ -55,13 +55,13 @@ public class FlagController {
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.Register.Flags.CanCreate
+  @CheckSecurity.Register.Flags.CanChange
   public FlagModel update(@PathVariable UUID id, @Valid @RequestBody FlagInput body) {
     return modelAssembler.toModel(service.update(id, body));
   }
 
   @PostMapping("/{id}/company-relations")
-  @CheckSecurity.Register.Flags.CanCreate
+  @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel addCompanies(
     @PathVariable UUID id,
     @Valid @RequestBody FlagCompanyRelationsInput body
@@ -70,13 +70,13 @@ public class FlagController {
   }
 
   @DeleteMapping("/{id}/companies/{companyId}")
-  @CheckSecurity.Register.Flags.CanCreate
+  @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel removeCompany(@PathVariable UUID id, @PathVariable UUID companyId) {
     return modelAssembler.toModel(service.removeCompany(id, companyId));
   }
 
   @PostMapping("/{id}/acquirer-relations")
-  @CheckSecurity.Register.Flags.CanCreate
+  @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel addAcquirerRelations(
     @PathVariable UUID id,
     @Valid @RequestBody FlagAcquirerRelationsInput body
@@ -85,7 +85,7 @@ public class FlagController {
   }
 
   @DeleteMapping("/{id}/acquirers/{acquirerId}")
-  @CheckSecurity.Register.Flags.CanCreate
+  @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel removeAcquirer(@PathVariable UUID id, @PathVariable UUID acquirerId) {
     return modelAssembler.toModel(service.removeAcquirer(id, acquirerId));
   }

@@ -115,6 +115,7 @@ public class GroupService {
   @Transactional
   public GroupEntity update(UUID groupId, GroupInput input) {
     GroupEntity group = getById(groupId);
+    ensureNotSupportGroup(group);
 
     String normalizedName = validation.requireName(input.name());
 
@@ -153,6 +154,7 @@ public class GroupService {
   @Transactional
   public GroupEntity updatePermissions(UUID groupId, List<UUID> permissionIds) {
     GroupEntity group = getById(groupId);
+    ensureNotSupportGroup(group);
     List<UUID> ids = distinctIds(permissionIds);
     List<PermissionEntity> permissions = ids.isEmpty() ? List.of() : permissionRepository.findAllById(ids);
 
@@ -160,6 +162,16 @@ public class GroupService {
       Set<UUID> foundIds = permissions.stream().map(PermissionEntity::getId).collect(Collectors.toSet());
       List<UUID> missing = ids.stream().filter(id -> !foundIds.contains(id)).toList();
       throw BusinessException.notFound(ErrorCode.PERMISSION_NOT_FOUND, "Permission(s) not found for ids: " + missing);
+    }
+
+    boolean containsSupportPermission = permissions.stream()
+      .anyMatch(permission -> permission.getName() != null && EXCLUDED_PERMISSION_NAME.equalsIgnoreCase(permission.getName()));
+
+    if (containsSupportPermission) {
+      throw BusinessException.forbidden(
+        ErrorCode.GROUP_DELETE_SUPPORT_NOT_ALLOWED,
+        "Support permission cannot be assigned to another group. groupId=" + groupId
+      );
     }
 
     group.setPermissions(new LinkedHashSet<>(permissions));

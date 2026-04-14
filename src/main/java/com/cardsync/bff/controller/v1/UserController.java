@@ -53,7 +53,7 @@ public class UserController {
   }
 
   @GetMapping("/{id}")
-  @CheckSecurity.Authenticated
+  @CheckSecurity.Security.Users.CanConsult
   public UserModel get(@PathVariable UUID id) {
     UserEntity entity = service.getById(id);
     return userModelAssembler.toModel(entity);
@@ -72,8 +72,8 @@ public class UserController {
   @PutMapping("/{id}")
   @CheckSecurity.Security.Users.CanChange
   public UserModel update(@PathVariable UUID id, @Valid @RequestBody UserInput body) {
-      UserEntity updatedUser  = service.update(id, body);
-      return userModelAssembler.toModel(updatedUser);
+    UserEntity updatedUser  = service.update(id, body);
+    return userModelAssembler.toModel(updatedUser);
   }
 
   @PostMapping("/{id}/activate")
