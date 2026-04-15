@@ -321,5 +321,7 @@
       "subtitle": "If the invitation is still available, we will send a new link.",
       "alert": "Check your inbox and spam folder."
     }
-  }
+  },
+  "error.CONTRACT_NOT_FOUND": "Contract not found."
+
 }

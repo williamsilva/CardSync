@@ -8,6 +8,8 @@ import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -25,10 +27,15 @@ public class ContractModel extends RepresentationModel<ContractModel> {
   private LocalDate endDate;
   private LocalDate startDate;
 
-  private CompanyModel company;
-  private AcquirerModel acquirer;
+  private OffsetDateTime createdAt;
+  private OffsetDateTime updatedAt;
 
-  //private List<ContractFlagModel> contractFlags;
-  //private EstablishmentAcquirerModel establishment;
+  private UserMinimalModel createdBy;
+  private UserMinimalModel updatedBy;
 
+  private CompanyMinimalModel company;
+  private AcquirerMinimalModel acquirer;
+  private EstablishmentMinimalModel establishment;
+
+  private List<ContractFlagModel> contractFlags;
 }

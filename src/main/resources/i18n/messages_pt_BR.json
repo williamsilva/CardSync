@@ -325,5 +325,7 @@
       "subtitle": "Se o convite ainda estiver disponível, enviaremos um novo link.",
       "alert": "Verifique sua caixa de entrada e spam."
     }
-  }
+  },
+  "error.CONTRACT_NOT_FOUND": "Contrato não encontrado."
+
 }

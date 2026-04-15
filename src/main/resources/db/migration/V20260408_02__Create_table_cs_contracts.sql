@@ -41,6 +41,53 @@ CREATE TABLE cs_contract_rates (
     FOREIGN KEY (contract_flag_id) REFERENCES cs_contract_flags(id)
 );
 
+ALTER TABLE cs_contracts
+    ADD COLUMN created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ADD COLUMN updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    ADD COLUMN created_by_id BINARY(16) NULL,
+    ADD COLUMN updated_by_id BINARY(16) NULL;
+
+CREATE INDEX idx_cs_contracts_status ON cs_contracts (status);
+CREATE INDEX idx_cs_contracts_start_date ON cs_contracts (start_date);
+CREATE INDEX idx_cs_contracts_end_date ON cs_contracts (end_date);
+CREATE INDEX idx_cs_contracts_company_id ON cs_contracts (company_id);
+CREATE INDEX idx_cs_contracts_acquirer_id ON cs_contracts (acquirer_id);
+CREATE INDEX idx_cs_contracts_establishment_id ON cs_contracts (establishment_id);
+CREATE INDEX idx_cs_contracts_created_by_id ON cs_contracts (created_by_id);
+CREATE INDEX idx_cs_contracts_updated_by_id ON cs_contracts (updated_by_id);
+
+ALTER TABLE cs_contracts
+  ADD CONSTRAINT fk_cs_contracts_created_by FOREIGN KEY (created_by_id)
+  REFERENCES cs_users(id) ON UPDATE CASCADE;
+
+ALTER TABLE cs_contracts
+  ADD CONSTRAINT fk_cs_contracts_updated_by FOREIGN KEY (updated_by_id)
+  REFERENCES cs_users(id) ON UPDATE CASCADE;
+
+CREATE UNIQUE INDEX uq_cs_contract_flags_contract_flag
+  ON cs_contract_flags (contract_id, flag_id);
+
+CREATE INDEX idx_cs_contract_flags_contract_id
+  ON cs_contract_flags (contract_id);
+
+CREATE INDEX idx_cs_contract_flags_flag_id
+  ON cs_contract_flags (flag_id);
+
+CREATE UNIQUE INDEX uq_cs_contract_rates_contract_flag_modality
+  ON cs_contract_rates (contract_flag_id, modality);
+
+CREATE INDEX idx_cs_contract_rates_contract_flag_id
+  ON cs_contract_rates (contract_flag_id);
+
+CREATE INDEX idx_cs_contract_rates_modality
+  ON cs_contract_rates (modality);
+
+CREATE UNIQUE INDEX uq_cs_contracts_company_acquirer_description_start_date
+  ON cs_contracts (company_id, acquirer_id, description, start_date);
+
+CREATE UNIQUE INDEX uq_cs_contracts_establishment_description_start_date
+  ON cs_contracts (establishment_id, description, start_date);
+
 INSERT INTO cs_permissions (id, name, description) VALUES
   (UUID_TO_BIN(UUID()), 'CONTRACTS_CHANGE', 'Altera contratos'), (UUID_TO_BIN(UUID()), 'CONTRACTS_CREATE', 'Cadastra contratos'),
   (UUID_TO_BIN(UUID()), 'CONTRACTS_CONSULT', 'Consulta contratos'), (UUID_TO_BIN(UUID()), 'CONTRACTS_DELETE', 'Excluir contratos'),

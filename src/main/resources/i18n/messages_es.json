@@ -321,5 +321,7 @@
       "subtitle": "Si la invitación aún está disponible, enviaremos un nuevo enlace.",
       "alert": "Revise su bandeja de entrada y spam."
     }
-  }
+  },
+  "error.CONTRACT_NOT_FOUND": "Contrato no encontrado."
+
 }

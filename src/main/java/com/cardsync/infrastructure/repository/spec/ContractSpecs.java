@@ -4,6 +4,7 @@ import com.cardsync.domain.filter.ContractFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.ContractAllowedFields;
 import com.cardsync.domain.model.ContractEntity;
+import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
@@ -42,24 +43,48 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
     if (query.advanced() != null) {
       var a = query.advanced();
 
-      /* spec = spec.and(contains("cnpj", a.cnpj()));
-      spec = spec.and(contains("fantasyName", a.fantasyName()));
-      spec = spec.and(contains("socialReason", a.socialReason()));
-      spec = spec.and(rangeOdt("createdAt", a.createdAtFrom(), a.createdAtTo()));
+      spec = spec.and(inCodes("status", a.status(), StatusEnum::getCode));
 
       spec = spec.and(
-        inPath(a.createdBy(), value -> {
+        inPath(a.company(), value -> {
           try {
             return UUID.fromString(value);
           } catch (Exception e) {
             return null;
           }
-        }, "createdBy", "id")
+        }, "company", "id")
       );
 
-      spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
-      */
+      spec = spec.and(
+        inPath(a.acquirer(), value -> {
+          try {
+            return UUID.fromString(value);
+          } catch (Exception e) {
+            return null;
+          }
+        }, "acquirer", "id")
+      );
+
+      spec = spec.and(
+        inPath(a.establishment(), value -> {
+          try {
+            return UUID.fromString(value);
+          } catch (Exception e) {
+            return null;
+          }
+        }, "establishment", "id")
+      );
     }
-    return spec.and(orderByAsc("id"));
+
+    if (!isBlank(query.globalFilter())) {
+      String gf = query.globalFilter();
+      spec = spec.and(anyOf(
+        contains("description", gf),
+        containsPath(gf, "company", "fantasyName"),
+        containsPath(gf, "acquirer", "fantasyName")
+      ));
+    }
+
+    return spec.and(orderByAsc("description"));
   }
 }

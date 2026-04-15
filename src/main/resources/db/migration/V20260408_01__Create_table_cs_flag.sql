@@ -32,6 +32,7 @@ CREATE TABLE cs_flag_company (
 INSERT INTO cs_permissions (id, name, description) VALUES
   (UUID_TO_BIN(UUID()), 'FLAGS_CHANGE', 'Altera bandeiras'), (UUID_TO_BIN(UUID()), 'FLAGS_CREATE', 'Cadastra bandeiras'),
   (UUID_TO_BIN(UUID()), 'FLAGS_CONSULT', 'Consulta bandeiras'), (UUID_TO_BIN(UUID()), 'FLAGS_DELETE', 'Excluir bandeiras'),
+  (UUID_TO_BIN(UUID()), 'PERM_FLAGS_MANAGE_RELATIONS', 'Relaciona bandeiras a adquirentes e empresas'),
   (UUID_TO_BIN(UUID()), 'FLAGS_ACTIVE_OR_INACTIVE', 'Ativa ou desativa bandeiras');
 
 INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
