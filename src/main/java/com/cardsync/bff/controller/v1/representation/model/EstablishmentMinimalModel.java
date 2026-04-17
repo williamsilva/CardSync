@@ -17,7 +17,10 @@ import java.util.UUID;
 public class EstablishmentMinimalModel extends RepresentationModel<EstablishmentMinimalModel> {
 
   private UUID id;
-  private String pvNumber;
   private String type;
   private String status;
+  private String pvNumber;
+
+  private CompanyMinimalModel company;
+  private AcquirerMinimalModel acquirer;
 }

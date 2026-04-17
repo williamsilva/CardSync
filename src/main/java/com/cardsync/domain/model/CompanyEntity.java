@@ -29,9 +29,6 @@ public class CompanyEntity extends AuditableEntityBase {
   @OneToMany(mappedBy = "company")
   private List<TransactionAcqEntity> transactions = new ArrayList<>();
 
-  @OneToMany(mappedBy = "company")
-  private List<CompanyAcquirerEntity> companyAcquirers = new ArrayList<>();
-
   public StatusEnum getStatus() {
     return StatusEnum.fromCode(status);
   }

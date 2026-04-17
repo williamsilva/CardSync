@@ -21,7 +21,14 @@ public interface AcquirerRepository extends JpaRepository< AcquirerEntity, UUID>
   Page< AcquirerEntity> findAll(Specification< AcquirerEntity> spec, Pageable pageable);
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy"})
+  @EntityGraph(attributePaths = {
+    "createdBy",
+    "updatedBy",
+    "acquirerCompanies",
+    "acquirerCompanies.company",
+    "acquirerEstablishments",
+    "acquirerEstablishments.establishment"
+  })
   Optional< AcquirerEntity> findById(UUID id);
 
   boolean existsByCnpj(String cnpj);

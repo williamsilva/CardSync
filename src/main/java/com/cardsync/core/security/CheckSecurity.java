@@ -140,6 +140,11 @@ public @interface CheckSecurity {
       @Retention(RUNTIME)
       @PreAuthorize("@csSecurity.canActiveOrInactiveAcquirers()")
       @interface CanActiveOrInactive {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canManageRelationsAcquirers()")
+      @interface CanManageRelations {}
     }
 
     @interface Establishments {

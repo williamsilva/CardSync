@@ -116,6 +116,10 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_ACQUIRER_ACTIVE_OR_INACTIVE);
   }
 
+  public boolean canManageRelationsAcquirers() {
+    return hasAllWriteScope() && hasAuthority(PERM_ACQUIRER_MANAGE_RELATIONS);
+  }
+
   /* Establishments */
   public boolean canConsultEstablishments() {
     return hasAllReadScope() && hasAuthority(PERM_ESTABLISHMENT_CONSULT);

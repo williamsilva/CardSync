@@ -9,13 +9,13 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FlagAcquirerRelationModel {
+public class RelationEstablishmentModel {
 
-  private UUID acquirerId;
+  private UUID establishmentId;
 
-  private String cnpj;
+  private String type;
   private String status;
-  private String fantasyName;
-  private String socialReason;
-  private String acquirerCode;
+  private Integer pvNumber;
+
+  private CompanyMinimalModel company;
 }

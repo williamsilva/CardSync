@@ -24,6 +24,7 @@ INSERT INTO cs_permissions (id, name, description) VALUES
 
   (UUID_TO_BIN(UUID()), 'ACQUIRER_CHANGE', 'Altera empresas'), (UUID_TO_BIN(UUID()), 'ACQUIRER_CREATE', 'Cadastra empresas'),
   (UUID_TO_BIN(UUID()), 'ACQUIRER_CONSULT', 'Consulta empresas'), (UUID_TO_BIN(UUID()), 'ACQUIRER_DELETE', 'Excluir empresas'),
+  (UUID_TO_BIN(UUID()), 'ACQUIRER_MANAGE_RELATIONS', 'Relaciona adquirentes a estabelecimentos e empresas'),
   (UUID_TO_BIN(UUID()), 'ACQUIRER_ACTIVE_OR_INACTIVE', 'Ativa ou desativa empresas');
 
 INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
@@ -37,4 +38,5 @@ INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'ACQUIRER_CONSULT')),
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'ACQUIRER_CREATE')),
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'ACQUIRER_DELETE')),
+  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'ACQUIRER_MANAGE_RELATIONS')),
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'ACQUIRER_ACTIVE_OR_INACTIVE'));

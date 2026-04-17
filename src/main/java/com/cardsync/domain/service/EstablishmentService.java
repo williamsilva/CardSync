@@ -17,6 +17,7 @@ import com.cardsync.infrastructure.repository.spec.EstablishmentSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,12 @@ public class EstablishmentService {
   private final EstablishmentSpecs establishmentSpecs;
   private final AcquirerRepository acquirerRepository;
   private final EstablishmentRepository establishmentRepository;
+
+  @Transactional(readOnly = true)
+  public List<EstablishmentEntity> listOptionsFilter() {
+    return establishmentRepository
+      .findAll(Sort.by(Sort.Direction.ASC, "pvNumber"));
+  }
 
   @Transactional(readOnly = true)
   public EstablishmentEntity getById(UUID establishmentId) {

@@ -24,12 +24,13 @@ public class ContractModelAssembler extends RepresentationModelAssemblerSupport<
     ContractModel model = createModelWithId(entity.getId(), entity);
 
     model.setId(entity.getId());
-    model.setDescription(entity.getDescription());
-    model.setStartDate(entity.getStartDate());
     model.setEndDate(entity.getEndDate());
-    model.setStatus(entity.getStatus() != null ? entity.getStatus().name() : null);
+    model.setStartDate(entity.getStartDate());
+    model.setDescription(entity.getDescription());
+
     model.setCreatedAt(entity.getCreatedAt());
     model.setUpdatedAt(entity.getUpdatedAt());
+    model.setStatus(entity.getStatus() != null ? entity.getStatus().name() : null);
 
     if (entity.getCreatedBy() != null) {
       model.setCreatedBy(new UserMinimalModel(
@@ -68,14 +69,14 @@ public class ContractModelAssembler extends RepresentationModelAssemblerSupport<
       ));
     }
 
-    if (entity.getEstablishment() != null) {
+    /*if (entity.getEstablishment() != null) {
       model.setEstablishment(new EstablishmentMinimalModel(
         entity.getEstablishment().getId(),
         entity.getEstablishment().getPvNumber() != null ? String.valueOf(entity.getEstablishment().getPvNumber()) : null,
         entity.getEstablishment().getType() != null ? entity.getEstablishment().getType().name() : null,
         entity.getEstablishment().getStatus() != null ? entity.getEstablishment().getStatus().name() : null
       ));
-    }
+    }*/
 
     List<ContractFlagModel> flags = entity.getContractFlags().stream()
       .sorted(Comparator.comparing(cf -> cf.getFlag() != null ? cf.getFlag().getName() : ""))

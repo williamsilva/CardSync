@@ -23,7 +23,7 @@ public class FlagModel extends RepresentationModel<FlagModel> {
   private String status;
   private Integer erpCode;
 
-  private List<FlagCompanyRelationModel> companies;
-  private List<FlagAcquirerRelationModel> acquirers;
+  private List<RelationCompanyModel> companies;
+  private List<RelationAcquirerModel> acquirers;
 
 }

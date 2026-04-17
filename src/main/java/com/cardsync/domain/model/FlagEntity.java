@@ -26,10 +26,10 @@ public class FlagEntity  {
   private Integer erpCode;
 
   @OneToMany(mappedBy = "flag", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<FlagAcquirerEntity> flagAcquirers = new LinkedHashSet<>();
+  private Set<RelationFlagAcquirerEntity> flagAcquirers = new LinkedHashSet<>();
 
   @OneToMany(mappedBy = "flag", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<FlagCompanyEntity> flagCompanies = new LinkedHashSet<>();
+  private Set<RelationFlagCompanyEntity> flagCompanies = new LinkedHashSet<>();
 
   public StatusEnum getStatus() {
     return StatusEnum.fromCode(status);

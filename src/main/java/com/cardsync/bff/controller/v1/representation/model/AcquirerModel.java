@@ -8,6 +8,7 @@ import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -27,4 +28,7 @@ public class AcquirerModel extends RepresentationModel<AcquirerModel>  {
 
   private OffsetDateTime createdAt;
   private UserMinimalModel createdBy;
+
+  private List<RelationCompanyModel> companies;
+  private List<RelationEstablishmentModel> establishments;
 }

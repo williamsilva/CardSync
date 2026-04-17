@@ -10,22 +10,22 @@ import java.util.UUID;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(of = {"flag", "company"})
+@EqualsAndHashCode(of = {"acquirer", "company"})
 @Table(
-  name = "cs_flag_company",
+  name = "cs_acquirer_company",
   uniqueConstraints = {
-    @UniqueConstraint(name = "uk_cs_flag_company_flag_company", columnNames = {"flag_id", "company_id"})
+    @UniqueConstraint(name = "uk_cs_acquirer_company_acquirer_company", columnNames = {"acquirer_id", "company_id"})
   }
 )
-public class FlagCompanyEntity {
+public class RelationAcquirerCompanyEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "flag_id", nullable = false)
-  private FlagEntity flag;
+  @JoinColumn(name = "acquirer_id", nullable = false)
+  private AcquirerEntity acquirer;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "company_id", nullable = false)

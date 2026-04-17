@@ -17,7 +17,7 @@ import java.util.UUID;
     @UniqueConstraint(name = "uk_cs_flag_acquirer_flag_acquirer", columnNames = {"flag_id", "acquirer_id"})
   }
 )
-public class FlagAcquirerEntity {
+public class RelationFlagAcquirerEntity {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)

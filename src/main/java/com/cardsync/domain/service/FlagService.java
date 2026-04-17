@@ -154,7 +154,7 @@ public class FlagService {
   }
 
   @Transactional
-  public FlagEntity addCompanies(UUID flagId, List<UUID> companyIds) {
+  public FlagEntity addCompaniesRelations(UUID flagId, List<UUID> companyIds) {
     FlagEntity flag = getById(flagId);
 
     List<UUID> ids = distinctIds(companyIds);
@@ -175,7 +175,7 @@ public class FlagService {
         );
       }
 
-      FlagCompanyEntity relation = new FlagCompanyEntity();
+      RelationFlagCompanyEntity relation = new RelationFlagCompanyEntity();
       relation.setFlag(flag);
       relation.setCompany(company);
       flag.getFlagCompanies().add(relation);
@@ -185,7 +185,7 @@ public class FlagService {
   }
 
   @Transactional
-  public FlagEntity removeCompany(UUID flagId, UUID companyId) {
+  public FlagEntity removeCompanyRelations(UUID flagId, UUID companyId) {
     FlagEntity flag = getById(flagId);
 
     boolean removed = flag.getFlagCompanies().removeIf(item ->
@@ -240,7 +240,7 @@ public class FlagService {
         );
       }
 
-      FlagAcquirerEntity relation = new FlagAcquirerEntity();
+      RelationFlagAcquirerEntity relation = new RelationFlagAcquirerEntity();
       relation.setFlag(flag);
       relation.setAcquirer(acquirer);
       relation.setAcquirerCode(input.acquirerCode().trim());
@@ -251,7 +251,7 @@ public class FlagService {
   }
 
   @Transactional
-  public FlagEntity removeAcquirer(UUID flagId, UUID acquirerId) {
+  public FlagEntity removeAcquirerRelations(UUID flagId, UUID acquirerId) {
     FlagEntity flag = getById(flagId);
 
     boolean removed = flag.getFlagAcquirers().removeIf(item ->
@@ -274,7 +274,7 @@ public class FlagService {
 
     validateAllIdsFound(ids, companies.stream().map(CompanyEntity::getId).toList(), "Company");
 
-    Map<UUID, FlagCompanyEntity> currentByCompanyId = flag.getFlagCompanies().stream()
+    Map<UUID, RelationFlagCompanyEntity> currentByCompanyId = flag.getFlagCompanies().stream()
       .filter(fc -> fc.getCompany() != null && fc.getCompany().getId() != null)
       .collect(Collectors.toMap(fc -> fc.getCompany().getId(), fc -> fc));
 
@@ -289,7 +289,7 @@ public class FlagService {
     for (CompanyEntity company : companies) {
       if (existing.contains(company.getId())) continue;
 
-      FlagCompanyEntity relation = new FlagCompanyEntity();
+      RelationFlagCompanyEntity relation = new RelationFlagCompanyEntity();
       relation.setFlag(flag);
       relation.setCompany(company);
       flag.getFlagCompanies().add(relation);
@@ -313,7 +313,7 @@ public class FlagService {
     for (AcquirerEntity acquirer : acquirers) {
       if (existing.contains(acquirer.getId())) continue;
 
-      FlagAcquirerEntity relation = new FlagAcquirerEntity();
+      RelationFlagAcquirerEntity relation = new RelationFlagAcquirerEntity();
       relation.setFlag(flag);
       relation.setAcquirer(acquirer);
       relation.setAcquirerCode(null);

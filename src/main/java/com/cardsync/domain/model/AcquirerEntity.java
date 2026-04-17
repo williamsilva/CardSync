@@ -1,6 +1,7 @@
 package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.StatusEnum;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -27,11 +28,11 @@ public class AcquirerEntity extends AuditableEntityBase {
   private String socialReason;
   private String fileIdentifier;
 
-  @OneToMany(mappedBy = "acquirer")
-  private List<EstablishmentEntity> establishments = new ArrayList<>();
+  @OneToMany(mappedBy = "acquirer", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<RelationAcquirerEstablishmentEntity> acquirerEstablishments = new ArrayList<>();
 
-  @OneToMany(mappedBy = "acquirer")
-  private List<CompanyAcquirerEntity> companyAcquirers = new ArrayList<>();
+  @OneToMany(mappedBy = "acquirer", cascade = CascadeType.ALL, orphanRemoval = true)
+  private List<RelationAcquirerCompanyEntity> acquirerCompanies = new ArrayList<>();
 
   public StatusEnum getStatus() {
     return StatusEnum.fromCode(status);

@@ -1,8 +1,8 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.mapper.model.FlagModelAssembler;
-import com.cardsync.bff.controller.v1.representation.input.FlagAcquirerRelationsInput;
-import com.cardsync.bff.controller.v1.representation.input.FlagCompanyRelationsInput;
+import com.cardsync.bff.controller.v1.representation.input.RelationsAcquirerInput;
+import com.cardsync.bff.controller.v1.representation.input.RelationsCompanyInput;
 import com.cardsync.bff.controller.v1.representation.input.FlagInput;
 import com.cardsync.bff.controller.v1.representation.model.FlagModel;
 import com.cardsync.core.security.CheckSecurity;
@@ -64,22 +64,22 @@ public class FlagController {
   @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel addCompanies(
     @PathVariable UUID id,
-    @Valid @RequestBody FlagCompanyRelationsInput body
+    @Valid @RequestBody RelationsCompanyInput body
   ) {
-    return modelAssembler.toModel(service.addCompanies(id, body.companyIds()));
+    return modelAssembler.toModel(service.addCompaniesRelations(id, body.companyIds()));
   }
 
   @DeleteMapping("/{id}/companies/{companyId}")
   @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel removeCompany(@PathVariable UUID id, @PathVariable UUID companyId) {
-    return modelAssembler.toModel(service.removeCompany(id, companyId));
+    return modelAssembler.toModel(service.removeCompanyRelations(id, companyId));
   }
 
   @PostMapping("/{id}/acquirer-relations")
   @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel addAcquirerRelations(
     @PathVariable UUID id,
-    @Valid @RequestBody FlagAcquirerRelationsInput body
+    @Valid @RequestBody RelationsAcquirerInput body
   ) {
     return modelAssembler.toModel(service.addAcquirerRelations(id, body.items()));
   }
@@ -87,7 +87,7 @@ public class FlagController {
   @DeleteMapping("/{id}/acquirers/{acquirerId}")
   @CheckSecurity.Register.Flags.CanManageRelations
   public FlagModel removeAcquirer(@PathVariable UUID id, @PathVariable UUID acquirerId) {
-    return modelAssembler.toModel(service.removeAcquirer(id, acquirerId));
+    return modelAssembler.toModel(service.removeAcquirerRelations(id, acquirerId));
   }
 
   @PostMapping("/{id}/activate")

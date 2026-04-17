@@ -1,11 +1,11 @@
 package com.cardsync.bff.controller.v1.mapper.model;
 
 import com.cardsync.bff.controller.v1.FlagController;
-import com.cardsync.bff.controller.v1.representation.model.FlagAcquirerRelationModel;
-import com.cardsync.bff.controller.v1.representation.model.FlagCompanyRelationModel;
+import com.cardsync.bff.controller.v1.representation.model.RelationAcquirerModel;
+import com.cardsync.bff.controller.v1.representation.model.RelationCompanyModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagModel;
-import com.cardsync.domain.model.FlagAcquirerEntity;
-import com.cardsync.domain.model.FlagCompanyEntity;
+import com.cardsync.domain.model.RelationFlagAcquirerEntity;
+import com.cardsync.domain.model.RelationFlagCompanyEntity;
 import com.cardsync.domain.model.FlagEntity;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
@@ -34,7 +34,7 @@ public class FlagModelAssembler extends RepresentationModelAssemblerSupport<Flag
         .filter(item -> item.getCompany() != null)
         .map(this::toCompanyRelationModel)
         .sorted(Comparator.comparing(
-          FlagCompanyRelationModel::getFantasyName,
+          RelationCompanyModel::getFantasyName,
           Comparator.nullsLast(String::compareToIgnoreCase)
         ))
         .toList()
@@ -45,7 +45,7 @@ public class FlagModelAssembler extends RepresentationModelAssemblerSupport<Flag
         .filter(item -> item.getAcquirer() != null)
         .map(this::toAcquirerRelationModel)
         .sorted(Comparator.comparing(
-          FlagAcquirerRelationModel::getFantasyName,
+          RelationAcquirerModel::getFantasyName,
           Comparator.nullsLast(String::compareToIgnoreCase)
         ))
         .toList()
@@ -59,10 +59,10 @@ public class FlagModelAssembler extends RepresentationModelAssemblerSupport<Flag
     return super.toCollectionModel(entities);
   }
 
-  private FlagCompanyRelationModel toCompanyRelationModel(FlagCompanyEntity item) {
+  private RelationCompanyModel toCompanyRelationModel(RelationFlagCompanyEntity item) {
     var company = item.getCompany();
 
-    return FlagCompanyRelationModel.builder()
+    return RelationCompanyModel.builder()
       .cnpj(company.getCnpj())
       .companyId(company.getId())
       .fantasyName(company.getFantasyName())
@@ -72,10 +72,10 @@ public class FlagModelAssembler extends RepresentationModelAssemblerSupport<Flag
       .build();
   }
 
-  private FlagAcquirerRelationModel toAcquirerRelationModel(FlagAcquirerEntity item) {
+  private RelationAcquirerModel toAcquirerRelationModel(RelationFlagAcquirerEntity item) {
     var acquirer = item.getAcquirer();
 
-    return FlagAcquirerRelationModel.builder()
+    return RelationAcquirerModel.builder()
       .cnpj(acquirer.getCnpj())
       .acquirerId( acquirer.getId())
       .acquirerCode(item.getAcquirerCode())

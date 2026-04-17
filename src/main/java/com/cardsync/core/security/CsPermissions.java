@@ -33,6 +33,7 @@ public abstract class CsPermissions {
   protected static final String PERM_ACQUIRER_CREATE = "PERM_ACQUIRER_CREATE";
   protected static final String PERM_ACQUIRER_DELETE = "PERM_ACQUIRER_DELETE";
   protected static final String PERM_ACQUIRER_CONSULT = "PERM_ACQUIRER_CONSULT";
+  protected static final String PERM_ACQUIRER_MANAGE_RELATIONS = "PERM_ACQUIRER_MANAGE_RELATIONS";
   protected static final String PERM_ACQUIRER_ACTIVE_OR_INACTIVE = "PERM_ACQUIRER_ACTIVE_OR_INACTIVE";
 
   /* Permission for Establishments */

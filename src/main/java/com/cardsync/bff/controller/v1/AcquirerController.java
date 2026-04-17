@@ -3,7 +3,9 @@ package com.cardsync.bff.controller.v1;
 import com.cardsync.bff.controller.v1.mapper.model.AcquirerMinimalModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.AcquirerModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.AcquirerInput;
+import com.cardsync.bff.controller.v1.representation.input.RelationsCompanyInput;
 import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.cardsync.bff.controller.v1.representation.input.RelationsEstablishmentInput;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerModel;
 import com.cardsync.core.security.CheckSecurity;
@@ -38,6 +40,12 @@ public class AcquirerController {
     return modelAssembler.toModel(entity);
   }
 
+  @GetMapping("/{id}/relations")
+  @CheckSecurity.Register.Acquirers.CanConsult
+  public AcquirerModel getRelations(@PathVariable UUID id) {
+    return modelAssembler.toModel(service.getById(id));
+  }
+
   @GetMapping("/options-filter")
   @CheckSecurity.Authenticated
   public CollectionModel<AcquirerMinimalModel> listOptionsFilter() {
@@ -57,6 +65,32 @@ public class AcquirerController {
   public AcquirerModel create(@Valid @RequestBody AcquirerInput body) {
     AcquirerEntity entity = service.create(body);
     return modelAssembler.toModel(entity);
+  }
+
+  @PostMapping("/{id}/company-relations")
+  @CheckSecurity.Register.Acquirers.CanManageRelations
+  public AcquirerModel addCompanies(@PathVariable UUID id, @Valid @RequestBody RelationsCompanyInput body) {
+    return modelAssembler.toModel(service.addCompaniesRelations(id, body.companyIds()));
+  }
+
+  @DeleteMapping("/{id}/companies/{companyId}")
+  @CheckSecurity.Register.Acquirers.CanManageRelations
+  public AcquirerModel removeCompany(@PathVariable UUID id, @PathVariable UUID companyId) {
+    return modelAssembler.toModel(service.removeCompanyRelations(id, companyId));
+  }
+
+  @PostMapping("/{id}/establishment-relations")
+  @CheckSecurity.Register.Acquirers.CanManageRelations
+  public AcquirerModel addEstablishmentRelations(
+    @PathVariable UUID id, @Valid @RequestBody RelationsEstablishmentInput body
+  ) {
+    return modelAssembler.toModel(service.addEstablishmentRelations(id, body.establishmentIds()));
+  }
+
+  @DeleteMapping("/{id}/establishments/{establishmentId}")
+  @CheckSecurity.Register.Acquirers.CanManageRelations
+  public AcquirerModel removeEstablishment(@PathVariable UUID id, @PathVariable UUID acquirerId) {
+    return modelAssembler.toModel(service.removeEstablishmentRelations(id, acquirerId));
   }
 
   @PutMapping("/{id}")

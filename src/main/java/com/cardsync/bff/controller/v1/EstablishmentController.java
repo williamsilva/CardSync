@@ -1,8 +1,10 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.mapper.model.EstablishmentMinimalModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.EstablishmentModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.EstablishmentInput;
 import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.EstablishmentModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.EstablishmentFilter;
@@ -13,6 +15,7 @@ import com.cardsync.domain.service.EstablishmentService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,7 +28,14 @@ public class EstablishmentController {
 
   private final EstablishmentService service;
   private final EstablishmentModelAssembler modelAssembler;
+  private final EstablishmentMinimalModelAssembler minimalModelAssembler;
   private final PagedResourcesAssembler<EstablishmentEntity> pagedResourcesAssembler;
+
+  @GetMapping("/options-filter")
+  @CheckSecurity.Authenticated
+  public CollectionModel<EstablishmentMinimalModel> listOptionsFilter() {
+    return minimalModelAssembler.toCollectionModel(service.listOptionsFilter());
+  }
 
   @GetMapping("/{id}")
   @CheckSecurity.Register.Establishments.CanConsult

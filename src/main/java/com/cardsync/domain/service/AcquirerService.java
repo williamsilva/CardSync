@@ -5,9 +5,11 @@ import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.AcquirerFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.model.AcquirerEntity;
+import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
+import com.cardsync.domain.repository.CompanyRepository;
+import com.cardsync.domain.repository.EstablishmentRepository;
 import com.cardsync.infrastructure.repository.spec.AcquirerSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,16 +28,9 @@ import java.util.stream.Collectors;
 public class AcquirerService {
 
   private final AcquirerSpecs acquirerSpecs;
+  private final CompanyRepository companyRepository;
   private final AcquirerRepository acquirerRepository;
-
-  @Transactional(readOnly = true)
-  public AcquirerEntity getById(UUID acquirerId) {
-    return acquirerRepository.findById(acquirerId)
-      .orElseThrow(() -> BusinessException.notFound(
-        ErrorCode.COMPANY_NOT_FOUND,
-        "Acquirer not found for id " + acquirerId
-      ));
-  }
+  private final EstablishmentRepository establishmentRepository;
 
   @Transactional(readOnly = true)
   public List<AcquirerEntity> listOptionsFilter() {
@@ -44,9 +39,25 @@ public class AcquirerService {
   }
 
   @Transactional(readOnly = true)
+  public AcquirerEntity getById(UUID acquirerId) {
+    AcquirerEntity entity = acquirerRepository.findById(acquirerId)
+      .orElseThrow(() -> BusinessException.notFound(
+        ErrorCode.COMPANY_NOT_FOUND,
+        "Acquirer not found for id " + acquirerId
+      ));
+
+    initializeRelations(entity);
+    return entity;
+  }
+
+  @Transactional(readOnly = true)
   public Page<AcquirerEntity> list(Pageable pageable, ListQueryDto<AcquirerFilter> query) {
     Specification<AcquirerEntity> spec = acquirerSpecs.fromQuery(query);
-    return acquirerRepository.findAll(spec, pageable);
+
+    Page<AcquirerEntity> page = acquirerRepository.findAll(spec, pageable);
+    page.getContent().forEach(this::initializeRelations);
+
+    return page;
   }
 
   @Transactional
@@ -168,6 +179,139 @@ public class AcquirerService {
       }
       entity.setStatus(StatusEnum.BLOCKED);
     });
+  }
+
+  @Transactional
+  public AcquirerEntity addCompaniesRelations(UUID acquirerId, List<UUID> companyIds) {
+    AcquirerEntity acquirer = getById(acquirerId);
+
+    List<UUID> ids = distinctIds(companyIds);
+    List<CompanyEntity> companies = ids.isEmpty() ? List.of() : companyRepository.findAllById(ids);
+
+    validateAllIdsFound(ids, companies.stream().map(CompanyEntity::getId).toList(), "Company");
+
+    Set<UUID> existingIds = acquirer.getAcquirerCompanies().stream()
+      .filter(item -> item.getCompany() != null)
+      .map(item -> item.getCompany().getId())
+      .collect(Collectors.toSet());
+
+    for (CompanyEntity company : companies) {
+      if (existingIds.contains(company.getId())) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_ERROR,
+          "Company already linked to this acquirer: " + company.getId()
+        );
+      }
+
+      RelationAcquirerCompanyEntity relation = new RelationAcquirerCompanyEntity();
+      relation.setAcquirer(acquirer);
+      relation.setCompany(company);
+      acquirer.getAcquirerCompanies().add(relation);
+    }
+
+    return acquirerRepository.save(acquirer);
+  }
+
+  @Transactional
+  public AcquirerEntity removeCompanyRelations(UUID acquirerId, UUID companyId) {
+    AcquirerEntity acquirer = getById(acquirerId);
+
+    boolean removed = acquirer.getAcquirerCompanies().removeIf(item ->
+      item.getCompany() != null && companyId.equals(item.getCompany().getId())
+    );
+
+    if (!removed) {
+      throw BusinessException.notFound(
+        ErrorCode.NOT_FOUND,
+        "Company relation not found for acquirerId=%s and companyId=%s".formatted(acquirerId, companyId)
+      );
+    }
+
+    return acquirerRepository.save(acquirer);
+  }
+
+  @Transactional
+  public AcquirerEntity addEstablishmentRelations(UUID acquirerId, List<UUID> establishmentIds) {
+    AcquirerEntity acquirer = getById(acquirerId);
+
+    List<UUID> ids = distinctIds(establishmentIds);
+    List<EstablishmentEntity> establishments = ids.isEmpty() ? List.of() : establishmentRepository.findAllById(ids);
+
+    validateAllIdsFound(ids, establishments.stream().map(EstablishmentEntity::getId).toList(), "Establishment");
+
+    Set<UUID> existingIds = acquirer.getAcquirerEstablishments().stream()
+      .filter(item -> item.getEstablishment() != null)
+      .map(item -> item.getEstablishment().getId())
+      .collect(Collectors.toSet());
+
+    for (EstablishmentEntity establishment : establishments) {
+      if (existingIds.contains(establishment.getId())) {
+        throw BusinessException.conflict(
+          ErrorCode.VALIDATION_ERROR,
+          "Establishment already linked to this acquirer: " + establishment.getId()
+        );
+      }
+
+      RelationAcquirerEstablishmentEntity relation = new RelationAcquirerEstablishmentEntity();
+      relation.setAcquirer(acquirer);
+      relation.setEstablishment(establishment);
+      acquirer.getAcquirerEstablishments().add(relation);
+    }
+
+    return acquirerRepository.save(acquirer);
+  }
+
+  @Transactional
+  public AcquirerEntity removeEstablishmentRelations(UUID acquirerId, UUID establishmentId) {
+    AcquirerEntity acquirer = getById(acquirerId);
+
+    boolean removed = acquirer.getAcquirerEstablishments().removeIf(item ->
+      item.getAcquirer() != null && establishmentId.equals(item.getAcquirer().getId())
+    );
+
+    if (!removed) {
+      throw BusinessException.notFound(
+        ErrorCode.NOT_FOUND,
+        "Acquirer relation not found for acquirerId=%s and establishmentId=%s".formatted(acquirerId, establishmentId)
+      );
+    }
+
+    return acquirerRepository.save(acquirer);
+  }
+
+  private void initializeRelations(AcquirerEntity acquirer) {
+    acquirer.getAcquirerCompanies().forEach(rel -> {
+      if (rel.getCompany() != null) {
+        rel.getCompany().getId();
+        rel.getCompany().getFantasyName();
+        rel.getCompany().getSocialReason();
+        rel.getCompany().getCnpj();
+        rel.getCompany().getStatus();
+        rel.getCompany().getType();
+      }
+    });
+
+    acquirer.getAcquirerEstablishments().forEach(rel -> {
+      if (rel.getEstablishment() != null) {
+        rel.getEstablishment().getId();
+        rel.getEstablishment().getPvNumber();
+        rel.getEstablishment().getStatus();
+        rel.getEstablishment().getType();
+      }
+    });
+  }
+
+  private List<UUID> distinctIds(List<UUID> ids) {
+    if (ids == null) return List.of();
+    return ids.stream().filter(Objects::nonNull).distinct().toList();
+  }
+
+  private void validateAllIdsFound(List<UUID> requested, List<UUID> found, String label) {
+    Set<UUID> foundSet = new HashSet<>(found);
+    List<UUID> missing = requested.stream().filter(id -> !foundSet.contains(id)).toList();
+    if (!missing.isEmpty()) {
+      throw BusinessException.notFound(ErrorCode.NOT_FOUND, label + " not found for ids " + missing);
+    }
   }
 
   private void updateBulkStatus(List<UUID> ids, Consumer<AcquirerEntity> updater) {
