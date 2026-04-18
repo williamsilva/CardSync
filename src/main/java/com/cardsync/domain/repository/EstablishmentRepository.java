@@ -27,7 +27,7 @@ public interface EstablishmentRepository extends JpaRepository<EstablishmentEnti
   Page<EstablishmentEntity> findAll(Specification<EstablishmentEntity> spec, Pageable pageable);
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy"})
+  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
   Optional<EstablishmentEntity> findById(UUID id);
 
   boolean existsByPvNumberAndCompany_IdAndAcquirer_Id(

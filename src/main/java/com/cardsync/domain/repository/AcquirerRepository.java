@@ -27,9 +27,10 @@ public interface AcquirerRepository extends JpaRepository< AcquirerEntity, UUID>
     "acquirerCompanies",
     "acquirerCompanies.company",
     "acquirerEstablishments",
-    "acquirerEstablishments.establishment"
+    "acquirerEstablishments.establishment",
+    "acquirerEstablishments.establishment.company"
   })
-  Optional< AcquirerEntity> findById(UUID id);
+  Optional<AcquirerEntity> findById(UUID id);
 
   boolean existsByCnpj(String cnpj);
   Optional< AcquirerEntity> findByCnpj(String cnpj);

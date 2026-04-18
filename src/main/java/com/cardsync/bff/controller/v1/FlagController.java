@@ -62,10 +62,7 @@ public class FlagController {
 
   @PostMapping("/{id}/company-relations")
   @CheckSecurity.Register.Flags.CanManageRelations
-  public FlagModel addCompanies(
-    @PathVariable UUID id,
-    @Valid @RequestBody RelationsCompanyInput body
-  ) {
+  public FlagModel addCompanies(  @PathVariable UUID id, @Valid @RequestBody RelationsCompanyInput body) {
     return modelAssembler.toModel(service.addCompaniesRelations(id, body.companyIds()));
   }
 
@@ -77,10 +74,7 @@ public class FlagController {
 
   @PostMapping("/{id}/acquirer-relations")
   @CheckSecurity.Register.Flags.CanManageRelations
-  public FlagModel addAcquirerRelations(
-    @PathVariable UUID id,
-    @Valid @RequestBody RelationsAcquirerInput body
-  ) {
+  public FlagModel addAcquirerRelations(@PathVariable UUID id,  @Valid @RequestBody RelationsAcquirerInput body) {
     return modelAssembler.toModel(service.addAcquirerRelations(id, body.items()));
   }
 

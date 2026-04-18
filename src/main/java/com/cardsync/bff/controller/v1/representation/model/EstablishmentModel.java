@@ -21,7 +21,7 @@ public class EstablishmentModel extends RepresentationModel<EstablishmentModel> 
 
   private String type;
   private String status;
-  private String pvNumber;
+  private Integer pvNumber;
 
   private OffsetDateTime createdAt;
 

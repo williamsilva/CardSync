@@ -8,6 +8,7 @@ import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.EstablishmentEntity;
+import com.cardsync.domain.model.RelationAcquirerEstablishmentEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.TypeEstablishmentEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
@@ -72,7 +73,14 @@ public class EstablishmentService {
     entity.setStatus(input.status());
 
     try {
-      return establishmentRepository.save(entity);
+      EstablishmentEntity saved = establishmentRepository.saveAndFlush(entity);
+      ensureAcquirerEstablishmentRelation(acquirer, saved);
+
+      return establishmentRepository.findById(saved.getId())
+        .orElseThrow(() -> BusinessException.notFound(
+          ErrorCode.COMPANY_NOT_FOUND,
+          "Establishment not found for id " + saved.getId()
+        ));
     } catch (org.springframework.dao.DataIntegrityViolationException ex) {
       throw BusinessException.badRequest(
         ErrorCode.ESTABLISHMENT_ALREADY_EXISTS,
@@ -84,6 +92,8 @@ public class EstablishmentService {
   @Transactional
   public EstablishmentEntity update(UUID establishmentId, EstablishmentInput input) {
     EstablishmentEntity entity = getById(establishmentId);
+
+    AcquirerEntity oldAcquirer = entity.getAcquirer();
 
     validateRequiredFields(input);
     validateUniqueCombination(input.pvNumber(), input.companyId(), input.acquirerId(), establishmentId);
@@ -98,7 +108,22 @@ public class EstablishmentService {
     entity.setStatus(input.status());
 
     try {
-      return establishmentRepository.save(entity);
+      EstablishmentEntity saved = establishmentRepository.saveAndFlush(entity);
+
+      if (oldAcquirer != null && !oldAcquirer.getId().equals(acquirer.getId())) {
+        oldAcquirer.getAcquirerEstablishments().removeIf(rel ->
+          rel.getEstablishment() != null && establishmentId.equals(rel.getEstablishment().getId())
+        );
+        acquirerRepository.save(oldAcquirer);
+      }
+
+      ensureAcquirerEstablishmentRelation(acquirer, saved);
+
+      return establishmentRepository.findById(saved.getId())
+        .orElseThrow(() -> BusinessException.notFound(
+          ErrorCode.COMPANY_NOT_FOUND,
+          "Establishment not found for id " + saved.getId()
+        ));
     } catch (org.springframework.dao.DataIntegrityViolationException ex) {
       throw BusinessException.badRequest(
         ErrorCode.ESTABLISHMENT_ALREADY_EXISTS,
@@ -299,5 +324,22 @@ public class EstablishmentService {
         ErrorCode.ACQUIRER_NOT_FOUND,
         "Acquirer not found for id " + acquirerId
       ));
+  }
+
+  private void ensureAcquirerEstablishmentRelation(AcquirerEntity acquirer, EstablishmentEntity establishment) {
+    boolean alreadyLinked = acquirer.getAcquirerEstablishments().stream()
+      .anyMatch(rel ->
+        rel.getEstablishment() != null
+          && rel.getEstablishment().getId() != null
+          && rel.getEstablishment().getId().equals(establishment.getId())
+      );
+
+    if (!alreadyLinked) {
+      RelationAcquirerEstablishmentEntity relation = new RelationAcquirerEstablishmentEntity();
+      relation.setAcquirer(acquirer);
+      relation.setEstablishment(establishment);
+      acquirer.getAcquirerEstablishments().add(relation);
+      acquirerRepository.save(acquirer);
+    }
   }
 }

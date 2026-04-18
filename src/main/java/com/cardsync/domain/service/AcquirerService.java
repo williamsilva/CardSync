@@ -1,5 +1,6 @@
 package com.cardsync.domain.service;
 
+import com.cardsync.bff.controller.v1.representation.input.AcquirerEstablishmentRelationItemInput;
 import com.cardsync.bff.controller.v1.representation.input.AcquirerInput;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
@@ -231,34 +232,89 @@ public class AcquirerService {
   }
 
   @Transactional
-  public AcquirerEntity addEstablishmentRelations(UUID acquirerId, List<UUID> establishmentIds) {
+  public AcquirerEntity addEstablishmentRelations(
+    UUID acquirerId,
+    List<AcquirerEstablishmentRelationItemInput> items
+  ) {
     AcquirerEntity acquirer = getById(acquirerId);
 
-    List<UUID> ids = distinctIds(establishmentIds);
-    List<EstablishmentEntity> establishments = ids.isEmpty() ? List.of() : establishmentRepository.findAllById(ids);
+    if (items == null || items.isEmpty()) {
+      throw BusinessException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        "The list of establishment relations must not be empty."
+      );
+    }
 
-    validateAllIdsFound(ids, establishments.stream().map(EstablishmentEntity::getId).toList(), "Establishment");
-
-    Set<UUID> existingIds = acquirer.getAcquirerEstablishments().stream()
-      .filter(item -> item.getEstablishment() != null)
-      .map(item -> item.getEstablishment().getId())
-      .collect(Collectors.toSet());
-
-    for (EstablishmentEntity establishment : establishments) {
-      if (existingIds.contains(establishment.getId())) {
-        throw BusinessException.conflict(
+    for (AcquirerEstablishmentRelationItemInput item : items) {
+      if (item.companyId() == null) {
+        throw BusinessException.badRequest(
           ErrorCode.VALIDATION_ERROR,
-          "Establishment already linked to this acquirer: " + establishment.getId()
+          "The field 'companyId' is required."
         );
       }
+
+      if (item.pvNumber() == null) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_ERROR,
+          "The field 'pvNumber' is required."
+        );
+      }
+
+      if (item.type() == null) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_ERROR,
+          "The field 'type' is required."
+        );
+      }
+
+      if (item.status() == null) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_ERROR,
+          "The field 'status' is required."
+        );
+      }
+
+      CompanyEntity company = companyRepository.findById(item.companyId())
+        .orElseThrow(() -> BusinessException.notFound(
+          ErrorCode.NOT_FOUND,
+          "Company not found for id " + item.companyId()
+        ));
+
+      boolean alreadyExists = acquirer.getAcquirerEstablishments().stream()
+        .filter(rel -> rel.getEstablishment() != null)
+        .anyMatch(rel ->
+          rel.getEstablishment().getCompany() != null
+            && item.companyId().equals(rel.getEstablishment().getCompany().getId())
+            && Objects.equals(item.pvNumber(), rel.getEstablishment().getPvNumber())
+        );
+
+      if (alreadyExists) {
+        throw BusinessException.conflict(
+          ErrorCode.VALIDATION_ERROR,
+          "Establishment already linked to this acquirer for companyId=%s and pvNumber=%s"
+            .formatted(item.companyId(), item.pvNumber())
+        );
+      }
+
+      EstablishmentEntity establishment = new EstablishmentEntity();
+      establishment.setCompany(company);
+      establishment.setAcquirer(acquirer);
+      establishment.setPvNumber(item.pvNumber());
+      establishment.setType(item.type());
+      establishment.setStatus(item.status());
+
+      establishment = establishmentRepository.save(establishment);
 
       RelationAcquirerEstablishmentEntity relation = new RelationAcquirerEstablishmentEntity();
       relation.setAcquirer(acquirer);
       relation.setEstablishment(establishment);
+
       acquirer.getAcquirerEstablishments().add(relation);
     }
 
-    return acquirerRepository.save(acquirer);
+    AcquirerEntity saved = acquirerRepository.save(acquirer);
+    initializeRelations(saved);
+    return saved;
   }
 
   @Transactional
@@ -266,17 +322,20 @@ public class AcquirerService {
     AcquirerEntity acquirer = getById(acquirerId);
 
     boolean removed = acquirer.getAcquirerEstablishments().removeIf(item ->
-      item.getAcquirer() != null && establishmentId.equals(item.getAcquirer().getId())
+      item.getEstablishment() != null && establishmentId.equals(item.getEstablishment().getId())
     );
 
     if (!removed) {
       throw BusinessException.notFound(
         ErrorCode.NOT_FOUND,
-        "Acquirer relation not found for acquirerId=%s and establishmentId=%s".formatted(acquirerId, establishmentId)
+        "Acquirer relation not found for acquirerId=%s and establishmentId=%s"
+          .formatted(acquirerId, establishmentId)
       );
     }
 
-    return acquirerRepository.save(acquirer);
+    AcquirerEntity saved = acquirerRepository.save(acquirer);
+    initializeRelations(saved);
+    return saved;
   }
 
   private void initializeRelations(AcquirerEntity acquirer) {
@@ -297,6 +356,15 @@ public class AcquirerService {
         rel.getEstablishment().getPvNumber();
         rel.getEstablishment().getStatus();
         rel.getEstablishment().getType();
+
+        if (rel.getEstablishment().getCompany() != null) {
+          rel.getEstablishment().getCompany().getId();
+          rel.getEstablishment().getCompany().getFantasyName();
+          rel.getEstablishment().getCompany().getSocialReason();
+          rel.getEstablishment().getCompany().getCnpj();
+          rel.getEstablishment().getCompany().getStatus();
+          rel.getEstablishment().getCompany().getType();
+        }
       }
     });
   }

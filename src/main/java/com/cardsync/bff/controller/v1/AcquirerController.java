@@ -84,13 +84,13 @@ public class AcquirerController {
   public AcquirerModel addEstablishmentRelations(
     @PathVariable UUID id, @Valid @RequestBody RelationsEstablishmentInput body
   ) {
-    return modelAssembler.toModel(service.addEstablishmentRelations(id, body.establishmentIds()));
+    return modelAssembler.toModel(service.addEstablishmentRelations(id, body.items()));
   }
 
   @DeleteMapping("/{id}/establishments/{establishmentId}")
   @CheckSecurity.Register.Acquirers.CanManageRelations
-  public AcquirerModel removeEstablishment(@PathVariable UUID id, @PathVariable UUID acquirerId) {
-    return modelAssembler.toModel(service.removeEstablishmentRelations(id, acquirerId));
+  public AcquirerModel removeEstablishment(@PathVariable UUID id, @PathVariable UUID establishmentId) {
+    return modelAssembler.toModel(service.removeEstablishmentRelations(id, establishmentId));
   }
 
   @PutMapping("/{id}")
