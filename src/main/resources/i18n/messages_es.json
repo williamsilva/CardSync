@@ -285,7 +285,9 @@
     "EMAIL_NOT_SEND": "Correo electrónico no enviado.",
     "EMAIL_AUTHENTICATION_FAILED": "Error de autenticación de correo electrónico.",
     "PASSWORD_RESET_RATE_LIMIT_EXCEEDED": "Se ha superado el límite de intentos de restablecimiento de contraseña.",
+    "ESTABLISHMENT_NOT_FOUND": "Establecimiento no encontrado.",
     "ESTABLISHMENT_ALREADY_EXISTS": "Ya existe un establecimiento con el mismo PV, empresa y adquirente.",
+    "ESTABLISHMENT_DELETE_IN_USE": "Este establecimiento tiene vínculos y no puede eliminarse.",
     "403": {
       "title": "403 — Acceso denegado.",
       "subtitle": "No tiene permiso para acceder a esta página."

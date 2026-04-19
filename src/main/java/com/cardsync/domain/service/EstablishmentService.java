@@ -16,6 +16,7 @@ import com.cardsync.domain.repository.CompanyRepository;
 import com.cardsync.domain.repository.EstablishmentRepository;
 import com.cardsync.infrastructure.repository.spec.EstablishmentSpecs;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -46,7 +47,7 @@ public class EstablishmentService {
   public EstablishmentEntity getById(UUID establishmentId) {
     return establishmentRepository.findById(establishmentId)
       .orElseThrow(() -> BusinessException.notFound(
-        ErrorCode.COMPANY_NOT_FOUND,
+        ErrorCode.ESTABLISHMENT_NOT_FOUND,
         "Establishment not found for id " + establishmentId
       ));
   }
@@ -175,6 +176,21 @@ public class EstablishmentService {
   }
 
   @Transactional
+  public void delete(UUID establishmentId) {
+    EstablishmentEntity entity = getById(establishmentId);
+
+    try {
+      establishmentRepository.delete(entity);
+      establishmentRepository.flush();
+    } catch (DataIntegrityViolationException ex) {
+      throw BusinessException.conflict(
+        ErrorCode.ESTABLISHMENT_DELETE_IN_USE,
+        "Cannot delete establishment because it has linked records. establishmentId=" + establishmentId
+      );
+    }
+  }
+
+  @Transactional
   public void activateBulk(List<UUID> ids) {
     updateBulkStatus(ids, entity -> {
       StatusEnum currentStatus = entity.getStatus();
@@ -247,7 +263,7 @@ public class EstablishmentService {
 
     if (!missingIds.isEmpty()) {
       throw BusinessException.notFound(
-        ErrorCode.COMPANY_NOT_FOUND,
+        ErrorCode.ESTABLISHMENT_NOT_FOUND,
         "Establishment not found for ids " + missingIds
       );
     }

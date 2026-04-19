@@ -285,7 +285,9 @@
     "EMAIL_NOT_SEND": "Email not sent.",
     "EMAIL_AUTHENTICATION_FAILED": "Email authentication failed.",
     "PASSWORD_RESET_RATE_LIMIT_EXCEEDED": "Password reset rate limit exceeded.",
+    "ESTABLISHMENT_NOT_FOUND": "Establishment not found.",
     "ESTABLISHMENT_ALREADY_EXISTS": "An establishment with the same PV, company, and acquirer already exists.",
+    "ESTABLISHMENT_DELETE_IN_USE": "This establishment has linked records and cannot be deleted.",
     "403": {
       "title": "403 — Access denied.",
       "subtitle": "You do not have permission to access this page."

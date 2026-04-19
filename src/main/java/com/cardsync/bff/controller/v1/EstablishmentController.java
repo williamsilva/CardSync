@@ -84,6 +84,12 @@ public class EstablishmentController {
     service.block(id);
   }
 
+  @PostMapping("/{id}/delete")
+  @CheckSecurity.Register.Establishments.CanDelete
+  public void delete(@PathVariable UUID id) {
+    service.delete(id);
+  }
+
   @PostMapping("/activate")
   @CheckSecurity.Register.Establishments.CanActiveOrInactive
   public void activateBulk(@Valid @RequestBody ListIdsInput body) {

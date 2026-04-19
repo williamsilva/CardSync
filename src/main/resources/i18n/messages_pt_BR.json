@@ -289,6 +289,8 @@
     "EMAIL_NOT_SEND": "E-mail não enviado.",
     "EMAIL_AUTHENTICATION_FAILED": "Falha de autenticação do e-mail.",
     "PASSWORD_RESET_RATE_LIMIT_EXCEEDED": "Limite taxa de reset de senha excedido.",
+    "ESTABLISHMENT_NOT_FOUND": "Estabelecimento não encontrado.",
+    "ESTABLISHMENT_DELETE_IN_USE": "Este estabelecimento possui vínculos e não pode ser excluído.",
     "ESTABLISHMENT_ALREADY_EXISTS": "Já existe um estabelecimento com o mesmo PV, empresa e adquirente.",
     "403": {
       "title": "403 — Acesso negado.",
