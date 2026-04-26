@@ -10,49 +10,48 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Getter
-public enum ModalityEnum {
+public enum PeriodEnum {
 
   NULL(0),
-  CASH_DEBIT(1),
-  CASH_CREDIT(2),
-  INSTALLMENT_CREDIT_2_6(3),
-  INSTALLMENT_CREDIT_7_12(4),
-  INSTALLMENT_CREDIT_13_18(5),
-  DIGITAL_WALLET(8),
-  OUTROS(9);
+  DAY(1),
+  END(2),
+  YEAR(3),
+  MONTH(4),
+  START(5),
+  INTERVAL(6);
 
   private final int code;
 
-  ModalityEnum(int code) {
+  PeriodEnum(int code) {
     this.code = code;
   }
 
   /*
    * Lookup O(1)
    */
-  private static final Map<Integer, ModalityEnum> BY_CODE =
+  private static final Map<Integer, PeriodEnum> BY_CODE =
     Arrays.stream(values())
-      .collect(Collectors.toUnmodifiableMap(ModalityEnum::getCode, Function.identity()));
+      .collect(Collectors.toUnmodifiableMap(PeriodEnum::getCode, Function.identity()));
 
-  private static final Map<String, ModalityEnum> BY_NAME =
+  private static final Map<String, PeriodEnum> BY_NAME =
     Arrays.stream(values())
       .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
 
   /*
    * Converte código do banco -> enum
    */
-  public static ModalityEnum fromCode(Integer code) {
+  public static PeriodEnum fromCode(Integer code) {
 
     if (code == null) {
       return null;
     }
 
-    ModalityEnum value = BY_CODE.get(code);
+    PeriodEnum value = BY_CODE.get(code);
 
     if (value == null) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Invalid ModalityEnum code: " + code
+        "Invalid PeriodEnum code: " + code
       );
     }
 
@@ -62,18 +61,18 @@ public enum ModalityEnum {
   /*
    * Converte string -> enum
    */
-  public static ModalityEnum fromName(String name) {
+  public static PeriodEnum fromName(String name) {
 
     if (name == null || name.isBlank()) {
       return null;
     }
 
-    ModalityEnum value = BY_NAME.get(name.trim().toUpperCase());
+    PeriodEnum value = BY_NAME.get(name.trim().toUpperCase());
 
     if (value == null) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Invalid ModalityEnum name: " + name
+        "Invalid PeriodEnum name: " + name
       );
     }
 
@@ -83,7 +82,7 @@ public enum ModalityEnum {
   /*
    * Enum -> código do banco
    */
-  public static Integer toCode(ModalityEnum status) {
+  public static Integer toCode(PeriodEnum status) {
     return status != null ? status.code : null;
   }
 

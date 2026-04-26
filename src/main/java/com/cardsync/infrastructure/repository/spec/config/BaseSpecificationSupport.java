@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
+import com.cardsync.domain.model.enums.PeriodEnum;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.From;
@@ -7,12 +8,21 @@ import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Path;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
 public abstract class BaseSpecificationSupport<T> {
+
+  private static final DateTimeFormatter BR_MONTH = DateTimeFormatter.ofPattern("MM/yyyy");
+  private static final DateTimeFormatter BR_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
   private final DateFilterService dateFilterService;
 
@@ -202,6 +212,201 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
+  protected Specification<T> datePeriod(
+    String field, PeriodEnum period, List<String> values, boolean nullableField) {
+    if (period == null || period == PeriodEnum.NULL || values == null || values.isEmpty()) {
+      return alwaysTrue();
+    }
+
+    return switch (period) {
+      case DAY -> {
+        LocalDate date = firstDate(values);
+        yield date == null ? alwaysTrue() : dateEquals(field, date, nullableField);
+      }
+
+      case START -> {
+        LocalDate date = firstDate(values);
+        yield date == null ? alwaysTrue() : dateGreaterThanOrEqual(field, date, nullableField);
+      }
+
+      case END -> {
+        LocalDate date = firstDate(values);
+        yield date == null ? alwaysTrue() : dateLessThanOrEqual(field, date, nullableField);
+      }
+
+      case MONTH -> {
+        YearMonth month = parseMonth(firstText(values));
+        if (month == null) {
+          yield alwaysTrue();
+        }
+        yield dateBetween(field, month.atDay(1), month.atEndOfMonth(), nullableField);
+      }
+
+      case YEAR -> {
+        Year year = parseYear(firstText(values));
+        if (year == null) {
+          yield alwaysTrue();
+        }
+        yield dateBetween(field, year.atDay(1), year.atMonth(12).atEndOfMonth(), nullableField);
+      }
+
+      case INTERVAL -> {
+        DateRange range = parseInterval(values);
+        yield range == null ? alwaysTrue() : dateBetween(field, range.start(), range.end(), nullableField);
+      }
+
+      case NULL -> alwaysTrue();
+    };
+  }
+
+  protected Specification<T> dateEquals(String field, LocalDate value, boolean nullableField) {
+    return (root, query, cb) -> {
+      var path = root.<LocalDate>get(field);
+
+      if (!nullableField) {
+        return cb.equal(path, value);
+      }
+
+      return cb.and(
+        cb.isNotNull(path),
+        cb.equal(path, value)
+      );
+    };
+  }
+
+  protected Specification<T> dateGreaterThanOrEqual(String field, LocalDate value, boolean nullableField) {
+    return (root, query, cb) -> {
+      var path = root.<LocalDate>get(field);
+
+      if (!nullableField) {
+        return cb.greaterThanOrEqualTo(path, value);
+      }
+
+      return cb.and(
+        cb.isNotNull(path),
+        cb.greaterThanOrEqualTo(path, value)
+      );
+    };
+  }
+
+  protected Specification<T> dateLessThanOrEqual(String field, LocalDate value, boolean nullableField) {
+    return (root, query, cb) -> {
+      var path = root.<LocalDate>get(field);
+
+      if (!nullableField) {
+        return cb.lessThanOrEqualTo(path, value);
+      }
+
+      return cb.and(
+        cb.isNotNull(path),
+        cb.lessThanOrEqualTo(path, value)
+      );
+    };
+  }
+
+  protected Specification<T> dateBetween(String field, LocalDate start, LocalDate end, boolean nullableField) {
+    return (root, query, cb) -> {
+      var path = root.<LocalDate>get(field);
+
+      if (!nullableField) {
+        return cb.and(
+          cb.greaterThanOrEqualTo(path, start),
+          cb.lessThanOrEqualTo(path, end)
+        );
+      }
+
+      return cb.and(
+        cb.isNotNull(path),
+        cb.greaterThanOrEqualTo(path, start),
+        cb.lessThanOrEqualTo(path, end)
+      );
+    };
+  }
+
+  protected LocalDate firstDate(List<String> values) {
+    return parseDate(firstText(values));
+  }
+
+  protected String firstText(List<String> values) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    return normalizeDate(values.getFirst());
+  }
+
+  protected DateRange parseInterval(List<String> values) {
+    if (values == null || values.size() < 2) {
+      return null;
+    }
+
+    LocalDate start = parseDate(values.get(0));
+    LocalDate end = parseDate(values.get(1));
+
+    if (start == null || end == null) {
+      return null;
+    }
+
+    if (end.isBefore(start)) {
+      LocalDate tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    return new DateRange(start, end);
+  }
+
+  protected YearMonth parseMonth(String raw) {
+    String value = normalizeDate(raw);
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return YearMonth.parse(value, BR_MONTH);
+    } catch (DateTimeParseException e) {
+      return null;
+    }
+  }
+
+  protected Year parseYear(String raw) {
+    String value = normalizeDate(raw);
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return Year.parse(value);
+    } catch (DateTimeParseException e) {
+      return null;
+    }
+  }
+
+  protected LocalDate parseDate(String raw) {
+    String value = normalizeDate(raw);
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return LocalDate.parse(value, BR_DATE);
+    } catch (DateTimeParseException ignored) {
+    }
+
+    try {
+      return LocalDate.parse(value);
+    } catch (DateTimeParseException ignored) {
+      return null;
+    }
+  }
+
+  protected String normalizeDate(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isBlank() ? null : trimmed;
+  }
+
   protected Specification<T> orderByAsc(String field) {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
@@ -269,5 +474,8 @@ public abstract class BaseSpecificationSupport<T> {
 
   protected String like(String value) {
     return "%" + value + "%";
+  }
+
+  protected record DateRange(LocalDate start, LocalDate end) {
   }
 }

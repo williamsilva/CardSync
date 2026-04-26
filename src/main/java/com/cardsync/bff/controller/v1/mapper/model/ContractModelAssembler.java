@@ -69,14 +69,14 @@ public class ContractModelAssembler extends RepresentationModelAssemblerSupport<
       ));
     }
 
-    /*if (entity.getEstablishment() != null) {
-      model.setEstablishment(new EstablishmentMinimalModel(
-        entity.getEstablishment().getId(),
-        entity.getEstablishment().getPvNumber() != null ? String.valueOf(entity.getEstablishment().getPvNumber()) : null,
-        entity.getEstablishment().getType() != null ? entity.getEstablishment().getType().name() : null,
-        entity.getEstablishment().getStatus() != null ? entity.getEstablishment().getStatus().name() : null
-      ));
-    }*/
+    if (entity.getEstablishment() != null) {
+      model.setEstablishment(EstablishmentMinimalModel.builder()
+          .id(entity.getEstablishment().getId())
+          .type( entity.getEstablishment().getType()!=null ? entity.getEstablishment().getType().name():null)
+          .status( entity.getEstablishment().getStatus()!=null ? entity.getEstablishment().getStatus().name():null)
+          .pvNumber( entity.getEstablishment().getPvNumber()!=null ? String.valueOf(entity.getEstablishment().getPvNumber()):null)
+        .build());
+    }
 
     List<ContractFlagModel> flags = entity.getContractFlags().stream()
       .sorted(Comparator.comparing(cf -> cf.getFlag() != null ? cf.getFlag().getName() : ""))

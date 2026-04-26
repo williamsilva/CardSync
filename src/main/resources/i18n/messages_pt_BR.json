@@ -262,6 +262,12 @@
     "NOT_FOUND": "Recurso não encontrado.",
     "SESSION_EXPIRED": "Sua sessão expirou. Faça login novamente.",
     "ACCESS_DENIED": "Você não tem permissão para executar esta ação.",
+
+    "COMPANY_NOT_FOUND": "Empresa não encontrada.",
+    "ACQUIRER_NOT_FOUND": "Adquirente não encontrada.",
+    "CONTRACT_NOT_FOUND": "Contrato não encontrado.",
+    "CONTRACT_ALREADY_EXISTS": "Já existe um contrato para a combinação informada.",
+
     "USER_DOCUMENT_ALREADY_EXISTS": "Já existe um usuário com este documento.",
     "USER_USERNAME_ALREADY_EXISTS": "Já existe um usuário com este nome de usuário.",
     "USER_NOT_FOUND": "Usuário não encontrado.",
@@ -327,7 +333,5 @@
       "subtitle": "Se o convite ainda estiver disponível, enviaremos um novo link.",
       "alert": "Verifique sua caixa de entrada e spam."
     }
-  },
-  "error.CONTRACT_NOT_FOUND": "Contrato não encontrado."
-
+  }
 }

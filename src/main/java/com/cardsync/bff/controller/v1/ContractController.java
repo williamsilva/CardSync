@@ -59,39 +59,39 @@ public class ContractController {
     service.delete(id);
   }
 
-  @PostMapping("/{id}/activate")
+  @PostMapping("/{id}/validity")
   @CheckSecurity.Register.Contracts.CanActiveOrInactive
-  public void activate(@PathVariable UUID id) {
-    service.activate(id);
+  public void validity(@PathVariable UUID id) {
+    service.validity(id);
   }
 
-  @PostMapping("/{id}/deactivate")
+  @PostMapping("/{id}/closed")
   @CheckSecurity.Register.Contracts.CanActiveOrInactive
-  public void deactivate(@PathVariable UUID id) {
-    service.deactivate(id);
+  public void closed(@PathVariable UUID id) {
+    service.closed(id);
   }
 
-  @PostMapping("/{id}/block")
+  @PostMapping("/{id}/expired")
   @CheckSecurity.Register.Contracts.CanActiveOrInactive
-  public void block(@PathVariable UUID id) {
-    service.block(id);
+  public void expired(@PathVariable UUID id) {
+    service.expired(id);
   }
 
-  @PostMapping("/activate")
+  @PostMapping("/validity")
   @CheckSecurity.Register.Contracts.CanActiveOrInactive
-  public void activateBulk(@Valid @RequestBody ListIdsInput body) {
-    service.activateBulk(body.ids());
+  public void validityBulk(@Valid @RequestBody ListIdsInput body) {
+    service.validityBulk(body.ids());
   }
 
-  @PostMapping("/deactivate")
+  @PostMapping("/closed")
   @CheckSecurity.Register.Contracts.CanActiveOrInactive
-  public void deactivateBulk(@Valid @RequestBody ListIdsInput body) {
-    service.deactivateBulk(body.ids());
+  public void closedBulk(@Valid @RequestBody ListIdsInput body) {
+    service.closedBulk(body.ids());
   }
 
-  @PostMapping("/block")
+  @PostMapping("/expired")
   @CheckSecurity.Register.Contracts.CanActiveOrInactive
-  public void blockBulk(@Valid @RequestBody ListIdsInput body) {
-    service.blockBulk(body.ids());
+  public void expiredBulk(@Valid @RequestBody ListIdsInput body) {
+    service.expiredBulk(body.ids());
   }
 }

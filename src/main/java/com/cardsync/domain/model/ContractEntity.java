@@ -1,6 +1,6 @@
 package com.cardsync.domain.model;
 
-import com.cardsync.domain.model.enums.StatusEnum;
+import com.cardsync.domain.model.enums.ContractEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -40,23 +40,23 @@ public class ContractEntity extends AuditableEntityBase {
   @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<ContractFlagEntity> contractFlags = new LinkedHashSet<>();
 
-  public StatusEnum getStatus() {
-    return StatusEnum.fromCode(status);
+  public ContractEnum getStatus() {
+    return ContractEnum.fromCode(status);
   }
 
-  public void setStatus(StatusEnum status) {
-    this.status = (status != null ? status : StatusEnum.NULL).getCode();
+  public void setStatus(ContractEnum status) {
+    this.status = (status != null ? status : ContractEnum.NULL).getCode();
   }
 
-  public void activate() {
-    setStatus(StatusEnum.ACTIVE);
+  public void validity() {
+    setStatus(ContractEnum.VALIDITY);
   }
 
-  public void inactivate() {
-    setStatus(StatusEnum.INACTIVE);
+  public void expired() {
+    setStatus(ContractEnum.EXPIRED);
   }
 
-  public void block() {
-    setStatus(StatusEnum.BLOCKED);
+  public void closed() {
+    setStatus(ContractEnum.CLOSED);
   }
 }

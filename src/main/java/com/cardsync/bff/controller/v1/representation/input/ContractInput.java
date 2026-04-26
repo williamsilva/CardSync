@@ -1,6 +1,6 @@
 package com.cardsync.bff.controller.v1.representation.input;
 
-import com.cardsync.domain.model.enums.StatusEnum;
+import com.cardsync.domain.model.enums.ContractEnum;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -16,6 +16,6 @@ public record ContractInput(
   UUID companyId,
   @NotNull UUID acquirerId,
   UUID establishmentId,
-  StatusEnum status,
+  ContractEnum status,
   @Valid List<ContractFlagInput> contractFlags
 ) {}

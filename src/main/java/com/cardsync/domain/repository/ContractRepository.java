@@ -19,7 +19,9 @@ public interface ContractRepository extends JpaRepository<ContractEntity, UUID>,
   JpaSpecificationExecutor<ContractEntity> {
 
   @Override
-  @EntityGraph(attributePaths = {"company", "acquirer", "establishment", "createdBy", "updatedBy"})
+  @EntityGraph(attributePaths = {
+    "company", "acquirer", "establishment", "createdBy", "updatedBy",
+    "contractFlags", "contractFlags.flag", "contractFlags.contractRates"})
   Page<ContractEntity> findAll(Specification<ContractEntity> spec, Pageable pageable);
 
   @EntityGraph(attributePaths = {
@@ -32,17 +34,17 @@ public interface ContractRepository extends JpaRepository<ContractEntity, UUID>,
   @Query("""
     select case when count(c) > 0 then true else false end
     from ContractEntity c
-    where lower(c.description) = lower(:description)
-      and c.acquirer.id = :acquirerId
+    where c.acquirer.id = :acquirerId
       and ((:companyId is null and c.company is null) or c.company.id = :companyId)
       and ((:establishmentId is null and c.establishment is null) or c.establishment.id = :establishmentId)
       and (:currentId is null or c.id <> :currentId)
+       and c.status = :status
     """)
   boolean existsDuplicate(
-    @Param("description") String description,
     @Param("companyId") UUID companyId,
     @Param("acquirerId") UUID acquirerId,
     @Param("establishmentId") UUID establishmentId,
-    @Param("currentId") UUID currentId
+    @Param("currentId") UUID currentId,
+    @Param("status") Integer status
   );
 }

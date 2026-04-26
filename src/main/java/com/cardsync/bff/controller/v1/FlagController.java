@@ -1,9 +1,11 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.mapper.model.FlagMinimalModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.FlagModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.RelationsAcquirerInput;
 import com.cardsync.bff.controller.v1.representation.input.RelationsCompanyInput;
 import com.cardsync.bff.controller.v1.representation.input.FlagInput;
+import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.FlagFilter;
@@ -14,6 +16,7 @@ import com.cardsync.domain.service.FlagService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +29,7 @@ public class FlagController {
 
   private final FlagService service;
   private final FlagModelAssembler modelAssembler;
+  private final FlagMinimalModelAssembler minimalModelAssembler;
   private final PagedResourcesAssembler<FlagEntity> pagedResourcesAssembler;
 
   @GetMapping("/{id}")
@@ -38,6 +42,12 @@ public class FlagController {
   @CheckSecurity.Register.Flags.CanConsult
   public FlagModel getRelations(@PathVariable UUID id) {
     return modelAssembler.toModel(service.getById(id));
+  }
+
+  @GetMapping("/options-filter")
+  @CheckSecurity.Authenticated
+  public CollectionModel<FlagMinimalModel> listOptionsFilter() {
+    return minimalModelAssembler.toCollectionModel(service.listOptionsFilter());
   }
 
   @PostMapping("/search")

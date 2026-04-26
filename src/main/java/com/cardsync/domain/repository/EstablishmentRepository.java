@@ -30,17 +30,14 @@ public interface EstablishmentRepository extends JpaRepository<EstablishmentEnti
   @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
   Optional<EstablishmentEntity> findById(UUID id);
 
+  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
+  List<EstablishmentEntity> findByCompany_IdAndAcquirer_IdOrderByPvNumberAsc(
+    UUID companyId, UUID acquirerId);
+
   boolean existsByPvNumberAndCompany_IdAndAcquirer_Id(
-    Integer pvNumber,
-    UUID companyId,
-    UUID acquirerId
-  );
+    Integer pvNumber,UUID companyId, UUID acquirerId);
 
   boolean existsByPvNumberAndCompany_IdAndAcquirer_IdAndIdNot(
-    Integer pvNumber,
-    UUID companyId,
-    UUID acquirerId,
-    UUID id
-  );
+    Integer pvNumber, UUID companyId, UUID acquirerId, UUID id);
 
 }

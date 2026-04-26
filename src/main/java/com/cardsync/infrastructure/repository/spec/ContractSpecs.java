@@ -2,9 +2,9 @@ package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.ContractFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.spec.ContractAllowedFields;
+import com.cardsync.infrastructure.repository.spec.tableFilters.ContractTableFields;
 import com.cardsync.domain.model.ContractEntity;
-import com.cardsync.domain.model.enums.StatusEnum;
+import com.cardsync.domain.model.enums.ContractEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
@@ -17,17 +17,17 @@ import java.util.UUID;
 @Component
 public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
 
+  private final ContractTableFields contractTableFields;
   private final SpecificationFactory specificationFactory;
-  private final ContractAllowedFields contractAllowedFields;
 
   public ContractSpecs(
     DateFilterService dateFilterService,
-    SpecificationFactory specificationFactory,
-    ContractAllowedFields contractAllowedFields
+    ContractTableFields contractTableFields,
+    SpecificationFactory specificationFactory
   ) {
     super(dateFilterService);
+    this.contractTableFields = contractTableFields;
     this.specificationFactory = specificationFactory;
-    this.contractAllowedFields = contractAllowedFields;
   }
 
   public Specification<ContractEntity> fromQuery(ListQueryDto<ContractFilter> query) {
@@ -36,14 +36,16 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
     spec = spec.and(
       specificationFactory.fromTableFilters(
         query.tableFilters(),
-        contractAllowedFields.table()
+        contractTableFields.table()
       )
     );
 
     if (query.advanced() != null) {
       var a = query.advanced();
 
-      spec = spec.and(inCodes("status", a.status(), StatusEnum::getCode));
+      spec = spec.and(inCodes("status", a.contractEnum(), ContractEnum::getCode));
+      spec = spec.and(datePeriod("endDate", a.periodEndDate(), a.endDate(), true));
+      spec = spec.and(datePeriod("startDate", a.periodStartDate(), a.startDate(), true));
 
       spec = spec.and(
         inPath(a.company(), value -> {
@@ -66,6 +68,16 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
       );
 
       spec = spec.and(
+        inPath(a.createdBy(), value -> {
+          try {
+            return UUID.fromString(value);
+          } catch (Exception e) {
+            return null;
+          }
+        }, "createdBy", "id")
+      );
+
+      spec = spec.and(
         inPath(a.establishment(), value -> {
           try {
             return UUID.fromString(value);
@@ -74,6 +86,7 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
           }
         }, "establishment", "id")
       );
+
     }
 
     if (!isBlank(query.globalFilter())) {
@@ -87,4 +100,5 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
 
     return spec.and(orderByAsc("description"));
   }
+
 }

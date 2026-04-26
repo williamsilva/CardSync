@@ -2,7 +2,7 @@ package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.EstablishmentFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.spec.EstablishmentAllowedFields;
+import com.cardsync.infrastructure.repository.spec.tableFilters.EstablishmentTableFields;
 import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.TypeEstablishmentEnum;
@@ -19,12 +19,12 @@ import java.util.UUID;
 public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEntity> {
 
   private final SpecificationFactory specificationFactory;
-  private final EstablishmentAllowedFields establishmentAllowedFields;
+  private final EstablishmentTableFields establishmentAllowedFields;
 
   public EstablishmentSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
-    EstablishmentAllowedFields establishmentAllowedFields
+    EstablishmentTableFields establishmentAllowedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
@@ -46,8 +46,8 @@ public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEn
 
       spec = spec.and(contains("pvNumber", a.pvNumber()));
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
-      spec = spec.and(rangeOdt("createdAt", a.createdAtFrom(), a.createdAtTo()));
       spec = spec.and(inCodes("type", a.typeEnum(), TypeEstablishmentEnum::getCode));
+      spec = spec.and(datePeriod("createdAt", a.periodCreatedAt(), a.createdAt(), true));
 
       spec = spec.and(
         inPath(a.company(), value -> {

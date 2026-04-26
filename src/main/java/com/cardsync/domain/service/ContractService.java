@@ -7,9 +7,16 @@ import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ContractFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.model.*;
+import com.cardsync.domain.model.AcquirerEntity;
+import com.cardsync.domain.model.CompanyEntity;
+import com.cardsync.domain.model.ContractEntity;
+import com.cardsync.domain.model.ContractFlagEntity;
+import com.cardsync.domain.model.ContractRateEntity;
+import com.cardsync.domain.model.EstablishmentEntity;
+import com.cardsync.domain.model.FlagEntity;
+import com.cardsync.domain.model.RelationAcquirerCompanyEntity;
+import com.cardsync.domain.model.enums.ContractEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.domain.repository.CompanyRepository;
 import com.cardsync.domain.repository.ContractRepository;
@@ -24,7 +31,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -63,7 +75,8 @@ public class ContractService {
     EstablishmentEntity establishment = resolveEstablishment(input.establishmentId());
 
     validateReferencesConsistency(company, acquirer, establishment);
-    validateDuplicate(input.description(), company, acquirer, establishment, null);
+    validateContractFlagsContext(company, acquirer, input.contractFlags());
+    validateDuplicate( company, acquirer, establishment, null);
 
     ContractEntity entity = new ContractEntity();
     entity.setDescription(input.description().trim());
@@ -72,7 +85,7 @@ public class ContractService {
     entity.setCompany(company);
     entity.setAcquirer(acquirer);
     entity.setEstablishment(establishment);
-    entity.setStatus(input.status() != null && input.status() != StatusEnum.NULL ? input.status() : StatusEnum.ACTIVE);
+    entity.setStatus(input.status() != null && input.status() != ContractEnum.NULL ? input.status() : ContractEnum.VALIDITY);
 
     syncFlags(entity, input.contractFlags());
     ContractEntity saved = contractRepository.save(entity);
@@ -89,7 +102,8 @@ public class ContractService {
     EstablishmentEntity establishment = resolveEstablishment(input.establishmentId());
 
     validateReferencesConsistency(company, acquirer, establishment);
-    validateDuplicate(input.description(), company, acquirer, establishment, contractId);
+    validateContractFlagsContext(company, acquirer, input.contractFlags());
+    validateDuplicate(company, acquirer, establishment, contractId);
 
     entity.setDescription(input.description().trim());
     entity.setStartDate(input.startDate());
@@ -98,11 +112,11 @@ public class ContractService {
     entity.setAcquirer(acquirer);
     entity.setEstablishment(establishment);
 
-    if (input.status() != null && input.status() != StatusEnum.NULL) {
+    if (input.status() != null && input.status() != ContractEnum.NULL) {
       entity.setStatus(input.status());
     }
+    replaceFlags(entity, input.contractFlags());
 
-    syncFlags(entity, input.contractFlags());
     ContractEntity saved = contractRepository.save(entity);
     return getById(saved.getId());
   }
@@ -114,87 +128,117 @@ public class ContractService {
   }
 
   @Transactional
-  public void activate(UUID contractId) {
+  public void validity(UUID contractId) {
     ContractEntity entity = getById(contractId);
-    StatusEnum currentStatus = entity.getStatus();
+    ContractEnum currentStatus = entity.getStatus();
 
-    if (currentStatus != StatusEnum.INACTIVE && currentStatus != StatusEnum.BLOCKED) {
+    if (currentStatus != ContractEnum.EXPIRED && currentStatus != ContractEnum.CLOSED) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Only INACTIVE or BLOCKED contracts can be activated. Current status: " + currentStatus
+        "Only EXPIRED or CLOSED contracts can be validity. Current status: " + currentStatus
       );
     }
-    entity.activate();
+
+    validateDuplicate(
+      entity.getCompany(),
+      entity.getAcquirer(),
+      entity.getEstablishment(),
+      entity.getId()
+    );
+    entity.validity();
   }
 
   @Transactional
-  public void deactivate(UUID contractId) {
+  public void expired(UUID contractId) {
     ContractEntity entity = getById(contractId);
-    StatusEnum currentStatus = entity.getStatus();
+    ContractEnum currentStatus = entity.getStatus();
 
-    if (currentStatus != StatusEnum.ACTIVE) {
+    if (currentStatus != ContractEnum.VALIDITY) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Only ACTIVE contracts can be deactivated. Current status: " + currentStatus
+        "Only VALIDITY contracts can be expired. Current status: " + currentStatus
       );
     }
-    entity.inactivate();
+    entity.expired();
   }
 
   @Transactional
-  public void block(UUID contractId) {
+  public void closed(UUID contractId) {
     ContractEntity entity = getById(contractId);
-    StatusEnum currentStatus = entity.getStatus();
+    ContractEnum currentStatus = entity.getStatus();
 
-    if (currentStatus != StatusEnum.ACTIVE) {
+    if (currentStatus != ContractEnum.VALIDITY) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Only ACTIVE contracts can be blocked. Current status: " + currentStatus
+        "Only VALIDITY contracts can be closed. Current status: " + currentStatus
       );
     }
-    entity.block();
+    entity.closed();
   }
 
   @Transactional
-  public void activateBulk(List<UUID> ids) {
+  public void validityBulk(List<UUID> ids) {
     updateBulkStatus(ids, entity -> {
-      StatusEnum currentStatus = entity.getStatus();
-      if (currentStatus != StatusEnum.INACTIVE && currentStatus != StatusEnum.BLOCKED) {
+      ContractEnum currentStatus = entity.getStatus();
+
+      if (currentStatus != ContractEnum.EXPIRED && currentStatus != ContractEnum.CLOSED) {
         throw BusinessException.badRequest(
           ErrorCode.VALIDATION_ERROR,
-          "Only INACTIVE or BLOCKED contracts can be activated. Contract id: " + entity.getId()
+          "Only EXPIRED or CLOSED contracts can be validity. Contract id: " + entity.getId()
         );
       }
-      entity.setStatus(StatusEnum.ACTIVE);
+
+      validateDuplicate(
+        entity.getCompany(),
+        entity.getAcquirer(),
+        entity.getEstablishment(),
+        entity.getId()
+      );
+
+      entity.setStatus(ContractEnum.VALIDITY);
     });
   }
 
   @Transactional
-  public void deactivateBulk(List<UUID> ids) {
+  public void expiredBulk(List<UUID> ids) {
     updateBulkStatus(ids, entity -> {
-      StatusEnum currentStatus = entity.getStatus();
-      if (currentStatus != StatusEnum.ACTIVE) {
+      ContractEnum currentStatus = entity.getStatus();
+      if (currentStatus != ContractEnum.VALIDITY) {
         throw BusinessException.badRequest(
           ErrorCode.VALIDATION_ERROR,
-          "Only ACTIVE contracts can be deactivated. Contract id: " + entity.getId()
+          "Only VALIDITY contracts can be expired. Contract id: " + entity.getId()
         );
       }
-      entity.setStatus(StatusEnum.INACTIVE);
+      entity.setStatus(ContractEnum.EXPIRED);
     });
   }
 
   @Transactional
-  public void blockBulk(List<UUID> ids) {
+  public void closedBulk(List<UUID> ids) {
     updateBulkStatus(ids, entity -> {
-      StatusEnum currentStatus = entity.getStatus();
-      if (currentStatus != StatusEnum.ACTIVE) {
+      ContractEnum currentStatus = entity.getStatus();
+      if (currentStatus != ContractEnum.CLOSED) {
         throw BusinessException.badRequest(
           ErrorCode.VALIDATION_ERROR,
-          "Only ACTIVE contracts can be blocked. Contract id: " + entity.getId()
+          "Only VALIDITY contracts can be closed. Contract id: " + entity.getId()
         );
       }
-      entity.setStatus(StatusEnum.BLOCKED);
+      entity.setStatus(ContractEnum.CLOSED);
     });
+  }
+
+  private void replaceFlags(ContractEntity contract, List<ContractFlagInput> inputs) {
+    if (contract.getId() != null && !contract.getContractFlags().isEmpty()) {
+      contract.getContractFlags().forEach(contractFlag -> {
+        contractFlag.getContractRates().clear();
+        contractFlag.setContract(null);
+      });
+
+      contract.getContractFlags().clear();
+      contractRepository.flush();
+    }
+
+    syncFlags(contract, inputs);
   }
 
   private void updateBulkStatus(List<UUID> ids, Consumer<ContractEntity> updater) {
@@ -343,10 +387,9 @@ public class ContractService {
   }
 
   private void validateReferencesConsistency(
-    CompanyEntity company,
-    AcquirerEntity acquirer,
-    EstablishmentEntity establishment
-  ) {
+    CompanyEntity company, AcquirerEntity acquirer, EstablishmentEntity establishment) {
+    validateCompanyAcquirerRelation(company, acquirer);
+
     if (establishment == null) {
       return;
     }
@@ -368,32 +411,74 @@ public class ContractService {
     }
   }
 
-  private void validateDuplicate(
-    String description,
-    CompanyEntity company,
-    AcquirerEntity acquirer,
-    EstablishmentEntity establishment,
-    UUID currentId
-  ) {
+  private void validateCompanyAcquirerRelation(CompanyEntity company, AcquirerEntity acquirer) {
+    if (company == null || acquirer == null) {
+      return;
+    }
+
+    boolean linked = acquirer.getAcquirerCompanies().stream()
+      .map(RelationAcquirerCompanyEntity::getCompany)
+      .filter(Objects::nonNull)
+      .anyMatch(item -> Objects.equals(item.getId(), company.getId()));
+
+    if (!linked) {
+      throw BusinessException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        "The acquirer is not linked to the informed company."
+      );
+    }
+  }
+
+  private void validateContractFlagsContext(
+    CompanyEntity company, AcquirerEntity acquirer, List<ContractFlagInput> inputs) {
+    if (inputs == null || inputs.isEmpty()) {
+      return;
+    }
+
+    if (company == null) {
+      throw BusinessException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        "The field 'companyId' is required when contract flags are informed."
+      );
+    }
+
+    Set<UUID> allowedFlagIds = flagRepository.findAllByCompanyIdAndAcquirerId(company.getId(), acquirer.getId())
+      .stream()
+      .map(FlagEntity::getId)
+      .collect(Collectors.toSet());
+
+    for (ContractFlagInput input : inputs) {
+      if (input == null || input.flagId() == null) {
+        continue;
+      }
+
+      if (!allowedFlagIds.contains(input.flagId())) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_ERROR,
+          "The flag %s is not linked to the informed company/acquirer context.".formatted(input.flagId())
+        );
+      }
+    }
+  }
+
+  private void validateDuplicate(CompanyEntity company,
+    AcquirerEntity acquirer, EstablishmentEntity establishment,  UUID currentId) {
     boolean exists = contractRepository.existsDuplicate(
-      description.trim(),
       company != null ? company.getId() : null,
       acquirer.getId(),
       establishment != null ? establishment.getId() : null,
-      currentId
+      currentId, ContractEnum.VALIDITY.getCode()
     );
 
     if (exists) {
       throw BusinessException.badRequest(
-        ErrorCode.VALIDATION_ERROR,
-        "There is already a contract with the same description, company, acquirer, and establishment."
+        ErrorCode.CONTRACT_ALREADY_EXISTS,
+        "There is already an active contract for the informed company, acquirer, and establishment."
       );
     }
   }
 
   private void syncFlags(ContractEntity contract, List<ContractFlagInput> inputs) {
-    contract.getContractFlags().clear();
-
     if (inputs == null || inputs.isEmpty()) {
       return;
     }
