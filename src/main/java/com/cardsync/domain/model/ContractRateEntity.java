@@ -25,6 +25,8 @@ public class ContractRateEntity {
   private BigDecimal rate;
   private Integer modality;
   private Integer paymentTermDays;
+  private Integer installmentMin;
+  private Integer installmentMax;
   private BigDecimal rateEcommerce;
   private Integer paymentTermDaysEcommerce;
 

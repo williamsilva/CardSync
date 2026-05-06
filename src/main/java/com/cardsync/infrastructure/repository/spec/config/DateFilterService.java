@@ -9,6 +9,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.time.format.DateTimeFormatter;
 
 @Component
 public class DateFilterService {
@@ -33,6 +34,18 @@ public class DateFilterService {
 
     try {
       return Instant.parse(value).atOffset(ZoneOffset.UTC);
+    } catch (DateTimeParseException ignored) {
+    }
+
+    try {
+      LocalDate localDate = LocalDate.parse(value, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+      return localDate.atStartOfDay(businessZone).toOffsetDateTime();
+    } catch (DateTimeParseException ignored) {
+    }
+
+    try {
+      LocalDate localDate = LocalDate.parse(value, DateTimeFormatter.ofPattern("d/M/yyyy"));
+      return localDate.atStartOfDay(businessZone).toOffsetDateTime();
     } catch (DateTimeParseException ignored) {
     }
 

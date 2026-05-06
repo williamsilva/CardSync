@@ -21,6 +21,7 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private Long nsu;
 
   private LocalDate canceledDate;
+  private LocalDate creditDate;
   private OffsetDateTime saleDate;
   private OffsetDateTime saleReconciliationDate;
 
@@ -31,6 +32,9 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private String cardNumber;
   private String authorization;
   private String referenceNumber;
+  private String transactionType;
+  private String dccCurrency;
+  private String serviceCode;
 
   private Integer capture;
   private Integer modality;
@@ -50,6 +54,8 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private BigDecimal discountValue;
   private BigDecimal firstInstallmentValue;
   private BigDecimal otherInstallmentsValue;
+  private BigDecimal purchaseValue;
+  private BigDecimal withdrawalValue;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private FlagEntity flag;
@@ -63,74 +69,12 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   @ManyToOne(fetch = FetchType.LAZY)
   private CompanyEntity company;
 
-  /*
   @ManyToOne(fetch = FetchType.LAZY)
-  private ProcessedFile processedFile;
+  private ProcessedFileEntity processedFile;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  private SalesSummary salesSummary;
+  private SalesSummaryEntity salesSummary;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private EstablishmentEntity establishment;
-
-  @OrderBy("installment ASC")
-  @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<InstallmentAcq> installments = new ArrayList<>();
-
-  @OneToMany(mappedBy = "transaction")
-  private List<Adjustment> adjustments = new ArrayList<>();
-
-  public StatusTransactionAuditEnum getStatusAudit() {
-    return StatusTransactionAuditEnum.toEnum(statusAudit);
-  }
-
-  public void setStatusAudit(StatusTransactionAuditEnum statusAudit) {
-    this.statusAudit = Optional.ofNullable(statusAudit).orElse(StatusTransactionAuditEnum.NULL).getCode();
-  }
-
-  public CaptureEnum getCapture() {
-    return CaptureEnum.toEnum(capture);
-  }
-
-  public void setCapture(CaptureEnum capture) {
-    this.capture = Optional.ofNullable(capture).orElse(CaptureEnum.NULL).getCode();
-  }
-
-  public ModalityEnum getModality() {
-    return ModalityEnum.toEnum(modality);
-  }
-
-  public void setModality(ModalityEnum modality) {
-    this.modality = Optional.ofNullable(modality).orElse(ModalityEnum.NULL).getCode();
-  }
-
-  public StatusTransactionEnum getTransactionStatus() {
-    return StatusTransactionEnum.toEnum(transactionStatus);
-  }
-
-  public void setTransactionStatus(StatusTransactionEnum transactionStatus) {
-    this.transactionStatus = Optional.ofNullable(transactionStatus).orElse(StatusTransactionEnum.NULL).getCode();
-  }
-
-  public StatusTransactionReasonEnum getTransactionStatusReason() {
-    return StatusTransactionReasonEnum.toEnum(transactionStatusReason);
-  }
-
-  public void setTransactionStatusReason(StatusTransactionReasonEnum transactionStatusReason) {
-    this.transactionStatusReason = Optional.ofNullable(transactionStatusReason).orElse(StatusTransactionReasonEnum.NULL).getCode();
-  }
-
-  public StatusPaymentBankEnum getStatusPaymentBank() {
-    return StatusPaymentBankEnum.toEnum(statusPaymentBank);
-  }
-
-  public void setStatusPaymentBank(StatusPaymentBankEnum statusPaymentBank) {
-    this.statusPaymentBank = Optional.ofNullable(statusPaymentBank).orElse(StatusPaymentBankEnum.NULL).getCode();
-  }
-
-  public void cancel(Adjustment adj) {
-    setAdjustment(adj);
-    setCanceledDate(adj.getAdjustmentDate());
-    setTransactionStatus(StatusTransactionEnum.CANCELED);
-  }*/
 }

@@ -166,6 +166,19 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_FLAGS_MANAGE_RELATIONS);
   }
 
+  /* File Processing */
+  public boolean canReadFileProcessing() {
+    return hasAllReadScope() && hasAuthority(PERM_FILE_PROCESSING_READ);
+  }
+
+  public boolean canProcessFiles() {
+    return hasAllWriteScope() && hasAuthority(PERM_FILE_PROCESSING_PROCESS);
+  }
+
+  public boolean canReprocessFiles() {
+    return hasAllWriteScope() && hasAuthority(PERM_FILE_PROCESSING_REPROCESS);
+  }
+
   /* Contracts */
   public boolean canConsultContracts() {
     return hasAllReadScope() && hasAuthority(PERM_CONTRACTS_CONSULT);

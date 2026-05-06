@@ -1,22 +1,25 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
 import com.cardsync.domain.model.enums.PeriodEnum;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.From;
+import jakarta.persistence.criteria.*;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Path;
-import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.Year;
 import java.time.YearMonth;
+import java.util.List;
+import java.util.function.BiFunction;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Function;
 
 public abstract class BaseSpecificationSupport<T> {
@@ -34,7 +37,7 @@ public abstract class BaseSpecificationSupport<T> {
     return Specs.all();
   }
 
-  protected Specification<T> contains(String field, String value) {
+  protected Specification<T> contains(String value, String field) {
     if (isBlank(value)) {
       return alwaysTrue();
     }
@@ -259,6 +262,65 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
+  protected Specification<T> datePeriodJoin(
+    String joinField, String dateField, PeriodEnum period, List<String> values, boolean nullableField) {
+    if (period == null || period == PeriodEnum.NULL || values == null || values.isEmpty()) {
+      return alwaysTrue();
+    }
+
+    return switch (period) {
+      case DAY -> {
+        LocalDate date = firstDate(values);
+
+        yield date == null
+          ? alwaysTrue()
+          : dateJoinEquals(joinField, dateField, date, nullableField);
+      }
+
+      case START -> {
+        LocalDate date = firstDate(values);
+
+        yield date == null
+          ? alwaysTrue()
+          : dateJoinGreaterThanOrEqual(joinField, dateField, date, nullableField);
+      }
+
+      case END -> {
+        LocalDate date = firstDate(values);
+
+        yield date == null
+          ? alwaysTrue()
+          : dateJoinLessThanOrEqual(joinField, dateField, date, nullableField);
+      }
+
+      case MONTH -> {
+        YearMonth month = parseMonth(firstText(values));
+
+        yield month == null
+          ? alwaysTrue()
+          : dateJoinBetween(joinField, dateField, month.atDay(1), month.atEndOfMonth(), nullableField);
+      }
+
+      case YEAR -> {
+        Year year = parseYear(firstText(values));
+
+        yield year == null
+          ? alwaysTrue()
+          : dateJoinBetween(joinField, dateField, year.atDay(1), year.atMonth(12).atEndOfMonth(), nullableField);
+      }
+
+      case INTERVAL -> {
+        DateRange range = parseInterval(values);
+
+        yield range == null
+          ? alwaysTrue()
+          : dateJoinBetween(joinField, dateField, range.start(), range.end(), nullableField);
+      }
+
+      case NULL -> alwaysTrue();
+    };
+  }
+
   protected Specification<T> dateEquals(String field, LocalDate value, boolean nullableField) {
     return (root, query, cb) -> {
       var path = root.<LocalDate>get(field);
@@ -464,6 +526,29 @@ public abstract class BaseSpecificationSupport<T> {
     return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 
+  protected static void fetchIfNotFetched(Root<?> root, String attributeName) {
+    boolean alreadyFetched = root.getFetches()
+      .stream()
+      .map(Fetch::getAttribute)
+      .anyMatch(attribute -> attributeName.equals(attribute.getName()));
+
+    if (!alreadyFetched) {
+      root.fetch(attributeName, JoinType.LEFT);
+    }
+  }
+
+  protected static UUID parseUuidOrNull(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+
+    try {
+      return UUID.fromString(value);
+    } catch (IllegalArgumentException ex) {
+      return null;
+    }
+  }
+
   protected boolean isBlank(String value) {
     return value == null || value.trim().isEmpty();
   }
@@ -474,6 +559,58 @@ public abstract class BaseSpecificationSupport<T> {
 
   protected String like(String value) {
     return "%" + value + "%";
+  }
+
+  private Specification<T> dateJoinEquals(
+    String joinField, String dateField, LocalDate value, boolean nullableField) {
+    return dateJoinPredicate(joinField, dateField, nullableField, (cb, path) ->
+      cb.equal(path, value)
+    );
+  }
+
+  private Specification<T> dateJoinGreaterThanOrEqual(
+    String joinField, String dateField, LocalDate value, boolean nullableField) {
+    return dateJoinPredicate(joinField, dateField, nullableField, (cb, path) ->
+      cb.greaterThanOrEqualTo(path, value)
+    );
+  }
+
+  private Specification<T> dateJoinLessThanOrEqual(
+    String joinField, String dateField, LocalDate value, boolean nullableField) {
+    return dateJoinPredicate(joinField, dateField, nullableField, (cb, path) ->
+      cb.lessThanOrEqualTo(path, value)
+    );
+  }
+
+  private Specification<T> dateJoinBetween(
+    String joinField, String dateField, LocalDate start, LocalDate end, boolean nullableField) {
+    return dateJoinPredicate(joinField, dateField, nullableField, (cb, path) ->
+      cb.and(
+        cb.greaterThanOrEqualTo(path, start),
+        cb.lessThanOrEqualTo(path, end)
+      )
+    );
+  }
+
+  private Specification<T> dateJoinPredicate(String joinField, String dateField, boolean nullableField,
+    BiFunction<CriteriaBuilder, Path<LocalDate>, Predicate> predicateFactory) {
+    return (root, query, cb) -> {
+      query.distinct(true);
+
+      Join<?, ?> join = root.join(joinField, JoinType.LEFT);
+      Path<LocalDate> path = join.get(dateField);
+
+      Predicate predicate = predicateFactory.apply(cb, path);
+
+      if (!nullableField) {
+        return predicate;
+      }
+
+      return cb.and(
+        cb.isNotNull(path),
+        predicate
+      );
+    };
   }
 
   protected record DateRange(LocalDate start, LocalDate end) {

@@ -234,6 +234,24 @@ public @interface CheckSecurity {
     }
   }
 
+  @interface FileProcessing {
+
+    @Target(METHOD)
+    @Retention(RUNTIME)
+    @PreAuthorize("@csSecurity.canReadFileProcessing()")
+    @interface CanRead {}
+
+    @Target(METHOD)
+    @Retention(RUNTIME)
+    @PreAuthorize("@csSecurity.canProcessFiles()")
+    @interface CanProcess {}
+
+    @Target(METHOD)
+    @Retention(RUNTIME)
+    @PreAuthorize("@csSecurity.canReprocessFiles()")
+    @interface CanReprocess {}
+  }
+
   @interface Audit {
 
     @interface Mail {

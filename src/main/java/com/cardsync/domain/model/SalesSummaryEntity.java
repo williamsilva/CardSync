@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "ws_sales_summary")
+@Table(name = "cs_sales_summary")
 public class SalesSummaryEntity extends AuditableEntityBase {
 
   private Integer modality;
@@ -25,8 +25,12 @@ public class SalesSummaryEntity extends AuditableEntityBase {
   private Integer creditOrderStatus;
   private Integer statusPaymentBank;
   private Integer transactionsStatus;
+  private Integer bank;
+  private Integer agency;
+  private Integer currentAccount;
 
   private String recordType;
+  private String summaryType;
 
   private BigDecimal tipValue;
   private BigDecimal grossValue;
@@ -48,51 +52,10 @@ public class SalesSummaryEntity extends AuditableEntityBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private CompanyEntity company;
-/*
-  @ManyToOne(fetch = FetchType.LAZY)
-  private ProcessedFile processedFile;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  private BankingDomicile bankingDomicile;
+  private BankingDomicileEntity bankingDomicile;
 
-  @OneToMany(mappedBy = "salesSummary")
-  private List<Adjustment> adjustments = new ArrayList<>();
-
-  @OneToMany(mappedBy = "salesSummary")
-  private List<CreditOrder> creditOrders = new ArrayList<>();
-
-  @OneToMany(mappedBy = "salesSummary", cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<TransactionAcq> transactions = new ArrayList<>();
-
-  public ModalityEnum getModality() {
-    return ModalityEnum.toEnum(modality);
-  }
-
-  public void setModality(ModalityEnum modality) {
-    this.modality = Optional.ofNullable(modality).orElse(ModalityEnum.NULL).getCode();
-  }
-
-  public ReconciliationStatusEnum getCreditOrderStatus() {
-    return ReconciliationStatusEnum.toEnum(creditOrderStatus);
-  }
-
-  public void setCreditOrderStatus(ReconciliationStatusEnum creditOrderStatus) {
-    this.creditOrderStatus = Optional.ofNullable(creditOrderStatus).orElse(ReconciliationStatusEnum.NULL).getCode();
-  }
-
-  public ReconciliationStatusEnum getTransactionsStatus() {
-    return ReconciliationStatusEnum.toEnum(transactionsStatus);
-  }
-
-  public void setTransactionsStatus(ReconciliationStatusEnum transactionsStatus) {
-    this.transactionsStatus = Optional.ofNullable(transactionsStatus).orElse(ReconciliationStatusEnum.NULL).getCode();
-  }
-
-  public StatusPaymentBankEnum getStatusPaymentBank() {
-    return StatusPaymentBankEnum.toEnum(statusPaymentBank);
-  }
-
-  public void setStatusPaymentBank(StatusPaymentBankEnum statusPaymentBank) {
-    this.statusPaymentBank = (statusPaymentBank!=null ? statusPaymentBank:StatusPaymentBankEnum.NULL).getCode();
-  }*/
+  @ManyToOne(fetch = FetchType.LAZY)
+  private ProcessedFileEntity processedFile;
 }

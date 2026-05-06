@@ -16,12 +16,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface AcquirerRepository extends JpaRepository< AcquirerEntity, UUID>,
+public interface AcquirerRepository extends JpaRepository<AcquirerEntity, UUID>,
   JpaSpecificationExecutor<AcquirerEntity> {
 
   @Override
   @EntityGraph(attributePaths = {"createdBy", "updatedBy"})
-  Page< AcquirerEntity> findAll(Specification< AcquirerEntity> spec, Pageable pageable);
+  Page<AcquirerEntity> findAll(Specification<AcquirerEntity> spec, Pageable pageable);
 
   @EntityGraph(attributePaths = {"createdBy", "updatedBy"})
   @Query("""
@@ -46,6 +46,10 @@ public interface AcquirerRepository extends JpaRepository< AcquirerEntity, UUID>
   Optional<AcquirerEntity> findById(UUID id);
 
   boolean existsByCnpj(String cnpj);
-  Optional< AcquirerEntity> findByCnpj(String cnpj);
 
+  Optional<AcquirerEntity> findByCnpj(String cnpj);
+
+  Optional<AcquirerEntity> findByFileIdentifierIgnoreCase(String fileIdentifier);
+
+  Optional<AcquirerEntity> findByFantasyNameIgnoreCase(String fantasyName);
 }

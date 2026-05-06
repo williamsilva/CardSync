@@ -1,0 +1,40 @@
+CREATE TABLE cs_rede_request_notice (
+  id BINARY(16) NOT NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  created_by_id BINARY(16) NULL,
+  updated_by_id BINARY(16) NULL,
+  line_number INT NULL,
+  record_type VARCHAR(20) NULL,
+  pv_number INT NULL,
+  rv_number INT NULL,
+  card_number VARCHAR(80) NULL,
+  transaction_value DECIMAL(18,8) NULL,
+  sale_date DATE NULL,
+  reference_number DECIMAL(38,0) NULL,
+  process_number DECIMAL(38,0) NULL,
+  nsu BIGINT NULL,
+  authorization VARCHAR(80) NULL,
+  request_code INT NULL,
+  deadline DATE NULL,
+  request_status INT NULL,
+  flag_id BINARY(16) NULL,
+  acquirer_id BINARY(16) NULL,
+  company_id BINARY(16) NULL,
+  establishment_id BINARY(16) NULL,
+  sales_summary_id BINARY(16) NULL,
+  processed_file_id BINARY(16) NULL,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_cs_rede_request_notice_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_cs_rede_request_notice_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_cs_rede_request_notice_pv_rv ON cs_rede_request_notice(pv_number, rv_number);
+CREATE INDEX idx_cs_rede_request_notice_nsu ON cs_rede_request_notice(nsu);
+CREATE INDEX idx_cs_rede_request_notice_processed_file ON cs_rede_request_notice(processed_file_id);

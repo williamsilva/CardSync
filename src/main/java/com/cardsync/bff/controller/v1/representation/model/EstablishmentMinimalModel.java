@@ -17,7 +17,7 @@ public class EstablishmentMinimalModel extends RepresentationModel<Establishment
   private UUID id;
   private String type;
   private String status;
-  private String pvNumber;
+  private Integer pvNumber;
 
   private CompanyMinimalModel company;
   private AcquirerMinimalModel acquirer;

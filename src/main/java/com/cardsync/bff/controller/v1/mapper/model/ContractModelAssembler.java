@@ -49,32 +49,32 @@ public class ContractModelAssembler extends RepresentationModelAssemblerSupport<
     }
 
     if (entity.getCompany() != null) {
-      model.setCompany(new CompanyMinimalModel(
-        entity.getCompany().getId(),
-        entity.getCompany().getType() != null ? entity.getCompany().getType().name() : null,
-        entity.getCompany().getCnpj(),
-        entity.getCompany().getStatus() != null ? entity.getCompany().getStatus().name() : null,
-        entity.getCompany().getFantasyName(),
-        entity.getCompany().getSocialReason()
-      ));
+      model.setCompany(CompanyMinimalModel.builder()
+        .id(entity.getCompany().getId())
+        .cnpj(entity.getCompany().getCnpj())
+        .type(entity.getCompany().getType().name())
+        .status(entity.getCompany().getStatus().name())
+        .fantasyName(entity.getCompany().getFantasyName())
+        .socialReason(entity.getCompany().getSocialReason())
+        .build());
     }
 
     if (entity.getAcquirer() != null) {
-      model.setAcquirer(new AcquirerMinimalModel(
-        entity.getAcquirer().getId(),
-        entity.getAcquirer().getCnpj(),
-        entity.getAcquirer().getStatus() != null ? entity.getAcquirer().getStatus().name() : null,
-        entity.getAcquirer().getFantasyName(),
-        entity.getAcquirer().getSocialReason()
-      ));
+      model.setAcquirer(AcquirerMinimalModel.builder()
+        .id(entity.getAcquirer().getId())
+        .cnpj(entity.getAcquirer().getCnpj())
+        .fantasyName(entity.getAcquirer().getFantasyName())
+        .socialReason(entity.getAcquirer().getSocialReason())
+        .status(entity.getAcquirer().getStatus().name())
+        .build());
     }
 
     if (entity.getEstablishment() != null) {
       model.setEstablishment(EstablishmentMinimalModel.builder()
-          .id(entity.getEstablishment().getId())
-          .type( entity.getEstablishment().getType()!=null ? entity.getEstablishment().getType().name():null)
-          .status( entity.getEstablishment().getStatus()!=null ? entity.getEstablishment().getStatus().name():null)
-          .pvNumber( entity.getEstablishment().getPvNumber()!=null ? String.valueOf(entity.getEstablishment().getPvNumber()):null)
+        .id(entity.getEstablishment().getId())
+        .type(entity.getEstablishment().getType().name())
+        .pvNumber(entity.getEstablishment().getPvNumber())
+        .status(entity.getEstablishment().getStatus().name())
         .build());
     }
 

@@ -3,6 +3,8 @@ package com.cardsync.infrastructure.repository.spec.config;
 import com.cardsync.domain.filter.query.RangeValue;
 
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -10,6 +12,76 @@ import java.util.function.Function;
 final class Converters {
 
   private Converters() {
+  }
+
+  private static Object singleValue(Object v) {
+    if (v == null) {
+      return null;
+    }
+
+    if (v instanceof Collection<?> collection) {
+      if (collection.isEmpty()) {
+        return null;
+      }
+      return collection.iterator().next();
+    }
+
+    if (v.getClass().isArray()) {
+      return Array.getLength(v) == 0 ? null : Array.get(v, 0);
+    }
+
+    return v;
+  }
+
+  private static String normalizeNumericText(Object v) {
+    Object single = singleValue(v);
+
+    if (single == null) {
+      return null;
+    }
+
+    String value = String.valueOf(single).trim();
+
+    if (value.isBlank()) {
+      return null;
+    }
+
+    return value
+      .replace("R$", "")
+      .replace("$", "")
+      .replace("€", "")
+      .replace("£", "")
+      .replace("\u00A0", "")
+      .replace(" ", "")
+      .trim();
+  }
+
+  private static String normalizeDecimalText(Object v) {
+    String value = normalizeNumericText(v);
+
+    if (value == null) {
+      return null;
+    }
+
+    boolean hasComma = value.contains(",");
+    boolean hasDot = value.contains(".");
+
+    if (hasComma && hasDot) {
+      int lastComma = value.lastIndexOf(',');
+      int lastDot = value.lastIndexOf('.');
+
+      if (lastComma > lastDot) {
+        return value.replace(".", "").replace(',', '.');
+      }
+
+      return value.replace(",", "");
+    }
+
+    if (hasComma) {
+      return value.replace(',', '.');
+    }
+
+    return value;
   }
 
   static String toStringOrNull(Object v) {
@@ -22,40 +94,75 @@ final class Converters {
   }
 
   static Integer toIntegerOrNull(Object v) {
-    if (v == null) {
+    Object single = singleValue(v);
+
+    if (single == null) {
       return null;
     }
 
-    if (v instanceof Number n) {
-      return n.intValue();
+    if (single instanceof Number n) {
+      double value = n.doubleValue();
+      return value % 1 == 0 ? n.intValue() : null;
     }
 
     try {
-      String s = String.valueOf(v).trim();
-      if (s.isEmpty()) {
+      String text = normalizeDecimalText(single);
+      if (text == null) {
         return null;
       }
-      return Integer.parseInt(s);
+
+      BigDecimal decimal = new BigDecimal(text);
+      return decimal.stripTrailingZeros().scale() <= 0 ? decimal.intValueExact() : null;
     } catch (Exception e) {
       return null;
     }
   }
 
   static Long toLongOrNull(Object v) {
-    if (v == null) {
+    Object single = singleValue(v);
+
+    if (single == null) {
       return null;
     }
 
-    if (v instanceof Number n) {
-      return n.longValue();
+    if (single instanceof Number n) {
+      double value = n.doubleValue();
+      return value % 1 == 0 ? n.longValue() : null;
     }
 
     try {
-      String s = String.valueOf(v).trim();
-      if (s.isEmpty()) {
+      String text = normalizeDecimalText(single);
+      if (text == null) {
         return null;
       }
-      return Long.parseLong(s);
+
+      BigDecimal decimal = new BigDecimal(text);
+      return decimal.stripTrailingZeros().scale() <= 0 ? decimal.longValueExact() : null;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  static BigDecimal toBigDecimalOrNull(Object v) {
+    Object single = singleValue(v);
+
+    switch (single) {
+      case null -> {
+        return null;
+      }
+      case BigDecimal bd -> {
+        return bd;
+      }
+      case Number n -> {
+        return BigDecimal.valueOf(n.doubleValue());
+      }
+      default -> {
+      }
+    }
+
+    try {
+      String text = normalizeDecimalText(single);
+      return text == null ? null : new BigDecimal(text);
     } catch (Exception e) {
       return null;
     }
@@ -101,6 +208,29 @@ final class Converters {
     }
 
     return dateFilterService.parseFlexibleToOffsetDateTime(s);
+  }
+
+  static LocalDate toLocalDateOrNull(Object v, DateFilterService dateFilterService) {
+    if (v == null) {
+      return null;
+    }
+
+    if (v instanceof LocalDate date) {
+      return date;
+    }
+
+    if (v instanceof OffsetDateTime odt) {
+      return odt
+        .toInstant()
+        .atZone(dateFilterService.businessZone())
+        .toLocalDate();
+    }
+
+    OffsetDateTime parsed = toOffsetDateTimeOrNull(v, dateFilterService);
+
+    return parsed == null
+      ? null
+      : parsed.toInstant().atZone(dateFilterService.businessZone()).toLocalDate();
   }
 
   static <E extends Enum<E>> E toEnumOrNull(Object v, Class<E> enumClass, Function<E, Integer> codeExtractor) {

@@ -4,6 +4,8 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Root;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -64,6 +66,22 @@ public record FieldSpec<T, V>(
     return new FieldSpec<>(name, Long.class, pathResolver, Converters::toLongOrNull, false);
   }
 
+
+  public static <T> FieldSpec<T, BigDecimal> bigDecimal(
+    String name,
+    BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver
+  ) {
+    return bigDecimal(name, pathResolver, false);
+  }
+
+  public static <T> FieldSpec<T, BigDecimal> bigDecimal(
+    String name,
+    BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver,
+    boolean requiresDistinct
+  ) {
+    return new FieldSpec<>(name, BigDecimal.class, pathResolver, Converters::toBigDecimalOrNull, requiresDistinct);
+  }
+
   public static <T> FieldSpec<T, Boolean> bool(
     String name,
     BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver
@@ -90,12 +108,44 @@ public record FieldSpec<T, V>(
     BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver,
     DateFilterService dateFilterService
   ) {
+    return offsetDateTime(name, pathResolver, dateFilterService, false);
+  }
+
+  public static <T> FieldSpec<T, OffsetDateTime> offsetDateTime(
+    String name,
+    BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver,
+    DateFilterService dateFilterService,
+    boolean requiresDistinct
+  ) {
     return new FieldSpec<>(
       name,
       OffsetDateTime.class,
       pathResolver,
       raw -> Converters.toOffsetDateTimeOrNull(raw, dateFilterService),
-      false
+      requiresDistinct
+    );
+  }
+
+  public static <T> FieldSpec<T, LocalDate> localDate(
+    String name,
+    BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver,
+    DateFilterService dateFilterService
+  ) {
+    return localDate(name, pathResolver, dateFilterService, false);
+  }
+
+  public static <T> FieldSpec<T, LocalDate> localDate(
+    String name,
+    BiFunction<Root<T>, CriteriaQuery<?>, Path<?>> pathResolver,
+    DateFilterService dateFilterService,
+    boolean requiresDistinct
+  ) {
+    return new FieldSpec<>(
+      name,
+      LocalDate.class,
+      pathResolver,
+      raw -> Converters.toLocalDateOrNull(raw, dateFilterService),
+      requiresDistinct
     );
   }
 

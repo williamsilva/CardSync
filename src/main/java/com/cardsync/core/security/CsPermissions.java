@@ -58,6 +58,11 @@ public abstract class CsPermissions {
   protected static final String PERM_CONTRACTS_CONSULT = "PERM_CONTRACTS_CONSULT";
   protected static final String PERM_CONTRACTS_ACTIVE_OR_INACTIVE = "PERM_CONTRACTS_ACTIVE_OR_INACTIVE";
 
+  /* Permission for File Processing */
+  protected static final String PERM_FILE_PROCESSING_READ = "PERM_FILE_PROCESSING_READ";
+  protected static final String PERM_FILE_PROCESSING_PROCESS = "PERM_FILE_PROCESSING_PROCESS";
+  protected static final String PERM_FILE_PROCESSING_REPROCESS = "PERM_FILE_PROCESSING_REPROCESS";
+
   /* Permission for Audit */
   protected static final String PERM_AUDIT_MAIL_CONSULT = "PERM_AUDIT_MAIL_CONSULT";
 }

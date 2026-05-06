@@ -13,6 +13,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.Year;
@@ -171,7 +172,15 @@ public class SpecificationFactory {
         PeriodFilter periodFilter = toPeriodFilter(raw);
 
         if (periodFilter != null) {
-          return buildOffsetDateTimePeriodPredicate(cb, path, periodFilter);
+          return buildOffsetDateTimePeriodPredicate(cb, path, periodFilter, matchMode);
+        }
+      }
+
+      if (LocalDate.class.equals(field.valueType())) {
+        PeriodFilter periodFilter = toPeriodFilter(raw);
+
+        if (periodFilter != null) {
+          return buildLocalDatePeriodPredicate(cb, path, periodFilter, matchMode);
         }
       }
 
@@ -204,55 +213,20 @@ public class SpecificationFactory {
 
         case OffsetDateTime dt -> {
           Expression<OffsetDateTime> expression = path.as(OffsetDateTime.class);
+          OffsetDateTime start = dateFilterService.startOfBusinessDay(dt);
+          OffsetDateTime end = dateFilterService.endOfBusinessDay(dt);
 
-          return switch (matchMode) {
-            case "dateBefore", "lt" ->
-              cb.lessThan(expression, dateFilterService.startOfBusinessDay(dt));
+          return buildComparableRangePredicate(cb, expression, start, end, matchMode);
+        }
 
-            case "dateAfter", "gt" ->
-              cb.greaterThan(expression, dateFilterService.endOfBusinessDay(dt));
+        case LocalDate date -> {
+          Expression<LocalDate> expression = path.as(LocalDate.class);
 
-            case "dateIs", "equals" -> {
-              OffsetDateTime start = dateFilterService.startOfBusinessDay(dt);
-              OffsetDateTime end = dateFilterService.endOfBusinessDay(dt);
-
-              yield cb.and(
-                cb.greaterThanOrEqualTo(expression, start),
-                cb.lessThanOrEqualTo(expression, end)
-              );
-            }
-
-            case "dateIsNot", "notEquals" -> {
-              OffsetDateTime start = dateFilterService.startOfBusinessDay(dt);
-              OffsetDateTime end = dateFilterService.endOfBusinessDay(dt);
-
-              yield cb.or(
-                cb.lessThan(expression, start),
-                cb.greaterThan(expression, end)
-              );
-            }
-
-            case "gte" ->
-              cb.greaterThanOrEqualTo(expression, dateFilterService.startOfBusinessDay(dt));
-
-            case "lte" ->
-              cb.lessThanOrEqualTo(expression, dateFilterService.endOfBusinessDay(dt));
-
-            default -> cb.equal(expression, dt);
-          };
+          return buildComparableRangePredicate(cb, expression, date, date, matchMode);
         }
 
         case Number n -> {
-          Expression<Number> expression = path.as(Number.class);
-
-          return switch (matchMode) {
-            case "gt" -> cb.gt(expression, n);
-            case "gte" -> cb.ge(expression, n);
-            case "lt" -> cb.lt(expression, n);
-            case "lte" -> cb.le(expression, n);
-            case "notEquals" -> cb.notEqual(expression, n);
-            default -> cb.equal(expression, n);
-          };
+          return buildNumberPredicate(cb, path, field.valueType(), n, matchMode);
         }
 
         default -> {
@@ -263,6 +237,105 @@ public class SpecificationFactory {
         ? cb.notEqual(path, typed)
         : cb.equal(path, typed);
     };
+  }
+
+
+  @SuppressWarnings({ "unchecked", "rawtypes" })
+  private Predicate buildNumberPredicate(
+    CriteriaBuilder cb,
+    Path<?> path,
+    Class<?> valueType,
+    Number value,
+    String matchMode
+  ) {
+    if (isTextNumberMatchMode(matchMode)) {
+      Expression<String> expression = path.as(String.class);
+      String textValue = numberText(value);
+
+      return switch (matchMode) {
+        case "startsWith" -> cb.like(expression, textValue + "%");
+        case "endsWith" -> cb.like(expression, "%" + textValue);
+        case "notContains" -> cb.notLike(expression, "%" + textValue + "%");
+        default -> cb.like(expression, "%" + textValue + "%");
+      };
+    }
+
+    if (Integer.class.equals(valueType)) {
+      Expression<Integer> expression = path.as(Integer.class);
+      Integer typed = value.intValue();
+
+      return switch (matchMode) {
+        case "gt" -> cb.greaterThan(expression, typed);
+        case "gte" -> cb.greaterThanOrEqualTo(expression, typed);
+        case "lt" -> cb.lessThan(expression, typed);
+        case "lte" -> cb.lessThanOrEqualTo(expression, typed);
+        case "notEquals" -> cb.notEqual(expression, typed);
+        default -> cb.equal(expression, typed);
+      };
+    }
+
+    if (Long.class.equals(valueType)) {
+      Expression<Long> expression = path.as(Long.class);
+      Long typed = value.longValue();
+
+      return switch (matchMode) {
+        case "gt" -> cb.greaterThan(expression, typed);
+        case "gte" -> cb.greaterThanOrEqualTo(expression, typed);
+        case "lt" -> cb.lessThan(expression, typed);
+        case "lte" -> cb.lessThanOrEqualTo(expression, typed);
+        case "notEquals" -> cb.notEqual(expression, typed);
+        default -> cb.equal(expression, typed);
+      };
+    }
+
+    if (BigDecimal.class.equals(valueType)) {
+      Expression<BigDecimal> expression = path.as(BigDecimal.class);
+      BigDecimal typed = toBigDecimal(value);
+
+      return switch (matchMode) {
+        case "gt" -> cb.greaterThan(expression, typed);
+        case "gte" -> cb.greaterThanOrEqualTo(expression, typed);
+        case "lt" -> cb.lessThan(expression, typed);
+        case "lte" -> cb.lessThanOrEqualTo(expression, typed);
+        case "notEquals" -> cb.notEqual(expression, typed);
+        default -> cb.equal(expression, typed);
+      };
+    }
+
+    Expression<Double> expression = path.as(Double.class);
+    Double typed = value.doubleValue();
+
+    return switch (matchMode) {
+      case "gt" -> cb.greaterThan(expression, typed);
+      case "gte" -> cb.greaterThanOrEqualTo(expression, typed);
+      case "lt" -> cb.lessThan(expression, typed);
+      case "lte" -> cb.lessThanOrEqualTo(expression, typed);
+      case "notEquals" -> cb.notEqual(expression, typed);
+      default -> cb.equal(expression, typed);
+    };
+  }
+
+  private boolean isTextNumberMatchMode(String matchMode) {
+    return "contains".equals(matchMode)
+      || "notContains".equals(matchMode)
+      || "startsWith".equals(matchMode)
+      || "endsWith".equals(matchMode);
+  }
+
+  private String numberText(Number value) {
+    if (value instanceof BigDecimal bd) {
+      return bd.stripTrailingZeros().toPlainString();
+    }
+
+    return String.valueOf(value);
+  }
+
+  private BigDecimal toBigDecimal(Number value) {
+    if (value instanceof BigDecimal bd) {
+      return bd;
+    }
+
+    return new BigDecimal(String.valueOf(value));
   }
 
   private record PeriodFilter(PeriodEnum period, List<String> values) {
@@ -353,68 +426,129 @@ public class SpecificationFactory {
   private Predicate buildOffsetDateTimePeriodPredicate(
     CriteriaBuilder cb,
     Path<?> path,
-    PeriodFilter filter
+    PeriodFilter filter,
+    String matchMode
   ) {
     Expression<OffsetDateTime> expression = path.as(OffsetDateTime.class);
 
+    DateRange range = resolveDateRange(filter);
+
+    if (range == null) {
+      return cb.conjunction();
+    }
+
+    OffsetDateTime start = range.start() == null ? null : startOfDay(range.start());
+    OffsetDateTime end = range.end() == null ? null : endOfDay(range.end());
+
+    return buildComparableRangePredicate(cb, expression, start, end, matchMode);
+  }
+
+  private Predicate buildLocalDatePeriodPredicate(
+    CriteriaBuilder cb,
+    Path<?> path,
+    PeriodFilter filter,
+    String matchMode
+  ) {
+    Expression<LocalDate> expression = path.as(LocalDate.class);
+
+    DateRange range = resolveDateRange(filter);
+
+    if (range == null) {
+      return cb.conjunction();
+    }
+
+    return buildComparableRangePredicate(cb, expression, range.start(), range.end(), matchMode);
+  }
+
+  private DateRange resolveDateRange(PeriodFilter filter) {
     return switch (filter.period()) {
       case DAY -> {
         LocalDate date = parseDate(first(filter.values()));
-
-        yield date == null
-          ? cb.conjunction()
-          : cb.between(expression, startOfDay(date), endOfDay(date));
+        yield date == null ? null : new DateRange(date, date);
       }
 
       case START -> {
         LocalDate date = parseDate(first(filter.values()));
-
-        yield date == null
-          ? cb.conjunction()
-          : cb.greaterThanOrEqualTo(expression, startOfDay(date));
+        yield date == null ? null : new DateRange(date, null);
       }
 
       case END -> {
         LocalDate date = parseDate(first(filter.values()));
-
-        yield date == null
-          ? cb.conjunction()
-          : cb.lessThanOrEqualTo(expression, endOfDay(date));
+        yield date == null ? null : new DateRange(null, date);
       }
 
       case MONTH -> {
         YearMonth month = parseMonth(first(filter.values()));
-
-        yield month == null
-          ? cb.conjunction()
-          : cb.between(
-          expression,
-          startOfDay(month.atDay(1)),
-          endOfDay(month.atEndOfMonth())
-        );
+        yield month == null ? null : new DateRange(month.atDay(1), month.atEndOfMonth());
       }
 
       case YEAR -> {
         Year year = parseYear(first(filter.values()));
-
-        yield year == null
-          ? cb.conjunction()
-          : cb.between(
-          expression,
-          startOfDay(year.atDay(1)),
-          endOfDay(year.atMonth(12).atEndOfMonth())
-        );
+        yield year == null ? null : new DateRange(year.atDay(1), year.atMonth(12).atEndOfMonth());
       }
 
-      case INTERVAL -> {
-        DateRange range = parseDateRange(filter.values());
+      case INTERVAL -> parseDateRange(filter.values());
 
-        yield range == null
-          ? cb.conjunction()
-          : cb.between(expression, startOfDay(range.start()), endOfDay(range.end()));
+      case NULL -> null;
+    };
+  }
+
+  private <Y extends Comparable<? super Y>> Predicate buildComparableRangePredicate(
+    CriteriaBuilder cb,
+    Expression<Y> expression,
+    Y start,
+    Y end,
+    String matchMode
+  ) {
+    if (start == null && end == null) {
+      return cb.conjunction();
+    }
+
+    if (start != null && end != null && end.compareTo(start) < 0) {
+      Y tmp = start;
+      start = end;
+      end = tmp;
+    }
+
+    return switch (matchMode) {
+      case "dateBefore", "lt" ->
+        start == null ? cb.conjunction() : cb.lessThan(expression, start);
+
+      case "dateAfter", "gt" ->
+        end == null ? cb.conjunction() : cb.greaterThan(expression, end);
+
+      case "dateIsNot", "notEquals" -> {
+        if (start != null && end != null) {
+          yield cb.or(
+            cb.lessThan(expression, start),
+            cb.greaterThan(expression, end)
+          );
+        }
+
+        if (start != null) {
+          yield cb.lessThan(expression, start);
+        }
+
+        yield cb.greaterThan(expression, end);
       }
 
-      case NULL -> cb.conjunction();
+      case "gte" ->
+        start == null ? cb.conjunction() : cb.greaterThanOrEqualTo(expression, start);
+
+      case "lte" ->
+        end == null ? cb.conjunction() : cb.lessThanOrEqualTo(expression, end);
+
+      default -> {
+        if (start != null && end != null) {
+          yield cb.between(expression, start, end);
+        }
+
+        if (start != null) {
+          yield cb.greaterThanOrEqualTo(expression, start);
+        }
+
+        yield cb.lessThanOrEqualTo(expression, end);
+      }
     };
   }
 

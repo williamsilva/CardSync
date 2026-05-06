@@ -1,9 +1,9 @@
 INSERT INTO cs_users (id, name, user_name, document,  created_at, updated_at, password_expires_at, created_by_id, password_hash) VALUES
-	('97d48758','Suporte Sistema', 'suporte@cardsync.com.br', '12345678912', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 5 DAY),
+	('97d48758','Suporte Sistema', 'suporte@cardsync.com.br', '12345678912', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY),
 	  '97d48758', '$2a$10$Le0LMZWPAhWqgkI8TbjqCOo1gCkhUplcCMZsMUS/scRl4dpgvGWAi');
 
 INSERT INTO cs_users (id, name, user_name, document,  created_at, updated_at, password_expires_at, created_by_id, password_hash) VALUES
-	('97d48756','William Silva', 'william@cardsync.com.br', '13582679799', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 5 DAY),
+	('97d48756','William Silva', 'william@cardsync.com.br', '13582679799', NOW(), NOW(), DATE_ADD(NOW(), INTERVAL 90 DAY),
 	  '97d48756', '$2a$10$Le0LMZWPAhWqgkI8TbjqCOo1gCkhUplcCMZsMUS/scRl4dpgvGWAi');
 
 INSERT INTO cs_groups (id, name, description, created_at, updated_at, created_by_id) VALUES

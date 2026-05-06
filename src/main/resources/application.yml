@@ -4,6 +4,11 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
+  jpa:
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+
   jackson:
     time-zone: UTC
 
@@ -25,3 +30,67 @@ server:
 cardsync:
   app:
     business-zone: America/Sao_Paulo
+
+# File processing migrated from Nimbus API
+file-processing:
+  base-path: C:/cardsync/files
+  base-bank: ${file-processing.base-path}/bank
+  base-acquirer: ${file-processing.base-path}/acquirer
+
+  erp:
+    default-pv-number: ${ERP_DEFAULT_PV_NUMBER:}
+    default-company-cnpj: ${ERP_DEFAULT_COMPANY_CNPJ:}
+    default-company-name: ${ERP_DEFAULT_COMPANY_NAME:}
+    default-establishment-name: ${ERP_DEFAULT_ESTABLISHMENT_NAME:}
+    default-commercial-name: ${ERP_DEFAULT_COMMERCIAL_NAME:ERP}
+    default-pv-group-number: ${ERP_DEFAULT_PV_GROUP_NUMBER:}
+
+  scheduler:
+    enabled: false
+    erp-enabled: false
+    bank-enabled: false
+    rede-enabled: false
+    log-idle-cycles: false
+    erp-cron: "0 0/5 * * * *"
+    rede-cron: "0 0/5 * * * *"
+    bank-cron: "0 0/5 * * * *"
+
+  systems:
+
+    erp:
+      input: ${file-processing.base-path}/ERP/input
+      processed: ${file-processing.base-path}/ERP/processed
+      duplicate: ${file-processing.base-path}/ERP/duplicate
+      error: ${file-processing.base-path}/ERP/error
+
+    acquirer:
+      rede:
+        input: ${file-processing.base-acquirer}/REDE/input
+        processed: ${file-processing.base-acquirer}/REDE/processed
+        duplicate: ${file-processing.base-acquirer}/REDE/duplicate
+        error: ${file-processing.base-acquirer}/REDE/error
+
+    bank:
+      itau:
+        input: ${file-processing.base-bank}/ITAU/input
+        processed: ${file-processing.base-bank}/ITAU/processed
+        duplicate: ${file-processing.base-bank}/ITAU/duplicate
+        error: ${file-processing.base-bank}/ITAU/error
+
+      santander:
+        input: ${file-processing.base-bank}/SANTANDER/input
+        processed: ${file-processing.base-bank}/SANTANDER/processed
+        duplicate: ${file-processing.base-bank}/SANTANDER/duplicate
+        error: ${file-processing.base-bank}/SANTANDER/error
+
+      bradesco:
+        input: ${file-processing.base-bank}/BRADESCO/input
+        processed: ${file-processing.base-bank}/BRADESCO/processed
+        duplicate: ${file-processing.base-bank}/BRADESCO/duplicate
+        error: ${file-processing.base-bank}/BRADESCO/error
+
+    reconciliation:
+      date-tolerance-days: 7
+      value-tolerance: "0.05"
+      recursive-limit: 30
+      safe-cap-cents: 50000000
