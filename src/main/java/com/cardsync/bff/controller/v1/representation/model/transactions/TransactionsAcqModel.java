@@ -1,13 +1,12 @@
-package com.cardsync.bff.controller.v1.representation.model.erp;
+package com.cardsync.bff.controller.v1.representation.model.transactions;
 
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileSummaryModel;
+import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
@@ -23,32 +22,39 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Relation(collectionRelation = "content")
-public class TransactionsErpModel extends RepresentationModel<TransactionsErpModel> {
+public class TransactionsAcqModel extends RepresentationModel<@NonNull TransactionsAcqModel> {
 
   private UUID id;
 
   private Long cvNsu;
   private Integer capture;
   private Integer modality;
+  private Integer lineNumber;
   private Integer installment;
+  private Integer transactionStatus;
+  private Integer transactionStatusReason;
 
+  private String tid;
+  private String cardNumber;
   private String authorization;
 
-  private BigDecimal feeValue;
-  private BigDecimal netValue;
+  private BigDecimal mdrRate;
+  private BigDecimal flexRate;
   private BigDecimal grossValue;
+  private BigDecimal liquidValue;
+  private BigDecimal discountValue;
   private BigDecimal adjustmentValue;
 
   private OffsetDateTime saleDate;
-
   private LocalDate expectedPaymentDate;
-
-  private Integer conciliationStatus;
+  private OffsetDateTime saleReconciliationDate;
 
   private FlagMinimalModel flag;
   private CompanyMinimalModel company;
   private AcquirerMinimalModel acquirer;
+  private SalesSummaryMinimalModel salesSummary;
   private EstablishmentMinimalModel establishment;
+  private ProcessedFileMinimalModel processedFile;
 
-  private List<TransactionErpInstallmentModel> installments = new ArrayList<>();
+  private List<TransactionAcqInstallmentModel> installments = new ArrayList<>();
 }

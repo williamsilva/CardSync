@@ -1,11 +1,23 @@
 CREATE TABLE cs_flag (
   id BINARY(16) NOT NULL,
+
+  -- EntityBase (auditoria)
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
+  created_by_id BINARY(16) NULL,
+  updated_by_id BINARY(16) NULL,
+
   status INT NOT NULL DEFAULT 1,
   erp_code BIGINT NOT NULL,
   name VARCHAR(20) NOT NULL UNIQUE,
   text_color VARCHAR(20) NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  CONSTRAINT fk_cs_flag_created_by FOREIGN KEY (created_by_id)
+      REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
+
+  CONSTRAINT fk_cs_flag_updated_by FOREIGN KEY (updated_by_id)
+     REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_flag_name ON cs_flag (name);

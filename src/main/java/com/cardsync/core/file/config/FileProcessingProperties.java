@@ -164,6 +164,21 @@ public class FileProcessingProperties {
     private String defaultCompanyCnpj;
     private String defaultCompanyName;
     private String defaultEstablishmentName;
+
+    /**
+     * Indica se o arquivo ERP informa empresa na própria linha.
+     * Quando false, a conciliação ERP x adquirente pode preencher/corrigir empresa
+     * usando o contexto da venda da adquirente.
+     */
+    private boolean informsCompany = false;
+
+    /**
+     * Indica se o arquivo ERP informa estabelecimento/PV na própria linha.
+     * Quando false, a conciliação ERP x adquirente pode preencher/corrigir estabelecimento
+     * usando o contexto da venda da adquirente.
+     */
+    private boolean informsEstablishment = false;
+
     private String defaultCommercialName = "ERP";
     private Integer defaultPvGroupNumber;
   }
@@ -197,6 +212,12 @@ public class FileProcessingProperties {
     /** Cron de 6 campos do Spring. Default: a cada 5 minutos. */
     private String bankCron = "0 0/5 * * * *";
 
+    /** Liga/desliga o agendamento da conciliação ERP x adquirente. */
+    private boolean erpAcquirerReconciliationEnabled = false;
+
+    /** Cron de 6 campos do Spring para conciliação ERP x adquirente. Default: a cada 15 minutos. */
+    private String erpAcquirerReconciliationCron = "0 0/15 * * * *";
+
     /** Apenas para logs/status, indicando se o scheduler deve registrar ciclos sem arquivos. */
     private boolean logIdleCycles = true;
   }
@@ -225,6 +246,12 @@ public class FileProcessingProperties {
      * Proteção contra subset-sum muito grande. Valor em centavos; default R$ 500.000,00.
      */
     private long safeCapCents = 50_000_000L;
+
+    /**
+     * Por padrão, a conciliação ERP x adquirente ignora vendas já conciliadas.
+     * Ative apenas quando precisar reprocessar/corrigir conciliações antigas.
+     */
+    private boolean reconcileAlreadyReconciledErpAcquirerSales = false;
 
     public BigDecimal valueToleranceAsBigDecimal() {
       if (valueTolerance == null || valueTolerance.isBlank()) {

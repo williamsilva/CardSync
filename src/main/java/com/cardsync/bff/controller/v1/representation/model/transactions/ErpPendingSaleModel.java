@@ -1,4 +1,4 @@
-package com.cardsync.bff.controller.v1.representation.model.erp;
+package com.cardsync.bff.controller.v1.representation.model.transactions;
 
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
 
@@ -20,7 +20,6 @@ public record ErpPendingSaleModel(
   String sourceCompanyCnpj,
   String sourceCompanyName,
   Integer sourceEstablishmentPvNumber,
-  String sourceEstablishmentName,
   Integer installment,
   BigDecimal grossValue,
   BigDecimal liquidValue,

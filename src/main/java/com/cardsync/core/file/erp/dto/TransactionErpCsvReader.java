@@ -104,8 +104,6 @@ public class TransactionErpCsvReader {
       dto.setTid(valueAny(values, headerMap, "tid"));
       dto.setAuthorization(valueAny(values, headerMap,
         "autorizacao", "codigo autorizacao", "cod autorizacao", "cod. autorizacao", "auth", "authorization", "aut"));
-      dto.setThreeDs(valueAny(values, headerMap, "3ds"));
-      dto.setAntiFraud(valueAny(values, headerMap, "antifraude", "anti fraude"));
       dto.setGrossValue(parseBigDecimal(valueAny(values, headerMap,
         "valor", "valor bruto", "valor venda", "valor da venda", "valor transacao", "valor da transacao", "bruto")));
       dto.setSaleDate(parseOffsetDateTime(valueAny(values, headerMap,
@@ -117,8 +115,6 @@ public class TransactionErpCsvReader {
         "empresa", "nome empresa", "razao social", "razao social empresa", "fantasia empresa", "nome fantasia", "empresa fantasia", "grupo comercial"));
       dto.setEstablishmentPvNumber(parseInteger(valueAny(values, headerMap,
         "pv", "numero pv", "n pv", "nº pv", "codigo pv", "cod pv", "cod. pv", "codigo estabelecimento", "cod estabelecimento", "cod. estabelecimento", "numero estabelecimento", "estabelecimento pv", "ponto de venda", "loja", "codigo loja", "cod loja", "unidade")));
-      dto.setEstablishmentName(valueAny(values, headerMap,
-        "nome estabelecimento", "estabelecimento", "nome loja", "loja", "ponto venda", "ponto de venda", "nome pv", "fantasia estabelecimento", "nome unidade", "unidade"));
       dto.setMachine(valueAny(values, headerMap,
         "maquina", "terminal", "pdv", "pos", "tef", "equipamento", "ec", "codigo ec", "cod ec"));
 
@@ -144,9 +140,7 @@ public class TransactionErpCsvReader {
     if (isBlank(dto.getCompanyName())) {
       dto.setCompanyName(trimToNull(erp.getDefaultCompanyName()));
     }
-    if (isBlank(dto.getEstablishmentName())) {
-      dto.setEstablishmentName(trimToNull(erp.getDefaultEstablishmentName()));
-    }
+
   }
 
   public int countPhysicalLines(Path file) throws Exception {
@@ -326,6 +320,11 @@ public class TransactionErpCsvReader {
       return null;
     }
 
+    OffsetDateTime brazilianDateTime = tryParseBrazilianDateTime(text);
+    if (brazilianDateTime != null) {
+      return brazilianDateTime;
+    }
+
     for (DateTimeFormatter formatter : DATE_TIME_FORMATTERS) {
       try {
         return LocalDateTime.parse(text, formatter)
@@ -352,6 +351,34 @@ public class TransactionErpCsvReader {
         .toOffsetDateTime();
     } catch (DateTimeParseException ignored) {
       throw new IllegalArgumentException("Data/hora ERP inválida: " + value);
+    }
+  }
+
+  private OffsetDateTime tryParseBrazilianDateTime(String text) {
+    if (text == null || text.isBlank()) return null;
+
+    String normalized = text.trim();
+    var matcher = java.util.regex.Pattern
+      .compile("^(\\d{2})[/-](\\d{2})[/-](\\d{4})(?:\\s+(\\d{2}):(\\d{2})(?::(\\d{2}))?)?$")
+      .matcher(normalized);
+
+    if (!matcher.matches()) {
+      return null;
+    }
+
+    int day = Integer.parseInt(matcher.group(1));
+    int month = Integer.parseInt(matcher.group(2));
+    int year = Integer.parseInt(matcher.group(3));
+    int hour = matcher.group(4) == null ? 0 : Integer.parseInt(matcher.group(4));
+    int minute = matcher.group(5) == null ? 0 : Integer.parseInt(matcher.group(5));
+    int second = matcher.group(6) == null ? 0 : Integer.parseInt(matcher.group(6));
+
+    try {
+      return LocalDateTime.of(year, month, day, hour, minute, second)
+        .atZone(DEFAULT_ZONE)
+        .toOffsetDateTime();
+    } catch (RuntimeException ex) {
+      throw new IllegalArgumentException("Data/hora ERP inválida: " + text, ex);
     }
   }
 

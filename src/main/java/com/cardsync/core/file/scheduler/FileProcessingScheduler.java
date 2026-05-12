@@ -1,5 +1,6 @@
 package com.cardsync.core.file.scheduler;
 
+import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.service.FileStorageTask;
 import lombok.RequiredArgsConstructor;
@@ -15,9 +16,11 @@ public class FileProcessingScheduler {
   private static final String TRIGGER_ERP = "SCHEDULER_ERP";
   private static final String TRIGGER_REDE = "SCHEDULER_REDE";
   private static final String TRIGGER_BANK = "SCHEDULER_BANK";
+  private static final String TRIGGER_ERP_ACQUIRER_RECONCILIATION = "SCHEDULER_ERP_ACQUIRER_RECONCILIATION";
 
   private final FileProcessingProperties properties;
   private final FileStorageTask fileStorageTask;
+  private final ConciliationAnalysisService conciliationAnalysisService;
 
   @Scheduled(cron = "${file-processing.scheduler.erp-cron:0 0/5 * * * *}", zone = "${cardsync.app.business-zone:America/Sao_Paulo}")
   public void processErp() {
@@ -44,6 +47,29 @@ public class FileProcessingScheduler {
       return;
     }
     fileStorageTask.tryProcessFileBank(TRIGGER_BANK);
+  }
+
+  @Scheduled(cron = "${file-processing.scheduler.erp-acquirer-reconciliation-cron:0 0/15 * * * *}", zone = "${cardsync.app.business-zone:America/Sao_Paulo}")
+  public void reconcileErpAcquirerSales() {
+    if (!isSchedulerEnabled() || !properties.getScheduler().isErpAcquirerReconciliationEnabled()) {
+      logIdle("Conciliação ERP x adquirente");
+      return;
+    }
+
+    var result = conciliationAnalysisService.reconcileErpWithAcquirerBusinessContext(TRIGGER_ERP_ACQUIRER_RECONCILIATION);
+    log.info(
+      "✅ Conciliação ERP x adquirente finalizada: trigger={}, analisadas={}, conciliadas={}, atualizadas={}, bandeirasAtualizadas={}, contextoAtualizado={}, naoEncontradas={}, divergenciaValor={}, divergenciaAdquirente={}, ambiguas={}",
+      TRIGGER_ERP_ACQUIRER_RECONCILIATION,
+      result.analyzed(),
+      result.matched(),
+      result.updated(),
+      result.flagUpdated(),
+      result.businessContextUpdated(),
+      result.notMatched(),
+      result.valueDivergences(),
+      result.acquirerDivergences(),
+      result.ambiguousMatches()
+    );
   }
 
   private boolean isSchedulerEnabled() {

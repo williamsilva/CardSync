@@ -25,10 +25,10 @@ public class SalesSummaryEntity extends AuditableEntityBase {
   private Integer creditOrderStatus;
   private Integer statusPaymentBank;
   private Integer transactionsStatus;
-  private Integer bank;
   private Integer agency;
   private Integer currentAccount;
 
+  private String bank;
   private String recordType;
   private String summaryType;
 

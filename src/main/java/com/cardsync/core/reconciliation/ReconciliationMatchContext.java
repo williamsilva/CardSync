@@ -6,7 +6,6 @@ record ReconciliationMatchContext(
   UUID companyId,
   UUID acquirerId,
   UUID establishmentId,
-  UUID bankingDomicileId,
   UUID flagId,
   PaymentKind paymentKind
 ) {
@@ -22,7 +21,6 @@ record ReconciliationMatchContext(
     if (!sameRequired(companyId, other.companyId)) return false;
     if (!sameOptional(acquirerId, other.acquirerId)) return false;
     if (!sameOptional(establishmentId, other.establishmentId)) return false;
-    if (!sameOptional(bankingDomicileId, other.bankingDomicileId)) return false;
     if (!sameOptional(flagId, other.flagId)) return false;
     return paymentKind == PaymentKind.UNKNOWN
       || other.paymentKind == PaymentKind.UNKNOWN

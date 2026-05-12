@@ -1,12 +1,15 @@
 package com.cardsync.domain.filter;
 
-import com.cardsync.domain.model.enums.*;
+import com.cardsync.domain.model.enums.CaptureEnum;
+import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.PeriodEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-public record TransactionErpSalesFilter(
+public record TransactionAcqSalesFilter(
 
   String tid,
   String cvNsu,

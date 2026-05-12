@@ -1,7 +1,7 @@
 package com.cardsync.infrastructure.repository.spec.advancedFilters;
 
-import com.cardsync.domain.filter.TransactionErpSalesFilter;
-import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.domain.filter.TransactionAcqSalesFilter;
+import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
@@ -16,18 +16,18 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 
 @Component
-public class TransactionErpAdvancedFields extends BaseSpecificationSupport<TransactionErpEntity> {
+public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<TransactionAcqEntity> {
 
-  public TransactionErpAdvancedFields(DateFilterService dateFilterService) {
+  public TransactionAcqAdvancedFields(DateFilterService dateFilterService) {
     super(dateFilterService);
   }
 
-  public Specification<TransactionErpEntity> advanced(TransactionErpSalesFilter filter) {
+  public Specification<TransactionAcqEntity> advanced(TransactionAcqSalesFilter filter) {
     if (filter == null) {
       return Specs.all();
     }
 
-    Specification<TransactionErpEntity> spec = Specs.all();
+    Specification<TransactionAcqEntity> spec = Specs.all();
 
     spec = spec.and(contains(filter.tid(), "tid"));
     spec = spec.and(contains(filter.cvNsu(), "nsu"));
@@ -52,16 +52,16 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     return spec;
   }
 
-  private Specification<TransactionErpEntity> adjustmentValue(BigDecimal start, BigDecimal end) {
+  private Specification<TransactionAcqEntity> adjustmentValue(BigDecimal start, BigDecimal end) {
     return currencyRangeValue("adjustment", "adjustmentValue", start, end, BigDecimal.ZERO);
   }
 
-  protected Specification<TransactionErpEntity> currencyRangeValue(String field, BigDecimal start, BigDecimal end) {
+  protected Specification<TransactionAcqEntity> currencyRangeValue(String field, BigDecimal start, BigDecimal end) {
     return currencyRangeValue(null, field, start, end, null);
   }
 
-  private Specification<TransactionErpEntity> currencyRangeValue(
-    String association, String field, BigDecimal start, BigDecimal end, BigDecimal nullAs ) {
+  private Specification<TransactionAcqEntity> currencyRangeValue(
+    String association, String field, BigDecimal start, BigDecimal end, BigDecimal nullAs) {
     if (start == null && end == null) {
       return alwaysTrue();
     }
@@ -100,7 +100,7 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     };
   }
 
-  private Specification<TransactionErpEntity> saleDate(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> saleDate(TransactionAcqSalesFilter filter) {
     return datePeriod(
       "saleDate",
       filter.periodSaleDate(),
@@ -109,17 +109,17 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     );
   }
 
-  private Specification<TransactionErpEntity> expectedPaymentDate(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> expectedPaymentDate(TransactionAcqSalesFilter filter) {
     return localDatePeriodJoin(
       "installments",
-      "creditDate",
+      "expectedPaymentDate",
       filter.periodExpectedPaymentDate(),
       filter.expectedPaymentDate(),
       true
     );
   }
 
-  private Specification<TransactionErpEntity> modality(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> modality(TransactionAcqSalesFilter filter) {
     return inCodes(
       "modality",
       filter.modality(),
@@ -127,7 +127,7 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     );
   }
 
-  private Specification<TransactionErpEntity> transactionStatus(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> transactionStatus(TransactionAcqSalesFilter filter) {
     return inCodes(
       "transactionStatus",
       filter.transactionStatus(),
@@ -135,7 +135,7 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     );
   }
 
-  private Specification<TransactionErpEntity> capture(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> capture(TransactionAcqSalesFilter filter) {
     return inCodes(
       "capture",
       filter.capture(),
@@ -143,37 +143,37 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     );
   }
 
-  private Specification<TransactionErpEntity> company(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> company(TransactionAcqSalesFilter filter) {
     return inPath(
       filter.companies(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
+      TransactionAcqAdvancedFields::parseUuidOrNull,
       "company",
       "id"
     );
   }
 
-  private Specification<TransactionErpEntity> establishment(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> establishment(TransactionAcqSalesFilter filter) {
     return inPath(
       filter.establishments(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
+      TransactionAcqAdvancedFields::parseUuidOrNull,
       "establishment",
       "id"
     );
   }
 
-  private Specification<TransactionErpEntity> acquirer(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> acquirer(TransactionAcqSalesFilter filter) {
     return inPath(
       filter.acquirers(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
+      TransactionAcqAdvancedFields::parseUuidOrNull,
       "acquirer",
       "id"
     );
   }
 
-  private Specification<TransactionErpEntity> flag(TransactionErpSalesFilter filter) {
+  private Specification<TransactionAcqEntity> flag(TransactionAcqSalesFilter filter) {
     return inPath(
       filter.flags(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
+      TransactionAcqAdvancedFields::parseUuidOrNull,
       "flag",
       "id"
     );

@@ -13,8 +13,7 @@ CREATE INDEX idx_cs_contract_rates_installment_range
 ALTER TABLE cs_transaction_erp
   ADD COLUMN source_company_cnpj VARCHAR(32) NULL AFTER authorization,
   ADD COLUMN source_company_name VARCHAR(255) NULL AFTER source_company_cnpj,
-  ADD COLUMN source_establishment_pv_number INT NULL AFTER source_company_name,
-  ADD COLUMN source_establishment_name VARCHAR(255) NULL AFTER source_establishment_pv_number;
+  ADD COLUMN source_establishment_pv_number INT NULL AFTER source_company_name;
 
 CREATE INDEX idx_cs_transaction_erp_source_company_cnpj ON cs_transaction_erp(source_company_cnpj);
 CREATE INDEX idx_cs_transaction_erp_source_establishment_pv ON cs_transaction_erp(source_establishment_pv_number);

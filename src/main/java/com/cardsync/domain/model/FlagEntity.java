@@ -15,11 +15,7 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "cs_flag")
-public class FlagEntity  {
-
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private UUID id;
+public class FlagEntity extends AuditableEntityBase {
 
   private String name;
   private Integer status;

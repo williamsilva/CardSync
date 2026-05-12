@@ -1,18 +1,13 @@
 package com.cardsync.bff.controller.v1.mapper.model;
 
-import com.cardsync.bff.controller.v1.TransactionErpSalesController;
+import com.cardsync.bff.controller.v1.TransactionAcqSalesController;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.BankMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.BankingDomicileMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionErpInstallmentModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsErpModel;
-import com.cardsync.domain.model.BankEntity;
-import com.cardsync.domain.model.InstallmentErpEntity;
-import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.bff.controller.v1.representation.model.transactions.*;
+import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentEnum;
 import org.jspecify.annotations.NonNull;
@@ -26,45 +21,45 @@ import java.util.List;
 import java.util.Objects;
 
 @Component
-public class TransactionsErpModelAssembler extends RepresentationModelAssemblerSupport<
-  @NonNull TransactionErpEntity,
-  @NonNull TransactionsErpModel
+public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerSupport<
+  @NonNull TransactionAcqEntity,
+  @NonNull TransactionsAcqModel
   > {
 
-  public TransactionsErpModelAssembler() {
-    super(TransactionErpSalesController.class, TransactionsErpModel.class);
+  public TransactionsAcqModelAssembler() {
+    super(TransactionAcqSalesController.class, TransactionsAcqModel.class);
   }
 
   @Override
-  public @NonNull TransactionsErpModel toModel(@NonNull TransactionErpEntity entity) {
-    TransactionsErpModel model = createModelWithId(entity.getId(), entity);
+  public @NonNull TransactionsAcqModel toModel(@NonNull TransactionAcqEntity entity) {
+    TransactionsAcqModel model = createModelWithId(entity.getId(), entity);
 
     BigDecimal adjustmentValue = getAdjustmentValue(entity);
-    List<InstallmentErpEntity> installments = getInstallments(entity);
-    InstallmentErpEntity firstInstallment = installments.isEmpty() ? null : installments.getFirst();
+    List<InstallmentAcqEntity> installments = getInstallments(entity);
+    InstallmentAcqEntity firstInstallment = installments.isEmpty() ? null : installments.getFirst();
 
     model.setId(entity.getId());
     model.setTid(entity.getTid());
     model.setCvNsu(entity.getNsu());
+    model.setMdrRate(entity.getMdrRate());
     model.setCapture(entity.getCapture());
-    model.setCardName(entity.getCardName());
     model.setSaleDate(entity.getSaleDate());
+    model.setFlexRate(entity.getFlexRate());
     model.setModality(entity.getModality());
     model.setAdjustmentValue(adjustmentValue);
+    model.setLineNumber(entity.getLineNumber());
     model.setCardNumber(entity.getCardNumber());
     model.setGrossValue(entity.getGrossValue());
-    model.setLineNumber(entity.getLineNumber());
     model.setLiquidValue(entity.getLiquidValue());
     model.setInstallment(entity.getInstallment());
-    model.setContractedFee(entity.getContractedFee());
     model.setDiscountValue(entity.getDiscountValue());
     model.setAuthorization(entity.getAuthorization());
     model.setTransactionStatus(entity.getTransactionStatus());
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
     model.setTransactionStatusReason(entity.getTransactionStatusReason());
-    model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getCreditDate());
+    model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
     model.setInstallments(installments.stream()
-      .map(TransactionsErpModelAssembler::toInstallmentModel)
+      .map(TransactionsAcqModelAssembler::toInstallmentModel)
       .toList());
 
     if (entity.getAcquirer() != null) {
@@ -81,7 +76,6 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
       model.setFlag(FlagMinimalModel.builder()
         .id(entity.getFlag().getId())
         .name(entity.getFlag().getName())
-        .erpCode(entity.getFlag().getErpCode())
         .status(entity.getFlag().getStatus() == null ? null : entity.getFlag().getStatus().name())
         .build());
     }
@@ -106,12 +100,14 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
         .build());
     }
 
-    if (entity.getBankingDomicile() != null) {
-      model.setBankingDomicile(BankingDomicileMinimalModel.builder()
-          .id(entity.getBankingDomicile().getId())
-          .agency(entity.getBankingDomicile().getAgency())
-          .currentAccount(entity.getBankingDomicile().getCurrentAccount())
-          .bank(entity.getBankingDomicile().getBank() == null ? null: toBank(entity.getBankingDomicile().getBank()))
+    if(entity.getSalesSummary() != null) {
+      model.setSalesSummary(SalesSummaryMinimalModel.builder()
+        .id(entity.getSalesSummary().getId())
+        .agency(entity.getSalesSummary().getAgency())
+        .currentAccount(entity.getSalesSummary().getCurrentAccount())
+        .pvNumber(entity.getSalesSummary().getPvNumber())
+        .bankingDomicile(entity.getSalesSummary().getBankingDomicile() == null ?
+          null : toBankingDomicile(entity.getSalesSummary().getBankingDomicile()))
         .build());
     }
 
@@ -125,6 +121,15 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
     return model;
   }
 
+  private static BankingDomicileMinimalModel toBankingDomicile(BankingDomicileEntity bankingDomicile) {
+    return BankingDomicileMinimalModel.builder()
+      .id(bankingDomicile.getId())
+      .agency(bankingDomicile.getAgency())
+      .currentAccount(bankingDomicile.getCurrentAccount())
+      .bank(bankingDomicile.getBank() == null ? null : toBank(bankingDomicile.getBank()))
+      .build();
+  }
+
   private static BankMinimalModel toBank(BankEntity bank) {
     return BankMinimalModel.builder()
       .id(bank.getId())
@@ -133,39 +138,37 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
       .build();
   }
 
-  private static TransactionErpInstallmentModel toInstallmentModel(InstallmentErpEntity entity) {
-    StatusPaymentEnum paymentStatus = statusPayment(entity.getPaymentStatus());
+  private static TransactionAcqInstallmentModel toInstallmentModel(InstallmentAcqEntity entity) {
+    StatusPaymentEnum paymentStatus = statusPayment(entity.getInstallmentStatus());
     StatusInstallmentEnum installmentStatus = statusInstallment(entity.getInstallmentStatus());
 
-    TransactionErpInstallmentModel model = new TransactionErpInstallmentModel();
+    TransactionAcqInstallmentModel model = new TransactionAcqInstallmentModel();
     model.setId(entity.getId());
     model.setNetValue(entity.getLiquidValue());
     model.setGrossValue(entity.getGrossValue());
     model.setFeeValue(entity.getDiscountValue());
     model.setInstallment(entity.getInstallment());
     model.setPaymentStatus(paymentStatus.getCode());
-    model.setExpectedPaymentDate(entity.getCreditDate());
+    model.setExpectedPaymentDate(entity.getPaymentDate());
     model.setCancellationDate(entity.getCancellationDate());
     model.setInstallmentStatus(installmentStatus.getCode());
     model.setReconciliationBankLine(entity.getReconciliationBankLine());
-    model.setReconciliationPaymentLine(entity.getReconciliationPaymentLine());
     model.setReconciliationBankProcessedAt(entity.getReconciliationBankProcessedAt());
-    model.setReconciliationPaymentProcessedAt(entity.getReconciliationPaymentProcessedAt());
     return model;
   }
 
-  private static BigDecimal getAdjustmentValue(TransactionErpEntity entity) {
+  private static BigDecimal getAdjustmentValue(TransactionAcqEntity entity) {
     return entity.getAdjustment() == null || entity.getAdjustment().getAdjustmentValue() == null
       ? BigDecimal.ZERO
       : entity.getAdjustment().getAdjustmentValue();
   }
 
-  private static List<InstallmentErpEntity> getInstallments(TransactionErpEntity entity) {
+  private static List<InstallmentAcqEntity> getInstallments(TransactionAcqEntity entity) {
     return entity.getInstallments() == null
       ? List.of()
       : entity.getInstallments().stream()
       .sorted(Comparator.comparing(
-        InstallmentErpEntity::getInstallment,
+        InstallmentAcqEntity::getInstallment,
         Comparator.nullsLast(Integer::compareTo)
       ))
       .toList();

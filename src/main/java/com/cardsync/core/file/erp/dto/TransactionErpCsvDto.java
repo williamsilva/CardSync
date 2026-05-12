@@ -22,8 +22,6 @@ public class TransactionErpCsvDto {
   private Long nsu;
   private String tid;
   private String authorization;
-  private String threeDs;
-  private String antiFraud;
   private BigDecimal grossValue;
   private OffsetDateTime saleDate;
 
@@ -34,6 +32,5 @@ public class TransactionErpCsvDto {
   private String companyCnpj;
   private String companyName;
   private Integer establishmentPvNumber;
-  private String establishmentName;
   private String machine;
 }

@@ -5,10 +5,13 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -20,8 +23,8 @@ public class TransactionAcqEntity extends AuditableEntityBase {
 
   private Long nsu;
 
-  private LocalDate canceledDate;
   private LocalDate creditDate;
+  private LocalDate canceledDate;
   private OffsetDateTime saleDate;
   private OffsetDateTime saleReconciliationDate;
 
@@ -30,11 +33,11 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private String statusCv;
   private String recordType;
   private String cardNumber;
+  private String dccCurrency;
+  private String serviceCode;
   private String authorization;
   private String referenceNumber;
   private String transactionType;
-  private String dccCurrency;
-  private String serviceCode;
 
   private Integer capture;
   private Integer modality;
@@ -52,10 +55,10 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private BigDecimal grossValue;
   private BigDecimal liquidValue;
   private BigDecimal discountValue;
-  private BigDecimal firstInstallmentValue;
-  private BigDecimal otherInstallmentsValue;
   private BigDecimal purchaseValue;
   private BigDecimal withdrawalValue;
+  private BigDecimal firstInstallmentValue;
+  private BigDecimal otherInstallmentsValue;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private FlagEntity flag;
@@ -77,4 +80,9 @@ public class TransactionAcqEntity extends AuditableEntityBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private EstablishmentEntity establishment;
+
+  @BatchSize(size = 100)
+  @OrderBy("installment ASC")
+  @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
+  private Set<InstallmentAcqEntity> installments = new LinkedHashSet<>();
 }

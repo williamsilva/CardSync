@@ -1,5 +1,6 @@
 package com.cardsync.core.file.service;
 
+import com.cardsync.core.file.bank.BankingDomicileResolver;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
@@ -39,7 +40,7 @@ public class ProcessRedeEeFiService {
   private final AnticipationRepository anticipationRepository;
   private final CreditTotalizerRepository creditTotalizerRepository;
   private final SettledDebtRepository settledDebtRepository;
-  private final BankingDomicileRepository bankingDomicileRepository;
+  private final BankingDomicileResolver bankingDomicileResolver;
   private final SalesSummaryRepository salesSummaryRepository;
   private final PvMatrixHeaderRepository pvMatrixHeaderRepository;
   private final SerasaConsultationRepository serasaConsultationRepository;
@@ -990,13 +991,13 @@ public class ProcessRedeEeFiService {
   }
 
   private BankingDomicileEntity safeDomicile(Integer agency, Integer currentAccount, CompanyEntity company) {
-    if (agency == null || currentAccount == null) return null;
-    if (company != null && company.getId() != null) {
-      return bankingDomicileRepository
-        .findFirstByAgencyAndCurrentAccountAndCompany_Id(agency, currentAccount, company.getId())
-        .orElseGet(() -> bankingDomicileRepository.findFirstByAgencyAndCurrentAccount(agency, currentAccount).orElse(null));
+    try {
+      return bankingDomicileResolver.resolve(agency, currentAccount, company).orElse(null);
+    } catch (Exception ex) {
+      log.debug("Domicílio bancário não encontrado para agência={} conta={} durante parsing EEFI: {}",
+        agency, currentAccount, ex.getMessage());
+      return null;
     }
-    return bankingDomicileRepository.findFirstByAgencyAndCurrentAccount(agency, currentAccount).orElse(null);
   }
 
   private String normalizeFlagCode(String code) {

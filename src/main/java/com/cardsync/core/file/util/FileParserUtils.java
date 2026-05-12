@@ -13,7 +13,7 @@ import java.util.function.Function;
 public final class FileParserUtils {
   private FileParserUtils() {}
 
-  public static final ZoneId APP_ZONE = TimeZone.getDefault().toZoneId();
+  private static final ZoneId SOURCE_FILE_ZONE = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter DATE_FORMAT_6 = DateTimeFormatter.ofPattern("ddMMyy");
   private static final DateTimeFormatter DATE_FORMAT_8 = DateTimeFormatter.ofPattern("ddMMyyyy");
   private static final DateTimeFormatter DATE_FORMAT_8_YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -53,7 +53,7 @@ public final class FileParserUtils {
     String pattern = cleanTime.length() == 4 ? "HHmm" : "HHmmss";
     LocalTime parsedTime = LocalTime.parse(cleanTime, DateTimeFormatter.ofPattern(pattern));
     return LocalDateTime.of(parsedDate, parsedTime)
-      .atZone(APP_ZONE)
+      .atZone(SOURCE_FILE_ZONE)
       .toOffsetDateTime()
       .withOffsetSameInstant(ZoneOffset.UTC);
   }

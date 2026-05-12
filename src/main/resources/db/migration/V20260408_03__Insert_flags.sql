@@ -1,14 +1,23 @@
-INSERT INTO cs_flag (id, status, name, erp_code, text_color) VALUES
-	(UUID_TO_BIN(UUID()), '1', 'Mastercard', 1, '#dc2626'), (UUID_TO_BIN(UUID()), '1', 'Visa', 2, '#2563eb'),
-	(UUID_TO_BIN(UUID()), '1', 'American Express', 3, '#16a34a'), (UUID_TO_BIN(UUID()), '1', 'Diners Club', 4, ''),
-	(UUID_TO_BIN(UUID()), '1', 'Hipercard', 5, ''), (UUID_TO_BIN(UUID()), '1', 'Elo', 6, '#ca8a04'),
-	(UUID_TO_BIN(UUID()), '1', 'PicPay', 7, ''), (UUID_TO_BIN(UUID()), '1', 'JCB', 8, ''),
-	(UUID_TO_BIN(UUID()), '1', 'Banescard', 9, ''), (UUID_TO_BIN(UUID()), '1', 'Cabal', 10, ''),
-	(UUID_TO_BIN(UUID()), '1', 'Sorocred', 11, ''), (UUID_TO_BIN(UUID()), '1', 'CUP', 12, ''),
-	(UUID_TO_BIN(UUID()), '1', 'Credsystem (Mais)', 13, ''), (UUID_TO_BIN(UUID()), '1', 'Sicredi', 14, ''),
-	(UUID_TO_BIN(UUID()), '1', 'Avista', 15, ''), (UUID_TO_BIN(UUID()), '1', 'Credz', 16, ''),
-	(UUID_TO_BIN(UUID()), '1', 'Banricompras', 17, ''), (UUID_TO_BIN(UUID()), '1', 'Pix', 98, '#2563eb'),
-	(UUID_TO_BIN(UUID()), '1', 'Outras', 99, '#2563eb');
+INSERT INTO cs_flag (id, status, name, erp_code, text_color, created_at, updated_at, created_by_id) VALUES
+	(UUID_TO_BIN(UUID()), '1', 'Mastercard', 1, '#dc2626', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Visa', 2, '#2563eb', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'American Express', 3, '#16a34a', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Diners Club', 4, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Hipercard', 5, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Elo', 6, '#ca8a04', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'PicPay', 7, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'JCB', 8, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Banescard', 9, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Cabal', 10, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Sorocred', 11, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'CUP', 12, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Credsystem (Mais)', 13, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Sicredi', 14, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Avista', 15, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Credz', 16, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Banricompras', 17, '', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Pix', 98, '#2563eb', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+	(UUID_TO_BIN(UUID()), '1', 'Outras', 99, '#2563eb', NOW(), NOW(),(SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br'));
 
 INSERT INTO cs_flag_acquirer (id, acquirer_id, flag_id, acquirer_code) VALUES
 	(UUID_TO_BIN(UUID()), (SELECT id FROM cs_acquirer WHERE file_identifier = 'Rede'), (SELECT id FROM cs_flag WHERE name = 'Mastercard'), '1'),

@@ -4,5 +4,11 @@ public record ReconcileErpAcquirerResultModel(
   int analyzed,
   int matched,
   int updated,
-  int skippedDivergent
+  int skippedDivergent,
+  int flagUpdated,
+  int businessContextUpdated,
+  int notMatched,
+  int valueDivergences,
+  int acquirerDivergences,
+  int ambiguousMatches
 ) {}

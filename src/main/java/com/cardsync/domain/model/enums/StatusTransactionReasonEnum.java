@@ -10,48 +10,52 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Getter
-public enum StatusTransactionEnum {
+public enum StatusTransactionReasonEnum {
 
   NULL(0),
-  PENDING(1),
-  AUTOMATICALLY_RECONCILED(2),
-  MANUALLY_RECONCILED(3),
-  NOT_RECONCILED(4),
-  CANCELED(5),
-  DELETED(6);
+  CV_NOT_FOUND_ERP(1),
+  CV_NOT_FOUND_ADQ(2),
+  FLAG_MISMATCH(3),
+  DIFFERENT_PLANS(4),
+  SCHEDULED(5),
+  CANCEL_VENDAS(6),
+  CHARGEBACK(7),
+  VALUE_MISMATCH(8),
+  ACQUIRER_MISMATCH(9),
+  AMBIGUOUS_MATCH(10);
 
   private final int code;
 
-  StatusTransactionEnum(int code) {
+  StatusTransactionReasonEnum(int code) {
     this.code = code;
   }
 
   /*
    * Lookup O(1)
    */
-  private static final Map<Integer, StatusTransactionEnum> BY_CODE =
+  private static final Map<Integer, StatusTransactionReasonEnum> BY_CODE =
     Arrays.stream(values())
-      .collect(Collectors.toUnmodifiableMap(StatusTransactionEnum::getCode, Function.identity()));
+      .collect(Collectors.toUnmodifiableMap(StatusTransactionReasonEnum::getCode, Function.identity()));
 
-  private static final Map<String, StatusTransactionEnum> BY_NAME =
+  private static final Map<String, StatusTransactionReasonEnum> BY_NAME =
     Arrays.stream(values())
       .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
 
   /*
    * Converte código do banco -> enum
    */
-  public static StatusTransactionEnum fromCode(Integer code) {
+  public static StatusTransactionReasonEnum fromCode(Integer code) {
 
     if (code == null) {
       return null;
     }
 
-    StatusTransactionEnum value = BY_CODE.get(code);
+    StatusTransactionReasonEnum value = BY_CODE.get(code);
 
     if (value == null) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Invalid StatusTransactionEnum code: " + code
+        "Invalid StatusTransactionReasonEnum code: " + code
       );
     }
 
@@ -61,18 +65,18 @@ public enum StatusTransactionEnum {
   /*
    * Converte string -> enum
    */
-  public static StatusTransactionEnum fromName(String name) {
+  public static StatusTransactionReasonEnum fromName(String name) {
 
     if (name == null || name.isBlank()) {
       return null;
     }
 
-    StatusTransactionEnum value = BY_NAME.get(name.trim().toUpperCase());
+    StatusTransactionReasonEnum value = BY_NAME.get(name.trim().toUpperCase());
 
     if (value == null) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
-        "Invalid StatusTransactionEnum name: " + name
+        "Invalid StatusTransactionReasonEnum name: " + name
       );
     }
 
@@ -82,7 +86,7 @@ public enum StatusTransactionEnum {
   /*
    * Enum -> código do banco
    */
-  public static Integer toCode(StatusTransactionEnum status) {
+  public static Integer toCode(StatusTransactionReasonEnum status) {
     return status != null ? status.code : null;
   }
 

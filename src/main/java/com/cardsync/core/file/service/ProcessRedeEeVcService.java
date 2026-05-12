@@ -1,5 +1,6 @@
 package com.cardsync.core.file.service;
 
+import com.cardsync.core.file.bank.BankingDomicileResolver;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
@@ -56,7 +57,7 @@ public class ProcessRedeEeVcService {
   private final AdjustmentRepository adjustmentRepository;
   private final TotalizerMatrixRepository totalizerMatrixRepository;
   private final ArchiveTrailerRepository archiveTrailerRepository;
-  private final BankingDomicileRepository bankingDomicileRepository;
+  private final BankingDomicileResolver bankingDomicileResolver;
   private final RedeIcPlusTransactionRepository redeIcPlusTransactionRepository;
   private final SerasaConsultationRepository serasaConsultationRepository;
   private final ThreadLocal<RedeProcessingWarningCollector> warningCollector = new ThreadLocal<>();
@@ -116,18 +117,20 @@ public class ProcessRedeEeVcService {
           case "010" -> summaries.add(buildSalesSummary(line, lineNumber, processedFile, TransactionLayout.PARCELADO));
           case "011" -> adjustments.add(buildAdjustmentCvNsuCredit(line, lineNumber, processedFile, summaries));
           case "012" -> addIfValid(transactions, buildTransaction(line, lineNumber, processedFile, summaries, TransactionLayout.PARCELADO));
-          case "014" -> layoutInstallments.add(buildRvInstallment(line, lineNumber));
+          case "014", "020" -> layoutInstallments.add(buildRvInstallment(line, lineNumber));
           case "016" -> summaries.add(buildSalesSummary(line, lineNumber, processedFile, TransactionLayout.IATA));
           case "017", "019", "021" -> auxiliaryConsultations.add(buildAuxiliaryConsultation(line, lineNumber, processedFile));
           case "018" -> addIfValid(transactions, buildTransaction(line, lineNumber, processedFile, summaries, TransactionLayout.IATA));
-          case "020" -> layoutInstallments.add(buildRvInstallment(line, lineNumber));
           case "022" -> summaries.add(buildSalesSummary(line, lineNumber, processedFile, TransactionLayout.DOLLAR));
           case "024" -> addIfValid(transactions, buildTransaction(line, lineNumber, processedFile, summaries, TransactionLayout.DOLLAR));
           case "026" -> totalizerMatrices.add(buildTotalizerMatrix(line, lineNumber, processedFile));
           case "028" -> archiveTrailers.add(buildArchiveTrailer(line, lineNumber, processedFile));
           case "029" -> icPlusTransactions.add(buildIcPlusTransaction(line, lineNumber, processedFile, summaries));
           case "033" -> requestNotices.add(buildRequestNotice(line, lineNumber, processedFile, summaries, true));
-          case "034", "035", "036" -> addIfValid(transactions, buildEcommerceTransaction(line, lineNumber, processedFile, summaries));
+          case "034", "035", "036" -> mergeOrAddEcommerceTransaction(
+            transactions,
+            buildEcommerceTransaction(line, lineNumber, processedFile, summaries)
+          );
           case "040" -> auxiliaryConsultations.add(buildRechargeAsAuxiliaryConsultation(line, lineNumber, processedFile));
           default -> {
             ignored++;
@@ -170,6 +173,8 @@ public class ProcessRedeEeVcService {
           + ", avisosLayout=" + (collector == null ? 0 : collector.totalWarnings())
           + ", ids=" + countsByIdentifier
           + ", unidentified=" + unidentified);
+
+      ensureSalesSummariesBankingDomicile(summaries);
 
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
@@ -263,7 +268,7 @@ public class ProcessRedeEeVcService {
     summary.setCreditOrderStatus(RECONCILIATION_PENDING);
     summary.setTransactionsStatus(RECONCILIATION_PENDING);
     summary.setRvNumber(FileParserUtils.extractIntegerLine(line, "12-21", lineNumber));
-    summary.setBank(FileParserUtils.extractIntegerLine(line, "21-24", lineNumber));
+    summary.setBank(FileParserUtils.extractStringLine(line, "21-24", lineNumber));
     summary.setAgency(agency);
     summary.setCurrentAccount(currentAccount);
     summary.setRvDate(FileParserUtils.extractDateLine(line, "40-48", lineNumber));
@@ -275,7 +280,7 @@ public class ProcessRedeEeVcService {
     summary.setLiquidValue(safeMoney(line, "113-128", lineNumber, "liquid_value", "sales_summary"));
     summary.setFirstInstallmentCreditDate(FileParserUtils.extractDateLine(line, "128-136", lineNumber));
     summary.setModality(layout.summaryModality);
-    summary.setBankingDomicile(safeBankingDomicile(establishment, agency, currentAccount));
+    applyBankingDomicile(summary, safeBankingDomicile(summary.getBank(), establishment, agency, currentAccount));
     summary.setProcessedFile(processedFile);
     return summary;
   }
@@ -784,20 +789,71 @@ public class ProcessRedeEeVcService {
     }
   }
 
-  private BankingDomicileEntity safeBankingDomicile(EstablishmentEntity establishment, Integer agency, Integer currentAccount) {
-    if (agency == null || currentAccount == null) return null;
-    try {
-      if (establishment != null && establishment.getCompany() != null && establishment.getCompany().getId() != null) {
-        return bankingDomicileRepository
-          .findFirstByAgencyAndCurrentAccountAndCompany_Id(agency, currentAccount, establishment.getCompany().getId())
-          .or(() -> bankingDomicileRepository.findFirstByAgencyAndCurrentAccount(agency, currentAccount))
-          .orElse(null);
+
+  private void ensureSalesSummariesBankingDomicile(List<SalesSummaryEntity> summaries) {
+    if (summaries == null || summaries.isEmpty()) {
+      return;
+    }
+
+    int resolved = 0;
+    int unresolved = 0;
+
+    for (SalesSummaryEntity summary : summaries) {
+      if (summary == null || summary.getBankingDomicile() != null) {
+        continue;
       }
-      return bankingDomicileRepository.findFirstByAgencyAndCurrentAccount(agency, currentAccount).orElse(null);
-    } catch (Exception ex) {
-      log.debug("Domicílio bancário não encontrado para agência={} conta={} no EEVC: {}", agency, currentAccount, ex.getMessage());
+
+      BankingDomicileEntity bankingDomicile = safeBankingDomicile(summary);
+      if (bankingDomicile != null) {
+        applyBankingDomicile(summary, bankingDomicile);
+        resolved++;
+      } else if (summary.getAgency() != null || summary.getCurrentAccount() != null) {
+        unresolved++;
+      }
+    }
+
+    if (resolved > 0 || unresolved > 0) {
+      log.info("ℹ EEVC: domicílios bancários em resumos de vendas: resolvidos={}, pendentes={}", resolved, unresolved);
+    }
+  }
+
+  private void applyBankingDomicile(SalesSummaryEntity summary, BankingDomicileEntity bankingDomicile) {
+    if (summary == null || bankingDomicile == null) {
+      return;
+    }
+
+    summary.setBankingDomicile(bankingDomicile);
+    summary.setAgency(bankingDomicile.getAgency());
+    summary.setCurrentAccount(bankingDomicile.getCurrentAccount());
+  }
+
+  private BankingDomicileEntity safeBankingDomicile(SalesSummaryEntity summary) {
+    if (summary == null) {
       return null;
     }
+
+    CompanyEntity company = summary.getCompany();
+    if (company == null && summary.getPvNumber() != null) {
+      EstablishmentEntity establishment = safeEstablishment(summary.getPvNumber());
+      company = establishment != null ? establishment.getCompany() : null;
+    }
+
+    return safeBankingDomicile(summary.getBank(), company, summary.getAgency(), summary.getCurrentAccount());
+  }
+
+  private BankingDomicileEntity safeBankingDomicile(String bankCode, CompanyEntity company, Integer agency, Integer currentAccount) {
+    try {
+      return bankingDomicileResolver.resolve(bankCode, agency, currentAccount, company).orElse(null);
+    } catch (Exception ex) {
+      log.debug("Domicílio bancário não encontrado para banco={} agência={} conta={} no EEVC: {}",
+        bankCode, agency, currentAccount, ex.getMessage());
+      return null;
+    }
+  }
+
+  private BankingDomicileEntity safeBankingDomicile(String bankCode, EstablishmentEntity establishment, Integer agency, Integer currentAccount) {
+    CompanyEntity company = establishment != null ? establishment.getCompany() : null;
+    return safeBankingDomicile(bankCode, company, agency, currentAccount);
   }
 
   private FlagEntity safeFlag(AcquirerEntity acquirer, String code) {
@@ -879,6 +935,108 @@ public class ProcessRedeEeVcService {
       this.summaryType = summaryType;
       this.summaryModality = summaryModality;
     }
+  }
+
+  private void mergeOrAddEcommerceTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity ecommerceTx) {
+    if (ecommerceTx == null) {
+      return;
+    }
+
+    Optional<TransactionAcqEntity> existing = transactions.stream()
+      .filter(tx -> isSameRedeTransaction(tx, ecommerceTx))
+      .findFirst();
+
+    if (existing.isPresent()) {
+      TransactionAcqEntity tx = existing.get();
+
+      tx.setTid(ecommerceTx.getTid());
+
+      if (isBlank(tx.getReferenceNumber()) && !isBlank(ecommerceTx.getReferenceNumber())) {
+        tx.setReferenceNumber(ecommerceTx.getReferenceNumber());
+      }
+
+      tx.setCapture(CaptureEnum.ECOMMERCE.getCode());
+
+      /*
+       * Mantém o recordType original da transação principal.
+       * Exemplo:
+       * 008 continua 008
+       * 012 continua 012
+       * 018 continua 018
+       *
+       * O 034/035/036 funciona como complemento e-commerce.
+       */
+
+      return;
+    }
+
+    transactions.add(ecommerceTx);
+  }
+
+  private boolean isSameRedeTransaction(TransactionAcqEntity a, TransactionAcqEntity b) {
+    if (a == null || b == null) {
+      return false;
+    }
+
+    return Objects.equals(a.getRvNumber(), b.getRvNumber())
+      && Objects.equals(a.getNsu(), b.getNsu())
+      && sameAuthorization(a.getAuthorization(), b.getAuthorization())
+      && sameDay(a.getSaleDate(), b.getSaleDate())
+      && sameMoney(a.getGrossValue(), b.getGrossValue())
+      && sameEstablishment(a, b);
+  }
+
+  private boolean sameEstablishment(TransactionAcqEntity a, TransactionAcqEntity b) {
+    if (a.getEstablishment() == null || b.getEstablishment() == null) {
+      return true;
+    }
+
+    return Objects.equals(a.getEstablishment().getId(), b.getEstablishment().getId());
+  }
+
+  private boolean sameAuthorization(String a, String b) {
+    String aa = normalizeAuth(a);
+    String bb = normalizeAuth(b);
+
+    if (aa == null || bb == null) {
+      return Objects.equals(aa, bb);
+    }
+
+    return aa.equals(bb);
+  }
+
+  private String normalizeAuth(String value) {
+    if (value == null) {
+      return null;
+    }
+
+    String normalized = value.trim();
+
+    if (normalized.isBlank()) {
+      return null;
+    }
+
+    return normalized.replaceFirst("^0+(?!$)", "");
+  }
+
+  private boolean sameDay(OffsetDateTime a, OffsetDateTime b) {
+    if (a == null || b == null) {
+      return Objects.equals(a, b);
+    }
+
+    return Objects.equals(a.toLocalDate(), b.toLocalDate());
+  }
+
+  private boolean sameMoney(BigDecimal a, BigDecimal b) {
+    if (a == null || b == null) {
+      return Objects.equals(a, b);
+    }
+
+    return a.compareTo(b) == 0;
+  }
+
+  private boolean isBlank(String value) {
+    return value == null || value.trim().isBlank();
   }
 
   private record EeVcRvInstallment(

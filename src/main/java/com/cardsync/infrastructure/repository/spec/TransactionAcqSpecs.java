@@ -1,24 +1,17 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.domain.filter.TransactionErpSalesFilter;
+import com.cardsync.domain.filter.TransactionAcqSalesFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
-import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.infrastructure.repository.spec.advancedFilters.TransactionErpAdvancedFields;
+import com.cardsync.infrastructure.repository.spec.advancedFilters.TransactionAcqAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
-import com.cardsync.infrastructure.repository.spec.tableFilters.TransactionErpTableFields;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Order;
-import jakarta.persistence.criteria.Path;
-import jakarta.persistence.criteria.Root;
+import com.cardsync.infrastructure.repository.spec.tableFilters.TransactionAcqTableFields;
+import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -27,26 +20,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
+public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
 
   private final SpecificationFactory specificationFactory;
-  private final TransactionErpTableFields transactionErpTableFields;
-  private final TransactionErpAdvancedFields transactionErpAdvancedFields;
+  private final TransactionAcqTableFields transactionAcqTableFields;
+  private final TransactionAcqAdvancedFields transactionAcqAdvancedFields;
 
-  public TransactionErpSpecs(
+  public TransactionAcqSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
-    TransactionErpTableFields transactionErpFields,
-    TransactionErpAdvancedFields transactionErpAdvancedFields
+    TransactionAcqTableFields transactionAcqFields,
+    TransactionAcqAdvancedFields transactionAcqAdvancedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
-    this.transactionErpTableFields = transactionErpFields;
-    this.transactionErpAdvancedFields = transactionErpAdvancedFields;
+    this.transactionAcqTableFields = transactionAcqFields;
+    this.transactionAcqAdvancedFields = transactionAcqAdvancedFields;
   }
 
-  public Specification<TransactionErpEntity> fromQuery(ListQueryDto<TransactionErpSalesFilter> query) {
-    Specification<TransactionErpEntity> spec = Specs.all();
+  public Specification<TransactionAcqEntity> fromQuery(ListQueryDto<TransactionAcqSalesFilter> query) {
+    Specification<TransactionAcqEntity> spec = Specs.all();
 
     spec = spec.and(fetchListAssociations());
 
@@ -57,11 +50,11 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
     spec = spec.and(
       specificationFactory.fromTableFilters(
         query.tableFilters(),
-        transactionErpTableFields.table()
+        transactionAcqTableFields.table()
       )
     );
 
-    spec = spec.and(transactionErpAdvancedFields.advanced(query.advanced()));
+    spec = spec.and(transactionAcqAdvancedFields.advanced(query.advanced()));
 
     if (!isBlank(query.globalFilter())) {
       String gf = query.globalFilter();
@@ -70,8 +63,7 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
         anyOf(
           contains(gf, "pvNumber" ),
           contains(gf,"nsu"),
-          contains(gf,"authorizationCode"),
-          containsPath(gf, "company", "fantasyName")
+          contains(gf,"authorizationCode")
         )
       );
     }
@@ -89,7 +81,7 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
     );
   }
 
-  private Specification<TransactionErpEntity> fetchListAssociations() {
+  private Specification<TransactionAcqEntity> fetchListAssociations() {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
         fetchIfNotFetched(root, "flag");
@@ -105,7 +97,7 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
     };
   }
 
-  private Specification<TransactionErpEntity> orderByTableSort(List<SortDto> sort) {
+  private Specification<TransactionAcqEntity> orderByTableSort(List<SortDto> sort) {
     return (root, query, cb) -> {
       if (isCountQuery(query)) {
         return cb.conjunction();
@@ -144,28 +136,31 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
     };
   }
 
-  private Expression<?> sortExpression(Root<TransactionErpEntity> root, CriteriaQuery<?> query,
+  private Expression<?> sortExpression(Root<TransactionAcqEntity> root, CriteriaQuery<?> query,
     CriteriaBuilder cb, String field, boolean descending ) {
     return switch (field) {
-      case "saleDate" -> root.get("saleDate");
       case "conciliationDate" -> root.get("saleReconciliationDate");
       case "expectedPaymentDate" -> expectedPaymentDateSortExpression(root, query, cb, descending);
 
-      case "company" -> root.join("company", JoinType.LEFT).get("fantasyName");
+      case "company" -> root.join("company", JoinType.LEFT).get("id");
       case "establishment" -> root.join("establishment", JoinType.LEFT).get("commercialName");
       case "acquirer" -> root.join("acquirer", JoinType.LEFT).get("name");
       case "flag" -> root.join("flag", JoinType.LEFT).get("name");
+      case "adjustmentValue" -> root.join("adjustment", JoinType.LEFT).get("adjustmentValue");
+
+      case "saleStatus" -> root.get("transactionStatus");
+      case "captureEnum", "captureType" -> root.get("capture");
 
       default -> directRootPathOrNull(root, field);
     };
   }
 
   private Expression<LocalDate> expectedPaymentDateSortExpression(
-    Root<TransactionErpEntity> root,  CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending) {
+    Root<TransactionAcqEntity> root,  CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending) {
     var subquery = query.subquery(LocalDate.class);
-    Root<TransactionErpEntity> correlatedRoot = subquery.correlate(root);
+    Root<TransactionAcqEntity> correlatedRoot = subquery.correlate(root);
     Join<?, ?> installments = correlatedRoot.join("installments", JoinType.LEFT);
-    Expression<LocalDate> creditDate = installments.get("creditDate");
+    Expression<LocalDate> creditDate = installments.get("expectedPaymentDate");
 
     // Como expectedPaymentDate vem de uma coleção, ordenar direto pelo join pode quebrar
     // paginação/distinct. Para ASC usamos a menor data da venda; para DESC, a maior.
@@ -174,7 +169,7 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
     return subquery;
   }
 
-  private Path<?> directRootPathOrNull(Root<TransactionErpEntity> root, String field) {
+  private Path<?> directRootPathOrNull(Root<TransactionAcqEntity> root, String field) {
     try {
       return root.get(field);
     } catch (IllegalArgumentException ex) {

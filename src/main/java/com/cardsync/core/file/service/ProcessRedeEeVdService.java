@@ -150,6 +150,8 @@ public class ProcessRedeEeVdService {
           + ", avisos=" + warnings
           + ", registros=" + countsByIdentifier);
 
+      ensureSalesSummariesBankingDomicile(summaries);
+
       processedFileRepository.save(processedFile);
       salesSummaryRepository.saveAll(summaries);
       transactionAcqRepository.saveAll(transactions);
@@ -222,7 +224,7 @@ public class ProcessRedeEeVdService {
     summary.setDiscountValue(money(col(c, 7)));
     summary.setLiquidValue(money(col(c, 8)));
     summary.setSummaryType(col(c, 9));
-    summary.setBank(toInteger(col(c, 10)));
+    summary.setBank((col(c, 10)));
     summary.setAgency(agency);
     summary.setCurrentAccount(currentAccount);
     summary.setTipValue(BigDecimal.ZERO);
@@ -237,7 +239,7 @@ public class ProcessRedeEeVdService {
     summary.setModality(resolveSummaryModality(col(c, 9)));
     summary.setAcquirer(acquirer);
     summary.setCompany(company);
-    summary.setBankingDomicile(safeBankingDomicile(agency, currentAccount, company));
+    applyBankingDomicile(summary, safeBankingDomicile(summary.getBank(), agency, currentAccount, company));
     summary.setFlag(safeFlag(acquirer, flagCode));
     summary.setProcessedFile(processedFile);
     return summary;
@@ -581,11 +583,50 @@ public class ProcessRedeEeVdService {
     }
   }
 
-  private BankingDomicileEntity safeBankingDomicile(Integer agency, Integer currentAccount, CompanyEntity company) {
+
+  private void ensureSalesSummariesBankingDomicile(List<SalesSummaryEntity> summaries) {
+    if (summaries == null || summaries.isEmpty()) {
+      return;
+    }
+
+    int resolved = 0;
+    int unresolved = 0;
+
+    for (SalesSummaryEntity summary : summaries) {
+      if (summary == null || summary.getBankingDomicile() != null) {
+        continue;
+      }
+
+      BankingDomicileEntity bankingDomicile = safeBankingDomicile(summary.getBank(), summary.getAgency(), summary.getCurrentAccount(), summary.getCompany());
+      if (bankingDomicile != null) {
+        applyBankingDomicile(summary, bankingDomicile);
+        resolved++;
+      } else if (summary.getAgency() != null || summary.getCurrentAccount() != null) {
+        unresolved++;
+      }
+    }
+
+    if (resolved > 0 || unresolved > 0) {
+      log.info("ℹ EEVD: domicílios bancários em resumos de vendas: resolvidos={}, pendentes={}", resolved, unresolved);
+    }
+  }
+
+  private void applyBankingDomicile(SalesSummaryEntity summary, BankingDomicileEntity bankingDomicile) {
+    if (summary == null || bankingDomicile == null) {
+      return;
+    }
+
+    summary.setBankingDomicile(bankingDomicile);
+    summary.setAgency(bankingDomicile.getAgency());
+    summary.setCurrentAccount(bankingDomicile.getCurrentAccount());
+  }
+
+  private BankingDomicileEntity safeBankingDomicile(String bankCode, Integer agency, Integer currentAccount, CompanyEntity company) {
     try {
-      return bankingDomicileResolver.resolve(agency, currentAccount, company).orElse(null);
+      return bankingDomicileResolver.resolve(bankCode, agency, currentAccount, company).orElse(null);
     } catch (Exception ex) {
-      log.debug("Domicílio bancário não encontrado para agência={} conta={} durante parsing EEVD: {}", agency, currentAccount, ex.getMessage());
+      log.debug("Domicílio bancário não encontrado para banco={} agência={} conta={} durante parsing EEVD: {}",
+        bankCode, agency, currentAccount, ex.getMessage());
       return null;
     }
   }

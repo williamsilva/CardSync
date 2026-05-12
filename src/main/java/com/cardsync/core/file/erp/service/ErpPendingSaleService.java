@@ -1,7 +1,7 @@
 package com.cardsync.core.file.erp.service;
 
-import com.cardsync.bff.controller.v1.representation.model.erp.ErpPendingSaleModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ReprocessPendingErpResultModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ErpPendingSaleModel;
 import com.cardsync.core.file.erp.calculator.InstallmentErpGenerator;
 import com.cardsync.core.file.erp.calculator.TransactionErpFeeCalculator;
 import com.cardsync.core.file.erp.resolver.ErpBusinessContextResolver;
@@ -138,7 +138,6 @@ public class ErpPendingSaleService {
       tx.getSourceCompanyCnpj(),
       tx.getSourceCompanyName(),
       tx.getSourceEstablishmentPvNumber(),
-      tx.getSourceEstablishmentName(),
       tx.getInstallment(),
       tx.getGrossValue(),
       tx.getLiquidValue(),

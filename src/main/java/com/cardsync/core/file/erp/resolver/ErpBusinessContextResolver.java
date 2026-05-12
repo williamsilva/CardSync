@@ -29,7 +29,6 @@ public class ErpBusinessContextResolver {
     tx.setSourceCompanyCnpj(row.getCompanyCnpj());
     tx.setSourceCompanyName(row.getCompanyName());
     tx.setSourceEstablishmentPvNumber(row.getEstablishmentPvNumber());
-    tx.setSourceEstablishmentName(row.getEstablishmentName());
     resolve(tx);
   }
 
@@ -43,11 +42,8 @@ public class ErpBusinessContextResolver {
     String companyCnpj = normalizeCnpj(tx.getSourceCompanyCnpj());
     Integer pvNumber = tx.getSourceEstablishmentPvNumber();
 
-    if (pvNumber == null) {
-      pvNumber = extractPvNumber(tx.getSourceEstablishmentName());
-      if (pvNumber != null) {
-        tx.setSourceEstablishmentPvNumber(pvNumber);
-      }
+    if (pvNumber != null) {
+      tx.setSourceEstablishmentPvNumber(pvNumber);
     }
 
     // 1) Empresa primeiro: no Nimbus, o contexto comercial orienta a busca do PV/contrato.
@@ -90,12 +86,11 @@ public class ErpBusinessContextResolver {
 
     if (tx.getCompany() == null || tx.getEstablishment() == null) {
       log.debug(
-        "Contexto ERP incompleto. nsu={}, cnpjEmpresa={}, empresa='{}', pv={}, estabelecimento='{}', adquirente='{}'. companyResolved={}, establishmentResolved={}",
+        "Contexto ERP incompleto. nsu={}, cnpjEmpresa={}, empresa='{}', pv={}, adquirente='{}'. companyResolved={}, establishmentResolved={}",
         tx.getNsu(),
         companyCnpj,
         tx.getSourceCompanyName(),
         pvNumber,
-        tx.getSourceEstablishmentName(),
         acquirer != null ? acquirer.getFantasyName() : null,
         tx.getCompany() != null,
         tx.getEstablishment() != null

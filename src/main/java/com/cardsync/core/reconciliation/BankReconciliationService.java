@@ -289,7 +289,6 @@ public class BankReconciliationService {
       idOrNull(release.getCompany()),
       idOrNull(release.getAcquirer()),
       idOrNull(release.getEstablishment()),
-      idOrNull(release.getBankingDomicile()),
       idOrNull(release.getFlag()),
       paymentKindFromBank(release.getModalityPaymentBank(), release.getDescriptionHistoricalBank(), release.getComplementRelease())
     );
@@ -300,7 +299,6 @@ public class BankReconciliationService {
       idOrNull(order.getCompany()),
       idOrNull(order.getAcquirer()),
       null,
-      idOrNull(order.getBankingDomicile()),
       idOrNull(order.getFlag()),
       paymentKindFromCreditOrder(order)
     );
@@ -309,13 +307,13 @@ public class BankReconciliationService {
   private ReconciliationMatchContext contextOf(InstallmentAcqEntity installment) {
     TransactionAcqEntity tx = installment.getTransaction();
     if (tx == null) {
-      return new ReconciliationMatchContext(null, null, null, null, null, ReconciliationMatchContext.PaymentKind.UNKNOWN);
+      return new ReconciliationMatchContext(null, null,  null, null, ReconciliationMatchContext.PaymentKind.UNKNOWN);
     }
     return new ReconciliationMatchContext(
       idOrNull(tx.getCompany()),
       idOrNull(tx.getAcquirer()),
       idOrNull(tx.getEstablishment()),
-      null,
+
       idOrNull(tx.getFlag()),
       paymentKindFromTransaction(tx)
     );

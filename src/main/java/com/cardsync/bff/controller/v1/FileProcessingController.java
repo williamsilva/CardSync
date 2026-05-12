@@ -1,7 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.bank.BankReleaseModel;
-import com.cardsync.bff.controller.v1.representation.model.erp.ErpPendingSaleModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ErpPendingSaleModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.FileProcessingScheduleStatusModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileErrorModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileModel;

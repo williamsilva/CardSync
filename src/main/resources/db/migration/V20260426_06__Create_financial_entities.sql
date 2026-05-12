@@ -357,12 +357,3 @@ CREATE TABLE cs_settled_debt (
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_settled_debt_pv_date ON cs_settled_debt(pv_number, liquidated_date);
 CREATE INDEX idx_cs_settled_debt_nsu ON cs_settled_debt(nsu);
-
-INSERT INTO cs_bank (id, code, name, active, created_at)
-VALUES
-  (UUID_TO_BIN(UUID()), '001', 'Banco do Brasil', 1, CURRENT_TIMESTAMP(6)),
-  (UUID_TO_BIN(UUID()), '033', 'Santander', 1, CURRENT_TIMESTAMP(6)),
-  (UUID_TO_BIN(UUID()), '104', 'Caixa Econômica Federal', 1, CURRENT_TIMESTAMP(6)),
-  (UUID_TO_BIN(UUID()), '237', 'Bradesco', 1, CURRENT_TIMESTAMP(6)),
-  (UUID_TO_BIN(UUID()), '341', 'Itaú', 1, CURRENT_TIMESTAMP(6))
-ON DUPLICATE KEY UPDATE name = VALUES(name), active = VALUES(active);

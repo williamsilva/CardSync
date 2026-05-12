@@ -26,12 +26,6 @@ public class ConciliationController {
     return conciliationAnalysisService.dashboard();
   }
 
-  @GetMapping("/acquirer-sales")
-  @CheckSecurity.FileProcessing.CanRead
-  public Page<AcquirerSaleAnalysisModel> listAcquirerSales(Pageable pageable) {
-    return conciliationAnalysisService.listAcquirerSales(pageable);
-  }
-
   @GetMapping("/fees")
   @CheckSecurity.FileProcessing.CanRead
   public Page<ConciliationFeeAnalysisModel> listFees(Pageable pageable) {

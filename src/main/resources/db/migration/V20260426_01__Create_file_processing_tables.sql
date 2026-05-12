@@ -143,8 +143,7 @@ CREATE INDEX idx_cs_transaction_acq_rv_number ON cs_transaction_acq(rv_number);
 CREATE INDEX idx_cs_transaction_acq_sale_date ON cs_transaction_acq(sale_date);
 CREATE INDEX idx_cs_transaction_acq_processed_file ON cs_transaction_acq(processed_file_id);
 
-INSERT INTO cs_origin_file (id, created_at, code, name, description)
-VALUES
+INSERT INTO cs_origin_file (id, created_at, code, name, description) VALUES
   (UUID_TO_BIN(UUID()), CURRENT_TIMESTAMP(6), 'ERP', 'ERP', 'Arquivos CSV do ERP'),
   (UUID_TO_BIN(UUID()), CURRENT_TIMESTAMP(6), 'REDE', 'Rede', 'Arquivos da adquirente Rede')
 ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description);

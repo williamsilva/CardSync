@@ -1,4 +1,4 @@
-package com.cardsync.bff.controller.v1.representation.model.erp;
+package com.cardsync.bff.controller.v1.representation.model.transactions;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -14,7 +14,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class TransactionErpInstallmentModel {
+public class TransactionAcqInstallmentModel {
 
   private UUID id;
 
@@ -22,7 +22,6 @@ public class TransactionErpInstallmentModel {
   private Integer paymentStatus;
   private Integer installmentStatus;
   private Integer reconciliationBankLine;
-  private Integer reconciliationPaymentLine;
 
   private BigDecimal grossValue;
   private BigDecimal netValue;
@@ -32,5 +31,4 @@ public class TransactionErpInstallmentModel {
   private LocalDate expectedPaymentDate;
 
   private OffsetDateTime reconciliationBankProcessedAt;
-  private OffsetDateTime reconciliationPaymentProcessedAt;
 }
