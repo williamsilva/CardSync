@@ -2,7 +2,7 @@ package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.mapper.model.TransactionsErpModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsErpModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionErpSalesTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.filter.TransactionErpSalesFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.TransactionErpEntity;
@@ -42,7 +42,7 @@ public class TransactionErpSalesService {
   }
 
   @Transactional(readOnly = true)
-  public TransactionErpSalesTotalsModel totals(ListQueryDto<TransactionErpSalesFilter> query) {
+  public TransactionTotalsModel totals(ListQueryDto<TransactionErpSalesFilter> query) {
     Specification<TransactionErpEntity> spec = transactionErpSpecs.fromQuery(query);
 
     var rows = transactionErpRepository.findAll(spec);
@@ -68,6 +68,6 @@ public class TransactionErpSalesService {
       .map(item -> item.getAdjustmentValue() == null ? BigDecimal.ZERO : item.getAdjustmentValue())
       .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-    return new TransactionErpSalesTotalsModel(totalGross, totalFee, totalNet, totalAdjustments, rows.size());
+    return new TransactionTotalsModel(totalGross, totalFee, totalNet, totalAdjustments, rows.size());
   }
 }

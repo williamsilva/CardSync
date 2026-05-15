@@ -1,7 +1,7 @@
 package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.mapper.model.TransactionsAcqModelAssembler;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionAcquirersSalesTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsAcqModel;
 import com.cardsync.domain.filter.TransactionAcqSalesFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
@@ -42,7 +42,7 @@ public class TransactionAcqSalesService {
   }
 
   @Transactional(readOnly = true)
-  public TransactionAcquirersSalesTotalsModel totals(ListQueryDto<TransactionAcqSalesFilter> query) {
+  public TransactionTotalsModel totals(ListQueryDto<TransactionAcqSalesFilter> query) {
     Specification<TransactionAcqEntity> spec = transactionAcqSpecs.fromQuery(query);
 
     var rows = transactionAcqRepository.findAll(spec);
@@ -68,6 +68,6 @@ public class TransactionAcqSalesService {
       .map(item -> item.getAdjustmentValue() == null ? BigDecimal.ZERO : item.getAdjustmentValue())
       .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-    return new TransactionAcquirersSalesTotalsModel(totalGross, totalFee, totalNet, totalAdjustments, rows.size());
+    return new TransactionTotalsModel(totalGross, totalFee, totalNet, totalAdjustments, rows.size());
   }
 }

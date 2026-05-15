@@ -28,8 +28,10 @@ public class InstallmentErpEntity extends AuditableEntityBase {
   private Integer reconciliationBankLine;
   private Integer reconciliationPaymentLine;
 
-  private LocalDate creditDate;
+  private LocalDate paymentDate;
   private LocalDate cancellationDate;
+  private LocalDate expectedPaymentDate;
+
   private OffsetDateTime reconciliationBankProcessedAt;
   private OffsetDateTime reconciliationPaymentProcessedAt;
 

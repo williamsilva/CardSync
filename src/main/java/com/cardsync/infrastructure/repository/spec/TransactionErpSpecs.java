@@ -68,10 +68,7 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
 
       spec = spec.and(
         anyOf(
-          contains(gf, "pvNumber" ),
-          contains(gf,"nsu"),
-          contains(gf,"authorizationCode"),
-          containsPath(gf, "company", "fantasyName")
+          contains(gf,"nsu")
         )
       );
     }
@@ -97,8 +94,6 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
         fetchIfNotFetched(root, "acquirer");
         fetchIfNotFetched(root, "adjustment");
         fetchIfNotFetched(root, "establishment");
-
-        query.distinct(true);
       }
 
       return cb.conjunction();
@@ -138,7 +133,6 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
       orders.add(cb.desc(root.get("id")));
 
       query.orderBy(orders);
-      query.distinct(true);
 
       return cb.conjunction();
     };
@@ -152,7 +146,7 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
       case "expectedPaymentDate" -> expectedPaymentDateSortExpression(root, query, cb, descending);
 
       case "company" -> root.join("company", JoinType.LEFT).get("fantasyName");
-      case "establishment" -> root.join("establishment", JoinType.LEFT).get("commercialName");
+      case "establishment" -> root.join("establishment", JoinType.LEFT).get("pvNumber");
       case "acquirer" -> root.join("acquirer", JoinType.LEFT).get("name");
       case "flag" -> root.join("flag", JoinType.LEFT).get("name");
 
@@ -165,11 +159,11 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
     var subquery = query.subquery(LocalDate.class);
     Root<TransactionErpEntity> correlatedRoot = subquery.correlate(root);
     Join<?, ?> installments = correlatedRoot.join("installments", JoinType.LEFT);
-    Expression<LocalDate> creditDate = installments.get("creditDate");
+    Expression<LocalDate> expectedPaymentDate = installments.get("expectedPaymentDate");
 
     // Como expectedPaymentDate vem de uma coleção, ordenar direto pelo join pode quebrar
-    // paginação/distinct. Para ASC usamos a menor data da venda; para DESC, a maior.
-    subquery.select(descending ? cb.greatest(creditDate) : cb.least(creditDate));
+    // paginação. Para ASC usamos a menor data da venda; para DESC, a maior.
+    subquery.select(descending ? cb.greatest(expectedPaymentDate) : cb.least(expectedPaymentDate));
 
     return subquery;
   }

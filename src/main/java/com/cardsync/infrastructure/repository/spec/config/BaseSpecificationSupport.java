@@ -139,22 +139,6 @@ public abstract class BaseSpecificationSupport<T> {
     return (root, query, cb) -> root.get(field).in(mapped);
   }
 
-  protected <E extends Enum<E>> Specification<T> inEnums(String field, Collection<E> values) {
-    if (values == null || values.isEmpty()) {
-      return alwaysTrue();
-    }
-
-    var mapped = values.stream()
-      .filter(Objects::nonNull)
-      .toList();
-
-    if (mapped.isEmpty()) {
-      return alwaysTrue();
-    }
-
-    return (root, query, cb) -> root.get(field).in(mapped);
-  }
-
   protected <V> Specification<T> inPath(Collection<V> values, Function<V, ?> mapper, String... path) {
     if (values == null || values.isEmpty()) {
       return alwaysTrue();
@@ -224,8 +208,11 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   @SuppressWarnings("SameParameterValue")
-  protected Specification<T> datePeriod(
+  protected Specification<T> offsetDateTimePeriod(
     String field, PeriodEnum period, List<String> values, boolean nullableField) {
+    if (period == null || period == PeriodEnum.NULL || values == null || values.isEmpty()) {
+      return alwaysTrue();
+    }
 
     return switch (period) {
       case DAY -> {
@@ -269,8 +256,12 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   @SuppressWarnings("SameParameterValue")
-  protected Specification<T> datePeriodJoin(
+  protected Specification<T> offsetDateTimePeriodJoin(
     String joinField, String dateField, PeriodEnum period, List<String> values, boolean nullableField) {
+
+    if (period == null || period == PeriodEnum.NULL || values == null || values.isEmpty()) {
+      return alwaysTrue();
+    }
 
     return switch (period) {
       case DAY -> {
@@ -327,6 +318,10 @@ public abstract class BaseSpecificationSupport<T> {
 
   protected Specification<T> localDatePeriod(
     String field, PeriodEnum period, List<String> values, boolean nullableField) {
+    if (period == null || period == PeriodEnum.NULL || values == null || values.isEmpty()) {
+      return alwaysTrue();
+    }
+
     return switch (period) {
       case DAY -> {
         LocalDate date = firstDate(values);
@@ -368,8 +363,12 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
+  @SuppressWarnings("SameParameterValue")
   protected Specification<T> localDatePeriodJoin(
     String joinField, String dateField, PeriodEnum period, List<String> values, boolean nullableField) {
+    if (period == null || period == PeriodEnum.NULL || values == null || values.isEmpty()) {
+      return alwaysTrue();
+    }
 
     return switch (period) {
       case DAY -> {
@@ -811,27 +810,33 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
-  protected Specification<T> currencyRangeValueJoin(
-    String joinField, String field, BigDecimal start, BigDecimal end) {
+  protected Specification<T> currencyRangeValuePath(BigDecimal start, BigDecimal end, String... path) {
     if (start == null && end == null) {
       return alwaysTrue();
     }
 
     return (root, query, cb) -> {
-      query.distinct(true);
+      From<?, ?> join = null;
 
-      Join<?, ?> join = root.join(joinField, JoinType.LEFT);
-      Path<BigDecimal> path = join.get(field);
+      for (int i = 0; i < path.length - 1; i++) {
+        join = (join == null)
+          ? root.join(path[i], JoinType.LEFT)
+          : join.join(path[i], JoinType.LEFT);
+      }
+
+      Path<BigDecimal> valuePath = (join == null)
+        ? root.get(path[path.length - 1])
+        : join.get(path[path.length - 1]);
 
       if (start != null && end != null) {
-        return cb.between(path, start, end);
+        return cb.between(valuePath, start, end);
       }
 
       if (start != null) {
-        return cb.greaterThanOrEqualTo(path, start);
+        return cb.greaterThanOrEqualTo(valuePath, start);
       }
 
-      return cb.lessThanOrEqualTo(path, end);
+      return cb.lessThanOrEqualTo(valuePath, end);
     };
   }
 
@@ -893,7 +898,6 @@ public abstract class BaseSpecificationSupport<T> {
     String joinField, String dateField, boolean nullableField,
     BiFunction<CriteriaBuilder, Path<OffsetDateTime>, Predicate> predicateFactory) {
     return (root, query, cb) -> {
-      query.distinct(true);
 
       Join<?, ?> join = root.join(joinField, JoinType.LEFT);
       Path<OffsetDateTime> path = join.get(dateField);
@@ -912,11 +916,7 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   private Specification<T> localDateJoinEquals(
-    String joinField,
-    String dateField,
-    LocalDate value,
-    boolean nullableField
-  ) {
+    String joinField, String dateField, LocalDate value, boolean nullableField) {
     if (value == null) {
       return alwaysTrue();
     }
@@ -927,11 +927,7 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   private Specification<T> localDateJoinGreaterThanOrEqual(
-    String joinField,
-    String dateField,
-    LocalDate value,
-    boolean nullableField
-  ) {
+    String joinField, String dateField, LocalDate value, boolean nullableField) {
     if (value == null) {
       return alwaysTrue();
     }
@@ -942,11 +938,7 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   private Specification<T> localDateJoinLessThanOrEqual(
-    String joinField,
-    String dateField,
-    LocalDate value,
-    boolean nullableField
-  ) {
+    String joinField, String dateField, LocalDate value, boolean nullableField) {
     if (value == null) {
       return alwaysTrue();
     }
@@ -957,12 +949,7 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   private Specification<T> localDateJoinBetween(
-    String joinField,
-    String dateField,
-    LocalDate start,
-    LocalDate end,
-    boolean nullableField
-  ) {
+    String joinField, String dateField, LocalDate start, LocalDate end, boolean nullableField) {
     if (start == null || end == null) {
       return alwaysTrue();
     }
@@ -973,13 +960,9 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   private Specification<T> localDateJoinPredicate(
-    String joinField,
-    String dateField,
-    boolean nullableField,
-    BiFunction<CriteriaBuilder, Path<LocalDate>, Predicate> predicateFactory
-  ) {
+    String joinField, String dateField, boolean nullableField,
+    BiFunction<CriteriaBuilder, Path<LocalDate>, Predicate> predicateFactory) {
     return (root, query, cb) -> {
-      query.distinct(true);
 
       Join<?, ?> join = root.join(joinField, JoinType.LEFT);
       Path<LocalDate> path = join.get(dateField);
@@ -993,6 +976,80 @@ public abstract class BaseSpecificationSupport<T> {
       return cb.and(
         cb.isNotNull(path),
         predicate
+      );
+    };
+  }
+
+  protected Join<?, ?> join(From<?, ?> from, String attribute) {
+    for (Join<?, ?> join : from.getJoins()) {
+      if (join.getAttribute().getName().equals(attribute) && join.getJoinType().equals(JoinType.LEFT)) {
+        return join;
+      }
+    }
+
+    return from.join(attribute, JoinType.LEFT);
+  }
+
+  protected <V> Path<V> resolvePath(Root<T> root, String... path) {
+    if (path == null || path.length == 0) {
+      throw new IllegalArgumentException("Path must not be empty");
+    }
+
+    if (path.length == 1) {
+      return root.get(path[0]);
+    }
+
+    From<?, ?> from = root;
+
+    for (int i = 0; i < path.length - 1; i++) {
+      from = join(from, path[i]);
+    }
+
+    return from.get(path[path.length - 1]);
+  }
+
+  protected Path<?> nestedPathOrDirectRootPath(Root<T> root, String field) {
+    try {
+      if (isBlank(field)) {
+        return null;
+      }
+
+      if (!field.contains(".")) {
+        return root.get(field);
+      }
+
+      String[] parts = field.split("\\.");
+      return resolvePath(root, parts);
+    } catch (IllegalArgumentException ex) {
+      return null;
+    }
+  }
+
+  protected <E, C> Specification<T> notInCodes(
+    Collection<E> values,
+    Function<E, C> codeExtractor,
+    String... path
+  ) {
+    if (values == null || values.isEmpty() || path == null || path.length == 0) {
+      return alwaysTrue();
+    }
+
+    List<C> codes = values.stream()
+      .filter(Objects::nonNull)
+      .map(codeExtractor)
+      .filter(Objects::nonNull)
+      .toList();
+
+    if (codes.isEmpty()) {
+      return alwaysTrue();
+    }
+
+    return (root, query, cb) -> {
+      Path<C> fieldPath = resolvePath(root, path);
+
+      return cb.or(
+        cb.isNull(fieldPath),
+        cb.not(fieldPath.in(codes))
       );
     };
   }

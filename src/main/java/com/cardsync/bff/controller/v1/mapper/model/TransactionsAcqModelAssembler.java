@@ -9,7 +9,7 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Proces
 import com.cardsync.bff.controller.v1.representation.model.transactions.*;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.StatusPaymentEnum;
+import com.cardsync.domain.model.enums.PaymentStatusEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -139,7 +139,7 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
   }
 
   private static TransactionAcqInstallmentModel toInstallmentModel(InstallmentAcqEntity entity) {
-    StatusPaymentEnum paymentStatus = statusPayment(entity.getInstallmentStatus());
+    PaymentStatusEnum paymentStatus = statusPayment(entity.getInstallmentStatus());
     StatusInstallmentEnum installmentStatus = statusInstallment(entity.getInstallmentStatus());
 
     TransactionAcqInstallmentModel model = new TransactionAcqInstallmentModel();
@@ -174,11 +174,11 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
       .toList();
   }
 
-  private static StatusPaymentEnum statusPayment(Integer code) {
-    return Arrays.stream(StatusPaymentEnum.values())
+  private static PaymentStatusEnum statusPayment(Integer code) {
+    return Arrays.stream(PaymentStatusEnum.values())
       .filter(item -> Objects.equals(item.getCode(), code))
       .findFirst()
-      .orElse(StatusPaymentEnum.NULL);
+      .orElse(PaymentStatusEnum.NULL);
   }
 
   private static StatusInstallmentEnum statusInstallment(Integer code) {

@@ -26,7 +26,6 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     if (filter == null) {
       return Specs.all();
     }
-
     Specification<TransactionAcqEntity> spec = Specs.all();
 
     spec = spec.and(contains(filter.tid(), "tid"));
@@ -101,7 +100,7 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
   }
 
   private Specification<TransactionAcqEntity> saleDate(TransactionAcqSalesFilter filter) {
-    return datePeriod(
+    return offsetDateTimePeriod(
       "saleDate",
       filter.periodSaleDate(),
       filter.saleDate(),

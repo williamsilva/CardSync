@@ -9,19 +9,16 @@ import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Relation(collectionRelation = "content")
-public class TransactionsErpModel extends RepresentationModel<@NonNull TransactionsErpModel> {
+public class TransactionsErpMinimalModel extends RepresentationModel<@NonNull TransactionsErpMinimalModel> {
 
   private UUID id;
 
@@ -33,20 +30,13 @@ public class TransactionsErpModel extends RepresentationModel<@NonNull Transacti
   private Integer transactionStatus;
   private Integer transactionStatusReason;
 
+  private OffsetDateTime saleReconciliationDate;
+
   private String tid;
   private String cardName;
   private String cardNumber;
   private String authorization;
-
-  private BigDecimal grossValue;
-  private BigDecimal liquidValue;
-  private BigDecimal discountValue;
-  private BigDecimal contractedFee;
-  private BigDecimal adjustmentValue;
-
   private OffsetDateTime saleDate;
-  private LocalDate expectedPaymentDate;
-  private OffsetDateTime saleReconciliationDate;
 
   private FlagMinimalModel flag;
   private CompanyMinimalModel company;
@@ -55,5 +45,4 @@ public class TransactionsErpModel extends RepresentationModel<@NonNull Transacti
   private ProcessedFileMinimalModel processedFile;
   private BankingDomicileMinimalModel bankingDomicile;
 
-  private List<InstallmentErpModel> installments = new ArrayList<>();
 }

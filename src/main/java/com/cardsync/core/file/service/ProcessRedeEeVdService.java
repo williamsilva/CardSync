@@ -37,7 +37,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ProcessRedeEeVdService {
-  private static final int STATUS_PENDING = StatusPaymentEnum.PENDING.getCode();
+  private static final int STATUS_PENDING = PaymentStatusEnum.PENDING.getCode();
   private static final int TRANSACTION_PENDING = StatusTransactionEnum.PENDING.getCode();
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
   private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HHmmss");

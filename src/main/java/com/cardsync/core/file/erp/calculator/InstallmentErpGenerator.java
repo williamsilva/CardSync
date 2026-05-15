@@ -4,7 +4,7 @@ import com.cardsync.domain.model.InstallmentErpEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.StatusPaymentEnum;
+import com.cardsync.domain.model.enums.PaymentStatusEnum;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -34,9 +34,9 @@ public class InstallmentErpGenerator {
     for (int i = 1; i <= totalInstallments; i++) {
       InstallmentErpEntity installment = new InstallmentErpEntity();
       installment.setInstallment(i);
-      installment.setPaymentStatus(StatusPaymentEnum.PENDING.getCode());
+      installment.setPaymentStatus(PaymentStatusEnum.PENDING.getCode());
       installment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
-      installment.setCreditDate(calculateCreditDate(transaction, i, contractedPaymentTermDays));
+      installment.setExpectedPaymentDate(calculateExpectedPaymentDate(transaction, i, contractedPaymentTermDays));
       installment.setGrossValue(i == 1 ? grossPerInstallment.add(grossRemainder) : grossPerInstallment);
       installment.setLiquidValue(i == 1 ? liquidPerInstallment.add(liquidRemainder) : liquidPerInstallment);
       installment.setDiscountValue(i == 1 ? discountPerInstallment.add(discountRemainder) : discountPerInstallment);
@@ -46,7 +46,7 @@ public class InstallmentErpGenerator {
     return installments;
   }
 
-  private LocalDate calculateCreditDate(TransactionErpEntity transaction, int installmentNumber, Integer contractedPaymentTermDays) {
+  private LocalDate calculateExpectedPaymentDate(TransactionErpEntity transaction, int installmentNumber, Integer contractedPaymentTermDays) {
     LocalDate saleDate = transaction.getSaleDate() == null ? LocalDate.now() : transaction.getSaleDate().toLocalDate();
     if (contractedPaymentTermDays != null && contractedPaymentTermDays >= 0) {
       return saleDate.plusDays(contractedPaymentTermDays.longValue() * installmentNumber);

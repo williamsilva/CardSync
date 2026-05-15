@@ -6,18 +6,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
 import java.util.List;
 
-public record TransactionErpSalesFilter(
+public record InstallmentsErpFilter(
 
   String tid,
   String cvNsu,
   String machine,
   String cardNumber,
   String authorization,
-
-  List<String> flags,
-  List<String> companies,
-  List<String> acquirers,
-  List<String> establishments,
 
   BigDecimal grossValueEnd,
   BigDecimal liquidValueEnd,
@@ -27,6 +22,11 @@ public record TransactionErpSalesFilter(
   BigDecimal discountValueStart,
   BigDecimal adjustmentValueEnd,
   BigDecimal adjustmentValueStart,
+
+  List<String> flags,
+  List<String> companies,
+  List<String> acquirers,
+  List<String> establishments,
 
   List<CaptureEnum> capture,
   List<ModalityEnum> modality,

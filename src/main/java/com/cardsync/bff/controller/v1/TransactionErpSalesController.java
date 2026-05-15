@@ -1,7 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsErpModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionErpSalesTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.service.TransactionErpSalesService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.TransactionErpSalesFilter;
@@ -42,7 +42,7 @@ public class TransactionErpSalesController {
 
   @PostMapping("/totals")
   @CheckSecurity.FileProcessing.CanRead
-  public TransactionErpSalesTotalsModel totals(@RequestBody ListQueryDto<TransactionErpSalesFilter> body) {
+  public TransactionTotalsModel totals(@RequestBody ListQueryDto<TransactionErpSalesFilter> body) {
     return transactionErpSalesService.totals(body);
   }
 }

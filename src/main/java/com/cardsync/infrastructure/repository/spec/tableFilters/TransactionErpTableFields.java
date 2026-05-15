@@ -76,9 +76,9 @@ public class TransactionErpTableFields {
       Map.entry("expectedPaymentDate",
         FieldSpec.localDate(
           "expectedPaymentDate",
-          (root, query) -> root.join("installments", JoinType.LEFT).get("creditDate"),
+          (root, query) -> root.join("installments", JoinType.LEFT).get("expectedPaymentDate"),
           dateFilterService,
-          true
+          false
         )),
 
       Map.entry("company",
@@ -100,9 +100,9 @@ public class TransactionErpTableFields {
         )),
 
       Map.entry("establishment",
-        FieldSpec.joinedUuid(
+        FieldSpec.integer(
           "establishment",
-          (root, query) -> root.join("establishment", JoinType.LEFT).get("id")
+          (root, query) -> root.join("establishment", JoinType.LEFT).get("pvNumber")
         )),
 
       Map.entry("capture",

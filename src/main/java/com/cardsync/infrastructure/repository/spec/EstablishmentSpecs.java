@@ -47,7 +47,7 @@ public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEn
       spec = spec.and(contains("pvNumber", a.pvNumber()));
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
       spec = spec.and(inCodes("type", a.typeEnum(), TypeEstablishmentEnum::getCode));
-      spec = spec.and(datePeriod("createdAt", a.periodCreatedAt(), a.createdAt(), true));
+      spec = spec.and(offsetDateTimePeriod("createdAt", a.periodCreatedAt(), a.createdAt(), true));
 
       spec = spec.and(
         inPath(a.company(), value -> {

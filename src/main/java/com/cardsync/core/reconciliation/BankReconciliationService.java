@@ -8,7 +8,7 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.StatusPaymentEnum;
+import com.cardsync.domain.model.enums.PaymentStatusEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
@@ -33,11 +33,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BankReconciliationService {
 
-  private static final int STATUS_PENDING = StatusPaymentEnum.PENDING.getCode();
-  private static final int STATUS_LIQUIDATED = StatusPaymentEnum.PAID.getCode();
+  private static final int STATUS_PENDING = PaymentStatusEnum.PENDING.getCode();
+  private static final int STATUS_LIQUIDATED = PaymentStatusEnum.PAID.getCode();
   private static final int STATUS_RECONCILED = StatusInstallmentEnum.RECONCILED.getCode();
   private static final int STATUS_PARTIALLY_LIQUIDATED = 4;
-  private static final int STATUS_NOT_RECONCILED = StatusPaymentEnum.NOT_PAID.getCode();
+  private static final int STATUS_NOT_RECONCILED = PaymentStatusEnum.NOT_PAID.getCode();
 
   private static final int CREDIT_ORDER_STATUS_RECONCILED = 2;
   private static final int CREDIT_ORDER_STATUS_PENDING = 1;

@@ -4,16 +4,13 @@ import com.cardsync.domain.filter.TransactionErpSalesFilter;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.PaymentStatusEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
-import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
-
-import java.math.BigDecimal;
 
 @Component
 public class TransactionErpAdvancedFields extends BaseSpecificationSupport<TransactionErpEntity> {
@@ -23,159 +20,48 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
   }
 
   public Specification<TransactionErpEntity> advanced(TransactionErpSalesFilter filter) {
-    if (filter == null) {
-      return Specs.all();
-    }
-
     Specification<TransactionErpEntity> spec = Specs.all();
 
+    if (filter == null) {
+      return spec;
+    }
+
+    // Filtros diretos da Venda
     spec = spec.and(contains(filter.tid(), "tid"));
     spec = spec.and(contains(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.machine(), "machine"));
     spec = spec.and(contains(filter.cardNumber(), "cardNumber"));
     spec = spec.and(contains(filter.authorization(), "authorization"));
 
-    spec = spec.and(flag(filter));
-    spec = spec.and(company(filter));
-    spec = spec.and(capture(filter));
-    spec = spec.and(saleDate(filter));
-    spec = spec.and(modality(filter));
-    spec = spec.and(acquirer(filter));
-    spec = spec.and(establishment(filter));
-    spec = spec.and(transactionStatus(filter));
-    spec = spec.and(expectedPaymentDate(filter));
-    spec = spec.and(adjustmentValue(filter.adjustmentValueStart(), filter.adjustmentValueEnd()));
     spec = spec.and(currencyRangeValue("grossValue", filter.grossValueStart(), filter.grossValueEnd()));
     spec = spec.and(currencyRangeValue("liquidValue", filter.liquidValueStart(), filter.liquidValueEnd()));
     spec = spec.and(currencyRangeValue("discountValue", filter.discountValueStart(), filter.discountValueEnd()));
 
+    spec = spec.and(inCodes("capture", filter.capture(), CaptureEnum::getCode));
+    spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode ));
+    spec = spec.and(inCodes("paymentStatus", filter.paymentStatus(), PaymentStatusEnum::getCode));
+    spec = spec.and(inCodes("transactionStatus", filter.transactionStatus(), StatusTransactionEnum::getCode));
+
+    spec = spec.and(inPath(
+      filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull, "acquirer", "id"));
+
+    spec = spec.and(inPath(
+      filter.flags(), BaseSpecificationSupport::parseUuidOrNull,  "flag", "id"));
+
+    spec = spec.and(inPath(
+      filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
+
+    spec = spec.and(inPath(
+      filter.companies(), BaseSpecificationSupport::parseUuidOrNull, "company", "id"));
+
+    // Filtros aninhados no Ajuste
+    spec = spec.and(currencyRangeValuePath(
+      filter.adjustmentValueStart(),
+      filter.adjustmentValueEnd(),
+      "adjustment",
+      "adjustmentValue"
+    ));
+
     return spec;
-  }
-
-  private Specification<TransactionErpEntity> adjustmentValue(BigDecimal start, BigDecimal end) {
-    return currencyRangeValue("adjustment", "adjustmentValue", start, end, BigDecimal.ZERO);
-  }
-
-  protected Specification<TransactionErpEntity> currencyRangeValue(String field, BigDecimal start, BigDecimal end) {
-    return currencyRangeValue(null, field, start, end, null);
-  }
-
-  private Specification<TransactionErpEntity> currencyRangeValue(
-    String association, String field, BigDecimal start, BigDecimal end, BigDecimal nullAs ) {
-    if (start == null && end == null) {
-      return alwaysTrue();
-    }
-
-    if (start != null && end != null && end.compareTo(start) < 0) {
-      BigDecimal tmp = start;
-      start = end;
-      end = tmp;
-    }
-
-    BigDecimal finalStart = start;
-    BigDecimal finalEnd = end;
-
-    return (root, query, cb) -> {
-      Expression<BigDecimal> path;
-
-      if (association == null || association.isBlank()) {
-        path = root.get(field).as(BigDecimal.class);
-      } else {
-        path = root.join(association, JoinType.LEFT).get(field).as(BigDecimal.class);
-      }
-
-      if (nullAs != null) {
-        path = cb.coalesce(path, nullAs);
-      }
-
-      if (finalStart != null && finalEnd != null) {
-        return cb.between(path, finalStart, finalEnd);
-      }
-
-      if (finalStart != null) {
-        return cb.greaterThanOrEqualTo(path, finalStart);
-      }
-
-      return cb.lessThanOrEqualTo(path, finalEnd);
-    };
-  }
-
-  private Specification<TransactionErpEntity> saleDate(TransactionErpSalesFilter filter) {
-    return datePeriod(
-      "saleDate",
-      filter.periodSaleDate(),
-      filter.saleDate(),
-      true
-    );
-  }
-
-  private Specification<TransactionErpEntity> expectedPaymentDate(TransactionErpSalesFilter filter) {
-    return localDatePeriodJoin(
-      "installments",
-      "creditDate",
-      filter.periodExpectedPaymentDate(),
-      filter.expectedPaymentDate(),
-      true
-    );
-  }
-
-  private Specification<TransactionErpEntity> modality(TransactionErpSalesFilter filter) {
-    return inCodes(
-      "modality",
-      filter.modality(),
-      ModalityEnum::getCode
-    );
-  }
-
-  private Specification<TransactionErpEntity> transactionStatus(TransactionErpSalesFilter filter) {
-    return inCodes(
-      "transactionStatus",
-      filter.transactionStatus(),
-      StatusTransactionEnum::getCode
-    );
-  }
-
-  private Specification<TransactionErpEntity> capture(TransactionErpSalesFilter filter) {
-    return inCodes(
-      "capture",
-      filter.capture(),
-      CaptureEnum::getCode
-    );
-  }
-
-  private Specification<TransactionErpEntity> company(TransactionErpSalesFilter filter) {
-    return inPath(
-      filter.companies(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
-      "company",
-      "id"
-    );
-  }
-
-  private Specification<TransactionErpEntity> establishment(TransactionErpSalesFilter filter) {
-    return inPath(
-      filter.establishments(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
-      "establishment",
-      "id"
-    );
-  }
-
-  private Specification<TransactionErpEntity> acquirer(TransactionErpSalesFilter filter) {
-    return inPath(
-      filter.acquirers(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
-      "acquirer",
-      "id"
-    );
-  }
-
-  private Specification<TransactionErpEntity> flag(TransactionErpSalesFilter filter) {
-    return inPath(
-      filter.flags(),
-      TransactionErpAdvancedFields::parseUuidOrNull,
-      "flag",
-      "id"
-    );
   }
 }

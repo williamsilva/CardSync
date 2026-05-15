@@ -44,8 +44,8 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
       var a = query.advanced();
 
       spec = spec.and(inCodes("status", a.contractEnum(), ContractEnum::getCode));
-      spec = spec.and(datePeriod("endDate", a.periodEndDate(), a.endDate(), true));
-      spec = spec.and(datePeriod("startDate", a.periodStartDate(), a.startDate(), true));
+      spec = spec.and(offsetDateTimePeriod("endDate", a.periodEndDate(), a.endDate(), true));
+      spec = spec.and(offsetDateTimePeriod("startDate", a.periodStartDate(), a.startDate(), true));
 
       spec = spec.and(
         inPath(a.company(), value -> {

@@ -1,13 +1,12 @@
 package com.cardsync.bff.controller.v1;
 
-
+import com.cardsync.bff.controller.v1.representation.model.transactions.InstallmentErpModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsAcqModel;
 import com.cardsync.core.security.CheckSecurity;
-import com.cardsync.domain.filter.TransactionAcqSalesFilter;
+import com.cardsync.domain.filter.InstallmentsErpFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
-import com.cardsync.domain.service.TransactionAcqSalesService;
+import com.cardsync.domain.service.InstallmentsErpService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.hateoas.PagedModel;
@@ -18,17 +17,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/bff/v1/transaction/acq/sales")
-public class TransactionAcqSalesController {
+@RequestMapping("/bff/v1/transaction/erp/installments")
+public class InstallmentsErpController {
 
-  private final TransactionAcqSalesService transactionAcqSalesService;
+  private final InstallmentsErpService transactionErpInstallmentsService;
 
   @PostMapping("/search")
   @CheckSecurity.FileProcessing.CanRead
-  public PagedModel<TransactionsAcqModel> search(@RequestBody ListQueryDto<TransactionAcqSalesFilter> body) {
+  public PagedModel<InstallmentErpModel> search(@RequestBody ListQueryDto<InstallmentsErpFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
-    Page<TransactionsAcqModel> page = transactionAcqSalesService.search(pageable, body);
+    Page<InstallmentErpModel> page = transactionErpInstallmentsService.search(pageable, body);
 
     return PagedModel.of(
       page.getContent(),
@@ -43,7 +42,7 @@ public class TransactionAcqSalesController {
 
   @PostMapping("/totals")
   @CheckSecurity.FileProcessing.CanRead
-  public TransactionTotalsModel totals(@RequestBody ListQueryDto<TransactionAcqSalesFilter> body) {
-    return transactionAcqSalesService.totals(body);
+  public TransactionTotalsModel totals(@RequestBody ListQueryDto<InstallmentsErpFilter> body) {
+    return transactionErpInstallmentsService.totals(body);
   }
 }

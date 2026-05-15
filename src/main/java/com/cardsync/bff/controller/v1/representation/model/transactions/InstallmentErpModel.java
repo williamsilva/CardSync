@@ -1,9 +1,8 @@
 package com.cardsync.bff.controller.v1.representation.model.transactions;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+import org.springframework.hateoas.RepresentationModel;
+import org.springframework.hateoas.server.core.Relation;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,7 +13,8 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class TransactionErpInstallmentModel {
+@Relation(collectionRelation = "content")
+public class InstallmentErpModel extends RepresentationModel<@NonNull InstallmentErpModel>  {
 
   private UUID id;
 
@@ -25,12 +25,16 @@ public class TransactionErpInstallmentModel {
   private Integer reconciliationPaymentLine;
 
   private BigDecimal grossValue;
-  private BigDecimal netValue;
-  private BigDecimal feeValue;
+  private BigDecimal liquidValue;
+  private BigDecimal discountValue;
+  private BigDecimal adjustmentValue;
 
+  private LocalDate paymentDate;
   private LocalDate cancellationDate;
   private LocalDate expectedPaymentDate;
 
   private OffsetDateTime reconciliationBankProcessedAt;
   private OffsetDateTime reconciliationPaymentProcessedAt;
+
+  private TransactionsErpMinimalModel transaction;
 }

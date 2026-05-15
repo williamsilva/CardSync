@@ -9,4 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface InstallmentErpRepository extends JpaRepository<InstallmentErpEntity, UUID>, JpaSpecificationExecutor<InstallmentErpEntity> {
+
 }
