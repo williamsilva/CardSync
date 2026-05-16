@@ -4,7 +4,7 @@ import com.cardsync.domain.filter.TransactionErpSalesFilter;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.domain.model.enums.PaymentStatusEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
@@ -39,8 +39,8 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
 
     spec = spec.and(inCodes("capture", filter.capture(), CaptureEnum::getCode));
     spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode ));
-    spec = spec.and(inCodes("paymentStatus", filter.paymentStatus(), PaymentStatusEnum::getCode));
-    spec = spec.and(inCodes("transactionStatus", filter.transactionStatus(), StatusTransactionEnum::getCode));
+    spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
+    spec = spec.and(inCodes("statusTransaction", filter.statusTransaction(), StatusTransactionEnum::getCode));
 
     spec = spec.and(inPath(
       filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull, "acquirer", "id"));

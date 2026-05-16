@@ -30,8 +30,8 @@ public class ProcessRedeEeFiService {
   private static final int STATUS_PENDING = 1;
   private static final BigDecimal MAX_SAFE_MONEY = new BigDecimal("999999999.99");
   private static final Set<String> SUPPORTED_IDENTIFIERS = Set.of(
-    "030", "032", "034", "035", "036", "037", "038", "040", "041", "042", "043", "044", "045", "046", "047", "048", "049", "050", "052", "053", "054", "055", "056", "057", "063", "064", "066", "069"
-  );
+    "030", "032", "034", "035", "036", "037", "038", "040", "041", "042", "043", "044", "045", "046", "047", "048",
+    "049", "050", "052", "053", "054", "055", "056", "057", "063", "064", "066", "069");
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
@@ -49,6 +49,7 @@ public class ProcessRedeEeFiService {
   private final TotalizerMatrixRepository totalizerMatrixRepository;
   private final ArchiveTrailerRepository archiveTrailerRepository;
   private final AdjustmentRepository adjustmentRepository;
+  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
   private final RedeNegotiatedTransactionRepository negotiatedTransactionRepository;
   private final RedePixCancellationRepository pixCancellationRepository;
   private final RedeSuspendedPaymentRepository suspendedPaymentRepository;
@@ -183,7 +184,14 @@ public class ProcessRedeEeFiService {
       installmentUnschedulingRepository.saveAll(unschedulings);
       totalizerMatrixRepository.saveAll(totalizerMatrices);
       archiveTrailerRepository.saveAll(archiveTrailers);
-      adjustmentRepository.saveAll(financialAdjustments);
+      List<AdjustmentEntity> savedFinancialAdjustments = adjustmentRepository.saveAll(financialAdjustments);
+      AdjustmentTransactionLinkService.LinkResult financialAdjustmentLinkResult =
+        adjustmentTransactionLinkService.linkSavedAdjustments(savedFinancialAdjustments);
+      log.info(
+        "🔗 Vínculo de ajustes EEFI com transações: analisados={}, vinculados={}",
+        financialAdjustmentLinkResult.analyzed(),
+        financialAdjustmentLinkResult.linked()
+      );
       negotiatedTransactionRepository.saveAll(negotiatedTransactions);
       pixCancellationRepository.saveAll(pixCancellations);
       suspendedPaymentRepository.saveAll(suspendedPayments);
@@ -552,7 +560,8 @@ public class ProcessRedeEeFiService {
     AcquirerEntity acquirer = safeAcquirer();
     Integer pvNumber = "053".equals(identifier) ? FileParserUtils.extractIntegerLine(line, "36-45", lineNumber) : FileParserUtils.extractIntegerLine(line, "3-12", lineNumber);
     EstablishmentEntity establishment = safeEstablishment(pvNumber);
-    String acquirerCode = resolveAdjustmentAcquirerCode(line, lineNumber, identifier);
+    String originFlagCode = resolveAdjustmentOriginFlagCode(line, lineNumber, identifier);
+    String adjustmentFlagCode = resolveAdjustmentFlagCode(line, lineNumber, identifier);
 
     AdjustmentEntity adjustment = new AdjustmentEntity();
     adjustment.setLineNumber(lineNumber);
@@ -566,7 +575,8 @@ public class ProcessRedeEeFiService {
     adjustment.setAcquirer(acquirer);
     adjustment.setEstablishment(establishment);
     adjustment.setCompany(establishment != null ? establishment.getCompany() : null);
-    adjustment.setRvFlagAdjustment(safeFlag(acquirer, acquirerCode));
+    adjustment.setRvFlagOrigin(safeFlag(acquirer, originFlagCode));
+    adjustment.setRvFlagAdjustment(safeFlag(acquirer, adjustmentFlagCode));
 
     switch (identifier) {
       case "035" -> fillLiquidAdjustment(line, lineNumber, adjustment);
@@ -938,7 +948,20 @@ public class ProcessRedeEeFiService {
   }
 
 
-  private String resolveAdjustmentAcquirerCode(String line, int lineNumber, String identifier) {
+  private String resolveAdjustmentOriginFlagCode(String line, int lineNumber, String identifier) {
+    if ("035".equals(identifier)) {
+      return trim(FileParserUtils.extractStringLine(line, "298-299", lineNumber));
+    }
+    if ("038".equals(identifier)) {
+      return trim(FileParserUtils.extractStringLine(line, "302-303", lineNumber));
+    }
+    if ("043".equals(identifier)) {
+      return trim(FileParserUtils.extractStringLine(line, "114-115", lineNumber));
+    }
+    return null;
+  }
+
+  private String resolveAdjustmentFlagCode(String line, int lineNumber, String identifier) {
     if ("035".equals(identifier)) {
       return trim(FileParserUtils.extractStringLine(line, "299-300", lineNumber));
     }

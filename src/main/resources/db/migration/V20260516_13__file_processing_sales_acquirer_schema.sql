@@ -25,6 +25,8 @@ CREATE TABLE cs_processed_file (
   date_file DATE NULL,
   date_import DATETIME(6) NOT NULL,
   date_processing DATETIME(6) NOT NULL,
+  started_at DATETIME(6) NULL,
+  finished_at DATETIME(6) NULL,
   type_file VARCHAR(120) NULL,
   commercial_name VARCHAR(150) NULL,
   version VARCHAR(80) NULL,
@@ -32,7 +34,12 @@ CREATE TABLE cs_processed_file (
   total_lines INT NULL,
   processed_lines INT NULL,
   ignored_lines INT NULL,
+  warning_lines INT NULL,
+  error_lines INT NULL,
+  pending_contract_lines INT NULL,
+  pending_business_context_lines INT NULL,
   error_message VARCHAR(500) NULL,
+  status_message VARCHAR(500) NULL,
   origin_file_id BINARY(16) NOT NULL,
   PRIMARY KEY (id),
   CONSTRAINT uk_cs_processed_file_file_origin UNIQUE (file_name, origin_file_id),
@@ -109,9 +116,9 @@ CREATE TABLE cs_transaction_acq (
   line_number INT NULL,
   status_audit INT NULL,
   installment INT NULL,
-  transaction_status INT NULL,
+  status_transaction INT NULL,
   status_payment_bank INT NULL,
-  transaction_status_reason INT NULL,
+  status_transaction_reason INT NULL,
   mdr_rate DECIMAL(18,8) NULL,
   flex_rate DECIMAL(18,8) NULL,
   tip_value DECIMAL(18,8) NULL,
@@ -145,5 +152,31 @@ CREATE INDEX idx_cs_transaction_acq_processed_file ON cs_transaction_acq(process
 
 INSERT INTO cs_origin_file (id, created_at, code, name, description) VALUES
   (UUID_TO_BIN(UUID()), CURRENT_TIMESTAMP(6), 'ERP', 'ERP', 'Arquivos CSV do ERP'),
-  (UUID_TO_BIN(UUID()), CURRENT_TIMESTAMP(6), 'REDE', 'Rede', 'Arquivos da adquirente Rede')
-ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description);
+  (UUID_TO_BIN(UUID()), CURRENT_TIMESTAMP(6), 'REDE', 'Rede', 'Arquivos da adquirente Rede') AS new
+ON DUPLICATE KEY UPDATE
+  name = new.name,
+  description = new.description;
+
+ALTER TABLE cs_sales_summary
+  ADD COLUMN bank INT NULL,
+  ADD COLUMN agency INT NULL,
+  ADD COLUMN current_account INT NULL,
+  ADD COLUMN summary_type VARCHAR(10) NULL,
+  ADD COLUMN banking_domicile_id BINARY(16) NULL;
+
+ALTER TABLE cs_sales_summary
+  ADD CONSTRAINT fk_cs_sales_summary_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE;
+
+CREATE INDEX idx_cs_sales_summary_banking_domicile ON cs_sales_summary(banking_domicile_id);
+CREATE INDEX idx_cs_sales_summary_bank_account ON cs_sales_summary(bank, agency, current_account);
+
+ALTER TABLE cs_transaction_acq
+  ADD COLUMN credit_date DATE NULL,
+  ADD COLUMN transaction_type VARCHAR(10) NULL,
+  ADD COLUMN dcc_currency VARCHAR(10) NULL,
+  ADD COLUMN service_code VARCHAR(10) NULL,
+  ADD COLUMN purchase_value DECIMAL(18,8) NULL,
+  ADD COLUMN withdrawal_value DECIMAL(18,8) NULL;
+
+CREATE INDEX idx_cs_transaction_acq_credit_date ON cs_transaction_acq(credit_date);
+CREATE INDEX idx_cs_transaction_acq_type_service ON cs_transaction_acq(transaction_type, service_code);

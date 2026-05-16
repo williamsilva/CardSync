@@ -1,4 +1,3 @@
-
 INSERT INTO cs_company(id, status, type, fantasy_name, social_reason, cnpj, created_at, updated_at, created_by_id) VALUES
     (UUID_TO_BIN(UUID()), 1, 1, 'Acquamania Multiplo Lazer S.A', 'Acquamania', '39303847000180', NOW(), NOW(),
         (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),

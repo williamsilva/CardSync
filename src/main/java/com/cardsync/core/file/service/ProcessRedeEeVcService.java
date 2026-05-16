@@ -36,15 +36,8 @@ public class ProcessRedeEeVcService {
   private static final int REQUEST_AWAITING_DECISION = 1;
 
   private static final Set<String> SUPPORTED_IDENTIFIERS = Set.of(
-    "002", "004", "005",
-    "006", "008",
-    "010", "011", "012", "014",
-    "016", "017", "018", "019", "020", "021",
-    "022", "024",
-    "026", "028", "029",
-    "033", "034", "035", "036",
-    "040"
-  );
+    "002", "004", "005", "006", "008", "010", "011", "012", "014", "016", "017", "018", "019", "020", "021",
+    "022", "024", "026", "028", "029", "033", "034", "035", "036", "040");
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
@@ -55,6 +48,7 @@ public class ProcessRedeEeVcService {
   private final PvMatrixHeaderRepository pvMatrixHeaderRepository;
   private final RedeRequestNoticeRepository redeRequestNoticeRepository;
   private final AdjustmentRepository adjustmentRepository;
+  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
   private final TotalizerMatrixRepository totalizerMatrixRepository;
   private final ArchiveTrailerRepository archiveTrailerRepository;
   private final BankingDomicileResolver bankingDomicileResolver;
@@ -182,7 +176,14 @@ public class ProcessRedeEeVcService {
       transactionAcqRepository.saveAll(transactions);
       installmentAcqRepository.saveAll(installments);
       redeRequestNoticeRepository.saveAll(requestNotices);
-      adjustmentRepository.saveAll(adjustments);
+      List<AdjustmentEntity> savedAdjustments = adjustmentRepository.saveAll(adjustments);
+      AdjustmentTransactionLinkService.LinkResult adjustmentLinkResult =
+        adjustmentTransactionLinkService.linkSavedAdjustments(savedAdjustments);
+      log.info(
+        "🔗 Vínculo de ajustes EEVC com transações: analisados={}, vinculados={}",
+        adjustmentLinkResult.analyzed(),
+        adjustmentLinkResult.linked()
+      );
       totalizerMatrixRepository.saveAll(totalizerMatrices);
       archiveTrailerRepository.saveAll(archiveTrailers);
       redeIcPlusTransactionRepository.saveAll(icPlusTransactions);
@@ -304,8 +305,8 @@ public class ProcessRedeEeVcService {
     tx.setRvNumber(rvNumber);
     tx.setStatusAudit(STATUS_PENDING);
     tx.setStatusPaymentBank(STATUS_PENDING);
-    tx.setTransactionStatus(RECONCILIATION_PENDING);
-    tx.setTransactionStatusReason(0);
+    tx.setStatusTransaction(RECONCILIATION_PENDING);
+    tx.setStatusTransactionReason(0);
 
     if (layout == TransactionLayout.DOLLAR) {
       return fillDollarTransaction(tx, line, lineNumber, acquirer);
@@ -419,8 +420,8 @@ public class ProcessRedeEeVcService {
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);
     tx.setStatusAudit(STATUS_PENDING);
     tx.setStatusPaymentBank(STATUS_PENDING);
-    tx.setTransactionStatus(RECONCILIATION_PENDING);
-    tx.setTransactionStatusReason(0);
+    tx.setStatusTransaction(RECONCILIATION_PENDING);
+    tx.setStatusTransactionReason(0);
     return tx;
   }
 
@@ -492,11 +493,14 @@ public class ProcessRedeEeVcService {
     adjustment.setAdjustmentReason(FileParserUtils.extractIntegerLine(line, "88-90", lineNumber));
     adjustment.setAdjustmentDescription(FileParserUtils.extractStringLine(line, "90-118", lineNumber));
     adjustment.setAdjustmentReason2(FileParserUtils.extractIntegerLine(line, "119-123", lineNumber));
+    SalesSummaryEntity summary = findSummary(summaries, pvNumber, rvNumber);
+
     adjustment.setAcquirer(acquirer);
+    adjustment.setRvFlagOrigin(summary != null ? summary.getFlag() : null);
     adjustment.setRvFlagAdjustment(safeFlag(acquirer, acquirerCode));
     adjustment.setEstablishment(establishment);
     adjustment.setCompany(establishment != null ? establishment.getCompany() : null);
-    adjustment.setSalesSummary(findSummary(summaries, pvNumber, rvNumber));
+    adjustment.setSalesSummary(summary);
     return adjustment;
   }
 

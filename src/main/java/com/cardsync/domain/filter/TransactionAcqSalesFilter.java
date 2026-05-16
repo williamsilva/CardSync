@@ -33,7 +33,7 @@ public record TransactionAcqSalesFilter(
 
   List<CaptureEnum> capture,
   List<ModalityEnum> modality,
-  List<StatusTransactionEnum> transactionStatus,
+  List<StatusTransactionEnum> statusTransaction,
 
   PeriodEnum periodSaleDate,
   PeriodEnum periodPaymentDate,

@@ -14,7 +14,7 @@ import com.cardsync.domain.model.BankEntity;
 import com.cardsync.domain.model.InstallmentErpEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.PaymentStatusEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -58,9 +58,9 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
     model.setDiscountValue(entity.getDiscountValue());
     model.setAuthorization(entity.getAuthorization());
     model.setAdjustmentValue(getAdjustmentValue(entity));
-    model.setTransactionStatus(entity.getTransactionStatus());
+    model.setStatusTransaction(entity.getStatusTransaction());
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
-    model.setTransactionStatusReason(entity.getTransactionStatusReason());
+    model.setStatusTransactionReason(entity.getStatusTransactionReason());
     model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
     model.setInstallments(installments.stream()
       .map(TransactionsErpModelAssembler::toInstallmentModel)
@@ -133,7 +133,7 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
   }
 
   private static InstallmentErpModel toInstallmentModel(InstallmentErpEntity entity) {
-    PaymentStatusEnum paymentStatus = statusPayment(entity.getPaymentStatus());
+    StatusPaymentBankEnum statusPaymentBank = statusPayment(entity.getStatusPaymentBank());
     StatusInstallmentEnum installmentStatus = statusInstallment(entity.getInstallmentStatus());
 
     InstallmentErpModel model = new InstallmentErpModel();
@@ -141,11 +141,13 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
     model.setGrossValue(entity.getGrossValue());
     model.setLiquidValue(entity.getLiquidValue());
     model.setInstallment(entity.getInstallment());
-    model.setPaymentStatus(paymentStatus.getCode());
     model.setDiscountValue(entity.getDiscountValue());
+    model.setStatusPaymentBank(statusPaymentBank.getCode());
     model.setCancellationDate(entity.getCancellationDate());
     model.setInstallmentStatus(installmentStatus.getCode());
+    model.setStatusPaymentBank(entity.getStatusPaymentBank());
     model.setExpectedPaymentDate(entity.getExpectedPaymentDate());
+    model.setContractedFee(entity.getTransaction().getContractedFee());
     model.setReconciliationBankLine(entity.getReconciliationBankLine());
     model.setReconciliationPaymentLine(entity.getReconciliationPaymentLine());
     model.setReconciliationBankProcessedAt(entity.getReconciliationBankProcessedAt());
@@ -170,11 +172,11 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
       .toList();
   }
 
-  private static PaymentStatusEnum statusPayment(Integer code) {
-    return Arrays.stream(PaymentStatusEnum.values())
+  private static StatusPaymentBankEnum statusPayment(Integer code) {
+    return Arrays.stream(StatusPaymentBankEnum.values())
       .filter(item -> Objects.equals(item.getCode(), code))
       .findFirst()
-      .orElse(PaymentStatusEnum.NULL);
+      .orElse(StatusPaymentBankEnum.NULL);
   }
 
   private static StatusInstallmentEnum statusInstallment(Integer code) {

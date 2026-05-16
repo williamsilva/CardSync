@@ -28,9 +28,9 @@ public class TransactionErpEntity extends AuditableEntityBase {
   private Integer modality;
   private Integer lineNumber;
   private Integer installment;
-  private Integer transactionStatus;
+  private Integer statusTransaction;
   private Integer reasonExclusionStatus;
-  private Integer transactionStatusReason;
+  private Integer statusTransactionReason;
   private Integer sourceEstablishmentPvNumber;
 
   private String tid;
@@ -79,6 +79,17 @@ public class TransactionErpEntity extends AuditableEntityBase {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "adjustment_id")
   private AdjustmentEntity adjustment;
+
+  /**
+   * Venda da adquirente vinculada na conciliação ERP x Adquirente.
+   *
+   * Esse vínculo evita redescobrir o match em consultas posteriores e permite
+   * reaproveitar rapidamente o contexto da adquirente, como ajuste, domicílio
+   * bancário, empresa, estabelecimento, bandeira e adquirente.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "transaction_acq_id")
+  private TransactionAcqEntity transactionAcq;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "processed_file_id")

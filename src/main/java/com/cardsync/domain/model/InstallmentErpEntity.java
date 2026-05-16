@@ -23,7 +23,7 @@ public class InstallmentErpEntity extends AuditableEntityBase {
   private BigDecimal discountValue;
 
   private Integer installment;
-  private Integer paymentStatus;
+  private Integer statusPaymentBank;
   private Integer installmentStatus;
   private Integer reconciliationBankLine;
   private Integer reconciliationPaymentLine;

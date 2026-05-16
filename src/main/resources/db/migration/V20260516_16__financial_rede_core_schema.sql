@@ -1,45 +1,3 @@
-CREATE TABLE cs_bank (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
-  code VARCHAR(10) NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  ispb VARCHAR(20) NULL,
-  active BIT NOT NULL DEFAULT 1,
-  PRIMARY KEY (id),
-  CONSTRAINT uk_cs_bank_code UNIQUE (code),
-  CONSTRAINT fk_cs_bank_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_bank_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB;
-
-CREATE TABLE cs_banking_domicile (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
-  agency INT NULL,
-  agency_digit VARCHAR(5) NULL,
-  current_account INT NULL,
-  account_digit INT NULL,
-  holder_document VARCHAR(20) NULL,
-  holder_name VARCHAR(120) NULL,
-  active BIT NOT NULL DEFAULT 1,
-  bank_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  PRIMARY KEY (id),
-  CONSTRAINT fk_cs_banking_domicile_bank FOREIGN KEY (bank_id) REFERENCES cs_bank(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_banking_domicile_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_banking_domicile_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_banking_domicile_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_banking_domicile_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB;
-CREATE INDEX idx_cs_banking_domicile_lookup ON cs_banking_domicile(agency, current_account);
-CREATE INDEX idx_cs_banking_domicile_company ON cs_banking_domicile(company_id);
-
 CREATE TABLE cs_adjustment (
   id BINARY(16) NOT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -357,3 +315,35 @@ CREATE TABLE cs_settled_debt (
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_settled_debt_pv_date ON cs_settled_debt(pv_number, liquidated_date);
 CREATE INDEX idx_cs_settled_debt_nsu ON cs_settled_debt(nsu);
+
+ALTER TABLE cs_adjustment
+  ADD COLUMN ecommerce BIT(1) NULL,
+  ADD COLUMN pv_number INT NULL,
+  ADD COLUMN installment_number INT NULL,
+  ADD COLUMN installment_total INT NULL,
+  ADD COLUMN adjustment_sequence INT NULL,
+  ADD COLUMN raw_adjustment_code VARCHAR(80) NULL,
+  ADD COLUMN source_record_identifier VARCHAR(20) NULL,
+  ADD COLUMN release_date DATE NULL,
+  ADD COLUMN original_due_date DATE NULL,
+  ADD COLUMN gross_value DECIMAL(18,8) NULL,
+  ADD COLUMN liquid_value DECIMAL(18,8) NULL,
+  ADD COLUMN discount_value DECIMAL(18,8) NULL,
+  ADD COLUMN establishment_id BINARY(16) NULL,
+  ADD COLUMN processed_file_id BINARY(16) NULL;
+
+ALTER TABLE cs_adjustment
+  ADD CONSTRAINT fk_cs_adjustment_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
+  ADD CONSTRAINT fk_cs_adjustment_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE;
+
+CREATE INDEX idx_cs_adjustment_processed_file ON cs_adjustment(processed_file_id);
+CREATE INDEX idx_cs_adjustment_record_type ON cs_adjustment(record_type, source_record_identifier);
+CREATE INDEX idx_cs_adjustment_context ON cs_adjustment(company_id, acquirer_id, establishment_id, rv_flag_adjustment_id);
+CREATE INDEX idx_cs_adjustment_rv_original ON cs_adjustment(rv_number_original, pv_number_original, rv_date_original);
+
+ALTER TABLE cs_adjustment
+  ADD COLUMN ecommerce_order_number VARCHAR(80) NULL,
+  ADD COLUMN letter_reference VARCHAR(80) NULL;
+
+CREATE INDEX idx_cs_adjustment_ecommerce_order ON cs_adjustment(ecommerce_order_number);
+CREATE INDEX idx_cs_adjustment_letter_reference ON cs_adjustment(letter_reference);

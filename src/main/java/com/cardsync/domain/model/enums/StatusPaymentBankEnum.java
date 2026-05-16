@@ -3,7 +3,7 @@ package com.cardsync.domain.model.enums;
 import lombok.Getter;
 
 @Getter
-public enum PaymentStatusEnum {
+public enum StatusPaymentBankEnum {
   NULL(0),
   PENDING(1),
   PAID(2),
@@ -14,7 +14,7 @@ public enum PaymentStatusEnum {
 
   private final int code;
 
-  PaymentStatusEnum(int code) {
+  StatusPaymentBankEnum(int code) {
     this.code = code;
   }
 }

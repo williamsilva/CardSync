@@ -61,10 +61,10 @@ public class TransactionErpTableFields {
           "authorization",
           (root, query) -> root.get("authorization"))),
 
-      Map.entry("saleStatus",
+      Map.entry("statusTransaction",
         FieldSpec.integer(
-          "saleStatus",
-          (root, query) -> root.get("transactionStatus"))),
+          "statusTransaction",
+          (root, query) -> root.get("statusTransaction"))),
 
       Map.entry("saleDate",
         FieldSpec.offsetDateTime(

@@ -1,7 +1,7 @@
 package com.cardsync.infrastructure.repository.spec.advancedFilters;
 
-import com.cardsync.domain.filter.InstallmentsErpFilter;
-import com.cardsync.domain.model.InstallmentErpEntity;
+import com.cardsync.domain.filter.InstallmentsAcqFilter;
+import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
@@ -13,14 +13,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 @Component
-public class InstallmentsErpAdvancedFields extends BaseSpecificationSupport<InstallmentErpEntity> {
+public class InstallmentsAcqAdvancedFields extends BaseSpecificationSupport<InstallmentAcqEntity> {
 
-  public InstallmentsErpAdvancedFields(DateFilterService dateFilterService) {
+  public InstallmentsAcqAdvancedFields(DateFilterService dateFilterService) {
     super(dateFilterService);
   }
 
-  public Specification<InstallmentErpEntity> advanced(InstallmentsErpFilter filter) {
-    Specification<InstallmentErpEntity> spec = Specs.all();
+  public Specification<InstallmentAcqEntity> advanced(InstallmentsAcqFilter filter) {
+    Specification<InstallmentAcqEntity> spec = Specs.all();
 
     if (filter == null) {
       return spec;

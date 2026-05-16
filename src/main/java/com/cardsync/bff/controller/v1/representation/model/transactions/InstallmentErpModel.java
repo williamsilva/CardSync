@@ -19,13 +19,14 @@ public class InstallmentErpModel extends RepresentationModel<@NonNull Installmen
   private UUID id;
 
   private Integer installment;
-  private Integer paymentStatus;
+  private Integer statusPaymentBank;
   private Integer installmentStatus;
   private Integer reconciliationBankLine;
   private Integer reconciliationPaymentLine;
 
   private BigDecimal grossValue;
   private BigDecimal liquidValue;
+  private BigDecimal contractedFee;
   private BigDecimal discountValue;
   private BigDecimal adjustmentValue;
 

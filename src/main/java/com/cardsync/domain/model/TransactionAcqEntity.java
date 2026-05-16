@@ -45,9 +45,9 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private Integer lineNumber;
   private Integer statusAudit;
   private Integer installment;
-  private Integer transactionStatus;
+  private Integer statusTransaction;
   private Integer statusPaymentBank;
-  private Integer transactionStatusReason;
+  private Integer statusTransactionReason;
 
   private BigDecimal mdrRate;
   private BigDecimal flexRate;

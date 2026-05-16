@@ -41,7 +41,7 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     spec = spec.and(modality(filter));
     spec = spec.and(acquirer(filter));
     spec = spec.and(establishment(filter));
-    spec = spec.and(transactionStatus(filter));
+    spec = spec.and(statusTransaction(filter));
     spec = spec.and(expectedPaymentDate(filter));
     spec = spec.and(adjustmentValue(filter.adjustmentValueStart(), filter.adjustmentValueEnd()));
     spec = spec.and(currencyRangeValue("grossValue", filter.grossValueStart(), filter.grossValueEnd()));
@@ -126,10 +126,10 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     );
   }
 
-  private Specification<TransactionAcqEntity> transactionStatus(TransactionAcqSalesFilter filter) {
+  private Specification<TransactionAcqEntity> statusTransaction(TransactionAcqSalesFilter filter) {
     return inCodes(
-      "transactionStatus",
-      filter.transactionStatus(),
+      "statusTransaction",
+      filter.statusTransaction(),
       StatusTransactionEnum::getCode
     );
   }

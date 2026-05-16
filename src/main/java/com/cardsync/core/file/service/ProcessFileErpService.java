@@ -245,7 +245,7 @@ public class ProcessFileErpService {
     TransactionErpEntity tx = transactionErpMapper.map(row);
     tx.setProcessedFile(processedFile);
     tx.setLineNumber(lineNumber);
-    tx.setTransactionStatus(StatusTransactionEnum.PENDING.getCode());
+    tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
 
     var acquirer = lookupService.acquirerByIdentifier(row.getAcquirer());
     var flag = lookupService.flagByName(row.getFlag());
@@ -282,14 +282,14 @@ public class ProcessFileErpService {
 
       tx.setCommercialStatus(status);
       tx.setCommercialStatusMessage("Venda importada, mas pendente de vínculo comercial. Revise CNPJ da empresa e PV/estabelecimento informados no arquivo ERP.");
-      tx.setTransactionStatus(StatusTransactionEnum.PENDING.getCode());
+      tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
       return;
     }
 
     if (!contractFound) {
       tx.setCommercialStatus(ErpCommercialStatusEnum.PENDING_CONTRACT);
       tx.setCommercialStatusMessage("Venda importada, mas pendente de contrato/taxa vigente. Revise empresa, estabelecimento/PV, adquirente, bandeira, modalidade, parcelas e vigência do contrato.");
-      tx.setTransactionStatus(StatusTransactionEnum.PENDING.getCode());
+      tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
       return;
     }
 

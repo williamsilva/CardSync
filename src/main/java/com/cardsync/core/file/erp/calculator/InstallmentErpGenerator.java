@@ -4,7 +4,7 @@ import com.cardsync.domain.model.InstallmentErpEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.PaymentStatusEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -34,7 +34,7 @@ public class InstallmentErpGenerator {
     for (int i = 1; i <= totalInstallments; i++) {
       InstallmentErpEntity installment = new InstallmentErpEntity();
       installment.setInstallment(i);
-      installment.setPaymentStatus(PaymentStatusEnum.PENDING.getCode());
+      installment.setStatusPaymentBank(StatusPaymentBankEnum.PENDING.getCode());
       installment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
       installment.setExpectedPaymentDate(calculateExpectedPaymentDate(transaction, i, contractedPaymentTermDays));
       installment.setGrossValue(i == 1 ? grossPerInstallment.add(grossRemainder) : grossPerInstallment);

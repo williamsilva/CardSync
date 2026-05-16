@@ -8,7 +8,7 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.PaymentStatusEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
@@ -33,11 +33,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BankReconciliationService {
 
-  private static final int STATUS_PENDING = PaymentStatusEnum.PENDING.getCode();
-  private static final int STATUS_LIQUIDATED = PaymentStatusEnum.PAID.getCode();
+  private static final int STATUS_PENDING = StatusPaymentBankEnum.PENDING.getCode();
+  private static final int STATUS_LIQUIDATED = StatusPaymentBankEnum.PAID.getCode();
   private static final int STATUS_RECONCILED = StatusInstallmentEnum.RECONCILED.getCode();
   private static final int STATUS_PARTIALLY_LIQUIDATED = 4;
-  private static final int STATUS_NOT_RECONCILED = PaymentStatusEnum.NOT_PAID.getCode();
+  private static final int STATUS_NOT_RECONCILED = StatusPaymentBankEnum.NOT_PAID.getCode();
 
   private static final int CREDIT_ORDER_STATUS_RECONCILED = 2;
   private static final int CREDIT_ORDER_STATUS_PENDING = 1;
@@ -68,7 +68,7 @@ public class BankReconciliationService {
       if (creditOrderResult.matched()) {
         result.releaseReconciled(release.getReleaseValue());
         result.matchedByCreditOrders(creditOrderResult.itemsMatched(), creditOrderResult.matchedValue());
-        result.transactionsUpdated(propagateReleaseTransactionStatuses(release));
+        result.transactionsUpdated(propagateReleaseStatusTransactions(release));
         continue;
       }
 
@@ -77,7 +77,7 @@ public class BankReconciliationService {
       if (installmentResult.matched()) {
         result.releaseReconciled(release.getReleaseValue());
         result.matchedByInstallments(installmentResult.itemsMatched(), installmentResult.matchedValue());
-        result.transactionsUpdated(propagateReleaseTransactionStatuses(release));
+        result.transactionsUpdated(propagateReleaseStatusTransactions(release));
       } else {
         markReleaseNotReconciled(release);
         result.releaseWithoutMatch();
@@ -217,7 +217,7 @@ public class BankReconciliationService {
     }
   }
 
-  private int propagateReleaseTransactionStatuses(ReleasesBankEntity release) {
+  private int propagateReleaseStatusTransactions(ReleasesBankEntity release) {
     if (release.getId() == null) return 0;
     List<InstallmentAcqEntity> linkedInstallments = installmentAcqRepository.findByReleaseBank_Id(release.getId());
     Set<UUID> updatedTransactions = new HashSet<>();
@@ -225,13 +225,13 @@ public class BankReconciliationService {
     for (InstallmentAcqEntity linked : linkedInstallments) {
       TransactionAcqEntity transaction = linked.getTransaction();
       if (transaction == null || transaction.getId() == null || updatedTransactions.contains(transaction.getId())) continue;
-      updateTransactionStatus(transaction);
+      updateStatusTransaction(transaction);
       updatedTransactions.add(transaction.getId());
     }
     return updatedTransactions.size();
   }
 
-  private void updateTransactionStatus(TransactionAcqEntity transaction) {
+  private void updateStatusTransaction(TransactionAcqEntity transaction) {
     if (transaction == null || transaction.getId() == null) return;
     List<InstallmentAcqEntity> installments = installmentAcqRepository.findByTransaction_Id(transaction.getId());
     if (installments.isEmpty()) return;
@@ -241,12 +241,12 @@ public class BankReconciliationService {
 
     if (allLiquidated) {
       transaction.setStatusPaymentBank(STATUS_LIQUIDATED);
-      transaction.setTransactionStatus(StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode());
+      transaction.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode());
     } else if (anyLiquidated) {
       transaction.setStatusPaymentBank(STATUS_PARTIALLY_LIQUIDATED);
     } else {
       transaction.setStatusPaymentBank(STATUS_NOT_RECONCILED);
-      transaction.setTransactionStatus(StatusTransactionEnum.NOT_RECONCILED.getCode());
+      transaction.setStatusTransaction(StatusTransactionEnum.NOT_RECONCILED.getCode());
     }
 
     updateSalesSummaryFromTransaction(transaction);
@@ -256,7 +256,7 @@ public class BankReconciliationService {
     SalesSummaryEntity summary = transaction.getSalesSummary();
     if (summary == null) return;
     summary.setStatusPaymentBank(transaction.getStatusPaymentBank());
-    summary.setTransactionsStatus(transaction.getTransactionStatus());
+    summary.setTransactionsStatus(transaction.getStatusTransaction());
   }
 
   private void updateSalesSummaryFromCreditOrder(CreditOrderEntity order) {

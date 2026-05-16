@@ -1,24 +1,13 @@
 package com.cardsync.bff.controller.v1.mapper.model;
 
-import com.cardsync.bff.controller.v1.TransactionErpSalesController;
+import com.cardsync.bff.controller.v1.TransactionAcqSalesController;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.BankMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.BankingDomicileMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.InstallmentErpModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsErpMinimalModel;
-import com.cardsync.domain.model.AcquirerEntity;
-import com.cardsync.domain.model.BankEntity;
-import com.cardsync.domain.model.BankingDomicileEntity;
-import com.cardsync.domain.model.CompanyEntity;
-import com.cardsync.domain.model.EstablishmentEntity;
-import com.cardsync.domain.model.FlagEntity;
-import com.cardsync.domain.model.InstallmentErpEntity;
-import com.cardsync.domain.model.ProcessedFileEntity;
-import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.bff.controller.v1.representation.model.transactions.*;
+import com.cardsync.domain.model.*;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -26,18 +15,18 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 
 @Component
-public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerSupport<
-  @NonNull InstallmentErpEntity,
-  @NonNull InstallmentErpModel
+public class InstallmentsAcqModelAssembler extends RepresentationModelAssemblerSupport<
+  @NonNull InstallmentAcqEntity,
+  @NonNull InstallmentAcqModel
   > {
 
-  public InstallmentsErpModelAssembler() {
-    super(TransactionErpSalesController.class, InstallmentErpModel.class);
+  public InstallmentsAcqModelAssembler() {
+    super(TransactionAcqSalesController.class, InstallmentAcqModel.class);
   }
 
   @Override
-  public @NonNull InstallmentErpModel toModel(@NonNull InstallmentErpEntity entity) {
-    InstallmentErpModel model = createModelWithId(entity.getId(), entity);
+  public @NonNull InstallmentAcqModel toModel(@NonNull InstallmentAcqEntity entity) {
+    InstallmentAcqModel model = createModelWithId(entity.getId(), entity);
 
     model.setGrossValue(entity.getGrossValue());
     model.setPaymentDate(entity.getPaymentDate());
@@ -48,14 +37,13 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
     model.setAdjustmentValue(getAdjustmentValue(entity.getTransaction()));
 
     if (entity.getTransaction() != null) {
-      TransactionErpEntity transaction = entity.getTransaction();
+      TransactionAcqEntity transaction = entity.getTransaction();
 
       model.setTransaction(
-        TransactionsErpMinimalModel.builder()
+        TransactionsAcqMinimalModel.builder()
           .id(transaction.getId())
           .tid(transaction.getTid())
           .cvNsu(transaction.getNsu())
-          .cardName(transaction.getCardName())
           .saleDate(transaction.getSaleDate())
           .lineNumber(transaction.getLineNumber())
           .cardNumber(transaction.getCardNumber())
@@ -71,8 +59,8 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
           .company(toCompany(transaction.getCompany()))
           .acquirer(toAcquirer(transaction.getAcquirer()))
           .processedFile(toFile(transaction.getProcessedFile()))
+          .salesSummary(toSummary(transaction.getSalesSummary()))
           .establishment(toEstablishment(transaction.getEstablishment()))
-          .bankingDomicile(toDomicile(transaction.getBankingDomicile()))
           .build()
       );
     }
@@ -88,6 +76,20 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
     return ProcessedFileMinimalModel.builder()
       .id(entity.getId())
       .file(entity.getFile())
+      .build();
+  }
+
+  private static SalesSummaryMinimalModel toSummary(SalesSummaryEntity entity) {
+    if (entity == null) {
+      return null;
+    }
+
+    return SalesSummaryMinimalModel.builder()
+      .id(entity.getId())
+      .agency(entity.getAgency())
+      .pvNumber(entity.getPvNumber())
+      .currentAccount(entity.getCurrentAccount())
+      .bankingDomicile(toDomicile(entity.getBankingDomicile()))
       .build();
   }
 
@@ -140,7 +142,6 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
     return FlagMinimalModel.builder()
       .id(flag.getId())
       .name(flag.getName())
-      .erpCode(flag.getErpCode())
       .status(flag.getStatus() == null ? null : flag.getStatus().name())
       .build();
   }
@@ -171,7 +172,7 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
       .build();
   }
 
-  private static BigDecimal getAdjustmentValue(TransactionErpEntity entity) {
+  private static BigDecimal getAdjustmentValue(TransactionAcqEntity entity) {
     if (entity == null || entity.getAdjustment() == null || entity.getAdjustment().getAdjustmentValue() == null) {
       return BigDecimal.ZERO;
     }

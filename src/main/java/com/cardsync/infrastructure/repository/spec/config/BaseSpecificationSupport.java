@@ -5,6 +5,7 @@ import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Fetch;
+import jakarta.persistence.criteria.FetchParent;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -755,15 +756,18 @@ public abstract class BaseSpecificationSupport<T> {
     return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 
-  protected static void fetchIfNotFetched(Root<?> root, String attributeName) {
-    boolean alreadyFetched = root.getFetches()
-      .stream()
-      .map(Fetch::getAttribute)
-      .anyMatch(attribute -> attributeName.equals(attribute.getName()));
+  protected static Fetch<?, ?> fetchIfNotFetched(Root<?> root, String attributeName) {
+    return fetchIfNotFetched((FetchParent<?, ?>) root, attributeName);
+  }
 
-    if (!alreadyFetched) {
-      root.fetch(attributeName, JoinType.LEFT);
+  protected static Fetch<?, ?> fetchIfNotFetched(FetchParent<?, ?> parent, String attributeName) {
+    for (Fetch<?, ?> fetch : parent.getFetches()) {
+      if (attributeName.equals(fetch.getAttribute().getName())) {
+        return fetch;
+      }
     }
+
+    return parent.fetch(attributeName, JoinType.LEFT);
   }
 
   protected static UUID parseUuidOrNull(String value) {

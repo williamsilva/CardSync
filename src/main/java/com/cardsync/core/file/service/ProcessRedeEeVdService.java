@@ -37,7 +37,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ProcessRedeEeVdService {
-  private static final int STATUS_PENDING = PaymentStatusEnum.PENDING.getCode();
+  private static final int STATUS_PENDING = StatusPaymentBankEnum.PENDING.getCode();
   private static final int TRANSACTION_PENDING = StatusTransactionEnum.PENDING.getCode();
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
   private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HHmmss");
@@ -54,6 +54,7 @@ public class ProcessRedeEeVdService {
   private final TransactionAcqRepository transactionAcqRepository;
   private final InstallmentAcqRepository installmentAcqRepository;
   private final AdjustmentRepository adjustmentRepository;
+  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
   private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
   private final RedeEeVdTotalizerRepository redeEeVdTotalizerRepository;
   private final RedeNegotiatedTransactionRepository redeNegotiatedTransactionRepository;
@@ -156,7 +157,14 @@ public class ProcessRedeEeVdService {
       salesSummaryRepository.saveAll(summaries);
       transactionAcqRepository.saveAll(transactions);
       installmentAcqRepository.saveAll(installments);
-      adjustmentRepository.saveAll(adjustments);
+      List<AdjustmentEntity> savedAdjustments = adjustmentRepository.saveAll(adjustments);
+      AdjustmentTransactionLinkService.LinkResult adjustmentLinkResult =
+        adjustmentTransactionLinkService.linkSavedAdjustments(savedAdjustments);
+      log.info(
+        "🔗 Vínculo de ajustes EEVD com transações: analisados={}, vinculados={}",
+        adjustmentLinkResult.analyzed(),
+        adjustmentLinkResult.linked()
+      );
       installmentUnschedulingRepository.saveAll(unschedulings);
       redeEeVdTotalizerRepository.saveAll(totalizers);
       redeNegotiatedTransactionRepository.saveAll(negotiatedTransactions);
@@ -537,8 +545,8 @@ public class ProcessRedeEeVdService {
     tx.setModality(ModalityEnum.CASH_DEBIT.getCode());
     tx.setStatusAudit(STATUS_PENDING);
     tx.setStatusPaymentBank(STATUS_PENDING);
-    tx.setTransactionStatus(TRANSACTION_PENDING);
-    tx.setTransactionStatusReason(0);
+    tx.setStatusTransaction(TRANSACTION_PENDING);
+    tx.setStatusTransactionReason(0);
     tx.setTipValue(BigDecimal.ZERO);
     tx.setFlexRate(BigDecimal.ZERO);
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);

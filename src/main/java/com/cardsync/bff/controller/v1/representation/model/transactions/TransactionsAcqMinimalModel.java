@@ -18,7 +18,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Relation(collectionRelation = "content")
-public class TransactionsErpMinimalModel extends RepresentationModel<@NonNull TransactionsErpMinimalModel> {
+public class TransactionsAcqMinimalModel extends RepresentationModel<@NonNull TransactionsAcqMinimalModel> {
 
   private UUID id;
 
@@ -33,7 +33,6 @@ public class TransactionsErpMinimalModel extends RepresentationModel<@NonNull Tr
   private OffsetDateTime saleReconciliationDate;
 
   private String tid;
-  private String cardName;
   private String cardNumber;
   private String authorization;
   private OffsetDateTime saleDate;
@@ -41,8 +40,8 @@ public class TransactionsErpMinimalModel extends RepresentationModel<@NonNull Tr
   private FlagMinimalModel flag;
   private CompanyMinimalModel company;
   private AcquirerMinimalModel acquirer;
+  private SalesSummaryMinimalModel salesSummary;
   private EstablishmentMinimalModel establishment;
   private ProcessedFileMinimalModel processedFile;
-  private BankingDomicileMinimalModel bankingDomicile;
 
 }

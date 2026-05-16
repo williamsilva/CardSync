@@ -1,10 +1,3 @@
-ALTER TABLE cs_processed_file
-  ADD COLUMN started_at DATETIME(6) NULL AFTER date_processing,
-  ADD COLUMN finished_at DATETIME(6) NULL AFTER started_at,
-  ADD COLUMN warning_lines INT NULL AFTER ignored_lines,
-  ADD COLUMN error_lines INT NULL AFTER warning_lines,
-  ADD COLUMN status_message VARCHAR(500) NULL AFTER error_message;
-
 CREATE TABLE cs_processed_file_error (
   id BINARY(16) NOT NULL,
   created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),

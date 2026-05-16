@@ -11,7 +11,14 @@ import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.TransactionAcqTableFields;
-import jakarta.persistence.criteria.*;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Order;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -39,46 +46,51 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
   }
 
   public Specification<TransactionAcqEntity> fromQuery(ListQueryDto<TransactionAcqSalesFilter> query) {
+    Specification<TransactionAcqEntity> spec = baseFilters(query)
+      .and(fetchListAssociations());
+
+    return spec.and(orderByTableSort(query == null ? null : query.sort()));
+  }
+
+  public Specification<TransactionAcqEntity> fromQueryForTotals(ListQueryDto<TransactionAcqSalesFilter> query) {
+    return baseFilters(query);
+  }
+
+  private Specification<TransactionAcqEntity> baseFilters(ListQueryDto<TransactionAcqSalesFilter> query) {
     Specification<TransactionAcqEntity> spec = Specs.all();
 
-    spec = spec.and(fetchListAssociations());
-
-    if (query == null) {
-      return spec.and(orderByTableSort(null));
-    }
-
-    spec = spec.and(
-      specificationFactory.fromTableFilters(
-        query.tableFilters(),
-        transactionAcqTableFields.table()
-      )
-    );
-
-    spec = spec.and(transactionAcqAdvancedFields.advanced(query.advanced()));
-
-    if (!isBlank(query.globalFilter())) {
-      String gf = query.globalFilter();
-
+    if (query != null) {
       spec = spec.and(
-        anyOf(
-          contains(gf, "pvNumber" ),
-          contains(gf,"nsu"),
-          contains(gf,"authorizationCode")
+        specificationFactory.fromTableFilters(
+          query.tableFilters(),
+          transactionAcqTableFields.table()
         )
       );
+
+      spec = spec.and(transactionAcqAdvancedFields.advanced(query.advanced()));
+
+      if (!isBlank(query.globalFilter())) {
+        String gf = query.globalFilter();
+
+        spec = spec.and(
+          anyOf(
+            containsPath(gf, "establishment", "pvNumber"),
+            contains(gf, "nsu"),
+            contains(gf, "authorization")
+          )
+        );
+      }
     }
 
     spec = spec.and(Specification.not(
       inCodes("modality", getModalityEnum(), ModalityEnum::getCode)
     ));
 
-    return spec.and(orderByTableSort(query.sort()));
+    return spec;
   }
 
   private static List<ModalityEnum> getModalityEnum() {
-    return List.of(
-      ModalityEnum.DIGITAL_WALLET
-    );
+    return List.of(ModalityEnum.DIGITAL_WALLET);
   }
 
   private Specification<TransactionAcqEntity> fetchListAssociations() {
@@ -88,7 +100,12 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
         fetchIfNotFetched(root, "adjustment");
+        fetchIfNotFetched(root, "processedFile");
         fetchIfNotFetched(root, "establishment");
+
+        var salesSummary = fetchIfNotFetched(root, "salesSummary");
+        var bankingDomicile = fetchIfNotFetched(salesSummary, "bankingDomicile");
+        fetchIfNotFetched(bankingDomicile, "bank");
 
         query.distinct(true);
       }
@@ -123,10 +140,9 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
       }
 
       if (orders.isEmpty()) {
-        orders.add(cb.asc(root.get("saleDate")));
+        orders.add(cb.desc(root.get("saleDate")));
       }
 
-      // Desempate estável para paginação.
       orders.add(cb.desc(root.get("id")));
 
       query.orderBy(orders);
@@ -137,16 +153,16 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
   }
 
   private Expression<?> sortExpression(Root<TransactionAcqEntity> root, CriteriaQuery<?> query,
-    CriteriaBuilder cb, String field, boolean descending ) {
+                                       CriteriaBuilder cb, String field, boolean descending) {
     return switch (field) {
       case "conciliationDate" -> root.get("saleReconciliationDate");
       case "expectedPaymentDate" -> expectedPaymentDateSortExpression(root, query, cb, descending);
 
-      case "company" -> root.join("company", JoinType.LEFT).get("id");
-      case "establishment" -> root.join("establishment", JoinType.LEFT).get("commercialName");
-      case "acquirer" -> root.join("acquirer", JoinType.LEFT).get("name");
-      case "flag" -> root.join("flag", JoinType.LEFT).get("name");
-      case "adjustmentValue" -> root.join("adjustment", JoinType.LEFT).get("adjustmentValue");
+      case "company" -> join(root, "company").get("fantasyName");
+      case "establishment" -> join(root, "establishment").get("pvNumber");
+      case "acquirer" -> join(root, "acquirer").get("fantasyName");
+      case "flag" -> join(root, "flag").get("name");
+      case "adjustmentValue" -> join(root, "adjustment").get("adjustmentValue");
 
       case "saleStatus" -> root.get("transactionStatus");
       case "captureEnum", "captureType" -> root.get("capture");
@@ -156,14 +172,12 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
   }
 
   private Expression<LocalDate> expectedPaymentDateSortExpression(
-    Root<TransactionAcqEntity> root,  CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending) {
+    Root<TransactionAcqEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending) {
     var subquery = query.subquery(LocalDate.class);
     Root<TransactionAcqEntity> correlatedRoot = subquery.correlate(root);
     Join<?, ?> installments = correlatedRoot.join("installments", JoinType.LEFT);
     Expression<LocalDate> creditDate = installments.get("expectedPaymentDate");
 
-    // Como expectedPaymentDate vem de uma coleção, ordenar direto pelo join pode quebrar
-    // paginação/distinct. Para ASC usamos a menor data da venda; para DESC, a maior.
     subquery.select(descending ? cb.greatest(creditDate) : cb.least(creditDate));
 
     return subquery;

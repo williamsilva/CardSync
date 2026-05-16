@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
 import java.util.List;
 
-public record InstallmentsErpFilter(
+public record InstallmentsAcqFilter(
 
   String tid,
   String cvNsu,

@@ -9,9 +9,9 @@ CREATE TABLE cs_transaction_erp (
   modality INT NULL,
   line_number INT NULL,
   installment INT NULL,
-  transaction_status INT NULL,
+  status_transaction INT NULL,
   reason_exclusion_status INT NULL,
-  transaction_status_reason INT NULL,
+  status_transaction_reason INT NULL,
   tid VARCHAR(80) NULL,
   origin VARCHAR(120) NULL,
   machine VARCHAR(80) NULL,
@@ -61,11 +61,12 @@ CREATE TABLE cs_installment_erp (
   liquid_value DECIMAL(18,8) NULL,
   discount_value DECIMAL(18,8) NULL,
   installment INT NULL,
-  payment_status INT NULL,
+  status_payment_bank INT NULL,
   installment_status INT NULL,
   reconciliation_bank_line INT NULL,
   reconciliation_payment_line INT NULL,
-  credit_date DATE NULL,
+  expected_payment_date DATE NULL,
+  payment_date DATE NULL,
   cancellation_date DATE NULL,
   reconciliation_bank_processed_at DATETIME(6) NULL,
   reconciliation_payment_processed_at DATETIME(6) NULL,
@@ -81,5 +82,31 @@ CREATE TABLE cs_installment_erp (
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_installment_erp_transaction ON cs_installment_erp(transaction_id);
-CREATE INDEX idx_cs_installment_erp_credit_date ON cs_installment_erp(credit_date);
-CREATE INDEX idx_cs_installment_erp_status ON cs_installment_erp(payment_status, installment_status);
+CREATE INDEX idx_cs_installment_erp_expected_payment_date ON cs_installment_erp(expected_payment_date);
+CREATE INDEX idx_cs_installment_erp_payment_date ON cs_installment_erp(payment_date);
+CREATE INDEX idx_cs_installment_erp_status ON cs_installment_erp(status_payment_bank, installment_status);
+
+ALTER TABLE cs_transaction_erp ADD COLUMN transaction_acq_id BINARY(16) NULL AFTER adjustment_id;
+CREATE INDEX idx_cs_transaction_erp_transaction_acq ON cs_transaction_erp (transaction_acq_id);
+ALTER TABLE cs_transaction_erp ADD CONSTRAINT fk_cs_transaction_erp_transaction_acq FOREIGN KEY (transaction_acq_id) REFERENCES cs_transaction_acq (id) ON UPDATE CASCADE;
+
+ALTER TABLE cs_transaction_erp
+  ADD COLUMN commercial_status VARCHAR(40) NULL AFTER contracted_fee,
+  ADD COLUMN commercial_status_message VARCHAR(500) NULL AFTER commercial_status;
+
+CREATE INDEX idx_cs_transaction_erp_commercial_status ON cs_transaction_erp(commercial_status);
+
+ALTER TABLE cs_transaction_erp
+  ADD COLUMN source_company_cnpj VARCHAR(32) NULL AFTER authorization,
+  ADD COLUMN source_company_name VARCHAR(255) NULL AFTER source_company_cnpj,
+  ADD COLUMN source_establishment_pv_number INT NULL AFTER source_company_name;
+
+CREATE INDEX idx_cs_transaction_erp_source_company_cnpj ON cs_transaction_erp(source_company_cnpj);
+CREATE INDEX idx_cs_transaction_erp_source_establishment_pv ON cs_transaction_erp(source_establishment_pv_number);
+
+ALTER TABLE cs_transaction_erp
+  ADD COLUMN banking_domicile_id BINARY(16) NULL AFTER company_id,
+  ADD CONSTRAINT fk_cs_transaction_erp_banking_domicile
+    FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE;
+
+CREATE INDEX idx_cs_transaction_erp_banking_domicile ON cs_transaction_erp(banking_domicile_id);

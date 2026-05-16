@@ -30,8 +30,8 @@ public record TransactionErpSalesFilter(
 
   List<CaptureEnum> capture,
   List<ModalityEnum> modality,
-  List<PaymentStatusEnum> paymentStatus,
-  List<StatusTransactionEnum> transactionStatus,
+  List<StatusPaymentBankEnum> statusPaymentBank,
+  List<StatusTransactionEnum> statusTransaction,
 
   PeriodEnum periodSaleDate,
   PeriodEnum periodPaymentDate,

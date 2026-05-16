@@ -24,7 +24,6 @@ CREATE TABLE cs_company (
    REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_cs_company_cnpj ON cs_company (cnpj);
 CREATE INDEX idx_cs_company_fantasy_name ON cs_company (fantasy_name);
 CREATE INDEX idx_cs_company_social_reason ON cs_company (social_reason);
 
@@ -55,6 +54,5 @@ CREATE TABLE cs_acquirer (
    REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE INDEX idx_cs_acquirer_cnpj ON cs_acquirer (cnpj);
 CREATE INDEX idx_cs_acquirer_fantasy_name ON cs_acquirer (fantasy_name);
 CREATE INDEX idx_cs_acquirer_social_reason ON cs_acquirer (social_reason);

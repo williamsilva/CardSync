@@ -9,7 +9,7 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Proces
 import com.cardsync.bff.controller.v1.representation.model.transactions.*;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
-import com.cardsync.domain.model.enums.PaymentStatusEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -54,9 +54,9 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
     model.setInstallment(entity.getInstallment());
     model.setDiscountValue(entity.getDiscountValue());
     model.setAuthorization(entity.getAuthorization());
-    model.setTransactionStatus(entity.getTransactionStatus());
+    model.setStatusTransaction(entity.getStatusTransaction());
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
-    model.setTransactionStatusReason(entity.getTransactionStatusReason());
+    model.setStatusTransactionReason(entity.getStatusTransactionReason());
     model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
     model.setInstallments(installments.stream()
       .map(TransactionsAcqModelAssembler::toInstallmentModel)
@@ -139,19 +139,20 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
   }
 
   private static TransactionAcqInstallmentModel toInstallmentModel(InstallmentAcqEntity entity) {
-    PaymentStatusEnum paymentStatus = statusPayment(entity.getInstallmentStatus());
     StatusInstallmentEnum installmentStatus = statusInstallment(entity.getInstallmentStatus());
 
     TransactionAcqInstallmentModel model = new TransactionAcqInstallmentModel();
     model.setId(entity.getId());
-    model.setNetValue(entity.getLiquidValue());
     model.setGrossValue(entity.getGrossValue());
-    model.setFeeValue(entity.getDiscountValue());
     model.setInstallment(entity.getInstallment());
-    model.setPaymentStatus(paymentStatus.getCode());
-    model.setExpectedPaymentDate(entity.getPaymentDate());
+    model.setLiquidValue(entity.getLiquidValue());
+    model.setPaymentDate(entity.getPaymentDate());
+    model.setDiscountValue(entity.getDiscountValue());
+    model.setMdrRate(entity.getTransaction().getMdrRate());
     model.setCancellationDate(entity.getCancellationDate());
     model.setInstallmentStatus(installmentStatus.getCode());
+    model.setStatusPaymentBank(entity.getInstallmentStatus());
+    model.setExpectedPaymentDate(entity.getExpectedPaymentDate());
     model.setReconciliationBankLine(entity.getReconciliationBankLine());
     model.setReconciliationBankProcessedAt(entity.getReconciliationBankProcessedAt());
     return model;
@@ -174,11 +175,11 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
       .toList();
   }
 
-  private static PaymentStatusEnum statusPayment(Integer code) {
-    return Arrays.stream(PaymentStatusEnum.values())
+  private static StatusPaymentBankEnum statusPayment(Integer code) {
+    return Arrays.stream(StatusPaymentBankEnum.values())
       .filter(item -> Objects.equals(item.getCode(), code))
       .findFirst()
-      .orElse(PaymentStatusEnum.NULL);
+      .orElse(StatusPaymentBankEnum.NULL);
   }
 
   private static StatusInstallmentEnum statusInstallment(Integer code) {

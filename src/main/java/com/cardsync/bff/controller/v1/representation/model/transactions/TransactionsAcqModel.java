@@ -31,8 +31,8 @@ public class TransactionsAcqModel extends RepresentationModel<@NonNull Transacti
   private Integer modality;
   private Integer lineNumber;
   private Integer installment;
-  private Integer transactionStatus;
-  private Integer transactionStatusReason;
+  private Integer statusTransaction;
+  private Integer statusTransactionReason;
 
   private String tid;
   private String cardNumber;

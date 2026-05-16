@@ -6,6 +6,10 @@ spring:
 
   jpa:
     properties:
+      hibernate.jdbc.batch_size: 1000
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+      hibernate.jdbc.batch_versioned_data: true
       hibernate:
         default_batch_fetch_size: 100
 
@@ -98,4 +102,4 @@ file-processing:
       date-tolerance-days: 7
       value-tolerance: "0.05"
       safe-cap-cents: 50000000
-      reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:true}
+      reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:false}

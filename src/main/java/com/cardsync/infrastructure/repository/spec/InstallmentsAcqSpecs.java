@@ -1,16 +1,16 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.domain.filter.InstallmentsErpFilter;
+import com.cardsync.domain.filter.InstallmentsAcqFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
-import com.cardsync.domain.model.InstallmentErpEntity;
+import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.infrastructure.repository.spec.advancedFilters.InstallmentsErpAdvancedFields;
+import com.cardsync.infrastructure.repository.spec.advancedFilters.InstallmentsAcqAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
-import com.cardsync.infrastructure.repository.spec.tableFilters.InstallmentsErpTableFields;
+import com.cardsync.infrastructure.repository.spec.tableFilters.InstallmentsAcqTableFields;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Root;
@@ -21,47 +21,47 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentErpEntity> {
+public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAcqEntity> {
 
   private final SpecificationFactory specificationFactory;
-  private final InstallmentsErpTableFields installmentsErpTableFields;
-  private final InstallmentsErpAdvancedFields installmentsErpAdvancedFields;
+  private final InstallmentsAcqTableFields installmentsAcqTableFields;
+  private final InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields;
 
-  public InstallmentsErpSpecs(
+  public InstallmentsAcqSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
-    InstallmentsErpTableFields installmentsErpTableFields,
-    InstallmentsErpAdvancedFields installmentsErpAdvancedFields
+    InstallmentsAcqTableFields installmentsAcqTableFields,
+    InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
-    this.installmentsErpTableFields = installmentsErpTableFields;
-    this.installmentsErpAdvancedFields = installmentsErpAdvancedFields;
+    this.installmentsAcqTableFields = installmentsAcqTableFields;
+    this.installmentsAcqAdvancedFields = installmentsAcqAdvancedFields;
   }
 
-  public Specification<InstallmentErpEntity> fromQuery(ListQueryDto<InstallmentsErpFilter> query) {
-    Specification<InstallmentErpEntity> spec = baseFilters(query)
+  public Specification<InstallmentAcqEntity> fromQuery(ListQueryDto<InstallmentsAcqFilter> query) {
+    Specification<InstallmentAcqEntity> spec = baseFilters(query)
       .and(fetchListAssociations());
 
     return spec.and(orderByTableSort(query == null ? null : query.sort()));
   }
 
-  public Specification<InstallmentErpEntity> fromQueryForTotals(ListQueryDto<InstallmentsErpFilter> query) {
+  public Specification<InstallmentAcqEntity> fromQueryForTotals(ListQueryDto<InstallmentsAcqFilter> query) {
     return baseFilters(query);
   }
 
-  private Specification<InstallmentErpEntity> baseFilters(ListQueryDto<InstallmentsErpFilter> query) {
-    Specification<InstallmentErpEntity> spec = Specs.all();
+  private Specification<InstallmentAcqEntity> baseFilters(ListQueryDto<InstallmentsAcqFilter> query) {
+    Specification<InstallmentAcqEntity> spec = Specs.all();
 
     if (query != null) {
       spec = spec.and(
         specificationFactory.fromTableFilters(
           query.tableFilters(),
-          installmentsErpTableFields.table()
+          installmentsAcqTableFields.table()
         )
       );
 
-      spec = spec.and(installmentsErpAdvancedFields.advanced(query.advanced()));
+      spec = spec.and(installmentsAcqAdvancedFields.advanced(query.advanced()));
 
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
@@ -85,11 +85,13 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
     return List.of(ModalityEnum.DIGITAL_WALLET, ModalityEnum.OUTROS);
   }
 
-  private Specification<InstallmentErpEntity> fetchListAssociations() {
+  private Specification<InstallmentAcqEntity> fetchListAssociations() {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
+        fetchIfNotFetched(root, "adjustment");
+        fetchIfNotFetched(root, "creditOrder");
+        fetchIfNotFetched(root, "releaseBank");
         fetchIfNotFetched(root, "reconciliationBankFile");
-        fetchIfNotFetched(root, "reconciliationPaymentFile");
 
         var transaction = fetchIfNotFetched(root, "transaction");
         fetchIfNotFetched(transaction, "flag");
@@ -99,7 +101,8 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
         fetchIfNotFetched(transaction, "processedFile");
         fetchIfNotFetched(transaction, "establishment");
 
-        var bankingDomicile = fetchIfNotFetched(transaction, "bankingDomicile");
+        var salesSummary = fetchIfNotFetched(transaction, "salesSummary");
+        var bankingDomicile = fetchIfNotFetched(salesSummary, "bankingDomicile");
         fetchIfNotFetched(bankingDomicile, "bank");
       }
 
@@ -107,7 +110,7 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
     };
   }
 
-  private Specification<InstallmentErpEntity> orderByTableSort(List<SortDto> sort) {
+  private Specification<InstallmentAcqEntity> orderByTableSort(List<SortDto> sort) {
     return (root, query, cb) -> {
       if (isCountQuery(query)) {
         return cb.conjunction();
@@ -143,7 +146,7 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
     };
   }
 
-  private Expression<?> sortExpression(Root<InstallmentErpEntity> root, String field) {
+  private Expression<?> sortExpression(Root<InstallmentAcqEntity> root, String field) {
     return switch (field) {
       case "id" -> root.get("id");
       case "grossValue" -> root.get("grossValue");
@@ -157,7 +160,6 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
       case "cancellationDate" -> root.get("cancellationDate");
       case "installmentStatus" -> root.get("installmentStatus");
       case "reconciliationBankProcessedAt" -> root.get("reconciliationBankProcessedAt");
-      case "reconciliationPaymentProcessedAt" -> root.get("reconciliationPaymentProcessedAt");
 
       case "tid" -> join(root, "transaction").get("tid");
       case "machine" -> join(root, "transaction").get("machine");
@@ -176,7 +178,6 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
       case "processedFile" -> join(join(root, "transaction"), "processedFile").get("file");
       case "establishment" -> join(join(root, "transaction"), "establishment").get("pvNumber");
       case "adjustmentValue" -> join(join(root, "transaction"), "adjustment").get("adjustmentValue");
-      case "bankingDomicile" -> join(join(root, "transaction"), "bankingDomicile").get("currentAccount");
 
       default -> nestedPathOrDirectRootPath(root, field);
     };
