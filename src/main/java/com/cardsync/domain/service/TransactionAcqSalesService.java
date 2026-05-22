@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class TransactionAcqSalesService {
 
   private final TransactionAcqSpecs transactionAcqSpecs;
-  private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionTotalsQueryService totalsQueryService;
+  private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionsAcqModelAssembler transactionsAcqModelAssembler;
 
   @Transactional(readOnly = true)

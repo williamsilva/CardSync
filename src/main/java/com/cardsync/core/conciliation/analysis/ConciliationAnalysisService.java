@@ -126,11 +126,6 @@ public class ConciliationAnalysisService {
     return transactionAcqRepository.findAll(pageable).map(this::toFeeModel);
   }
 
-  @Transactional(readOnly = true)
-  public Page<ErpVsAcquirerAnalysisModel> listErpVsAcquirer(Pageable pageable) {
-    return transactionErpRepository.findAll(remapErpVsAcquirerPageable(pageable)).map(this::toErpVsAcquirerModel);
-  }
-
   @Transactional
   public ReconcileErpAcquirerResultModel reconcileErpWithAcquirerBusinessContext() {
     return reconcileErpWithAcquirerBusinessContext("MANUAL");
@@ -235,6 +230,16 @@ public class ConciliationAnalysisService {
             batchUpdated++;
             changedErpSales.add(erp);
           }
+
+          int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
+            matchResult.acquirerSales(),
+            StatusTransactionEnum.NOT_RECONCILED,
+            StatusTransactionReasonEnum.VALUE_MISMATCH,
+            changedAcquirerIds,
+            changedAcquirerSales
+          );
+          updated += acquirerUpdated;
+          batchUpdated += acquirerUpdated;
           continue;
         }
 
@@ -250,6 +255,16 @@ public class ConciliationAnalysisService {
             batchUpdated++;
             changedErpSales.add(erp);
           }
+
+          int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
+            matchResult.acquirerSales(),
+            StatusTransactionEnum.NOT_RECONCILED,
+            StatusTransactionReasonEnum.ACQUIRER_MISMATCH,
+            changedAcquirerIds,
+            changedAcquirerSales
+          );
+          updated += acquirerUpdated;
+          batchUpdated += acquirerUpdated;
           continue;
         }
 
@@ -265,6 +280,16 @@ public class ConciliationAnalysisService {
             batchUpdated++;
             changedErpSales.add(erp);
           }
+
+          int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
+            matchResult.acquirerSales(),
+            StatusTransactionEnum.NOT_RECONCILED,
+            StatusTransactionReasonEnum.AMBIGUOUS_MATCH,
+            changedAcquirerIds,
+            changedAcquirerSales
+          );
+          updated += acquirerUpdated;
+          batchUpdated += acquirerUpdated;
           continue;
         }
 
@@ -314,14 +339,24 @@ public class ConciliationAnalysisService {
       );
     }
 
+    int acquirerMissingErpUpdated = classifyAcquirerSalesMissingInErp(
+      reconcileAlreadyReconciled,
+      pendingStatuses
+    );
+
+    if (acquirerMissingErpUpdated > 0) {
+      updated += acquirerMissingErpUpdated;
+    }
+
     log.info(
-      "✅ Conciliação ERP x Adquirente finalizada. trigger={}, analisadas={}, conciliadas={}, atualizadas={}, divergentes={}, semMatch={}, valorDivergente={}, adquirenteDivergente={}, ambiguas={}",
+      "✅ Conciliação ERP x Adquirente finalizada. trigger={}, analisadas={}, conciliadas={}, atualizadas={}, divergentes={}, semMatchErp={}, semErpNaAdquirenteAtualizadas={}, valorDivergente={}, adquirenteDivergente={}, ambiguas={}",
       trigger,
       analyzed,
       matched,
       updated,
       skippedDivergent,
       notMatched,
+      acquirerMissingErpUpdated,
       valueDivergences,
       acquirerDivergences,
       ambiguousMatches
@@ -483,7 +518,10 @@ public class ConciliationAnalysisService {
     BigDecimal erpGross = nz(erp.getGrossValue());
     BigDecimal acqGross = matched != null ? nz(matched.getGrossValue()) : ZERO;
     return new ErpVsAcquirerAnalysisModel(
-      erp.getId(), erp.getSaleDate(), matched != null ? matched.getSaleDate() : null,
+      erp.getId(),
+      erp.getId(),
+      matched != null ? matched.getId() : null,
+      erp.getSaleDate(), matched != null ? matched.getSaleDate() : null,
       companyName(firstNonNull(erp.getCompany(), matched != null ? matched.getCompany() : null)),
       establishmentName(firstNonNull(erp.getEstablishment(), matched != null ? matched.getEstablishment() : null)),
       acquirerName(firstNonNull(erp.getAcquirer(), matched != null ? matched.getAcquirer() : null)),
@@ -495,6 +533,35 @@ public class ConciliationAnalysisService {
       matched != null ? erpGross.subtract(acqGross) : erpGross,
       erp.getInstallment(), matched != null ? matched.getInstallment() : null,
       comparisonStatus(erp, matched)
+    );
+  }
+
+  private ErpVsAcquirerAnalysisModel toMissingInErpModel(TransactionAcqEntity acq) {
+    BigDecimal acqGross = nz(acq.getGrossValue());
+
+    return new ErpVsAcquirerAnalysisModel(
+      acq.getId(),
+      null,
+      acq.getId(),
+      null,
+      acq.getSaleDate(),
+      companyName(acq.getCompany()),
+      establishmentName(acq.getEstablishment()),
+      acquirerName(acq.getAcquirer()),
+      null,
+      flagName(acq.getFlag()),
+      null,
+      modalityName(acq.getModality()),
+      null,
+      acq.getNsu(),
+      null,
+      acq.getAuthorization(),
+      null,
+      acq.getGrossValue(),
+      acqGross.negate(),
+      null,
+      acq.getInstallment(),
+      "MISSING_IN_ERP"
     );
   }
 
@@ -932,23 +999,71 @@ public class ConciliationAnalysisService {
       return false;
     }
 
+    StatusTransactionReasonEnum normalizedReason = normalizeReasonForStatus(status, reason);
+
     boolean changed = false;
     changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, status.getCode());
-    changed |= setIfDifferent(erp::getStatusTransactionReason, erp::setStatusTransactionReason, reasonCode(reason));
+    changed |= setIfDifferent(erp::getStatusTransactionReason, erp::setStatusTransactionReason, reasonCode(normalizedReason));
     return changed;
   }
 
-  private void applyAcquirerReconciliationStatus(
+  private boolean applyAcquirerReconciliationStatus(
     TransactionAcqEntity acq,
     StatusTransactionEnum status,
     StatusTransactionReasonEnum reason
   ) {
     if (acq == null || status == null || isFinalAcquirerStatusTransaction(acq)) {
-      return;
+      return false;
     }
 
-    setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, status.getCode());
-    setIfDifferent(acq::getStatusTransactionReason, acq::setStatusTransactionReason, reasonCode(reason));
+    StatusTransactionReasonEnum normalizedReason = normalizeReasonForStatus(status, reason);
+
+    boolean changed = false;
+    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, status.getCode());
+    changed |= setIfDifferent(acq::getStatusTransactionReason, acq::setStatusTransactionReason, reasonCode(normalizedReason));
+    return changed;
+  }
+
+  private int applyAcquirerReconciliationStatusToCandidates(
+    List<TransactionAcqEntity> candidates,
+    StatusTransactionEnum status,
+    StatusTransactionReasonEnum reason,
+    Set<UUID> changedAcquirerIds,
+    List<TransactionAcqEntity> changedAcquirerSales
+  ) {
+    if (candidates == null || candidates.isEmpty()) {
+      return 0;
+    }
+
+    int updated = 0;
+
+    for (TransactionAcqEntity acq : candidates) {
+      if (acq == null) {
+        continue;
+      }
+
+      if (applyAcquirerReconciliationStatus(acq, status, reason)) {
+        updated++;
+
+        if (acq.getId() == null || changedAcquirerIds.add(acq.getId())) {
+          changedAcquirerSales.add(acq);
+        }
+      }
+    }
+
+    return updated;
+  }
+
+  private StatusTransactionReasonEnum normalizeReasonForStatus(
+    StatusTransactionEnum status,
+    StatusTransactionReasonEnum reason
+  ) {
+    if (status == StatusTransactionEnum.AUTOMATICALLY_RECONCILED
+      || status == StatusTransactionEnum.MANUALLY_RECONCILED) {
+      return StatusTransactionReasonEnum.SCHEDULED;
+    }
+
+    return reason;
   }
 
   private boolean isFinalErpStatusTransaction(TransactionErpEntity erp) {
@@ -962,6 +1077,66 @@ public class ConciliationAnalysisService {
   private boolean isFinalStatusTransaction(Integer status) {
     return Objects.equals(status, StatusTransactionEnum.CANCELED.getCode())
       || Objects.equals(status, StatusTransactionEnum.DELETED.getCode());
+  }
+
+  private int classifyAcquirerSalesMissingInErp(
+    boolean reconcileAlreadyReconciled,
+    List<Integer> pendingStatuses
+  ) {
+    int totalUpdated = 0;
+    int batchNumber = 0;
+
+    while (true) {
+      List<UUID> acquirerIds = transactionAcqRepository.findIdsForMissingInErpStatusClassification(
+        PageRequest.of(0, ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE),
+        reconcileAlreadyReconciled,
+        pendingStatuses,
+        StatusTransactionEnum.NOT_RECONCILED.getCode(),
+        StatusTransactionReasonEnum.NULL.getCode()
+      );
+
+      if (acquirerIds.isEmpty()) {
+        break;
+      }
+
+      batchNumber++;
+
+      List<TransactionAcqEntity> acquirerBatch = transactionAcqRepository.findBatchForMissingInErpStatusClassification(acquirerIds);
+      List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
+
+      for (TransactionAcqEntity acq : acquirerBatch) {
+        if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(acq)) {
+          continue;
+        }
+
+        if (applyAcquirerReconciliationStatus(
+          acq,
+          StatusTransactionEnum.NOT_RECONCILED,
+          StatusTransactionReasonEnum.CV_NOT_FOUND_ERP
+        )) {
+          changedAcquirerSales.add(acq);
+        }
+      }
+
+      if (changedAcquirerSales.isEmpty()) {
+        break;
+      }
+
+      transactionAcqRepository.saveAll(changedAcquirerSales);
+      totalUpdated += changedAcquirerSales.size();
+
+      entityManager.flush();
+      entityManager.clear();
+
+      log.info(
+        "🔎 Classificação de vendas da adquirente sem ERP: batch={}, analisadas={}, atualizadas={}",
+        batchNumber,
+        acquirerBatch.size(),
+        changedAcquirerSales.size()
+      );
+    }
+
+    return totalUpdated;
   }
 
   private boolean shouldReconcileAlreadyReconciledErpAcquirerSales() {
@@ -1150,7 +1325,7 @@ public class ConciliationAnalysisService {
       .toList();
 
     if (sameValue.isEmpty()) {
-      return ErpAcquirerMatchResult.valueDivergence();
+      return ErpAcquirerMatchResult.valueDivergence(sameIdentity);
     }
 
     List<TransactionAcqEntity> sameAcquirer = sameValue.stream()
@@ -1158,7 +1333,7 @@ public class ConciliationAnalysisService {
       .toList();
 
     if (sameAcquirer.isEmpty()) {
-      return ErpAcquirerMatchResult.acquirerDivergence();
+      return ErpAcquirerMatchResult.acquirerDivergence(sameValue);
     }
 
     int bestScore = sameAcquirer.stream()
@@ -1171,7 +1346,7 @@ public class ConciliationAnalysisService {
       .toList();
 
     if (best.size() != 1) {
-      return ErpAcquirerMatchResult.ambiguous();
+      return ErpAcquirerMatchResult.ambiguous(best);
     }
 
     return ErpAcquirerMatchResult.matched(best.get(0));
@@ -1256,25 +1431,37 @@ public class ConciliationAnalysisService {
     AMBIGUOUS
   }
 
-  private record ErpAcquirerMatchResult(ErpAcquirerMatchStatus status, TransactionAcqEntity acquirerSale) {
+  private record ErpAcquirerMatchResult(
+    ErpAcquirerMatchStatus status,
+    TransactionAcqEntity acquirerSale,
+    List<TransactionAcqEntity> acquirerSales
+  ) {
     static ErpAcquirerMatchResult matched(TransactionAcqEntity acquirerSale) {
-      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.MATCHED, acquirerSale);
+      return new ErpAcquirerMatchResult(
+        ErpAcquirerMatchStatus.MATCHED,
+        acquirerSale,
+        acquirerSale != null ? List.of(acquirerSale) : List.of()
+      );
     }
 
     static ErpAcquirerMatchResult notMatched() {
-      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.NOT_MATCHED, null);
+      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.NOT_MATCHED, null, List.of());
     }
 
-    static ErpAcquirerMatchResult valueDivergence() {
-      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.VALUE_DIVERGENCE, null);
+    static ErpAcquirerMatchResult valueDivergence(List<TransactionAcqEntity> acquirerSales) {
+      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.VALUE_DIVERGENCE, null, safeSales(acquirerSales));
     }
 
-    static ErpAcquirerMatchResult acquirerDivergence() {
-      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.ACQUIRER_DIVERGENCE, null);
+    static ErpAcquirerMatchResult acquirerDivergence(List<TransactionAcqEntity> acquirerSales) {
+      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.ACQUIRER_DIVERGENCE, null, safeSales(acquirerSales));
     }
 
-    static ErpAcquirerMatchResult ambiguous() {
-      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.AMBIGUOUS, null);
+    static ErpAcquirerMatchResult ambiguous(List<TransactionAcqEntity> acquirerSales) {
+      return new ErpAcquirerMatchResult(ErpAcquirerMatchStatus.AMBIGUOUS, null, safeSales(acquirerSales));
+    }
+
+    private static List<TransactionAcqEntity> safeSales(List<TransactionAcqEntity> acquirerSales) {
+      return acquirerSales != null ? acquirerSales : List.of();
     }
   }
 
@@ -1517,6 +1704,15 @@ public class ConciliationAnalysisService {
       if (value != null && !value.isBlank()) return value;
     }
     return null;
+  }
+
+  private Comparator<ErpVsAcquirerAnalysisModel> erpVsAcquirerModelComparator() {
+    return Comparator
+      .comparing(
+        (ErpVsAcquirerAnalysisModel item) -> firstNonNull(item.saleDateErp(), item.saleDateAcquirer()),
+        Comparator.nullsLast(Comparator.reverseOrder())
+      )
+      .thenComparing(ErpVsAcquirerAnalysisModel::id, Comparator.nullsLast(UUID::compareTo));
   }
 
   private <T> Page<T> page(List<T> items, Pageable pageable) {

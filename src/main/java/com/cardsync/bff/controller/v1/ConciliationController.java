@@ -6,10 +6,7 @@ import com.cardsync.core.security.CheckSecurity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -30,18 +27,6 @@ public class ConciliationController {
   @CheckSecurity.FileProcessing.CanRead
   public Page<ConciliationFeeAnalysisModel> listFees(Pageable pageable) {
     return conciliationAnalysisService.listFees(pageable);
-  }
-
-  @GetMapping("/erp-vs-acquirer")
-  @CheckSecurity.FileProcessing.CanRead
-  public Page<ErpVsAcquirerAnalysisModel> listErpVsAcquirer(Pageable pageable) {
-    return conciliationAnalysisService.listErpVsAcquirer(pageable);
-  }
-
-  @PostMapping("/erp-vs-acquirer/reconcile")
-  @CheckSecurity.FileProcessing.CanRead
-  public ReconcileErpAcquirerResultModel reconcileErpVsAcquirer() {
-    return conciliationAnalysisService.reconcileErpWithAcquirerBusinessContext();
   }
 
   @GetMapping("/debits")

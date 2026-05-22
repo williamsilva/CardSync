@@ -6,6 +6,8 @@ import java.util.UUID;
 
 public record ErpVsAcquirerAnalysisModel(
   UUID id,
+  UUID erpTransactionId,
+  UUID acquirerTransactionId,
   OffsetDateTime saleDateErp,
   OffsetDateTime saleDateAcquirer,
   String company,
