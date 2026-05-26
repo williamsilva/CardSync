@@ -27,6 +27,8 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     }
 
     // Filtros diretos da Venda
+    spec = spec.and(saleDate(filter));
+    spec = spec.and(expectedPaymentDate(filter));
     spec = spec.and(contains(filter.tid(), "tid"));
     spec = spec.and(contains(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.machine(), "machine"));
@@ -42,17 +44,10 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("statusTransaction", filter.statusTransaction(), StatusTransactionEnum::getCode));
 
-    spec = spec.and(inPath(
-      filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull, "acquirer", "id"));
-
-    spec = spec.and(inPath(
-      filter.flags(), BaseSpecificationSupport::parseUuidOrNull,  "flag", "id"));
-
-    spec = spec.and(inPath(
-      filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
-
-    spec = spec.and(inPath(
-      filter.companies(), BaseSpecificationSupport::parseUuidOrNull, "company", "id"));
+    spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,  "flag", "id"));
+    spec = spec.and(inPath(filter.companies(), BaseSpecificationSupport::parseUuidOrNull, "company", "id"));
+    spec = spec.and(inPath(filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull, "acquirer", "id"));
+    spec = spec.and(inPath(filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
 
     // Filtros aninhados no Ajuste
     spec = spec.and(currencyRangeValuePath(
@@ -64,4 +59,24 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
 
     return spec;
   }
+
+  private Specification<TransactionErpEntity> saleDate(TransactionErpSalesFilter filter) {
+    return offsetDateTimePeriod(
+      "saleDate",
+      filter.periodSaleDate(),
+      filter.saleDate(),
+      true
+    );
+  }
+
+  private Specification<TransactionErpEntity> expectedPaymentDate(TransactionErpSalesFilter filter) {
+    return localDatePeriodJoin(
+      "installments",
+      "expectedPaymentDate",
+      filter.periodExpectedPaymentDate(),
+      filter.expectedPaymentDate(),
+      true
+    );
+  }
+
 }

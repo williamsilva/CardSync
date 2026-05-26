@@ -9,6 +9,7 @@ import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -18,33 +19,11 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Relation(collectionRelation = "content")
-public class TransactionsErpMinimalModel extends RepresentationModel<@NonNull TransactionsErpMinimalModel> {
+public class TransactionsAcqToContractModel extends RepresentationModel<@NonNull TransactionsAcqToContractModel> {
 
   private UUID id;
 
-  private Long cvNsu;
-  private Integer capture;
-  private Integer modality;
-  private Integer lineNumber;
   private Integer installment;
-  private Integer statusTransaction;
-  private Integer statusTransactionReason;
 
-  private Boolean missingContractAtSale;
-
-  private OffsetDateTime saleReconciliationDate;
-
-  private String tid;
-  private String cardName;
-  private String cardNumber;
-  private String authorization;
   private OffsetDateTime saleDate;
-
-  private FlagMinimalModel flag;
-  private CompanyMinimalModel company;
-  private AcquirerMinimalModel acquirer;
-  private EstablishmentMinimalModel establishment;
-  private ProcessedFileMinimalModel processedFile;
-  private BankingDomicileMinimalModel bankingDomicile;
-
 }

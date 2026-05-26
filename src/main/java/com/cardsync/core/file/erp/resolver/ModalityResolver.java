@@ -24,7 +24,7 @@ public final class ModalityResolver {
     if (installment <= 1) return ModalityEnum.CASH_CREDIT;
     if (installment <= 6) return ModalityEnum.INSTALLMENT_CREDIT_2_6;
     if (installment <= 12) return ModalityEnum.INSTALLMENT_CREDIT_7_12;
-    if (installment <= 18) return ModalityEnum.INSTALLMENT_CREDIT_13_18;
+    if (installment <= 21) return ModalityEnum.INSTALLMENT_CREDIT_13_21;
     return ModalityEnum.NULL;
   }
 

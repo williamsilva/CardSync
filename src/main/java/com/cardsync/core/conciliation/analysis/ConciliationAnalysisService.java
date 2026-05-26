@@ -6,6 +6,7 @@ import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.domain.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -14,14 +15,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -36,11 +35,10 @@ import java.util.stream.Stream;
 public class ConciliationAnalysisService {
 
   private static final BigDecimal ZERO = BigDecimal.ZERO;
-  private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
-  private static final BigDecimal RATE_TOLERANCE = BigDecimal.valueOf(0.01);
   private static final BigDecimal VALUE_TOLERANCE = BigDecimal.valueOf(0.05);
 
-  private static final int ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE = 10_000;
+  private static final int ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE = 5_000;
+  private static final Integer EXCLUDED_CARD_RECONCILIATION_MODALITY = ModalityEnum.DIGITAL_WALLET.getCode();
 
   private final EntityManager entityManager;
   private final AdjustmentRepository adjustmentRepository;
@@ -52,8 +50,8 @@ public class ConciliationAnalysisService {
   private final TransactionAcqRepository transactionAcqRepository;
   private final FileProcessingProperties fileProcessingProperties;
   private final InstallmentAcqRepository installmentAcqRepository;
+  private final ConciliationFeeAnalysisService feeAnalysisService;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
-  private final ContractedAcquirerRateLookupService contractedAcquirerRateLookupService;
 
   @Transactional(readOnly = true)
   public ConciliationDashboardModel dashboard() {
@@ -64,7 +62,7 @@ public class ConciliationAnalysisService {
     List<PendingDebtEntity> pendingDebts = pendingDebtRepository.findAll();
     List<SettledDebtEntity> settledDebts = settledDebtRepository.findAll();
     List<AdjustmentEntity> adjustments = adjustmentRepository.findAll();
-    List<FeeAnalysisResult> feeAnalyses = acquirerSales.stream().map(this::analyzeFee).toList();
+    List<FeeAnalysisResult> feeAnalyses = acquirerSales.stream().map(feeAnalysisService::analyze).toList();
 
     BigDecimal erpGross = sum(erpSales.stream().map(TransactionErpEntity::getGrossValue));
     BigDecimal acquirerGross = sum(acquirerSales.stream().map(TransactionAcqEntity::getGrossValue));
@@ -121,9 +119,147 @@ public class ConciliationAnalysisService {
     );
   }
 
-  @Transactional(readOnly = true)
-  public Page<ConciliationFeeAnalysisModel> listFees(Pageable pageable) {
-    return transactionAcqRepository.findAll(pageable).map(this::toFeeModel);
+  @Transactional
+  public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
+    return reconcileErpAcquirerFees("MANUAL");
+  }
+
+  @Transactional
+  public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees(String trigger) {
+    List<Integer> reconciledStatuses = erpAcquirerReconciledStatusCodes();
+    List<Integer> pendingFeeStatuses = pendingFeeReconciliationStatusCodes();
+    List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerFeeReconciliation(
+      reconciledStatuses,
+      EXCLUDED_CARD_RECONCILIATION_MODALITY,
+      pendingFeeStatuses
+    );
+
+    int analyzed = 0;
+    int updatedErpSales = 0;
+    int divergentRates = 0;
+    int missingValidContracts = 0;
+    int okRates = 0;
+    int skippedWithoutAcquirer = 0;
+
+    int batchNumber = 0;
+    int totalBatches = (int) Math.ceil((double) erpIds.size() / ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE);
+
+    log.info(
+      "📌 Iniciando conciliação de taxas ERP x Adquirente. trigger={}, totalErpPendentesTaxa={}, batchSize={}, totalBatches={}, statusVenda={}, statusTaxaPendente={}",
+      trigger,
+      erpIds.size(),
+      ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE,
+      totalBatches,
+      reconciledStatuses,
+      pendingFeeStatuses
+    );
+
+    for (int start = 0; start < erpIds.size(); start += ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE) {
+      batchNumber++;
+      int end = Math.min(start + ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE, erpIds.size());
+      List<UUID> batchIds = erpIds.subList(start, end);
+
+      List<TransactionErpEntity> erpBatch = transactionErpRepository.findBatchForErpAcquirerFeeReconciliation(
+        batchIds,
+        reconciledStatuses,
+        EXCLUDED_CARD_RECONCILIATION_MODALITY,
+        pendingFeeStatuses
+      );
+      if (erpBatch.isEmpty()) {
+        continue;
+      }
+
+      List<TransactionErpEntity> changedErpSales = new ArrayList<>();
+      int batchAnalyzed = 0;
+      int batchUpdated = 0;
+      int batchDivergentRates = 0;
+      int batchMissingContracts = 0;
+
+      for (TransactionErpEntity erp : erpBatch) {
+        TransactionAcqEntity acq = erp.getTransactionAcq();
+        if (acq == null) {
+          skippedWithoutAcquirer++;
+          continue;
+        }
+
+        if (isExcludedFromCardReconciliation(erp) || isExcludedFromCardReconciliation(acq)) {
+          continue;
+        }
+
+        analyzed++;
+        batchAnalyzed++;
+
+        ConciliationFeeAnalysisService.FeeReconciliationResult feeResult = feeAnalysisService.reconcileMatchedSale(erp, acq);
+
+        if (feeResult.erpChanged()) {
+          updatedErpSales++;
+          batchUpdated++;
+          changedErpSales.add(erp);
+        }
+
+        if (feeResult.divergentRate()) {
+          divergentRates++;
+          batchDivergentRates++;
+        } else if (feeResult.missingValidContract()) {
+          missingValidContracts++;
+          batchMissingContracts++;
+        } else {
+          okRates++;
+        }
+      }
+
+      if (!changedErpSales.isEmpty()) {
+        transactionErpRepository.saveAll(changedErpSales);
+      }
+
+      entityManager.flush();
+      entityManager.clear();
+
+      log.info(
+        "🔄 Conciliação de taxas ERP x Adquirente: batch={}/{}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, semContratoValido={}, totalAnalisadas={}",
+        batchNumber,
+        totalBatches,
+        batchAnalyzed,
+        batchUpdated,
+        batchDivergentRates,
+        batchMissingContracts,
+        analyzed
+      );
+    }
+
+    log.info(
+      "✅ Conciliação de taxas ERP x Adquirente finalizada. trigger={}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, semContratoValido={}, taxasOk={}, semAdquirente={}",
+      trigger,
+      analyzed,
+      updatedErpSales,
+      divergentRates,
+      missingValidContracts,
+      okRates,
+      skippedWithoutAcquirer
+    );
+
+    return new ReconcileErpAcquirerFeesResultModel(
+      analyzed,
+      updatedErpSales,
+      divergentRates,
+      missingValidContracts,
+      okRates,
+      skippedWithoutAcquirer
+    );
+  }
+
+  private List<Integer> erpAcquirerReconciledStatusCodes() {
+    return List.of(
+      StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode(),
+      StatusTransactionEnum.MANUALLY_RECONCILED.getCode()
+    );
+  }
+
+  private List<Integer> pendingFeeReconciliationStatusCodes() {
+    return List.of(
+      FeeReconciliationStatusEnum.NULL.getCode(),
+      FeeReconciliationStatusEnum.PENDING.getCode()
+    );
   }
 
   @Transactional
@@ -138,7 +274,8 @@ public class ConciliationAnalysisService {
 
     List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerReconciliation(
       reconcileAlreadyReconciled,
-      pendingStatuses
+      pendingStatuses,
+      EXCLUDED_CARD_RECONCILIATION_MODALITY
     );
 
     int analyzed = 0;
@@ -190,6 +327,10 @@ public class ConciliationAnalysisService {
       int batchUpdated = 0;
 
       for (TransactionErpEntity erp : erpBatch) {
+        if (isExcludedFromCardReconciliation(erp)) {
+          continue;
+        }
+
         if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(erp)) {
           continue;
         }
@@ -310,6 +451,10 @@ public class ConciliationAnalysisService {
           businessContextUpdated++;
         }
 
+        // A conciliação ERP x Adquirente deve apenas parear a venda e atualizar o contexto comercial.
+        // A análise/atualização de taxas e o feeReconciliationStatus são exclusivos do fluxo
+        // reconcileErpAcquirerFees(...), para evitar reprocessamento indevido ou bloqueio prematuro.
+
         if (acq.getId() != null && changedAcquirerIds.add(acq.getId())) {
           changedAcquirerSales.add(acq);
         }
@@ -429,7 +574,7 @@ public class ConciliationAnalysisService {
       .forEach(items::add);
 
     acquirerSales.stream()
-      .map(this::analyzeFee)
+      .map(feeAnalysisService::analyze)
       .filter(fee -> !"OK".equals(fee.status()))
       .map(this::toFeeDivergence)
       .forEach(items::add);
@@ -490,28 +635,6 @@ public class ConciliationAnalysisService {
     return items;
   }
 
-  private ConciliationFeeAnalysisModel toFeeModel(TransactionAcqEntity entity) {
-    return analyzeFee(entity).toModel();
-  }
-
-  private FeeAnalysisResult analyzeFee(TransactionAcqEntity entity) {
-    BigDecimal gross = nz(entity.getGrossValue());
-    BigDecimal appliedFee = appliedFeeValue(entity);
-    BigDecimal appliedRate = entity.getMdrRate() != null ? entity.getMdrRate() : calculateRate(gross, appliedFee);
-
-    Optional<ContractedAcquirerRate> contractedRate = contractedAcquirerRateLookupService.findRate(entity);
-    BigDecimal expectedRate = contractedRate.map(ContractedAcquirerRate::rate).orElse(null);
-    BigDecimal expectedFee = expectedRate != null ? calculateFee(gross, expectedRate) : null;
-    BigDecimal feeDifference = expectedFee != null ? appliedFee.subtract(expectedFee) : null;
-    String status = feeStatus(expectedRate, appliedRate, feeDifference);
-
-    return new FeeAnalysisResult(
-      entity.getId(), entity.getSaleDate(), companyName(entity.getCompany()), establishmentName(entity.getEstablishment()),
-      acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), modalityName(entity.getModality()), entity.getNsu(),
-      entity.getAuthorization(), entity.getGrossValue(), expectedRate, appliedRate, expectedFee, appliedFee, feeDifference, status
-    );
-  }
-
   private ErpVsAcquirerAnalysisModel toErpVsAcquirerModel(TransactionErpEntity erp) {
     Optional<TransactionAcqEntity> acq = findAcquirerMatch(erp);
     TransactionAcqEntity matched = acq.orElse(null);
@@ -533,35 +656,6 @@ public class ConciliationAnalysisService {
       matched != null ? erpGross.subtract(acqGross) : erpGross,
       erp.getInstallment(), matched != null ? matched.getInstallment() : null,
       comparisonStatus(erp, matched)
-    );
-  }
-
-  private ErpVsAcquirerAnalysisModel toMissingInErpModel(TransactionAcqEntity acq) {
-    BigDecimal acqGross = nz(acq.getGrossValue());
-
-    return new ErpVsAcquirerAnalysisModel(
-      acq.getId(),
-      null,
-      acq.getId(),
-      null,
-      acq.getSaleDate(),
-      companyName(acq.getCompany()),
-      establishmentName(acq.getEstablishment()),
-      acquirerName(acq.getAcquirer()),
-      null,
-      flagName(acq.getFlag()),
-      null,
-      modalityName(acq.getModality()),
-      null,
-      acq.getNsu(),
-      null,
-      acq.getAuthorization(),
-      null,
-      acq.getGrossValue(),
-      acqGross.negate(),
-      null,
-      acq.getInstallment(),
-      "MISSING_IN_ERP"
     );
   }
 
@@ -771,7 +865,6 @@ public class ConciliationAnalysisService {
   private LocalDate localDate(OffsetDateTime date) {
     return date != null ? date.toLocalDate() : null;
   }
-
 
   private List<BankSettlementAnalysisModel> buildBankSettlementItems() {
     List<BankSettlementAnalysisModel> items = new ArrayList<>();
@@ -989,12 +1082,8 @@ public class ConciliationAnalysisService {
     return new ErpAcquirerApplyResult(changed, flagUpdated, businessContextUpdated);
   }
 
-
   private boolean applyErpReconciliationStatus(
-    TransactionErpEntity erp,
-    StatusTransactionEnum status,
-    StatusTransactionReasonEnum reason
-  ) {
+    TransactionErpEntity erp, StatusTransactionEnum status, StatusTransactionReasonEnum reason) {
     if (erp == null || status == null || isFinalErpStatusTransaction(erp)) {
       return false;
     }
@@ -1008,10 +1097,7 @@ public class ConciliationAnalysisService {
   }
 
   private boolean applyAcquirerReconciliationStatus(
-    TransactionAcqEntity acq,
-    StatusTransactionEnum status,
-    StatusTransactionReasonEnum reason
-  ) {
+    TransactionAcqEntity acq, StatusTransactionEnum status, StatusTransactionReasonEnum reason) {
     if (acq == null || status == null || isFinalAcquirerStatusTransaction(acq)) {
       return false;
     }
@@ -1025,12 +1111,8 @@ public class ConciliationAnalysisService {
   }
 
   private int applyAcquirerReconciliationStatusToCandidates(
-    List<TransactionAcqEntity> candidates,
-    StatusTransactionEnum status,
-    StatusTransactionReasonEnum reason,
-    Set<UUID> changedAcquirerIds,
-    List<TransactionAcqEntity> changedAcquirerSales
-  ) {
+    List<TransactionAcqEntity> candidates, StatusTransactionEnum status, StatusTransactionReasonEnum reason,
+    Set<UUID> changedAcquirerIds, List<TransactionAcqEntity> changedAcquirerSales) {
     if (candidates == null || candidates.isEmpty()) {
       return 0;
     }
@@ -1055,9 +1137,7 @@ public class ConciliationAnalysisService {
   }
 
   private StatusTransactionReasonEnum normalizeReasonForStatus(
-    StatusTransactionEnum status,
-    StatusTransactionReasonEnum reason
-  ) {
+    StatusTransactionEnum status, StatusTransactionReasonEnum reason) {
     if (status == StatusTransactionEnum.AUTOMATICALLY_RECONCILED
       || status == StatusTransactionEnum.MANUALLY_RECONCILED) {
       return StatusTransactionReasonEnum.SCHEDULED;
@@ -1079,10 +1159,7 @@ public class ConciliationAnalysisService {
       || Objects.equals(status, StatusTransactionEnum.DELETED.getCode());
   }
 
-  private int classifyAcquirerSalesMissingInErp(
-    boolean reconcileAlreadyReconciled,
-    List<Integer> pendingStatuses
-  ) {
+  private int classifyAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses) {
     int totalUpdated = 0;
     int batchNumber = 0;
 
@@ -1092,7 +1169,8 @@ public class ConciliationAnalysisService {
         reconcileAlreadyReconciled,
         pendingStatuses,
         StatusTransactionEnum.NOT_RECONCILED.getCode(),
-        StatusTransactionReasonEnum.NULL.getCode()
+        StatusTransactionReasonEnum.NULL.getCode(),
+        EXCLUDED_CARD_RECONCILIATION_MODALITY
       );
 
       if (acquirerIds.isEmpty()) {
@@ -1105,6 +1183,10 @@ public class ConciliationAnalysisService {
       List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
 
       for (TransactionAcqEntity acq : acquirerBatch) {
+        if (isExcludedFromCardReconciliation(acq)) {
+          continue;
+        }
+
         if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(acq)) {
           continue;
         }
@@ -1137,6 +1219,18 @@ public class ConciliationAnalysisService {
     }
 
     return totalUpdated;
+  }
+
+  private boolean isExcludedFromCardReconciliation(TransactionErpEntity erp) {
+    return erp == null
+      || erp.getModality() == null
+      || Objects.equals(erp.getModality(), EXCLUDED_CARD_RECONCILIATION_MODALITY);
+  }
+
+  private boolean isExcludedFromCardReconciliation(TransactionAcqEntity acq) {
+    return acq == null
+      || acq.getModality() == null
+      || Objects.equals(acq.getModality(), EXCLUDED_CARD_RECONCILIATION_MODALITY);
   }
 
   private boolean shouldReconcileAlreadyReconciledErpAcquirerSales() {
@@ -1249,16 +1343,15 @@ public class ConciliationAnalysisService {
   }
 
   private List<TransactionAcqEntity> findAcquirerCandidatesForBatch(
-    List<TransactionErpEntity> erpBatch,
-    boolean reconcileAlreadyReconciled,
-    List<Integer> pendingStatuses
-  ) {
+    List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses) {
     Set<Long> nsus = erpBatch.stream()
+      .filter(erp -> !isExcludedFromCardReconciliation(erp))
       .map(TransactionErpEntity::getNsu)
       .filter(Objects::nonNull)
       .collect(LinkedHashSet::new, LinkedHashSet::add, LinkedHashSet::addAll);
 
     Set<String> authorizations = erpBatch.stream()
+      .filter(erp -> !isExcludedFromCardReconciliation(erp))
       .map(TransactionErpEntity::getAuthorization)
       .map(this::normalizeLookupText)
       .filter(Objects::nonNull)
@@ -1270,7 +1363,8 @@ public class ConciliationAnalysisService {
       transactionAcqRepository.findCandidatesForErpAcquirerReconciliationByNsus(
         nsus,
         reconcileAlreadyReconciled,
-        pendingStatuses
+        pendingStatuses,
+        EXCLUDED_CARD_RECONCILIATION_MODALITY
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
@@ -1278,11 +1372,14 @@ public class ConciliationAnalysisService {
       transactionAcqRepository.findCandidatesForErpAcquirerReconciliationByAuthorizations(
         authorizations,
         reconcileAlreadyReconciled,
-        pendingStatuses
+        pendingStatuses,
+        EXCLUDED_CARD_RECONCILIATION_MODALITY
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
-    return new ArrayList<>(candidates.values());
+    return candidates.values().stream()
+      .filter(acq -> !isExcludedFromCardReconciliation(acq))
+      .toList();
   }
 
   private Map<ErpAcquirerIdentityKey, List<TransactionAcqEntity>> indexAcquirerCandidates(List<TransactionAcqEntity> acquirerCandidates) {
@@ -1369,12 +1466,6 @@ public class ConciliationAnalysisService {
     return left.subtract(right).abs().compareTo(effectiveTolerance) <= 0;
   }
 
-  private Optional<TransactionAcqEntity> findBestAcquirerMatch(TransactionErpEntity erp, List<TransactionAcqEntity> acquirerSales) {
-    return acquirerSales.stream()
-      .filter(acq -> sameSaleKey(erp, acq))
-      .max(Comparator.comparingInt(acq -> matchScore(erp, acq)));
-  }
-
   private int matchScore(TransactionErpEntity erp, TransactionAcqEntity acq) {
     int score = 0;
     if (erp.getNsu() != null && Objects.equals(erp.getNsu(), acq.getNsu())) score += 40;
@@ -1432,10 +1523,7 @@ public class ConciliationAnalysisService {
   }
 
   private record ErpAcquirerMatchResult(
-    ErpAcquirerMatchStatus status,
-    TransactionAcqEntity acquirerSale,
-    List<TransactionAcqEntity> acquirerSales
-  ) {
+    ErpAcquirerMatchStatus status, TransactionAcqEntity acquirerSale, List<TransactionAcqEntity> acquirerSales) {
     static ErpAcquirerMatchResult matched(TransactionAcqEntity acquirerSale) {
       return new ErpAcquirerMatchResult(
         ErpAcquirerMatchStatus.MATCHED,
@@ -1467,37 +1555,6 @@ public class ConciliationAnalysisService {
 
   private record ErpAcquirerApplyResult(boolean changed, boolean flagUpdated, boolean businessContextUpdated) {}
 
-
-  private Pageable remapErpVsAcquirerPageable(Pageable pageable) {
-    if (pageable == null || pageable.getSort().isUnsorted()) {
-      return pageable;
-    }
-
-    Sort mappedSort = Sort.by(pageable.getSort().stream()
-      .map(order -> new Sort.Order(order.getDirection(), erpVsAcquirerSortProperty(order.getProperty()), order.getNullHandling()))
-      .map(order -> order.isIgnoreCase() ? order.ignoreCase() : order)
-      .toList());
-
-    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), mappedSort);
-  }
-
-  private String erpVsAcquirerSortProperty(String property) {
-    if (property == null || property.isBlank()) {
-      return "saleDate";
-    }
-
-    return switch (property) {
-      case "saleDateErp" -> "saleDate";
-      case "grossValueErp" -> "grossValue";
-      case "nsuErp" -> "nsu";
-      case "authorizationErp" -> "authorization";
-      case "flagErp" -> "flag.name";
-      case "modalityErp" -> "modality";
-      case "company" -> "company.name";
-      case "establishment" -> "establishment.name";
-      default -> property;
-    };
-  }
   private Optional<TransactionAcqEntity> findAcquirerMatch(TransactionErpEntity erp) {
     if (erp == null) {
       return Optional.empty();
@@ -1562,43 +1619,15 @@ public class ConciliationAnalysisService {
     return entity.getSaleReconciliationDate() != null || entity.getStatusPaymentBank() != null || entity.getStatusTransaction() != null;
   }
 
-  private long countDivergences(BigDecimal erpGross, BigDecimal acquirerGross, List<AdjustmentEntity> adjustments, List<PendingDebtEntity> pendingDebts, List<FeeAnalysisResult> fees) {
+  private long countDivergences(
+    BigDecimal erpGross, BigDecimal acquirerGross, List<AdjustmentEntity> adjustments,
+    List<PendingDebtEntity> pendingDebts, List<FeeAnalysisResult> fees) {
     long total = 0;
     if (erpGross.compareTo(acquirerGross) != 0) total++;
     total += adjustments.size();
     total += pendingDebts.size();
     total += fees.stream().filter(fee -> !"OK".equals(fee.status())).count();
     return total;
-  }
-
-  private BigDecimal calculateRate(BigDecimal gross, BigDecimal fee) {
-    if (gross == null || gross.compareTo(ZERO) == 0 || fee == null) return null;
-    return fee.multiply(HUNDRED).divide(gross, 4, RoundingMode.HALF_UP);
-  }
-
-  private BigDecimal calculateFee(BigDecimal gross, BigDecimal rate) {
-    if (gross == null || rate == null) return null;
-    return gross.multiply(rate).divide(HUNDRED, 8, RoundingMode.HALF_UP);
-  }
-
-  private BigDecimal appliedFeeValue(TransactionAcqEntity entity) {
-    if (entity.getDiscountValue() != null) return entity.getDiscountValue();
-    if (entity.getGrossValue() != null && entity.getLiquidValue() != null) {
-      return entity.getGrossValue().subtract(entity.getLiquidValue());
-    }
-    return ZERO;
-  }
-
-  private String feeStatus(BigDecimal expectedRate, BigDecimal appliedRate, BigDecimal feeDifference) {
-    if (expectedRate == null) return "MISSING_CONTRACT";
-
-    BigDecimal absFeeDifference = abs(feeDifference);
-    if (absFeeDifference.compareTo(VALUE_TOLERANCE) <= 0) return "OK";
-
-    BigDecimal absRateDifference = expectedRate.subtract(nz(appliedRate)).abs();
-    if (absRateDifference.compareTo(RATE_TOLERANCE) > 0) return "RATE_DIVERGENCE";
-
-    return "VALUE_DIVERGENCE";
   }
 
   private BigDecimal sum(Stream<BigDecimal> values) {
@@ -1625,14 +1654,6 @@ public class ConciliationAnalysisService {
     } catch (RuntimeException ex) {
       return code(modality);
     }
-  }
-
-  private String reconciliationStatus(TransactionAcqEntity entity) {
-    return entity.getSaleReconciliationDate() != null ? "RECONCILED" : code(entity.getStatusTransaction());
-  }
-
-  private String paymentStatus(Integer status) {
-    return code(status);
   }
 
   private BigDecimal netInstallmentValue(InstallmentAcqEntity installment) {
@@ -1687,10 +1708,6 @@ public class ConciliationAnalysisService {
     return processedFile != null ? processedFile.getFile() : null;
   }
 
-  private boolean containsIgnoreCase(String value, String needle) {
-    return value != null && needle != null && value.toLowerCase(Locale.ROOT).contains(needle.toLowerCase(Locale.ROOT));
-  }
-
   @SafeVarargs
   private final <T> T firstNonNull(T... values) {
     for (T value : values) {
@@ -1706,45 +1723,10 @@ public class ConciliationAnalysisService {
     return null;
   }
 
-  private Comparator<ErpVsAcquirerAnalysisModel> erpVsAcquirerModelComparator() {
-    return Comparator
-      .comparing(
-        (ErpVsAcquirerAnalysisModel item) -> firstNonNull(item.saleDateErp(), item.saleDateAcquirer()),
-        Comparator.nullsLast(Comparator.reverseOrder())
-      )
-      .thenComparing(ErpVsAcquirerAnalysisModel::id, Comparator.nullsLast(UUID::compareTo));
-  }
-
   private <T> Page<T> page(List<T> items, Pageable pageable) {
     int start = Math.toIntExact(Math.min(pageable.getOffset(), items.size()));
     int end = Math.min(start + pageable.getPageSize(), items.size());
     return new PageImpl<>(items.subList(start, end), pageable, items.size());
-  }
-
-  private record FeeAnalysisResult(
-    UUID id,
-    OffsetDateTime saleDate,
-    String company,
-    String establishment,
-    String acquirer,
-    String flag,
-    String modality,
-    Long nsu,
-    String authorization,
-    BigDecimal grossValue,
-    BigDecimal expectedRate,
-    BigDecimal appliedRate,
-    BigDecimal expectedFeeValue,
-    BigDecimal appliedFeeValue,
-    BigDecimal feeDifference,
-    String status
-  ) {
-    private ConciliationFeeAnalysisModel toModel() {
-      return new ConciliationFeeAnalysisModel(
-        id, saleDate, company, establishment, acquirer, flag, modality, nsu, authorization,
-        grossValue, expectedRate, appliedRate, expectedFeeValue, appliedFeeValue, feeDifference, status
-      );
-    }
   }
 
   private record AgingItem(LocalDate referenceDate, BigDecimal amount) {

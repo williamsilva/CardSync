@@ -61,7 +61,10 @@ file-processing:
     rede-cron: "0 0/5 * * * *"
     bank-cron: "0 0/5 * * * *"
     erp-acquirer-reconciliation-cron: ${ERP_ACQUIRER_RECONCILIATION_CRON:0 0/15 * * * *}
+    erp-acquirer-fee-reconciliation-cron: ${ERP_ACQUIRER_FEE_RECONCILIATION_CRON:0 10/15 * * * *}
+
     erp-acquirer-reconciliation-enabled: ${ERP_ACQUIRER_RECONCILIATION_SCHEDULER_ENABLED:false}
+    erp-acquirer-fee-reconciliation-enabled: ${ERP_ACQUIRER_FEE_RECONCILIATION_SCHEDULER_ENABLED:false}
 
   systems:
 
@@ -102,4 +105,4 @@ file-processing:
       date-tolerance-days: 7
       value-tolerance: "0.05"
       safe-cap-cents: 50000000
-      reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:false}
+      reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:true}

@@ -126,6 +126,7 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
+       and (a.modality is not null and a.modality <> :excludedModality)
        and (a.statusTransaction is null
             or a.statusTransaction <> :notReconciledStatus
             or a.statusTransactionReason is null
@@ -137,7 +138,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("notReconciledStatus") Integer notReconciledStatus,
-    @Param("nullReason") Integer nullReason
+    @Param("nullReason") Integer nullReason,
+    @Param("excludedModality") Integer excludedModality
   );
 
   @Query("""
@@ -167,6 +169,7 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch a.salesSummary ss
       left join fetch ss.bankingDomicile
      where a.nsu in :nsus
+       and (a.modality is not null and a.modality <> :excludedModality)
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
@@ -174,7 +177,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
   List<TransactionAcqEntity> findCandidatesForErpAcquirerReconciliationByNsus(
     @Param("nsus") Collection<Long> nsus,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
-    @Param("pendingStatuses") Collection<Integer> pendingStatuses
+    @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("excludedModality") Integer excludedModality
   );
 
   @Query("""
@@ -188,6 +192,7 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch a.salesSummary ss
       left join fetch ss.bankingDomicile
      where lower(a.authorization) in :authorizations
+       and (a.modality is not null and a.modality <> :excludedModality)
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
@@ -195,7 +200,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
   List<TransactionAcqEntity> findCandidatesForErpAcquirerReconciliationByAuthorizations(
     @Param("authorizations") Collection<String> authorizations,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
-    @Param("pendingStatuses") Collection<Integer> pendingStatuses
+    @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("excludedModality") Integer excludedModality
   );
 
 

@@ -50,9 +50,9 @@ public class ConciliationWaitingErpTableFields {
           (root, query) -> root.get("authorization"))),
 
       Map.entry("establishment",
-        FieldSpec.joinedUuid(
+        FieldSpec.integer(
           "establishment",
-          (root, query) -> root.join("establishment", JoinType.LEFT).get("id")
+          (root, query) -> root.join("establishment", JoinType.LEFT).get("pvNumber")
         )),
 
       Map.entry("acquirer",

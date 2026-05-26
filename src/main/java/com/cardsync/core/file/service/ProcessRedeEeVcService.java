@@ -643,9 +643,7 @@ public class ProcessRedeEeVcService {
   }
 
   private void addIfValid(List<TransactionAcqEntity> transactions, TransactionAcqEntity tx) {
-    if (tx != null) {
-      transactions.add(tx);
-    }
+    mergeOrAddRedeTransaction(transactions, tx);
   }
 
   private BigDecimal safeMoney(String line, String range, int lineNumber, String field, String context) {
@@ -688,6 +686,8 @@ public class ProcessRedeEeVcService {
 
       if (layoutItems != null && !layoutItems.isEmpty()) {
         BigDecimal summaryGross = tx.getSalesSummary() == null ? tx.getGrossValue() : tx.getSalesSummary().getGrossValue();
+        BigDecimal transactionDiscount = BigDecimal.ZERO;
+        BigDecimal transactionLiquid = BigDecimal.ZERO;
 
         for (EeVcRvInstallment item : layoutItems) {
           InstallmentAcqEntity installment = new InstallmentAcqEntity();
@@ -700,7 +700,18 @@ public class ProcessRedeEeVcService {
           installment.setStatusPaymentBank(STATUS_PENDING);
           installment.setInstallmentStatus(STATUS_PENDING);
           installment.setExpectedPaymentDate(item.creditDate());
+          transactionDiscount = transactionDiscount.add(zero(installment.getDiscountValue()));
+          transactionLiquid = transactionLiquid.add(zero(installment.getLiquidValue()));
           result.add(installment);
+        }
+
+        // Alguns registros e-commerce (034/035/036) não trazem desconto/MDR no próprio registro
+        // da transação, mas as parcelas 014/020 trazem os valores corretos. Persistimos também
+        // na transação para que a conciliação de taxa use cs_transaction_acq.mdr_rate corretamente.
+        if (positive(transactionDiscount)) {
+          tx.setDiscountValue(transactionDiscount);
+          tx.setLiquidValue(transactionLiquid);
+          tx.setMdrRate(calculateRate(tx.getGrossValue(), transactionDiscount));
         }
         continue;
       }
@@ -885,7 +896,7 @@ public class ProcessRedeEeVcService {
     if (summary == null || summary.getModality() == null) return 1;
     if (Objects.equals(summary.getModality(), ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode())) return 2;
     if (Objects.equals(summary.getModality(), ModalityEnum.INSTALLMENT_CREDIT_7_12.getCode())) return 7;
-    if (Objects.equals(summary.getModality(), ModalityEnum.INSTALLMENT_CREDIT_13_18.getCode())) return 13;
+    if (Objects.equals(summary.getModality(), ModalityEnum.INSTALLMENT_CREDIT_13_21.getCode())) return 13;
     return 1;
   }
 
@@ -894,7 +905,7 @@ public class ProcessRedeEeVcService {
     if (total <= 1) return ModalityEnum.CASH_CREDIT.getCode();
     if (total <= 6) return ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode();
     if (total <= 12) return ModalityEnum.INSTALLMENT_CREDIT_7_12.getCode();
-    if (total <= 18) return ModalityEnum.INSTALLMENT_CREDIT_13_18.getCode();
+    if (total <= 21) return ModalityEnum.INSTALLMENT_CREDIT_13_21.getCode();
     return ModalityEnum.OUTROS.getCode();
   }
 
@@ -942,39 +953,144 @@ public class ProcessRedeEeVcService {
   }
 
   private void mergeOrAddEcommerceTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity ecommerceTx) {
-    if (ecommerceTx == null) {
+    mergeOrAddRedeTransaction(transactions, ecommerceTx);
+  }
+
+  private void mergeOrAddRedeTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity incoming) {
+    if (incoming == null) {
       return;
     }
 
     Optional<TransactionAcqEntity> existing = transactions.stream()
-      .filter(tx -> isSameRedeTransaction(tx, ecommerceTx))
+      .filter(tx -> isSameRedeTransaction(tx, incoming))
       .findFirst();
 
     if (existing.isPresent()) {
-      TransactionAcqEntity tx = existing.get();
-
-      tx.setTid(ecommerceTx.getTid());
-
-      if (isBlank(tx.getReferenceNumber()) && !isBlank(ecommerceTx.getReferenceNumber())) {
-        tx.setReferenceNumber(ecommerceTx.getReferenceNumber());
-      }
-
-      tx.setCapture(CaptureEnum.ECOMMERCE.getCode());
-
-      /*
-       * Mantém o recordType original da transação principal.
-       * Exemplo:
-       * 008 continua 008
-       * 012 continua 012
-       * 018 continua 018
-       *
-       * O 034/035/036 funciona como complemento e-commerce.
-       */
-
+      mergeRedeTransaction(existing.get(), incoming);
       return;
     }
 
-    transactions.add(ecommerceTx);
+    transactions.add(incoming);
+  }
+
+  private void mergeRedeTransaction(TransactionAcqEntity target, TransactionAcqEntity source) {
+    if (target == null || source == null || target == source) {
+      return;
+    }
+
+    boolean targetEcommerce = isEcommerceRecordType(target.getRecordType());
+    boolean sourceEcommerce = isEcommerceRecordType(source.getRecordType());
+
+    String currentTid = target.getTid();
+    String ecommerceTid = !isBlank(source.getTid()) ? source.getTid() : currentTid;
+    String currentReference = target.getReferenceNumber();
+
+    /*
+     * No EEVC, os registros 034/035/036 trazem dados próprios do e-commerce
+     * (TID e pedido), mas normalmente não carregam desconto, líquido, MDR, status,
+     * parcelas e demais dados completos da venda.
+     *
+     * Quando o registro e-commerce aparece antes do registro principal (008/012/018),
+     * a versão antiga criava uma linha para o 034/035/036 e outra para o 008/012/018.
+     * Aqui mantemos uma única entidade em memória e enriquecemos a mesma venda.
+     */
+    if (targetEcommerce && !sourceEcommerce) {
+      copyMainTransactionData(target, source);
+      if (!isBlank(ecommerceTid)) {
+        target.setTid(ecommerceTid);
+      }
+      if (isBlank(target.getReferenceNumber()) && !isBlank(currentReference)) {
+        target.setReferenceNumber(currentReference);
+      }
+      target.setCapture(CaptureEnum.ECOMMERCE.getCode());
+      return;
+    }
+
+    mergeMissingTransactionData(target, source);
+
+    if (!isBlank(source.getTid())) {
+      target.setTid(source.getTid());
+    }
+
+    if (sourceEcommerce) {
+      target.setCapture(CaptureEnum.ECOMMERCE.getCode());
+    }
+
+    if (isBlank(target.getReferenceNumber()) && !isBlank(source.getReferenceNumber())) {
+      target.setReferenceNumber(source.getReferenceNumber());
+    }
+  }
+
+  private void copyMainTransactionData(TransactionAcqEntity target, TransactionAcqEntity source) {
+    target.setRecordType(source.getRecordType());
+    target.setLineNumber(source.getLineNumber());
+    target.setCompany(source.getCompany());
+    target.setEstablishment(source.getEstablishment());
+    target.setAcquirer(source.getAcquirer());
+    target.setFlag(source.getFlag());
+    target.setProcessedFile(source.getProcessedFile());
+    target.setSalesSummary(source.getSalesSummary());
+    target.setRvNumber(source.getRvNumber());
+    target.setGrossValue(source.getGrossValue());
+    target.setTipValue(source.getTipValue());
+    target.setCardNumber(source.getCardNumber());
+    target.setStatusCv(source.getStatusCv());
+    target.setNsu(source.getNsu());
+    target.setAuthorization(source.getAuthorization());
+    target.setSaleDate(source.getSaleDate());
+    target.setDiscountValue(source.getDiscountValue());
+    target.setLiquidValue(source.getLiquidValue());
+    target.setMachine(source.getMachine());
+    target.setFlexRate(source.getFlexRate());
+    target.setMdrRate(source.getMdrRate());
+    target.setCapture(source.getCapture());
+    target.setServiceCode(source.getServiceCode());
+    target.setInstallment(source.getInstallment());
+    target.setModality(source.getModality());
+    target.setFirstInstallmentValue(source.getFirstInstallmentValue());
+    target.setOtherInstallmentsValue(source.getOtherInstallmentsValue());
+    target.setDccCurrency(source.getDccCurrency());
+    target.setStatusAudit(source.getStatusAudit());
+    target.setStatusPaymentBank(source.getStatusPaymentBank());
+    target.setStatusTransaction(source.getStatusTransaction());
+    target.setStatusTransactionReason(source.getStatusTransactionReason());
+  }
+
+  private void mergeMissingTransactionData(TransactionAcqEntity target, TransactionAcqEntity source) {
+    if (target.getCompany() == null) target.setCompany(source.getCompany());
+    if (target.getEstablishment() == null) target.setEstablishment(source.getEstablishment());
+    if (target.getAcquirer() == null) target.setAcquirer(source.getAcquirer());
+    if (target.getFlag() == null) target.setFlag(source.getFlag());
+    if (target.getProcessedFile() == null) target.setProcessedFile(source.getProcessedFile());
+    if (target.getSalesSummary() == null) target.setSalesSummary(source.getSalesSummary());
+    if (target.getRvNumber() == null) target.setRvNumber(source.getRvNumber());
+    if (target.getGrossValue() == null || target.getGrossValue().signum() == 0) target.setGrossValue(source.getGrossValue());
+    if (target.getTipValue() == null || target.getTipValue().signum() == 0) target.setTipValue(source.getTipValue());
+    if (isBlank(target.getCardNumber())) target.setCardNumber(source.getCardNumber());
+    if (isBlank(target.getStatusCv())) target.setStatusCv(source.getStatusCv());
+    if (target.getNsu() == null) target.setNsu(source.getNsu());
+    if (isBlank(target.getAuthorization())) target.setAuthorization(source.getAuthorization());
+    if (target.getSaleDate() == null) target.setSaleDate(source.getSaleDate());
+    if (target.getDiscountValue() == null || target.getDiscountValue().signum() == 0) target.setDiscountValue(source.getDiscountValue());
+    if (target.getLiquidValue() == null || target.getLiquidValue().signum() == 0) target.setLiquidValue(source.getLiquidValue());
+    if (isBlank(target.getMachine())) target.setMachine(source.getMachine());
+    if (target.getFlexRate() == null || target.getFlexRate().signum() == 0) target.setFlexRate(source.getFlexRate());
+    if (target.getMdrRate() == null || target.getMdrRate().signum() == 0) target.setMdrRate(source.getMdrRate());
+    if (target.getCapture() == null) target.setCapture(source.getCapture());
+    if (isBlank(target.getServiceCode())) target.setServiceCode(source.getServiceCode());
+    if (target.getInstallment() == null || target.getInstallment() <= 1) target.setInstallment(source.getInstallment());
+    if (target.getModality() == null) target.setModality(source.getModality());
+    if (target.getFirstInstallmentValue() == null || target.getFirstInstallmentValue().signum() == 0) target.setFirstInstallmentValue(source.getFirstInstallmentValue());
+    if (target.getOtherInstallmentsValue() == null || target.getOtherInstallmentsValue().signum() == 0) target.setOtherInstallmentsValue(source.getOtherInstallmentsValue());
+    if (isBlank(target.getDccCurrency())) target.setDccCurrency(source.getDccCurrency());
+    if (target.getStatusAudit() == null) target.setStatusAudit(source.getStatusAudit());
+    if (target.getStatusPaymentBank() == null) target.setStatusPaymentBank(source.getStatusPaymentBank());
+    if (target.getStatusTransaction() == null) target.setStatusTransaction(source.getStatusTransaction());
+    if (target.getStatusTransactionReason() == null) target.setStatusTransactionReason(source.getStatusTransactionReason());
+  }
+
+  private boolean isEcommerceRecordType(String recordType) {
+    return "034".equals(recordType) || "035".equals(recordType) || "036".equals(recordType);
   }
 
   private boolean isSameRedeTransaction(TransactionAcqEntity a, TransactionAcqEntity b) {
@@ -982,12 +1098,19 @@ public class ProcessRedeEeVcService {
       return false;
     }
 
+    if (a.getRvNumber() == null || b.getRvNumber() == null || a.getNsu() == null || b.getNsu() == null) {
+      return false;
+    }
+
+    boolean ecommercePair = isEcommerceRecordType(a.getRecordType()) || isEcommerceRecordType(b.getRecordType());
+
     return Objects.equals(a.getRvNumber(), b.getRvNumber())
       && Objects.equals(a.getNsu(), b.getNsu())
-      && sameAuthorization(a.getAuthorization(), b.getAuthorization())
-      && sameDay(a.getSaleDate(), b.getSaleDate())
+      && compatibleAuthorization(a.getAuthorization(), b.getAuthorization())
       && sameMoney(a.getGrossValue(), b.getGrossValue())
-      && sameEstablishment(a, b);
+      && sameCardNumber(a.getCardNumber(), b.getCardNumber())
+      && sameEstablishment(a, b)
+      && (sameDay(a.getSaleDate(), b.getSaleDate()) || ecommercePair);
   }
 
   private boolean sameEstablishment(TransactionAcqEntity a, TransactionAcqEntity b) {
@@ -998,12 +1121,33 @@ public class ProcessRedeEeVcService {
     return Objects.equals(a.getEstablishment().getId(), b.getEstablishment().getId());
   }
 
-  private boolean sameAuthorization(String a, String b) {
+  private boolean sameCardNumber(String a, String b) {
+    String aa = normalizeNullableText(a);
+    String bb = normalizeNullableText(b);
+
+    if (aa == null || bb == null) {
+      return true;
+    }
+
+    return aa.equals(bb);
+  }
+
+  private String normalizeNullableText(String value) {
+    if (value == null) {
+      return null;
+    }
+
+    String normalized = value.trim();
+    return normalized.isBlank() ? null : normalized;
+  }
+
+
+  private boolean compatibleAuthorization(String a, String b) {
     String aa = normalizeAuth(a);
     String bb = normalizeAuth(b);
 
     if (aa == null || bb == null) {
-      return Objects.equals(aa, bb);
+      return true;
     }
 
     return aa.equals(bb);

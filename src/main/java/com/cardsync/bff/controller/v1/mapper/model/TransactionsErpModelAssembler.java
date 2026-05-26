@@ -61,6 +61,7 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
     model.setStatusTransaction(entity.getStatusTransaction());
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
     model.setStatusTransactionReason(entity.getStatusTransactionReason());
+    model.setMissingContractAtSale(entity.getMissingContractAtSale());
     model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
     model.setInstallments(installments.stream()
       .map(TransactionsErpModelAssembler::toInstallmentModel)

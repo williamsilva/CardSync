@@ -23,12 +23,6 @@ public class ConciliationController {
     return conciliationAnalysisService.dashboard();
   }
 
-  @GetMapping("/fees")
-  @CheckSecurity.FileProcessing.CanRead
-  public Page<ConciliationFeeAnalysisModel> listFees(Pageable pageable) {
-    return conciliationAnalysisService.listFees(pageable);
-  }
-
   @GetMapping("/debits")
   @CheckSecurity.FileProcessing.CanRead
   public Page<DebitAnalysisModel> listDebits(Pageable pageable) {

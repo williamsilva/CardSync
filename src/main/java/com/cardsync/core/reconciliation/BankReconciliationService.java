@@ -333,7 +333,7 @@ public class BankReconciliationService {
     if (modality == ModalityEnum.CASH_CREDIT
       || modality == ModalityEnum.INSTALLMENT_CREDIT_2_6
       || modality == ModalityEnum.INSTALLMENT_CREDIT_7_12
-      || modality == ModalityEnum.INSTALLMENT_CREDIT_13_18) {
+      || modality == ModalityEnum.INSTALLMENT_CREDIT_13_21) {
       return ReconciliationMatchContext.PaymentKind.CREDIT;
     }
     return ReconciliationMatchContext.PaymentKind.UNKNOWN;

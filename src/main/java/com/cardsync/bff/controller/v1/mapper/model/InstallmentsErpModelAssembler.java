@@ -64,6 +64,7 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
           .statusTransaction(transaction.getStatusTransaction())
           .saleReconciliationDate(transaction.getSaleReconciliationDate())
           .statusTransactionReason(transaction.getStatusTransactionReason())
+          .missingContractAtSale(transaction.getMissingContractAtSale())
           .capture(transaction.getCapture() == null ? null : transaction.getCapture())
           .modality(transaction.getModality() == null ? null : transaction.getModality())
 

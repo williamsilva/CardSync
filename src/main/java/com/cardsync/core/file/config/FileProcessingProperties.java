@@ -218,6 +218,12 @@ public class FileProcessingProperties {
     /** Cron de 6 campos do Spring para conciliação ERP x adquirente. Default: a cada 15 minutos. */
     private String erpAcquirerReconciliationCron = "0 0/15 * * * *";
 
+    /** Liga/desliga o agendamento da conciliação de taxas ERP x adquirente. */
+    private boolean erpAcquirerFeeReconciliationEnabled = false;
+
+    /** Cron de 6 campos do Spring para conciliação de taxas ERP x adquirente. Default: a cada 15 minutos, deslocado em 10 minutos. */
+    private String erpAcquirerFeeReconciliationCron = "0 10/15 * * * *";
+
     /** Apenas para logs/status, indicando se o scheduler deve registrar ciclos sem arquivos. */
     private boolean logIdleCycles = true;
   }

@@ -3,23 +3,27 @@ package com.cardsync.domain.service;
 import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingAcqModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingErpModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingOtherDivergenceModelAssembler;
+import com.cardsync.bff.controller.v1.mapper.model.ContractAuditModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ConciliationWaitingOtherDivergencePair;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
+import com.cardsync.domain.filter.ContractAuditModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
+import com.cardsync.domain.repository.ContractAuditRepository;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingOtherDivergenceSpecs;
+import com.cardsync.infrastructure.repository.spec.ContractAuditSpecs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -39,13 +43,17 @@ public class ConciliationWaitingService {
   private static final String ORIGIN_ACQUIRER_GENERATED = "ACQUIRER_GENERATED";
 
   private final TransactionTotalsQueryService totalsQueryService;
+
   private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
+
   private final ConciliationWaitingAcqSpecs conciliationWaitingAcqSpecs;
   private final ConciliationWaitingErpSpecs conciliationWaitingErpSpecs;
+  private final ConciliationWaitingOtherDivergenceSpecs conciliationWaitingOtherDivergenceSpecs;
+
   private final ConciliationWaitingAcqModelAssembler conciliationWaitingAcqModelAssembler;
   private final ConciliationWaitingErpModelAssembler conciliationWaitingErpModelAssembler;
-  private final ConciliationWaitingOtherDivergenceSpecs conciliationWaitingOtherDivergenceSpecs;
+
   private final ConciliationWaitingOtherDivergenceModelAssembler conciliationWaitingOtherDivergenceModelAssembler;
 
   @Transactional(readOnly = true)
@@ -534,5 +542,4 @@ public class ConciliationWaitingService {
     }
     return current + " | " + message;
   }
-
 }

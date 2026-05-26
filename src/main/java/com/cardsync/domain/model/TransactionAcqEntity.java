@@ -1,5 +1,6 @@
 package com.cardsync.domain.model;
 
+import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -46,6 +47,7 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private Integer statusAudit;
   private Integer installment;
   private Integer statusTransaction;
+  private Integer feeReconciliationStatus = FeeReconciliationStatusEnum.PENDING.getCode();
   private Integer statusPaymentBank;
   private Integer statusTransactionReason;
 

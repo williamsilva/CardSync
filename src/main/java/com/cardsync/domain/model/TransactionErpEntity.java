@@ -1,6 +1,7 @@
 package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
+import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,6 +33,9 @@ public class TransactionErpEntity extends AuditableEntityBase {
   private Integer reasonExclusionStatus;
   private Integer statusTransactionReason;
   private Integer sourceEstablishmentPvNumber;
+  private Integer feeReconciliationStatus = FeeReconciliationStatusEnum.PENDING.getCode();
+
+  private Boolean missingContractAtSale = Boolean.FALSE;
 
   private String tid;
   private String origin;
@@ -82,7 +86,7 @@ public class TransactionErpEntity extends AuditableEntityBase {
 
   /**
    * Venda da adquirente vinculada na conciliação ERP x Adquirente.
-   *
+
    * Esse vínculo evita redescobrir o match em consultas posteriores e permite
    * reaproveitar rapidamente o contexto da adquirente, como ajuste, domicílio
    * bancário, empresa, estabelecimento, bandeira e adquirente.

@@ -287,12 +287,14 @@ public class ProcessFileErpService {
     }
 
     if (!contractFound) {
+      tx.setMissingContractAtSale(Boolean.TRUE);
       tx.setCommercialStatus(ErpCommercialStatusEnum.PENDING_CONTRACT);
-      tx.setCommercialStatusMessage("Venda importada, mas pendente de contrato/taxa vigente. Revise empresa, estabelecimento/PV, adquirente, bandeira, modalidade, parcelas e vigência do contrato.");
+      tx.setCommercialStatusMessage("Venda importada sem contrato/taxa vigente na data da transação. Na conciliação de taxa, se houver venda correspondente na adquirente, a taxa real da adquirente será assumida para evitar falsa divergência.");
       tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
       return;
     }
 
+    tx.setMissingContractAtSale(Boolean.FALSE);
     tx.setCommercialStatus(ErpCommercialStatusEnum.OK);
     tx.setCommercialStatusMessage("Venda importada com contexto comercial e contrato vigente resolvidos.");
   }

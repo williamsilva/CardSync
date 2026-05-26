@@ -140,6 +140,12 @@ public class ConciliationWaitingController {
     return conciliationAnalysisService.reconcileErpWithAcquirerBusinessContext();
   }
 
+  @PostMapping("/reconcile-fees")
+  @CheckSecurity.FileProcessing.CanRead
+  public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
+    return conciliationAnalysisService.reconcileErpAcquirerFees();
+  }
+
   @PostMapping("/reconcile-manually")
   @CheckSecurity.FileProcessing.CanProcess
   public ErpAcquirerResolutionResultModel reconcileManually(

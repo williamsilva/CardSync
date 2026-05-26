@@ -30,11 +30,13 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
      where (:includeAlreadyReconciled = true
             or (e.saleReconciliationDate is null
                 and (e.statusTransaction is null or e.statusTransaction in :pendingStatuses)))
+       and (e.modality is not null and e.modality <> :excludedModality)
      order by e.saleDate asc, e.id asc
   """)
   List<UUID> findIdsForErpAcquirerReconciliation(
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
-    @Param("pendingStatuses") Collection<Integer> pendingStatuses
+    @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("excludedModality") Integer excludedModality
   );
 
   @Query("""
@@ -46,6 +48,7 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
       left join fetch e.establishment
       left join fetch e.bankingDomicile
       left join fetch e.adjustment
+      left join fetch e.installments
       left join fetch e.transactionAcq ta
       left join fetch ta.adjustment
       left join fetch ta.salesSummary tas
@@ -134,5 +137,63 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
      where e.id = :id
   """)
   Optional<TransactionErpEntity> findForManualResolutionById(@Param("id") UUID id);
+
+
+  @Query("""
+    select e.id
+      from TransactionErpEntity e
+      join e.transactionAcq ta
+     where e.statusTransaction in :reconciledStatuses
+       and ta.statusTransaction in :reconciledStatuses
+       and e.modality is not null
+       and e.modality <> :excludedModality
+       and ta.modality is not null
+       and ta.modality <> :excludedModality
+       and (e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
+       and (ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
+     order by e.saleDate asc, e.id asc
+  """)
+  List<UUID> findIdsForErpAcquirerFeeReconciliation(
+    @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,
+    @Param("excludedModality") Integer excludedModality,
+    @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses
+  );
+
+  @Query("""
+    select distinct e
+      from TransactionErpEntity e
+      left join fetch e.acquirer
+      left join fetch e.flag
+      left join fetch e.company
+      left join fetch e.establishment
+      left join fetch e.bankingDomicile
+      left join fetch e.adjustment
+      left join fetch e.installments
+      join fetch e.transactionAcq ta
+      left join fetch ta.acquirer
+      left join fetch ta.flag
+      left join fetch ta.company
+      left join fetch ta.establishment
+      left join fetch ta.adjustment
+      left join fetch ta.installments
+      left join fetch ta.salesSummary tas
+      left join fetch tas.bankingDomicile
+     where e.id in :ids
+       and e.statusTransaction in :reconciledStatuses
+       and ta.statusTransaction in :reconciledStatuses
+       and e.modality is not null
+       and e.modality <> :excludedModality
+       and ta.modality is not null
+       and ta.modality <> :excludedModality
+       and (e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
+       and (ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
+     order by e.saleDate asc, e.id asc
+  """)
+  List<TransactionErpEntity> findBatchForErpAcquirerFeeReconciliation(
+    @Param("ids") Collection<UUID> ids,
+    @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,
+    @Param("excludedModality") Integer excludedModality,
+    @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses
+  );
 
 }

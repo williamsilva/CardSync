@@ -33,6 +33,8 @@ public class TransactionsErpModel extends RepresentationModel<@NonNull Transacti
   private Integer statusTransaction;
   private Integer statusTransactionReason;
 
+  private Boolean missingContractAtSale;
+
   private String tid;
   private String cardName;
   private String cardNumber;

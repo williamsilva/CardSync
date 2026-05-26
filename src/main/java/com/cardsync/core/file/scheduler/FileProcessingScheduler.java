@@ -17,6 +17,7 @@ public class FileProcessingScheduler {
   private static final String TRIGGER_REDE = "SCHEDULER_REDE";
   private static final String TRIGGER_BANK = "SCHEDULER_BANK";
   private static final String TRIGGER_ERP_ACQUIRER_RECONCILIATION = "SCHEDULER_ERP_ACQUIRER_RECONCILIATION";
+  private static final String TRIGGER_ERP_ACQUIRER_FEE_RECONCILIATION = "SCHEDULER_ERP_ACQUIRER_FEE_RECONCILIATION";
 
   private final FileProcessingProperties properties;
   private final FileStorageTask fileStorageTask;
@@ -69,6 +70,27 @@ public class FileProcessingScheduler {
       result.valueDivergences(),
       result.acquirerDivergences(),
       result.ambiguousMatches()
+    );
+  }
+
+
+  @Scheduled(cron = "${file-processing.scheduler.erp-acquirer-fee-reconciliation-cron:0 10/15 * * * *}", zone = "${cardsync.app.business-zone:America/Sao_Paulo}")
+  public void reconcileErpAcquirerFees() {
+    if (!isSchedulerEnabled() || !properties.getScheduler().isErpAcquirerFeeReconciliationEnabled()) {
+      logIdle("Conciliação de taxas ERP x adquirente");
+      return;
+    }
+
+    var result = conciliationAnalysisService.reconcileErpAcquirerFees(TRIGGER_ERP_ACQUIRER_FEE_RECONCILIATION);
+    log.info(
+      "✅ Conciliação de taxas ERP x adquirente finalizada: trigger={}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, semContratoValido={}, taxasOk={}, semAdquirente={}",
+      TRIGGER_ERP_ACQUIRER_FEE_RECONCILIATION,
+      result.analyzed(),
+      result.updatedErpSales(),
+      result.divergentRates(),
+      result.missingValidContracts(),
+      result.okRates(),
+      result.skippedWithoutAcquirer()
     );
   }
 
