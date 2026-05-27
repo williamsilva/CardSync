@@ -1,0 +1,16 @@
+package com.cardsync.domain.model.enums;
+
+public enum ChargebackAnalysisStatus {
+  REQUEST_RECEIVED,
+  DOCUMENTATION_DUE,
+  DOCUMENTATION_OVERDUE,
+  PENDING_DEBIT,
+  BANK_DEBIT_SCHEDULED,
+  NET_COMPENSATION_SCHEDULED,
+  DESCHEDULED,
+  LIQUIDATED,
+  WON,
+  LOST,
+  UNDER_REVIEW,
+  REVERSED
+}

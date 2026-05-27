@@ -1,7 +1,6 @@
 package com.cardsync.bff.controller.v1.representation.model.conciliation;
 
 import com.cardsync.domain.model.enums.ChargebackAnalysisStatus;
-import com.cardsync.domain.model.enums.ChargebackEventSourceType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,7 +10,8 @@ import org.springframework.hateoas.server.core.Relation;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -19,17 +19,12 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Relation(collectionRelation = "content")
-public class ChargebackAnalysisModel {
+public class ChargebackLifecycleModel {
 
-  private UUID id;
+  private String trackingKey;
 
-  private LocalDate saleDate;
-  private LocalDate disputeDate;
-  private LocalDate requestDate;
-  private LocalDate documentationDueDate;
-  private LocalDate dueDate;
-  private LocalDate debitDate;
-  private LocalDate settlementDate;
+  private ChargebackAnalysisStatus currentStatus;
+  private LocalDate firstEventDate;
   private LocalDate lastEventDate;
 
   private String company;
@@ -64,8 +59,6 @@ public class ChargebackAnalysisModel {
   private String compensationCode;
   private String compensationDescription;
 
-  private ChargebackEventSourceType sourceType;
-  private String processedFile;
-
-  private ChargebackAnalysisStatus status;
+  @Builder.Default
+  private List<ChargebackTimelineEventModel> timeline = new ArrayList<>();
 }

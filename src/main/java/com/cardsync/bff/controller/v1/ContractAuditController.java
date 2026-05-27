@@ -21,7 +21,6 @@ public class ContractAuditController {
   @PostMapping("/divergent-fees")
   @CheckSecurity.FileProcessing.CanRead
   public PagedModel<ContractAuditModel> divergentFees(@RequestBody ListQueryDto<ContractAuditModelFilter> body) {
-    System.out.println("Filter " + body);
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
     Page<ContractAuditModel> page = contractAuditService.divergentFees(pageable, body);

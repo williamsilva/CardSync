@@ -145,7 +145,8 @@ public class ConciliationAnalysisService {
     int totalBatches = (int) Math.ceil((double) erpIds.size() / ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE);
 
     log.info(
-      "📌 Iniciando conciliação de taxas ERP x Adquirente. trigger={}, totalErpPendentesTaxa={}, batchSize={}, totalBatches={}, statusVenda={}, statusTaxaPendente={}",
+      "📌 Iniciando conciliação de taxas ERP x Adquirente. trigger={}, totalErpPendentesTaxa={}, batchSize={}, " +
+        "totalBatches={}, statusVenda={}, statusTaxaPendente={}",
       trigger,
       erpIds.size(),
       ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE,
@@ -216,7 +217,8 @@ public class ConciliationAnalysisService {
       entityManager.clear();
 
       log.info(
-        "🔄 Conciliação de taxas ERP x Adquirente: batch={}/{}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, semContratoValido={}, totalAnalisadas={}",
+        "🔄 Conciliação de taxas ERP x Adquirente: batch={}/{}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, " +
+          "semContratoValido={}, totalAnalisadas={}",
         batchNumber,
         totalBatches,
         batchAnalyzed,
@@ -228,7 +230,8 @@ public class ConciliationAnalysisService {
     }
 
     log.info(
-      "✅ Conciliação de taxas ERP x Adquirente finalizada. trigger={}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, semContratoValido={}, taxasOk={}, semAdquirente={}",
+      "✅ Conciliação de taxas ERP x Adquirente finalizada. trigger={}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, " +
+        "semContratoValido={}, taxasOk={}, semAdquirente={}",
       trigger,
       analyzed,
       updatedErpSales,
@@ -472,7 +475,8 @@ public class ConciliationAnalysisService {
       entityManager.clear();
 
       log.info(
-        "🔄 Conciliação ERP x Adquirente: batch={}/{}, erpAnalisadas={}, acqCandidatas={}, conciliadas={}, atualizadas={}, totalAnalisadas={}, totalConciliadas={}",
+        "🔄 Conciliação ERP x Adquirente: batch={}/{}, erpAnalisadas={}, acqCandidatas={}, conciliadas={}, " +
+          "atualizadas={}, totalAnalisadas={}, totalConciliadas={}",
         batchNumber,
         totalBatches,
         batchAnalyzed,
@@ -494,7 +498,8 @@ public class ConciliationAnalysisService {
     }
 
     log.info(
-      "✅ Conciliação ERP x Adquirente finalizada. trigger={}, analisadas={}, conciliadas={}, atualizadas={}, divergentes={}, semMatchErp={}, semErpNaAdquirenteAtualizadas={}, valorDivergente={}, adquirenteDivergente={}, ambiguas={}",
+      "✅ Conciliação ERP x Adquirente finalizada. trigger={}, analisadas={}, conciliadas={}, atualizadas={}, divergentes={}, " +
+        "semMatchErp={}, semErpNaAdquirenteAtualizadas={}, valorDivergente={}, adquirenteDivergente={}, ambiguas={}",
       trigger,
       analyzed,
       matched,
@@ -531,19 +536,6 @@ public class ConciliationAnalysisService {
       .map(this::toAdjustmentDebitModel)
       .forEach(items::add);
     items.sort(Comparator.comparing(DebitAnalysisModel::debitDate, Comparator.nullsLast(Comparator.reverseOrder())));
-    return page(items, pageable);
-  }
-
-  @Transactional(readOnly = true)
-  public Page<ChargebackAnalysisModel> listChargebacks(Pageable pageable) {
-    List<ChargebackAnalysisModel> items = new ArrayList<>();
-    pendingDebtRepository.findAll().stream().filter(debitChargebackClassifier::isChargeback).map(this::toOpenChargebackModel).forEach(items::add);
-    settledDebtRepository.findAll().stream().filter(debitChargebackClassifier::isChargeback).map(this::toSettledChargebackModel).forEach(items::add);
-    adjustmentRepository.findAll().stream()
-      .filter(debitChargebackClassifier::isChargeback)
-      .map(this::toAdjustmentChargebackModel)
-      .forEach(items::add);
-    items.sort(Comparator.comparing(ChargebackAnalysisModel::disputeDate, Comparator.nullsLast(Comparator.reverseOrder())));
     return page(items, pageable);
   }
 
@@ -662,7 +654,7 @@ public class ConciliationAnalysisService {
   private DebitAnalysisModel toPendingDebitModel(PendingDebtEntity entity) {
     return new DebitAnalysisModel(
       entity.getId(), entity.getDateDebitOrder(), entity.getPaymentDate(), companyName(entity.getCompany()),
-      establishmentName(entity.getEstablishment()), acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), debitChargebackClassifier.type(entity),
+      establishmentName(entity.getEstablishment()), acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), debitChargebackClassifier.type(entity).name(),
       code(entity.getReasonCode()), entity.getReasonDescription(), firstNonNull(entity.getPendingValue(), entity.getValueDebitOrder()),
       entity.getCompensatedValue(), debitChargebackClassifier.status(entity), fileName(entity.getProcessedFile())
     );
@@ -671,26 +663,9 @@ public class ConciliationAnalysisService {
   private DebitAnalysisModel toSettledDebitModel(SettledDebtEntity entity) {
     return new DebitAnalysisModel(
       entity.getId(), entity.getDateDebitOrder(), entity.getLiquidatedDate(), null, null,
-      acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), debitChargebackClassifier.type(entity), code(entity.getReasonCode()),
+      acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), debitChargebackClassifier.type(entity).name(), code(entity.getReasonCode()),
       entity.getReasonDescription(), entity.getValueDebitOrder(), entity.getLiquidatedValue(), debitChargebackClassifier.status(entity),
       fileName(entity.getProcessedFile())
-    );
-  }
-
-  private ChargebackAnalysisModel toOpenChargebackModel(PendingDebtEntity entity) {
-    return new ChargebackAnalysisModel(
-      entity.getId(), entity.getDateOriginalTransaction(), entity.getDateDebitOrder(), null, companyName(entity.getCompany()),
-      establishmentName(entity.getEstablishment()), acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), entity.getNsu(),
-      entity.getAuthorization(), entity.getTid(), entity.getOriginalTransactionValue(), firstNonNull(entity.getPendingValue(), entity.getValueDebitOrder()),
-      code(entity.getReasonCode()), entity.getReasonDescription(), debitChargebackClassifier.chargebackStatus(entity)
-    );
-  }
-
-  private ChargebackAnalysisModel toSettledChargebackModel(SettledDebtEntity entity) {
-    return new ChargebackAnalysisModel(
-      entity.getId(), entity.getDateOriginalTransaction(), entity.getDateDebitOrder(), entity.getLiquidatedDate(), null, null,
-      acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), entity.getNsu(), entity.getAuthorization(), entity.getTid(),
-      entity.getOriginalTransactionValue(), entity.getLiquidatedValue(), code(entity.getReasonCode()), entity.getReasonDescription(), debitChargebackClassifier.chargebackStatus(entity)
     );
   }
 
@@ -698,23 +673,11 @@ public class ConciliationAnalysisService {
     return new DebitAnalysisModel(
       entity.getId(), debitChargebackClassifier.debitDate(entity), debitChargebackClassifier.settlementDate(entity),
       companyName(entity.getCompany()), establishmentName(entity.getEstablishment()), acquirerName(entity.getAcquirer()),
-      flagName(firstNonNull(entity.getRvFlagAdjustment(), entity.getRvFlagOrigin())), debitChargebackClassifier.type(entity),
+      flagName(firstNonNull(entity.getRvFlagAdjustment(), entity.getRvFlagOrigin())), debitChargebackClassifier.type(entity).name(),
       firstNonBlank(code(entity.getAdjustmentReason()), code(entity.getAdjustmentReason2()), entity.getRawAdjustmentCode()),
       firstNonBlank(entity.getAdjustmentDescription(), entity.getAdjustmentType(), entity.getDebitType(), entity.getSourceRecordIdentifier()),
       debitChargebackClassifier.debitValue(entity), debitChargebackClassifier.settledValue(entity),
       debitChargebackClassifier.status(entity), fileName(entity.getProcessedFile())
-    );
-  }
-
-  private ChargebackAnalysisModel toAdjustmentChargebackModel(AdjustmentEntity entity) {
-    return new ChargebackAnalysisModel(
-      entity.getId(), entity.getTransactionDate(), debitChargebackClassifier.debitDate(entity), debitChargebackClassifier.settlementDate(entity),
-      companyName(entity.getCompany()), establishmentName(entity.getEstablishment()), acquirerName(entity.getAcquirer()),
-      flagName(firstNonNull(entity.getRvFlagAdjustment(), entity.getRvFlagOrigin())), entity.getNsu(), entity.getAuthorization(), entity.getTid(),
-      firstNonNull(entity.getTransactionValue(), entity.getOriginalGrossSalesSummaryValue(), entity.getGrossValue()),
-      debitChargebackClassifier.debitValue(entity), firstNonBlank(code(entity.getAdjustmentReason()), code(entity.getAdjustmentReason2()), entity.getRawAdjustmentCode()),
-      firstNonBlank(entity.getAdjustmentDescription(), entity.getAdjustmentType(), entity.getDebitType(), entity.getSourceRecordIdentifier()),
-      debitChargebackClassifier.chargebackStatus(entity)
     );
   }
 
@@ -789,7 +752,7 @@ public class ConciliationAnalysisService {
   private DivergenceAnalysisModel toChargebackDivergence(PendingDebtEntity entity) {
     BigDecimal amount = firstNonNull(entity.getPendingValue(), entity.getValueDebitOrder());
     return new DivergenceAnalysisModel(
-      entity.getId(), "CHARGEBACK_OPEN", "CRITICAL", debitChargebackClassifier.chargebackStatus(entity), "CHARGEBACK", entity.getDateDebitOrder(), companyName(entity.getCompany()),
+      entity.getId(), "CHARGEBACK_OPEN", "CRITICAL", debitChargebackClassifier.chargebackStatus(entity).name(), "CHARGEBACK", entity.getDateDebitOrder(), companyName(entity.getCompany()),
       establishmentName(entity.getEstablishment()), acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), null,
       firstNonBlank(code(entity.getNumberProcessChargeback()), code(entity.getNumberDebitOrder()), code(entity.getNsu()), entity.getAuthorization(), entity.getTid()),
       entity.getOriginalTransactionValue(), amount, abs(amount), firstNonBlank(entity.getReasonDescription(), "Chargeback/contestação em aberto"),
@@ -799,7 +762,7 @@ public class ConciliationAnalysisService {
 
   private DivergenceAnalysisModel toAdjustmentDivergence(AdjustmentEntity entity) {
     boolean chargeback = debitChargebackClassifier.isChargeback(entity);
-    String type = chargeback ? "CHARGEBACK_ADJUSTMENT" : debitChargebackClassifier.type(entity);
+    String type = chargeback ? "CHARGEBACK_ADJUSTMENT" : debitChargebackClassifier.type(entity).name();
     BigDecimal amount = debitChargebackClassifier.debitValue(entity);
     return new DivergenceAnalysisModel(
       entity.getId(), type, chargeback ? "CRITICAL" : "LOW", debitChargebackClassifier.status(entity), "ADJUSTMENT",
@@ -973,7 +936,9 @@ public class ConciliationAnalysisService {
     return totals.entrySet().stream().map(e -> new ConciliationChartPointModel(e.getKey(), e.getValue(), counts.get(e.getKey()))).toList();
   }
 
-  private List<ConciliationChartPointModel> divergencesByType(BigDecimal erpGross, BigDecimal acquirerGross, List<PendingDebtEntity> pendingDebts, List<AdjustmentEntity> adjustments, List<CreditOrderEntity> creditOrders, List<ReleasesBankEntity> bankReleases, List<FeeAnalysisResult> fees) {
+  private List<ConciliationChartPointModel> divergencesByType(
+    BigDecimal erpGross, BigDecimal acquirerGross, List<PendingDebtEntity> pendingDebts, List<AdjustmentEntity> adjustments,
+    List<CreditOrderEntity> creditOrders, List<ReleasesBankEntity> bankReleases, List<FeeAnalysisResult> fees) {
     List<FeeAnalysisResult> feeDivergences = fees.stream().filter(fee -> !"OK".equals(fee.status())).toList();
     List<PendingDebtEntity> chargebackDebts = pendingDebts.stream().filter(debitChargebackClassifier::isChargeback).toList();
     List<AdjustmentEntity> chargebackAdjustments = adjustments.stream().filter(debitChargebackClassifier::isChargeback).toList();

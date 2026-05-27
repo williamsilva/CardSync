@@ -29,12 +29,6 @@ public class ConciliationController {
     return conciliationAnalysisService.listDebits(pageable);
   }
 
-  @GetMapping("/chargebacks")
-  @CheckSecurity.FileProcessing.CanRead
-  public Page<ChargebackAnalysisModel> listChargebacks(Pageable pageable) {
-    return conciliationAnalysisService.listChargebacks(pageable);
-  }
-
   @GetMapping("/bank-settlement")
   @CheckSecurity.FileProcessing.CanRead
   public Page<BankSettlementAnalysisModel> listBankSettlement(Pageable pageable) {
