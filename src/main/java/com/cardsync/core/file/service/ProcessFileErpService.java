@@ -12,7 +12,9 @@ import com.cardsync.core.file.erp.resolver.ModalityResolver;
 import com.cardsync.core.file.erp.validator.TransactionErpValidationError;
 import com.cardsync.core.file.erp.validator.TransactionErpValidationResult;
 import com.cardsync.core.file.erp.validator.TransactionErpValidator;
+import com.cardsync.core.file.util.FileHashService;
 import com.cardsync.core.file.util.MoveFileService;
+import com.cardsync.domain.model.OriginFileEntity;
 import com.cardsync.domain.model.ProcessedFileEntity;
 import com.cardsync.domain.model.ProcessedFileErrorEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
@@ -46,20 +48,24 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ProcessFileErpService {
 
-  private final FileLookupService lookupService;
-  private final MoveFileService moveFileService;
   private final TransactionErpMapper transactionErpMapper;
   private final TransactionErpCsvReader transactionErpCsvReader;
   private final TransactionErpValidator transactionErpValidator;
   private final InstallmentErpGenerator installmentErpGenerator;
-  private final TransactionErpFeeCalculator transactionErpFeeCalculator;
+  private final FileProcessingProperties fileProcessingProperties;
   private final ErpBusinessContextResolver erpBusinessContextResolver;
+  private final TransactionErpFeeCalculator transactionErpFeeCalculator;
+
+  private final FileLookupService lookupService;
+  private final FileHashService fileHashService;
+  private final MoveFileService moveFileService;
+
   private final ProcessedFileRepository processedFileRepository;
   private final TransactionErpRepository transactionErpRepository;
-  private final FileProcessingProperties fileProcessingProperties;
 
   public void processFiles() {
     var paths = fileProcessingProperties.getPathsOrThrow("erp");
+    paths.ensureDirectories();
     int processed = 0;
     int errors = 0;
 
@@ -71,11 +77,17 @@ public class ProcessFileErpService {
         } catch (Exception ex) {
           errors++;
           log.error("❌ Falha no processamento do arquivo ERP {}: {}", file.getFileName(), ex.getMessage(), ex);
+          if (Files.exists(file)) {
+            moveFileService.moveNow(file, paths.getError());
+          }
         }
       }
 
       if (errors > 0) {
-        throw new IllegalStateException("Processamento ERP finalizado com " + errors + " erro(s) e " + processed + " arquivo(s) processado(s).");
+        log.warn("⚠ Processamento ERP finalizado com {} erro(s) e {} arquivo(s) processado(s). "
+          + "Os arquivos com erro foram movidos para a pasta de erro; a esteira continua.", errors, processed);
+      } else {
+        log.info("✅ Processamento ERP finalizado. {} arquivo(s) processado(s).", processed);
       }
     } catch (Exception ex) {
       log.error("❌ Erro ao acessar/processar pasta ERP: {}", ex.getMessage(), ex);
@@ -87,8 +99,27 @@ public class ProcessFileErpService {
   public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
     ProcessedFileEntity processedFile = null;
     try {
+      var originFile = lookupService.origin("ERP");
+      String contentHash = fileHashService.sha256(file);
+
+      var duplicatedFile = processedFileRepository.findFirstByContentHash(contentHash)
+        .or(() -> processedFileRepository.findFirstByFileAndOriginFile(file.getFileName().toString(), originFile));
+
+      if (duplicatedFile.isPresent()) {
+        ProcessedFileEntity original = duplicatedFile.get();
+        log.warn(
+          "⚠ Arquivo ERP duplicado ignorado: nome={}, arquivoOriginal={}, dataArquivo={}, sha256={}",
+          file.getFileName(),
+          original.getFile(),
+          original.getDateFile(),
+          contentHash
+        );
+        moveFileService.moveNow(file, paths.getDuplicate(), original.getDateFile());
+        return;
+      }
+
       List<TransactionErpCsvDto> rows = transactionErpCsvReader.read(file);
-      processedFile = createProcessedFile(file, rows);
+      processedFile = createProcessedFile(file, rows, originFile, contentHash);
       processedFile.markProcessing();
       processedFile.setTotalLines(transactionErpCsvReader.countPhysicalLines(file));
       processedFileRepository.save(processedFile);
@@ -105,7 +136,7 @@ public class ProcessFileErpService {
           null
         ));
         finishFile(processedFile, FileStatusEnum.INVALID, "Arquivo inválido: sem linhas importáveis.");
-        moveFileService.moveAfterCommit(file, paths.getError());
+        moveFileService.moveAfterCommit(file, paths.getError(), processedFile.getDateFile());
         return;
       }
 
@@ -194,9 +225,9 @@ public class ProcessFileErpService {
       finishFile(processedFile, finalStatus, message);
 
       if (finalStatus == FileStatusEnum.INVALID || finalStatus == FileStatusEnum.ERROR) {
-        moveFileService.moveAfterCommit(file, paths.getError());
+        moveFileService.moveAfterCommit(file, paths.getError(), processedFile.getDateFile());
       } else {
-        moveFileService.moveAfterCommit(file, paths.getProcessed());
+        moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
       }
 
       log.info("✅ Arquivo ERP {} finalizado. status={}, {}", file.getFileName(), finalStatus, message);
@@ -205,27 +236,28 @@ public class ProcessFileErpService {
           file.getFileName(), pendingContract, pendingBusinessContext);
       }
     } catch (DataIntegrityViolationException ex) {
-      log.error("⚠ Arquivo ERP {} já processado anteriormente.", file.getFileName());
-      if (processedFile != null) {
-        processedFile.setStatus(FileStatusEnum.DUPLICATE);
-        processedFile.setErrorMessage("Arquivo duplicado: " + file.getFileName());
-      }
-      moveFileService.moveAfterRollback(file, paths.getDuplicate());
-      throw ex;
+      // Proteção para concorrência: outro processo pode registrar o mesmo arquivo
+      // entre a consulta preventiva e o insert. Duplicidade é uma situação esperada,
+      // portanto não deve gerar stack trace de erro no console.
+      log.warn("⚠ Arquivo ERP {} já foi registrado por outro processamento e será movido para duplicados.", file.getFileName());
+      moveFileService.moveAfterRollback(file, paths.getDuplicate(), processedFile == null ? null : processedFile.getDateFile());
     } catch (Exception ex) {
       log.error("❌ Erro ao processar arquivo ERP {}: {}", file.getFileName(), ex.getMessage(), ex);
       if (processedFile != null) {
         processedFile.setStatus(FileStatusEnum.ERROR);
         processedFile.setErrorMessage(safeMessage(ex));
       }
-      moveFileService.moveAfterRollback(file, paths.getError());
+      moveFileService.moveAfterRollback(file, paths.getError(), processedFile == null ? null : processedFile.getDateFile());
       throw new IllegalStateException(ex);
     }
   }
 
-  private ProcessedFileEntity createProcessedFile(Path file, List<TransactionErpCsvDto> rows) {
+  private ProcessedFileEntity createProcessedFile(
+    Path file, List<TransactionErpCsvDto> rows, OriginFileEntity originFile, String contentHash) {
+
     ProcessedFileEntity processedFile = new ProcessedFileEntity();
-    processedFile.setOriginFile(lookupService.origin("ERP"));
+    processedFile.setOriginFile(originFile);
+    processedFile.setContentHash(contentHash);
     processedFile.setGroup(FileGroupEnum.ERP);
     processedFile.setStatus(FileStatusEnum.RECEIVED);
     processedFile.setDateImport(OffsetDateTime.now());
@@ -234,6 +266,7 @@ public class ProcessFileErpService {
     processedFile.setDateFile(resolveDateFile(rows));
     processedFile.setTypeFile("Relatório de transações TEF");
     processedFile.setVersion("MultiVendas TEF");
+
     if (fileProcessingProperties.getErp() != null) {
       processedFile.setCommercialName(fileProcessingProperties.getErp().getDefaultCommercialName());
       processedFile.setPvGroupNumber(fileProcessingProperties.getErp().getDefaultPvGroupNumber());
@@ -281,7 +314,8 @@ public class ProcessFileErpService {
       }
 
       tx.setCommercialStatus(status);
-      tx.setCommercialStatusMessage("Venda importada, mas pendente de vínculo comercial. Revise CNPJ da empresa e PV/estabelecimento informados no arquivo ERP.");
+      tx.setCommercialStatusMessage("Venda importada, mas pendente de vínculo comercial. Revise CNPJ da empresa " +
+        "e PV/estabelecimento informados no arquivo ERP.");
       tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
       return;
     }
@@ -289,7 +323,8 @@ public class ProcessFileErpService {
     if (!contractFound) {
       tx.setMissingContractAtSale(Boolean.TRUE);
       tx.setCommercialStatus(ErpCommercialStatusEnum.PENDING_CONTRACT);
-      tx.setCommercialStatusMessage("Venda importada sem contrato/taxa vigente na data da transação. Na conciliação de taxa, se houver venda correspondente na adquirente, a taxa real da adquirente será assumida para evitar falsa divergência.");
+      tx.setCommercialStatusMessage("Venda importada sem contrato/taxa vigente na data da transação. Na conciliação " +
+        "de taxa, se houver venda correspondente na adquirente, a taxa real da adquirente será assumida para evitar falsa divergência.");
       tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
       return;
     }

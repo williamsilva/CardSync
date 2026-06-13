@@ -35,7 +35,7 @@ public class BankStatementClassifierService {
     classification.setNormalizedText(normalized);
     classification.addPvCandidates(textSignalResolver.extractPvCandidates(rawText));
 
-    Optional<BankingDomicileEntity> domicile = bankingDomicileResolver.resolve(agency, currentAccount, companyFromCnab);
+    Optional<BankingDomicileEntity> domicile = bankingDomicileResolver.resolve(layout != null ? layout.getBankCode() : null, agency, currentAccount, companyFromCnab);
     domicile.ifPresent(classification::setBankingDomicile);
 
     Optional<EstablishmentEntity> establishment = resolveEstablishment(classification.getPvCandidates())

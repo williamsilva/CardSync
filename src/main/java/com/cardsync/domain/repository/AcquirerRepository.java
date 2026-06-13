@@ -52,4 +52,9 @@ public interface AcquirerRepository extends JpaRepository<AcquirerEntity, UUID>,
   Optional<AcquirerEntity> findByFileIdentifierIgnoreCase(String fileIdentifier);
 
   Optional<AcquirerEntity> findByFantasyNameIgnoreCase(String fantasyName);
+
+  List<AcquirerEntity> findAllByStatusOrderByFantasyNameAsc(Integer status);
+
+  List<AcquirerEntity> findAllByOrderByFantasyNameAsc();
+
 }

@@ -2,11 +2,13 @@ package com.cardsync.bff.controller.v1.representation.model.fileprocessing;
 
 import com.cardsync.domain.model.enums.FileGroupEnum;
 import com.cardsync.domain.model.enums.FileStatusEnum;
+import org.springframework.hateoas.server.core.Relation;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+@Relation(collectionRelation = "content")
 public record ProcessedFileModel(
   UUID id,
   String file,

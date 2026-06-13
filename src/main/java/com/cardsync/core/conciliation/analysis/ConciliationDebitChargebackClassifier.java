@@ -5,6 +5,7 @@ import com.cardsync.domain.model.InstallmentUnschedulingEntity;
 import com.cardsync.domain.model.PendingDebtEntity;
 import com.cardsync.domain.model.SettledDebtEntity;
 import com.cardsync.domain.model.enums.ChargebackAnalysisStatus;
+import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
 import com.cardsync.domain.model.enums.ChargebackEventSourceType;
 import com.cardsync.domain.model.enums.ChargebackReasonCode;
 import org.springframework.stereotype.Component;
@@ -49,7 +50,8 @@ public class ConciliationDebitChargebackClassifier {
       return true;
     }
 
-    return isSaleChargebackReason(entity.getAdjustmentReason(), entity.getAdjustmentReason2(), entity.getAdjustmentDescription());
+    AdjustmentReasonEnum reason = entity.getAdjustmentReason();
+    return isSaleChargebackReason(reason != null ? reason.getCode() : null, entity.getAdjustmentReason2(), entity.getAdjustmentDescription());
   }
 
   public boolean isChargeback(InstallmentUnschedulingEntity entity) {
@@ -143,26 +145,6 @@ public class ConciliationDebitChargebackClassifier {
     return "APPLIED";
   }
 
-  public ChargebackAnalysisStatus chargebackStatus(PendingDebtEntity entity) {
-    BigDecimal pending = nz(entity.getPendingValue());
-    BigDecimal compensated = nz(entity.getCompensatedValue());
-    if (pending.compareTo(ZERO) <= 0 && compensated.compareTo(ZERO) > 0) {
-      return ChargebackAnalysisStatus.REVERSED;
-    }
-    return ChargebackAnalysisStatus.PENDING_DEBIT;
-  }
-
-  public ChargebackAnalysisStatus chargebackStatus(SettledDebtEntity entity) {
-    return ChargebackAnalysisStatus.LIQUIDATED;
-  }
-
-  public ChargebackAnalysisStatus chargebackStatus(AdjustmentEntity entity) {
-    if (isCreditAdjustment(entity)) return ChargebackAnalysisStatus.REVERSED;
-    String recordType = trim(entity.getRecordType());
-    if ("038".equals(recordType) || "054".equals(recordType)) return ChargebackAnalysisStatus.BANK_DEBIT_SCHEDULED;
-    return ChargebackAnalysisStatus.NET_COMPENSATION_SCHEDULED;
-  }
-
   public ChargebackAnalysisStatus chargebackStatus(InstallmentUnschedulingEntity entity) {
     return ChargebackAnalysisStatus.DESCHEDULED;
   }
@@ -218,17 +200,6 @@ public class ConciliationDebitChargebackClassifier {
       entity.getTransactionDate(),
       entity.getNegotiationDate()
     );
-  }
-
-  public boolean contributesToDebitAnalysis(AdjustmentEntity entity) {
-    if (entity == null) return false;
-    return isDebitAdjustment(entity)
-      || isCreditAdjustment(entity)
-      || isChargeback(entity)
-      || hasCancellationTerms(entity)
-      || notBlank(entity.getAdjustmentDescription())
-      || notBlank(entity.getAdjustmentType())
-      || notBlank(entity.getDebitType());
   }
 
   public boolean isDebitAdjustment(AdjustmentEntity entity) {

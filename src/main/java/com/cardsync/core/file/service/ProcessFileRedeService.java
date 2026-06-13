@@ -1,9 +1,11 @@
 package com.cardsync.core.file.service;
 
 import com.cardsync.core.file.config.FileProcessingProperties;
+import com.cardsync.core.file.util.FileHashService;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.FileUtil;
 import com.cardsync.core.file.util.MoveFileService;
+import com.cardsync.domain.repository.ProcessedFileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,14 +23,20 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 public class ProcessFileRedeService {
+
   private final MoveFileService moveFileService;
+  private final FileHashService fileHashService;
   private final ProcessRedeEeVcService processRedeEeVcService;
   private final ProcessRedeEeFiService processRedeEeFiService;
   private final ProcessRedeEeVdService processRedeEeVdService;
+
+  private final ProcessedFileRepository processedFileRepository;
+
   private final FileProcessingProperties fileProcessingProperties;
 
   public void processFiles() {
     var paths = fileProcessingProperties.getPathsOrThrow("rede");
+    paths.ensureDirectories();
     int processed = 0;
     int errors = 0;
 
@@ -45,7 +53,21 @@ public class ProcessFileRedeService {
             continue;
           }
 
-          if (validateAndProcess(file, paths)) {
+          String contentHash = fileHashService.sha256(file);
+          var originalProcessedFile = processedFileRepository.findFirstByContentHash(contentHash);
+          if (originalProcessedFile.isPresent()) {
+            log.warn(
+              "⚠ Arquivo Rede duplicado por conteúdo: nome={}, sha256={}. Movendo para {}.",
+              file.getFileName(),
+              contentHash,
+              paths.getDuplicate()
+            );
+            moveFileService.moveNow(file, paths.getDuplicate(), originalProcessedFile.get().getDateFile());
+            processed++;
+            continue;
+          }
+
+          if (validateAndProcess(file, paths, contentHash)) {
             processed++;
           } else {
             errors++;
@@ -64,7 +86,10 @@ public class ProcessFileRedeService {
       }
 
       if (errors > 0) {
-        throw new IllegalStateException("Processamento Rede finalizado com " + errors + " erro(s) e " + processed + " arquivo(s) processado(s).");
+        log.warn("⚠ Processamento Rede finalizado com {} erro(s) e {} arquivo(s) processado(s). "
+          + "Os arquivos com erro foram movidos para a pasta de erro; a esteira continua.", errors, processed);
+      } else {
+        log.info("✅ Processamento Rede finalizado. {} arquivo(s) processado(s).", processed);
       }
     } catch (Exception ex) {
       log.error("❌ Erro ao acessar/processar pasta Rede: {}", ex.getMessage(), ex);
@@ -72,23 +97,23 @@ public class ProcessFileRedeService {
     }
   }
 
-  private boolean validateAndProcess(Path file, FileProcessingProperties.FilePaths paths) {
+  private boolean validateAndProcess(Path file, FileProcessingProperties.FilePaths paths, String contentHash) {
     try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
       String firstLine = reader.readLine();
       String identifier = resolveIdentifier(firstLine);
 
       if ("002".equals(identifier)) {
-        processRedeEeVcService.processFile(file, paths);
+        processRedeEeVcService.processFile(file, paths, contentHash);
         return true;
       }
 
       if ("030".equals(identifier)) {
-        processRedeEeFiService.processFile(file, paths);
+        processRedeEeFiService.processFile(file, paths, contentHash);
         return true;
       }
 
       if (isEevdHeader(firstLine, identifier)) {
-        processRedeEeVdService.processFile(file, paths);
+        processRedeEeVdService.processFile(file, paths, contentHash);
         return true;
       }
 

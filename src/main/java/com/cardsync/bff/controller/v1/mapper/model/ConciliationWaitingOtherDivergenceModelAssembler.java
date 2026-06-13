@@ -37,7 +37,6 @@ public class ConciliationWaitingOtherDivergenceModelAssembler extends Representa
 
     model.setId(erp.getId());
 
-    // Mantém os campos flat já usados na tabela, priorizando o lado ERP.
     model.setCvNsu(erp.getNsu());
     model.setCapture(erp.getCapture());
     model.setSaleDate(erp.getSaleDate());
@@ -101,7 +100,7 @@ public class ConciliationWaitingOtherDivergenceModelAssembler extends Representa
     side.setDiscountValue(acq.getDiscountValue());
     side.setInstallment(acq.getInstallment());
     side.setAuthorization(acq.getAuthorization());
-    side.setStatusTransaction(acq.getStatusTransaction());
+    side.setStatusTransaction(acq.getStatusTransaction().getCode());
     side.setStatusTransactionReason(acq.getStatusTransactionReason());
     side.setAcquirer(toAcquirer(acq.getAcquirer()));
     side.setFlag(toFlag(acq.getFlag()));

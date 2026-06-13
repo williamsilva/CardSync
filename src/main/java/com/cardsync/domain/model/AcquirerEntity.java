@@ -2,6 +2,7 @@ package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.StatusEnum;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -10,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +24,9 @@ import java.util.List;
 public class AcquirerEntity extends AuditableEntityBase {
 
   private Integer status;
+
+  @Column(name = "status_date")
+  private OffsetDateTime statusDate;
 
   private String cnpj;
   private String fantasyName;
@@ -39,7 +44,14 @@ public class AcquirerEntity extends AuditableEntityBase {
   }
 
   public void setStatus(StatusEnum status) {
-    this.status = (status!=null ? status:StatusEnum.NULL).getCode();
+    StatusEnum normalizedStatus = status != null ? status : StatusEnum.NULL;
+    Integer newCode = normalizedStatus.getCode();
+
+    if (!java.util.Objects.equals(this.status, newCode)) {
+      this.statusDate = OffsetDateTime.now();
+    }
+
+    this.status = newCode;
   }
 
   public void activate() {

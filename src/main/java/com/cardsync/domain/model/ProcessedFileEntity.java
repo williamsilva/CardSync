@@ -26,6 +26,10 @@ public class ProcessedFileEntity extends AuditableEntityBase {
   @Column(name = "file_name", nullable = false, length = 255)
   private String file;
 
+  /** SHA-256 do conteúdo bruto do arquivo, independente do nome. */
+  @Column(name = "content_hash", length = 64, unique = true)
+  private String contentHash;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "file_group", nullable = false, length = 20)
   private FileGroupEnum group;

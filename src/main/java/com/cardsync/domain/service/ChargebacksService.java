@@ -9,11 +9,12 @@ import com.cardsync.domain.filter.ChargebackAnalysisFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.ChargebackAnalysisStatus;
+import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
 import com.cardsync.domain.model.enums.ChargebackEventSourceType;
 import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.InstallmentUnschedulingRepository;
 import com.cardsync.domain.repository.PendingDebtRepository;
-import com.cardsync.domain.repository.RedeRequestNoticeRepository;
+import com.cardsync.domain.repository.RequestNoticeRepository;
 import com.cardsync.domain.repository.SettledDebtRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +38,11 @@ import java.util.stream.Stream;
 public class ChargebacksService {
 
   private final AdjustmentRepository adjustmentRepository;
-  private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
   private final PendingDebtRepository pendingDebtRepository;
   private final SettledDebtRepository settledDebtRepository;
-  private final RedeRequestNoticeRepository redeRequestNoticeRepository;
+  private final RequestNoticeRepository redeRequestNoticeRepository;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
+  private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
 
   @Transactional(readOnly = true)
   public Page<ChargebackAnalysisModel> listChargebacks(Pageable pageable, ListQueryDto<ChargebackAnalysisFilter> body) {
@@ -219,7 +220,7 @@ public class ChargebacksService {
     return events;
   }
 
-  private ChargebackAnalysisModel toRequestChargebackModel(RedeRequestNoticeEntity entity) {
+  private ChargebackAnalysisModel toRequestChargebackModel(RequestNoticeEntity entity) {
     return ChargebackAnalysisModel.builder()
       .id(entity.getId())
       .saleDate(entity.getSaleDate())
@@ -351,9 +352,9 @@ public class ChargebacksService {
       .pendingValue(entity.getPendingValue())
       .settledValue(debitChargebackClassifier.settledValue(entity))
       .compensatedValue(debitChargebackClassifier.settledValue(entity))
-      .reasonCode(firstNonBlank(code(entity.getAdjustmentReason()), code(entity.getAdjustmentReason2()), entity.getRawAdjustmentCode()))
+      .reasonCode(firstNonBlank(adjustmentReasonCode(entity), code(entity.getAdjustmentReason2()), entity.getRawAdjustmentCode()))
       .reasonDescription(firstNonBlank(entity.getAdjustmentDescription(), entity.getAdjustmentType(), entity.getDebitType(), entity.getSourceRecordIdentifier()))
-      .sourceType(adjustmentSourceType(entity))
+      .sourceType(debitChargebackClassifier.type(entity))
       .processedFile(fileName(entity.getProcessedFile()))
       .status(status)
       .build();
@@ -597,13 +598,6 @@ public class ChargebacksService {
     return value == null ? "" : value;
   }
 
-  private ChargebackAnalysisStatus chargebackRequestStatus(RedeRequestNoticeEntity entity) {
-    if (entity == null) return ChargebackAnalysisStatus.REQUEST_RECEIVED;
-    LocalDate deadline = entity.getDeadline();
-    if (deadline == null) return ChargebackAnalysisStatus.REQUEST_RECEIVED;
-    return deadline.isBefore(LocalDate.now()) ? ChargebackAnalysisStatus.DOCUMENTATION_OVERDUE : ChargebackAnalysisStatus.DOCUMENTATION_DUE;
-  }
-
   private ChargebackAnalysisStatus pendingChargebackStatus(PendingDebtEntity entity) {
     if (entity == null) return ChargebackAnalysisStatus.PENDING_DEBIT;
     if (entity.getPendingValue() != null && entity.getPendingValue().compareTo(BigDecimal.ZERO) <= 0
@@ -621,10 +615,6 @@ public class ChargebacksService {
     if ("045".equals(recordType) || "056".equals(recordType)) return ChargebackAnalysisStatus.LIQUIDATED;
     if ("038".equals(recordType) || "054".equals(recordType)) return ChargebackAnalysisStatus.BANK_DEBIT_SCHEDULED;
     return ChargebackAnalysisStatus.NET_COMPENSATION_SCHEDULED;
-  }
-
-  private ChargebackEventSourceType adjustmentSourceType(AdjustmentEntity entity) {
-    return debitChargebackClassifier.type(entity);
   }
 
   private String requestDescription(Integer requestCode) {
@@ -656,6 +646,11 @@ public class ChargebacksService {
 
   private String code(BigInteger value) {
     return value != null ? String.valueOf(value) : null;
+  }
+
+  private String adjustmentReasonCode(AdjustmentEntity entity) {
+    AdjustmentReasonEnum reason = entity.getAdjustmentReason();
+    return reason != null ? code(reason.getCode()) : null;
   }
 
   private String flagName(FlagEntity flag) {

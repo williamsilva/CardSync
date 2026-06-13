@@ -29,23 +29,18 @@ public class ConciliationWaitingErpAdvancedFields extends BaseSpecificationSuppo
     spec = spec.and(contains(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.authorization(), "authorization"));
 
+    spec = spec.and(offsetDateTimePeriod("saleDate", filter.periodSaleDate(), filter.saleDate(),true));
+
     spec = spec.and(currencyRangeValue("grossValue", filter.grossValueStart(), filter.grossValueEnd()));
     spec = spec.and(currencyRangeValue("liquidValue", filter.liquidValueStart(), filter.liquidValueEnd()));
 
     spec = spec.and(inCodes("capture", filter.capture(), CaptureEnum::getCode));
     spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode ));
 
-    spec = spec.and(inPath(
-      filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull, "acquirer", "id"));
-
-    spec = spec.and(inPath(
-      filter.flags(), BaseSpecificationSupport::parseUuidOrNull,  "flag", "id"));
-
-    spec = spec.and(inPath(
-      filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
-
-    spec = spec.and(inPath(
-      filter.companies(), BaseSpecificationSupport::parseUuidOrNull, "company", "id"));
+    spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,  "flag", "id"));
+    spec = spec.and(inPath(filter.companies(), BaseSpecificationSupport::parseUuidOrNull, "company", "id"));
+    spec = spec.and(inPath(filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull, "acquirer", "id"));
+    spec = spec.and(inPath(filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
 
     return spec;
   }

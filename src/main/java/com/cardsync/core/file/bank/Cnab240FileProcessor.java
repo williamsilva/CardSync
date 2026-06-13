@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
@@ -28,6 +29,7 @@ import java.util.*;
 public class Cnab240FileProcessor {
 
   private static final int STATUS_PENDING = 1;
+  private static final Charset CNAB_CHARSET = Charset.forName("windows-1252");
 
   /**
    * Limite defensivo compatível com colunas DECIMAL(18,8), mantendo folga para evitar
@@ -37,18 +39,19 @@ public class Cnab240FileProcessor {
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
+  private final BankStatementClassifierService bankStatementClassifierService;
+
   private final BankRepository bankRepository;
   private final CompanyRepository companyRepository;
   private final ReleasesBankRepository releasesBankRepository;
   private final ProcessedFileRepository processedFileRepository;
-  private final BankStatementClassifierService bankStatementClassifierService;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
   public void processFile(Path file, FileProcessingProperties.FilePaths paths, Cnab240BankLayout layout) {
     ProcessedFileEntity processedFile = null;
     try {
       log.info("▶ Iniciando leitura CNAB240 {}: {}", layout.getDisplayName(), file.getFileName());
-      List<String> lines = Files.readAllLines(file);
+      List<String> lines = Files.readAllLines(file, CNAB_CHARSET);
       processedFile = createProcessedFile(file, lines.size(), layout);
       processedFile.markProcessing();
 
@@ -142,7 +145,20 @@ public class Cnab240FileProcessor {
 
       processedFileRepository.save(processedFile);
       releasesBankRepository.saveAll(releases);
-      moveFileService.moveAfterCommit(file, paths.getProcessed());
+
+      BankingDomicileEntity archiveDomicile = releases.stream()
+        .map(ReleasesBankEntity::getBankingDomicile)
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
+
+      moveFileService.moveAfterCommitBank(
+        file,
+        paths.getProcessed(),
+        processedFile.getDateFile(),
+        archiveDomicile == null ? null : archiveDomicile.getAgency(),
+        archiveDomicile == null ? null : archiveDomicile.getCurrentAccount()
+      );
 
       if (!unidentified.isEmpty()) {
         log.warn("⚠ CNAB240 {} possui tipos de registro não mapeados: {}", file.getFileName(), unidentified);
@@ -155,7 +171,13 @@ public class Cnab240FileProcessor {
     } catch (DataIntegrityViolationException ex) {
       log.error("⚠ Arquivo CNAB240 {} já processado anteriormente.", file.getFileName());
       if (processedFile != null) processedFile.setStatus(FileStatusEnum.DUPLICATE);
-      moveFileService.moveAfterRollback(file, paths.getDuplicate());
+      moveFileService.moveAfterRollbackBank(
+        file,
+        paths.getDuplicate(),
+        processedFile == null ? null : processedFile.getDateFile(),
+        null,
+        null
+      );
       throw ex;
     } catch (Exception ex) {
       log.error("❌ Erro ao processar CNAB240 {}: {}", file.getFileName(), ex.getMessage(), ex);
@@ -163,7 +185,13 @@ public class Cnab240FileProcessor {
         processedFile.setStatus(FileStatusEnum.ERROR);
         processedFile.setErrorMessage(safeMessage(ex));
       }
-      moveFileService.moveAfterRollback(file, paths.getError());
+      moveFileService.moveAfterRollbackBank(
+        file,
+        paths.getError(),
+        processedFile == null ? null : processedFile.getDateFile(),
+        null,
+        null
+      );
       throw new IllegalStateException(ex);
     }
   }

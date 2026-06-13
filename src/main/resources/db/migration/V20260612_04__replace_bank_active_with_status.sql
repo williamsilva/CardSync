@@ -1,0 +1,8 @@
+ALTER TABLE cs_bank ADD COLUMN status INT NOT NULL DEFAULT 1 AFTER code;
+
+UPDATE cs_bank SET status = CASE
+  WHEN active = TRUE THEN 1
+  ELSE 2
+END;
+
+ALTER TABLE cs_bank DROP COLUMN active;

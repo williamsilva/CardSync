@@ -3,6 +3,7 @@ package com.cardsync.bff.controller.v1;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
+import com.cardsync.core.conciliation.analysis.ConciliationManualSwapReconciliationService;
 import com.cardsync.core.conciliation.analysis.ErpAcquirerResolutionService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
@@ -24,6 +25,7 @@ public class ConciliationWaitingController {
   private final ConciliationWaitingService conciliationWaitingService;
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final ErpAcquirerResolutionService erpAcquirerResolutionService;
+  private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
 
   @PostMapping("/missing-acquirer")
   @CheckSecurity.FileProcessing.CanRead
@@ -113,8 +115,11 @@ public class ConciliationWaitingController {
 
   @PostMapping("/erp/{erpId}/mark-deleted")
   @CheckSecurity.FileProcessing.CanProcess
-  public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(@PathVariable UUID erpId) {
-    return conciliationWaitingService.markErpAsDeletedMissingAcquirer(erpId);
+  public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(
+    @PathVariable UUID erpId,
+    @RequestBody ErpMarkDeletedRequestModel request
+  ) {
+    return conciliationWaitingService.markErpAsDeletedMissingAcquirer(erpId, request);
   }
 
   @PostMapping("/erp/mark-deleted-batch")
@@ -122,7 +127,7 @@ public class ConciliationWaitingController {
   public ErpAcquirerBatchResolutionResultModel markErpAsDeletedMissingAcquirerBatch(
     @RequestBody ErpAcquirerBatchRequestModel request
   ) {
-    return conciliationWaitingService.markErpAsDeletedMissingAcquirerBatch(request.transactionIds());
+    return conciliationWaitingService.markErpAsDeletedMissingAcquirerBatch(request);
   }
 
   @GetMapping("/compare")
@@ -138,6 +143,12 @@ public class ConciliationWaitingController {
   @CheckSecurity.FileProcessing.CanRead
   public ReconcileErpAcquirerResultModel reconcileErpVsAcquirer() {
     return conciliationAnalysisService.reconcileErpWithAcquirerBusinessContext();
+  }
+
+  @PostMapping("/reconcile-manual-swapped")
+  @CheckSecurity.FileProcessing.CanRead
+  public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
+    return conciliationManualSwapReconciliationService.reconcileManualSwapped();
   }
 
   @PostMapping("/reconcile-fees")

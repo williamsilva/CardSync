@@ -28,13 +28,20 @@ public interface InstallmentAcqRepository extends JpaRepository<InstallmentAcqEn
     left join fetch tx.acquirer
     left join fetch tx.establishment
     left join fetch tx.flag
-    left join fetch tx.salesSummary
-    left join fetch ia.creditOrder
+    left join fetch tx.salesSummary ss
+    left join fetch ia.creditOrder co
+    left join fetch co.bankingDomicile
     where ia.releaseBank is null
       and (ia.statusPaymentBank is null or ia.statusPaymentBank = :pendingStatus)
       and tx.company.id = :companyId
       and (:acquirerId is null or tx.acquirer.id = :acquirerId)
       and (:establishmentId is null or tx.establishment.id = :establishmentId)
+      and (:flagId is null or tx.flag.id = :flagId)
+      and (
+        :bankingDomicileId is null
+        or co.bankingDomicile.id = :bankingDomicileId
+        or ss.bankingDomicile.id = :bankingDomicileId
+      )
       and ia.expectedPaymentDate between :dateFrom and :dateTo
     order by ia.expectedPaymentDate asc, ia.liquidValue asc
   """)
@@ -43,6 +50,8 @@ public interface InstallmentAcqRepository extends JpaRepository<InstallmentAcqEn
     @Param("companyId") UUID companyId,
     @Param("acquirerId") UUID acquirerId,
     @Param("establishmentId") UUID establishmentId,
+    @Param("bankingDomicileId") UUID bankingDomicileId,
+    @Param("flagId") UUID flagId,
     @Param("dateFrom") LocalDate dateFrom,
     @Param("dateTo") LocalDate dateTo
   );

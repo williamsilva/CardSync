@@ -18,7 +18,13 @@ public class SalesSummaryMinimalModel extends RepresentationModel<@NonNull Sales
 
   private Integer agency;
   private Integer pvNumber;
+  private Integer modality;
+  private Integer lineNumber;
+  private Integer numberCvNsu;
   private Integer currentAccount;
+
+  private String statusPaymentBank;
+  private String transactionsStatus;
 
   private BankingDomicileMinimalModel bankingDomicile;
 }

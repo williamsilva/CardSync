@@ -32,8 +32,8 @@ public class TransactionErpCsvReader {
     this.fileProcessingProperties = fileProcessingProperties;
   }
 
-  private static final Charset FILE_CHARSET = Charset.forName("Windows-1252");
   private static final ZoneId DEFAULT_ZONE = ZoneId.of("America/Sao_Paulo");
+  private static final Charset FILE_CHARSET = Charset.forName("Windows-1252");
 
   private static final List<DateTimeFormatter> DATE_TIME_FORMATTERS = List.of(
     DateTimeFormatter.ISO_LOCAL_DATE_TIME,
@@ -164,9 +164,38 @@ public class TransactionErpCsvReader {
         || normalized.contains("operadora")
         || normalized.contains("bandeira");
 
-      if (hasAmount && hasDate && (hasTransaction || hasAcquirerOrFlag)) return i;
+      if (hasAmount && hasDate && (hasTransaction || hasAcquirerOrFlag)) {
+        // Valida o candidato: a linha seguinte com dados deve ter ao menos 2 colunas
+        // preenchidas — descarta linhas de título/sumário que passaram nos critérios acima.
+        if (headerCandidateHasDataBelow(lines, i)) return i;
+      }
     }
     return -1;
+  }
+
+  /**
+   * Verifica se, após o candidato a cabeçalho na posição {@code headerIndex}, existe ao
+   * menos uma linha de dados com múltiplas colunas preenchidas. Isso evita confundir linhas
+   * de sumário no início do arquivo (que podem conter as palavras "valor" e "data") com o
+   * cabeçalho real da tabela.
+   */
+  private boolean headerCandidateHasDataBelow(List<String> lines, int headerIndex) {
+    String candidateLine = lines.get(headerIndex);
+    String delimiter = detectDelimiter(candidateLine);
+    List<String> candidateColumns = splitCsv(candidateLine, delimiter);
+
+    // O cabeçalho real tem múltiplas colunas; se o candidato tem só 1, descarta.
+    if (candidateColumns.size() < 2) return false;
+
+    // Procura a próxima linha de dados não-vazia e verifica se ela tem ao menos 2 colunas.
+    for (int j = headerIndex + 1; j < Math.min(headerIndex + 10, lines.size()); j++) {
+      String dataLine = lines.get(j);
+      if (dataLine == null || dataLine.isBlank()) continue;
+      List<String> dataColumns = splitCsv(dataLine, delimiter);
+      long nonBlank = dataColumns.stream().filter(v -> v != null && !v.isBlank()).count();
+      if (nonBlank >= 2) return true;
+    }
+    return false;
   }
 
   private boolean isSkippableNonTransactionLine(String line, List<String> values, Map<String, Integer> headerMap) {

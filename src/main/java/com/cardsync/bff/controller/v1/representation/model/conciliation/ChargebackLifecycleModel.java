@@ -21,43 +21,40 @@ import java.util.List;
 @Relation(collectionRelation = "content")
 public class ChargebackLifecycleModel {
 
-  private String trackingKey;
-
-  private ChargebackAnalysisStatus currentStatus;
-  private LocalDate firstEventDate;
-  private LocalDate lastEventDate;
-
-  private String company;
-  private String establishment;
-  private String acquirer;
-  private String flag;
+  private Long nsu;
 
   private Integer pvNumber;
-  private Integer originalPvNumber;
   private Integer rvNumber;
+  private Integer originalPvNumber;
   private Integer originalRvNumber;
 
-  private Long nsu;
-  private String authorization;
   private String tid;
-  private String orderNumber;
-
-  private String processNumber;
-  private String debitOrderNumber;
-  private String retentionProcessNumber;
-
-  private BigDecimal saleValue;
-  private BigDecimal disputedValue;
-  private BigDecimal pendingValue;
-  private BigDecimal settledValue;
-  private BigDecimal compensatedValue;
-
+  private String flag;
+  private String company;
+  private String acquirer;
   private String reasonCode;
+  private String trackingKey;
+  private String orderNumber;
+  private String establishment;
+  private String processNumber;
+  private String authorization;
+  private String debitOrderNumber;
+  private String compensationCode;
   private String reasonDescription;
   private String requestedDocuments;
-
-  private String compensationCode;
+  private String retentionProcessNumber;
   private String compensationDescription;
+
+  private BigDecimal saleValue;
+  private BigDecimal pendingValue;
+  private BigDecimal settledValue;
+  private BigDecimal disputedValue;
+  private BigDecimal compensatedValue;
+
+  private LocalDate lastEventDate;
+  private LocalDate firstEventDate;
+
+  private ChargebackAnalysisStatus currentStatus;
 
   @Builder.Default
   private List<ChargebackTimelineEventModel> timeline = new ArrayList<>();

@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.TimeZone;
 import java.util.function.Function;
 
 @Slf4j
@@ -61,8 +60,16 @@ public final class FileParserUtils {
   private static <T> T extractValueLine(String line, String range, int lineNumber, Function<String, T> parser) {
     if (line == null || line.isBlank()) return null;
     int[] positions = parseRangeLine(range);
+    if (positions == null) {
+      log.warn("[Linha {}] Range inválido '{}'; ignorando campo.", lineNumber, range);
+      return null;
+    }
     int start = positions[0];
     int end = positions[1];
+    if (start < 0 || end < start) {
+      log.warn("[Linha {}] Range inconsistente '{}' (start={}, end={}); ignorando campo.", lineNumber, range, start, end);
+      return null;
+    }
     if (start >= line.length()) return null;
     if (end > line.length()) {
       log.debug("[Linha {}] Range {} ultrapassa tamanho da linha (len={}); ajustando para fim.", lineNumber, range, line.length());
@@ -111,7 +118,13 @@ public final class FileParserUtils {
   }
 
   private static int[] parseRangeLine(String range) {
+    if (range == null) return null;
     String[] parts = range.split("-");
-    return new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1])};
+    if (parts.length != 2) return null;
+    try {
+      return new int[]{Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[1].trim())};
+    } catch (NumberFormatException ex) {
+      return null;
+    }
   }
 }

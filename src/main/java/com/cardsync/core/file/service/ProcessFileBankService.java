@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +22,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class ProcessFileBankService {
+  private static final Charset CNAB_CHARSET = Charset.forName("windows-1252");
+
   private final MoveFileService moveFileService;
   private final Cnab240FileProcessor cnab240FileProcessor;
   private final FileProcessingProperties fileProcessingProperties;
@@ -51,8 +53,9 @@ public class ProcessFileBankService {
     log.info("✅ Processamento bancário finalizado: bancosConfigurados={}, arquivosEncontrados={}, processados={}, invalidos={}, erros={}",
       bankPaths.size(), scanned, processed, invalid, errors);
 
-    if (errors > 0 && processed == 0) {
-      throw new IllegalStateException("Processamento bancário finalizado com " + errors + " erro(s) e " + processed + " arquivo(s) processado(s).");
+    if (errors > 0) {
+      log.warn("⚠ Processamento bancário teve {} erro(s) e {} arquivo(s) processado(s). "
+        + "Os arquivos com erro foram movidos para a pasta de erro; a esteira continua.", errors, processed);
     }
   }
 
@@ -61,6 +64,8 @@ public class ProcessFileBankService {
     int invalid = 0;
     int errors = 0;
     int scanned = 0;
+
+    paths.ensureDirectories();
 
     Path inputPath = Paths.get(paths.getInput());
     if (!Files.exists(inputPath)) {
@@ -78,7 +83,7 @@ public class ProcessFileBankService {
         try {
           if (!FileUtil.isTextFile(file)) {
             log.info("ℹ Arquivo bancário {} inválido para {}: não é texto. Movendo para invalid_file.", file.getFileName(), bankKey);
-            moveFileService.moveNow(file, paths.getInvalid());
+            moveFileService.moveNowBank(file, invalidDestination(paths), null, null, null);
             invalid++;
             continue;
           }
@@ -91,7 +96,7 @@ public class ProcessFileBankService {
           errors++;
           log.error("❌ Erro ao processar arquivo bancário {} em {}: {}", file.getFileName(), bankKey, ex.getMessage(), ex);
           if (Files.exists(file)) {
-            moveFileService.moveNow(file, paths.getError());
+            moveFileService.moveNowBank(file, paths.getError(), null, null, null);
           }
         }
       }
@@ -108,7 +113,7 @@ public class ProcessFileBankService {
   }
 
   private FileResult validateAndProcess(String bankKey, Path file, FileProcessingProperties.FilePaths paths) {
-    try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+    try (BufferedReader reader = Files.newBufferedReader(file, CNAB_CHARSET)) {
       String firstLine = reader.readLine();
       String bankCode = FileParserUtils.extractStringLine(firstLine, "0-3", 1);
       String recordType = FileParserUtils.extractStringLine(firstLine, "7-8", 1);
@@ -123,18 +128,24 @@ public class ProcessFileBankService {
       log.info("ℹ Arquivo bancário não reconhecido em {}: {}. Movendo para invalid_file. bankCode={}, recordType={}, primeiros40='{}', tamanhoLinha={}",
         bankKey, file.getFileName(), bankCode, recordType, preview, firstLine == null ? 0 : firstLine.length());
 
-      moveFileService.moveNow(file, paths.getInvalid());
+      moveFileService.moveNowBank(file, invalidDestination(paths), null, null, null);
       return FileResult.INVALID;
     } catch (Exception ex) {
       log.error("❌ Erro ao processar arquivo bancário {} em {}: {}", file.getFileName(), bankKey, ex.getMessage(), ex);
 
       if (Files.exists(file)) {
-        moveFileService.moveNow(file, paths.getError());
+        moveFileService.moveNowBank(file, paths.getError(), null, null, null);
       } else {
         log.warn("⚠ Arquivo bancário {} já foi movido por outro fluxo; ignorando novo movimento para erro.", file.getFileName());
       }
       return FileResult.ERROR;
     }
+  }
+
+  private String invalidDestination(FileProcessingProperties.FilePaths paths) {
+    if (paths.getInvalid() != null && !paths.getInvalid().isBlank()) return paths.getInvalid();
+    if (paths.getError() != null && !paths.getError().isBlank()) return paths.getError();
+    throw new IllegalStateException("Caminho invalid/error não configurado para processamento bancário.");
   }
 
   private enum FileResult {

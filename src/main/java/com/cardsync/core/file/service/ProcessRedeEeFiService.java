@@ -5,9 +5,7 @@ import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
 import com.cardsync.domain.model.*;
-import com.cardsync.domain.model.enums.FileGroupEnum;
-import com.cardsync.domain.model.enums.FileStatusEnum;
-import com.cardsync.domain.model.enums.ProcessedFileErrorTypeEnum;
+import com.cardsync.domain.model.enums.*;
 import com.cardsync.domain.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +15,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
@@ -29,41 +28,49 @@ public class ProcessRedeEeFiService {
 
   private static final int STATUS_PENDING = 1;
   private static final BigDecimal MAX_SAFE_MONEY = new BigDecimal("999999999.99");
+  private static final Charset REDE_CHARSET = Charset.forName("ISO-8859-1");
   private static final Set<String> SUPPORTED_IDENTIFIERS = Set.of(
     "030", "032", "034", "035", "036", "037", "038", "040", "041", "042", "043", "044", "045", "046", "047", "048",
     "049", "050", "052", "053", "054", "055", "056", "057", "063", "064", "066", "069");
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
-  private final ProcessedFileRepository processedFileRepository;
-  private final CreditOrderRepository creditOrderRepository;
-  private final AnticipationRepository anticipationRepository;
-  private final CreditTotalizerRepository creditTotalizerRepository;
-  private final SettledDebtRepository settledDebtRepository;
-  private final BankingDomicileResolver bankingDomicileResolver;
-  private final SalesSummaryRepository salesSummaryRepository;
-  private final PvMatrixHeaderRepository pvMatrixHeaderRepository;
-  private final SerasaConsultationRepository serasaConsultationRepository;
-  private final PendingDebtRepository pendingDebtRepository;
-  private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
-  private final TotalizerMatrixRepository totalizerMatrixRepository;
-  private final ArchiveTrailerRepository archiveTrailerRepository;
-  private final AdjustmentRepository adjustmentRepository;
   private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
-  private final RedeNegotiatedTransactionRepository negotiatedTransactionRepository;
+
+  private final AdjustmentRepository adjustmentRepository;
+  private final CreditOrderRepository creditOrderRepository;
+  private final PendingDebtRepository pendingDebtRepository;
+  private final SettledDebtRepository settledDebtRepository;
+  private final AnticipationRepository anticipationRepository;
+  private final SalesSummaryRepository salesSummaryRepository;
+  private final ProcessedFileRepository processedFileRepository;
+  private final ArchiveTrailerRepository archiveTrailerRepository;
+  private final PvMatrixHeaderRepository pvMatrixHeaderRepository;
+  private final TotalizerMatrixRepository totalizerMatrixRepository;
+  private final CreditTotalizerRepository creditTotalizerRepository;
   private final RedePixCancellationRepository pixCancellationRepository;
+  private final SerasaConsultationRepository serasaConsultationRepository;
   private final RedeSuspendedPaymentRepository suspendedPaymentRepository;
   private final RedeTechnicalReserveRepository technicalReserveRepository;
+  private final RedeNegotiatedTransactionRepository negotiatedTransactionRepository;
+  private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
+
+  private final BankingDomicileResolver bankingDomicileResolver;
   private final ThreadLocal<RedeProcessingWarningCollector> warningCollector = new ThreadLocal<>();
 
-  @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
   public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
+    processFile(file, paths, null);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+  public void processFile(Path file, FileProcessingProperties.FilePaths paths, String contentHash) {
     ProcessedFileEntity processedFile = null;
     try {
       warningCollector.set(new RedeProcessingWarningCollector("EEFI"));
       log.info("▶ Iniciando leitura Rede EEFI: {}", file.getFileName());
-      var lines = Files.readAllLines(file);
+      var lines = Files.readAllLines(file, REDE_CHARSET);
       processedFile = createProcessedFile(file, lines.size());
+      processedFile.setContentHash(contentHash);
       processedFile.markProcessing();
 
       List<PvMatrixHeaderEntity> pvMatrixHeaders = new ArrayList<>();
@@ -196,7 +203,7 @@ public class ProcessRedeEeFiService {
       pixCancellationRepository.saveAll(pixCancellations);
       suspendedPaymentRepository.saveAll(suspendedPayments);
       technicalReserveRepository.saveAll(technicalReserves);
-      moveFileService.moveAfterCommit(file, paths.getProcessed());
+      moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
 
       if (!unidentified.isEmpty()) {
         log.warn("⚠ EEFI {} possui identificadores não mapeados: {}", file.getFileName(), unidentified);
@@ -208,7 +215,7 @@ public class ProcessRedeEeFiService {
     } catch (DataIntegrityViolationException ex) {
       log.error("⚠ Arquivo EEFI {} já processado anteriormente.", file.getFileName());
       if (processedFile != null) processedFile.setStatus(FileStatusEnum.DUPLICATE);
-      moveFileService.moveAfterRollback(file, paths.getDuplicate());
+      moveFileService.moveAfterRollback(file, paths.getDuplicate(), processedFile == null ? null : processedFile.getDateFile());
       throw ex;
     } catch (Exception ex) {
       log.error("❌ Erro ao processar EEFI {}: {}", file.getFileName(), ex.getMessage(), ex);
@@ -216,7 +223,7 @@ public class ProcessRedeEeFiService {
         processedFile.setStatus(FileStatusEnum.ERROR);
         processedFile.setErrorMessage(safeMessage(ex));
       }
-      moveFileService.moveAfterRollback(file, paths.getError());
+      moveFileService.moveAfterRollback(file, paths.getError(), processedFile == null ? null : processedFile.getDateFile());
       throw new IllegalStateException(ex);
     } finally {
       warningCollector.remove();
@@ -265,14 +272,14 @@ public class ProcessRedeEeFiService {
     order.setRvNumber(FileParserUtils.extractIntegerLine(line, "75-84", lineNumber));
     order.setRvDate(FileParserUtils.extractDateLine(line, "84-92", lineNumber));
     order.setTransactionType(FileParserUtils.extractIntegerLine(line, "93-94", lineNumber));
-    order.setGrossRvValue(FileParserUtils.extractBigDecimalLine(line, "94-109", lineNumber));
-    order.setDiscountRateValue(FileParserUtils.extractBigDecimalLine(line, "109-124", lineNumber));
+    order.setGrossRvValue(optionalMoneyLine(line, "94-109", lineNumber, "gross_rv_value"));
+    order.setDiscountRateValue(optionalMoneyLine(line, "109-124", lineNumber, "discount_rate_value"));
     order.setInstallmentNumber(FileParserUtils.extractIntegerLine(line, "124-126", lineNumber));
     order.setInstallmentTotal(FileParserUtils.extractIntegerLine(line, "127-129", lineNumber));
     order.setCreditStatus(FileParserUtils.extractIntegerLine(line, "129-131", lineNumber));
     order.setOriginalPvNumber(FileParserUtils.extractIntegerLine(line, "131-140", lineNumber));
-    order.setStatusPaymentBank(STATUS_PENDING);
-    order.setSalesSummaryStatus(STATUS_PENDING);
+    order.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    order.setSalesSummaryStatus(StatusReconciliationEnum.PENDING);
     order.setReconciliationStatus(STATUS_PENDING);
     order.setSalesSummary(safeSalesSummary(acquirer, pvNumber, order.getRvNumber()));
     order.setProcessedFile(processedFile);
@@ -304,12 +311,12 @@ public class ProcessRedeEeFiService {
     anticipation.setBank(FileParserUtils.extractStringLine(line, "47-50", lineNumber));
     anticipation.setNumberRvCorresponding(FileParserUtils.extractIntegerLine(line, "67-76", lineNumber));
     anticipation.setDateRvCorresponding(FileParserUtils.extractDateLine(line, "76-84", lineNumber));
-    anticipation.setOriginalCreditValue(FileParserUtils.extractBigDecimalLine(line, "84-99", lineNumber));
+    anticipation.setOriginalCreditValue(optionalMoneyLine(line, "84-99", lineNumber, "original_credit_value"));
     anticipation.setOriginalDueDate(FileParserUtils.extractDateLine(line, "99-107", lineNumber));
     anticipation.setInstallmentNumber(FileParserUtils.extractIntegerLine(line, "107-109", lineNumber));
     anticipation.setInstallmentNumberMax(FileParserUtils.extractIntegerLine(line, "110-112", lineNumber));
-    anticipation.setGrossValue(FileParserUtils.extractBigDecimalLine(line, "112-127", lineNumber));
-    anticipation.setDiscountRateValue(FileParserUtils.extractBigDecimalLine(line, "127-142", lineNumber));
+    anticipation.setGrossValue(optionalMoneyLine(line, "112-127", lineNumber, "gross_value"));
+    anticipation.setDiscountRateValue(optionalMoneyLine(line, "127-142", lineNumber, "discount_rate_value"));
     anticipation.setPvNumberOriginal(FileParserUtils.extractIntegerLine(line, "142-151", lineNumber));
     anticipation.setProcessedFile(processedFile);
     anticipation.setAcquirer(acquirer);
@@ -333,10 +340,10 @@ public class ProcessRedeEeFiService {
     totalizer.setLineNumber(lineNumber);
     totalizer.setPvNumber(pvNumber);
     totalizer.setCreditDate(FileParserUtils.extractDateLine(line, "19-27", lineNumber));
-    totalizer.setTotalCreditValue(FileParserUtils.extractBigDecimalLine(line, "28-42", lineNumber));
+    totalizer.setTotalCreditValue(optionalMoneyLine(line, "28-42", lineNumber, "total_credit_value"));
     totalizer.setFileGenerationDate(FileParserUtils.extractDateLine(line, "63-71", lineNumber));
     totalizer.setAdvanceCreditDate(FileParserUtils.extractDateLine(line, "71-79", lineNumber));
-    totalizer.setTotalValueAdvanceCredits(FileParserUtils.extractBigDecimalLine(line, "79-94", lineNumber));
+    totalizer.setTotalValueAdvanceCredits(optionalMoneyLine(line, "79-94", lineNumber, "total_value_advance_credits"));
     totalizer.setProcessedFile(processedFile);
     totalizer.setAcquirer(acquirer);
     totalizer.setCompany(establishment != null ? establishment.getCompany() : null);
@@ -375,7 +382,7 @@ public class ProcessRedeEeFiService {
     debt.setCodeCompensation(FileParserUtils.extractIntegerLine(line, "241-243", lineNumber));
     debt.setCompensation(FileParserUtils.extractStringLine(line, "243-271", lineNumber));
     debt.setCodeReasonAdjustment2(FileParserUtils.extractIntegerLine(line, "272-276", lineNumber));
-    debt.setRequestedCancellationValue(FileParserUtils.extractBigDecimalLine(line, "276-291", lineNumber));
+    debt.setRequestedCancellationValue(optionalMoneyLine(line, "276-291", lineNumber, "requested_cancellation_value"));
     debt.setProcessedFile(processedFile);
     debt.setAcquirer(acquirer);
     debt.setFlag(safeFlag(acquirer, acquirerCode));
@@ -410,10 +417,10 @@ public class ProcessRedeEeFiService {
     serasa.setServiceType("040".equals(serasa.getRecordType()) ? "SERASA" : serasa.getRecordType());
     serasa.setPvNumber(pvNumber);
     serasa.setNumberConsultationCarriedOut(FileParserUtils.extractIntegerLine(line, "12-17", lineNumber));
-    serasa.setTotalValueConsultation(FileParserUtils.extractBigDecimalLine(line, "17-32", lineNumber));
+    serasa.setTotalValueConsultation(optionalMoneyLine(line, "17-32", lineNumber, "total_value_consultation"));
     serasa.setStartConsultationPeriod(FileParserUtils.extractDateLine(line, "32-40", lineNumber));
     serasa.setEndConsultationPeriod(FileParserUtils.extractDateLine(line, "40-48", lineNumber));
-    serasa.setValueConsultationPeriod(FileParserUtils.extractBigDecimalLine(line, "48-63", lineNumber));
+    serasa.setValueConsultationPeriod(optionalMoneyLine(line, "48-63", lineNumber, "value_consultation_period"));
     serasa.setProcessedFile(processedFile);
     serasa.setAcquirer(acquirer);
     serasa.setEstablishment(establishment);
@@ -479,7 +486,7 @@ public class ProcessRedeEeFiService {
     unscheduling.setRvNumberOriginal(FileParserUtils.extractIntegerLine(line, "12-21", lineNumber));
 
     if (ecommerce) {
-      unscheduling.setRvValueOriginal(FileParserUtils.extractBigDecimalLine(line, "21-36", lineNumber));
+      unscheduling.setRvValueOriginal(optionalMoneyLine(line, "21-36", lineNumber, "rv_value_original"));
       unscheduling.setCardNumber(FileParserUtils.extractStringLine(line, "36-52", lineNumber));
       unscheduling.setTransactionDate(FileParserUtils.extractDateLine(line, "52-60", lineNumber));
       unscheduling.setNsu(FileParserUtils.extractLongLine(line, "60-72", lineNumber));
@@ -489,11 +496,11 @@ public class ProcessRedeEeFiService {
       unscheduling.setReferenceNumber(FileParserUtils.extractStringLine(line, "21-36", lineNumber));
       unscheduling.setDateCredit(FileParserUtils.extractDateLine(line, "36-44", lineNumber));
       unscheduling.setNewInstallmentValue(optionalMoneyLine(line, "44-59", lineNumber, "adjustment_value"));
-      unscheduling.setOriginalValueChangedInstallment(FileParserUtils.extractBigDecimalLine(line, "59-74", lineNumber));
-      unscheduling.setAdjustmentValue(FileParserUtils.extractBigDecimalLine(line, "74-89", lineNumber));
+      unscheduling.setOriginalValueChangedInstallment(optionalMoneyLine(line, "59-74", lineNumber, "original_value_changed_installment"));
+      unscheduling.setAdjustmentValue(optionalMoneyLine(line, "74-89", lineNumber, "adjustment_value"));
       unscheduling.setCancellationDate(FileParserUtils.extractDateLine(line, "89-97", lineNumber));
-      unscheduling.setRvValueOriginal(FileParserUtils.extractBigDecimalLine(line, "97-112", lineNumber));
-      unscheduling.setCancellationValue(FileParserUtils.extractBigDecimalLine(line, "112-127", lineNumber));
+      unscheduling.setRvValueOriginal(optionalMoneyLine(line, "97-112", lineNumber, "rv_value_original"));
+      unscheduling.setCancellationValue(optionalMoneyLine(line, "112-127", lineNumber, "cancellation_value"));
       unscheduling.setCardNumber(FileParserUtils.extractStringLine(line, "127-143", lineNumber));
       unscheduling.setTransactionDate(FileParserUtils.extractDateLine(line, "143-151", lineNumber));
       unscheduling.setNsu(FileParserUtils.extractLongLine(line, "151-163", lineNumber));
@@ -518,13 +525,13 @@ public class ProcessRedeEeFiService {
     matrix.setRecordType(FileParserUtils.extractStringLine(line, "0-3", lineNumber));
     matrix.setPvNumber(pvNumber);
     matrix.setTotalNumberMatrixSummaries(FileParserUtils.extractIntegerLine(line, "12-18", lineNumber));
-    matrix.setTotalValueNormalCredits(FileParserUtils.extractBigDecimalLine(line, "18-33", lineNumber));
+    matrix.setTotalValueNormalCredits(optionalMoneyLine(line, "18-33", lineNumber, "total_value_normal_credits"));
     matrix.setValueAdvanceCredits(FileParserUtils.extractIntegerLine(line, "33-39", lineNumber));
-    matrix.setTotalValueAnticipated(FileParserUtils.extractBigDecimalLine(line, "39-54", lineNumber));
+    matrix.setTotalValueAnticipated(optionalMoneyLine(line, "39-54", lineNumber, "total_value_anticipated"));
     matrix.setAmountCreditAdjustments(FileParserUtils.extractIntegerLine(line, "54-58", lineNumber));
-    matrix.setTotalValueCreditAdjustments(FileParserUtils.extractBigDecimalLine(line, "58-73", lineNumber));
+    matrix.setTotalValueCreditAdjustments(optionalMoneyLine(line, "58-73", lineNumber, "total_value_credit_adjustments"));
     matrix.setAmountDebitAdjustments(FileParserUtils.extractIntegerLine(line, "73-79", lineNumber));
-    matrix.setTotalValueDebitAdjustments(FileParserUtils.extractBigDecimalLine(line, "79-94", lineNumber));
+    matrix.setTotalValueDebitAdjustments(optionalMoneyLine(line, "79-94", lineNumber, "total_value_debit_adjustments"));
     matrix.setProcessedFile(processedFile);
     matrix.setAcquirer(acquirer);
     matrix.setEstablishment(establishment);
@@ -542,13 +549,13 @@ public class ProcessRedeEeFiService {
     trailer.setNumberRecords(FileParserUtils.extractIntegerLine(line, "7-13", lineNumber));
     trailer.setPvRequesting(FileParserUtils.extractIntegerLine(line, "13-22", lineNumber));
     trailer.setNormalCreditsQuantity(FileParserUtils.extractIntegerLine(line, "22-26", lineNumber));
-    trailer.setTotalValueRv(FileParserUtils.extractBigDecimalLine(line, "26-41", lineNumber));
+    trailer.setTotalValueRv(optionalMoneyLine(line, "26-41", lineNumber, "total_value_rv"));
     trailer.setAdvanceCreditAmount(FileParserUtils.extractIntegerLine(line, "41-47", lineNumber));
-    trailer.setTotalValueUpfront(FileParserUtils.extractBigDecimalLine(line, "47-62", lineNumber));
+    trailer.setTotalValueUpfront(optionalMoneyLine(line, "47-62", lineNumber, "total_value_upfront"));
     trailer.setAmountCreditAdjustments(FileParserUtils.extractIntegerLine(line, "62-66", lineNumber));
-    trailer.setTotalValueCreditAdjustments(FileParserUtils.extractBigDecimalLine(line, "66-81", lineNumber));
+    trailer.setTotalValueCreditAdjustments(optionalMoneyLine(line, "66-81", lineNumber, "total_value_credit_adjustments"));
     trailer.setDebitAdjustmentQuantity(FileParserUtils.extractIntegerLine(line, "81-85", lineNumber));
-    trailer.setTotalValueDebit(FileParserUtils.extractBigDecimalLine(line, "85-100", lineNumber));
+    trailer.setTotalValueDebit(optionalMoneyLine(line, "85-100", lineNumber, "total_value_debit"));
     trailer.setProcessedFile(processedFile);
     trailer.setAcquirer(acquirer);
     return trailer;
@@ -571,7 +578,7 @@ public class ProcessRedeEeFiService {
     adjustment.setEcommerce(ecommerce);
     adjustment.setPvNumber(pvNumber);
     adjustment.setPvNumberOriginal(pvNumber);
-    adjustment.setAdjustmentStatus(STATUS_PENDING);
+    adjustment.setAdjustmentStatus(AdjustmentStatusEnum.PENDING);
     adjustment.setAcquirer(acquirer);
     adjustment.setEstablishment(establishment);
     adjustment.setCompany(establishment != null ? establishment.getCompany() : null);
@@ -602,7 +609,7 @@ public class ProcessRedeEeFiService {
     adjustment.setPvNumberAdjustment(adjustment.getPvNumber());
     adjustment.setAdjustmentDate(FileParserUtils.extractDateLine(line, "21-29", lineNumber));
     adjustment.setAdjustmentValue(optionalMoneyLine(line, "29-44", lineNumber, "adjustment_value"));
-    adjustment.setAdjustmentReason(FileParserUtils.extractIntegerLine(line, "45-47", lineNumber));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(FileParserUtils.extractIntegerLine(line, "45-47", lineNumber)));
     adjustment.setAdjustmentDescription(FileParserUtils.extractStringLine(line, "47-75", lineNumber));
     adjustment.setCardNumber(FileParserUtils.extractStringLine(line, "75-91", lineNumber));
     adjustment.setTransactionDate(FileParserUtils.extractDateLine(line, "91-99", lineNumber));
@@ -640,7 +647,7 @@ public class ProcessRedeEeFiService {
     adjustment.setRvNumberOriginal(FileParserUtils.extractIntegerLine(line, "67-76", lineNumber));
     adjustment.setRvDateOriginal(FileParserUtils.extractDateLine(line, "76-84", lineNumber));
     adjustment.setGrossValue(optionalMoneyLine(line, "84-99", lineNumber, "original_credit_value"));
-    adjustment.setAdjustmentReason(FileParserUtils.extractIntegerLine(line, "99-101", lineNumber));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(FileParserUtils.extractIntegerLine(line, "99-101", lineNumber)));
     adjustment.setAdjustmentDescription(FileParserUtils.extractStringLine(line, "101-129", lineNumber));
     adjustment.setCardNumber(FileParserUtils.extractStringLine(line, "129-145", lineNumber));
     adjustment.setLetterReference(FileParserUtils.extractStringLine(line, "145-160", lineNumber));
@@ -669,7 +676,7 @@ public class ProcessRedeEeFiService {
     adjustment.setAdjustmentDate(FileParserUtils.extractDateLine(line, "32-40", lineNumber));
     adjustment.setCreditDate(FileParserUtils.extractDateLine(line, "40-48", lineNumber));
     adjustment.setAdjustmentValue(optionalMoneyLine(line, "48-63", lineNumber, "credit_value"));
-    adjustment.setAdjustmentReason(FileParserUtils.extractIntegerLine(line, "84-86", lineNumber));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(FileParserUtils.extractIntegerLine(line, "84-86", lineNumber)));
     adjustment.setAdjustmentDescription(FileParserUtils.extractStringLine(line, "86-114", lineNumber));
     adjustment.setAdjustmentReason2(FileParserUtils.extractIntegerLine(line, "115-119", lineNumber));
   }
@@ -693,7 +700,7 @@ public class ProcessRedeEeFiService {
     adjustment.setRawAdjustmentCode(FileParserUtils.extractStringLine(line, "12-23", lineNumber));
     adjustment.setAdjustmentDate(optionalDateLine(line, "23-31", lineNumber));
     adjustment.setAdjustmentValue(optionalMoneyLine(line, "31-46", lineNumber));
-    adjustment.setAdjustmentReason(optionalIntegerLine(line, "46-48", lineNumber));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(optionalIntegerLine(line, "46-48", lineNumber)));
     adjustment.setAdjustmentDescription(FileParserUtils.extractStringLine(line, "48-76", lineNumber));
     adjustment.setCardNumber(FileParserUtils.extractStringLine(line, "76-92", lineNumber));
     adjustment.setNsu(optionalLongLine(line, "92-104", lineNumber));
@@ -725,7 +732,7 @@ public class ProcessRedeEeFiService {
     adjustment.setAdjustmentType("DEBIT_ECOMMERCE");
     adjustment.setPvNumber(pvNumber);
     adjustment.setPvNumberOriginal(pvNumber);
-    adjustment.setAdjustmentStatus(STATUS_PENDING);
+    adjustment.setAdjustmentStatus(AdjustmentStatusEnum.PENDING);
     adjustment.setAcquirer(acquirer);
     adjustment.setEstablishment(establishment);
     adjustment.setCompany(establishment != null ? establishment.getCompany() : null);

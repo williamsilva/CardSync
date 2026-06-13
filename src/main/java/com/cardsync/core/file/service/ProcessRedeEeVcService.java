@@ -5,11 +5,7 @@ import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
 import com.cardsync.domain.model.*;
-import com.cardsync.domain.model.enums.CaptureEnum;
-import com.cardsync.domain.model.enums.FileGroupEnum;
-import com.cardsync.domain.model.enums.FileStatusEnum;
-import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.domain.model.enums.ProcessedFileErrorTypeEnum;
+import com.cardsync.domain.model.enums.*;
 import com.cardsync.domain.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,10 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Slf4j
@@ -32,8 +30,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ProcessRedeEeVcService {
   private static final int STATUS_PENDING = 1;
-  private static final int RECONCILIATION_PENDING = 1;
   private static final int REQUEST_AWAITING_DECISION = 1;
+  private static final Charset REDE_CHARSET = Charset.forName("ISO-8859-1");
 
   private static final Set<String> SUPPORTED_IDENTIFIERS = Set.of(
     "002", "004", "005", "006", "008", "010", "011", "012", "014", "016", "017", "018", "019", "020", "021",
@@ -41,35 +39,39 @@ public class ProcessRedeEeVcService {
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
-  private final ProcessedFileRepository processedFileRepository;
+  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
+
+  private final AdjustmentRepository adjustmentRepository;
   private final SalesSummaryRepository salesSummaryRepository;
+  private final ProcessedFileRepository processedFileRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final InstallmentAcqRepository installmentAcqRepository;
   private final PvMatrixHeaderRepository pvMatrixHeaderRepository;
-  private final RedeRequestNoticeRepository redeRequestNoticeRepository;
-  private final AdjustmentRepository adjustmentRepository;
-  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
-  private final TotalizerMatrixRepository totalizerMatrixRepository;
   private final ArchiveTrailerRepository archiveTrailerRepository;
-  private final BankingDomicileResolver bankingDomicileResolver;
-  private final RedeIcPlusTransactionRepository redeIcPlusTransactionRepository;
+  private final RequestNoticeRepository redeRequestNoticeRepository;
+  private final TotalizerMatrixRepository totalizerMatrixRepository;
   private final SerasaConsultationRepository serasaConsultationRepository;
+  private final RedeIcPlusTransactionRepository redeIcPlusTransactionRepository;
+
+  private final BankingDomicileResolver bankingDomicileResolver;
   private final ThreadLocal<RedeProcessingWarningCollector> warningCollector = new ThreadLocal<>();
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-  public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
+  public void processFile(Path file, FileProcessingProperties.FilePaths paths, String contentHash) {
     ProcessedFileEntity processedFile = null;
     try {
       warningCollector.set(new RedeProcessingWarningCollector("EEVC"));
       log.info("▶ Iniciando processamento Rede EEVC: {}", file.getFileName());
-      List<String> lines = Files.readAllLines(file);
+      List<String> lines = Files.readAllLines(file, REDE_CHARSET);
       processedFile = new ProcessedFileEntity();
+      processedFile.setContentHash(contentHash);
 
       List<PvMatrixHeaderEntity> pvMatrixHeaders = new ArrayList<>();
       List<SalesSummaryEntity> summaries = new ArrayList<>();
       List<TransactionAcqEntity> transactions = new ArrayList<>();
+      List<TransactionAcqEntity> ecommerceComplements = new ArrayList<>();
       List<InstallmentAcqEntity> installments = new ArrayList<>();
-      List<RedeRequestNoticeEntity> requestNotices = new ArrayList<>();
+      List<RequestNoticeEntity> requestNotices = new ArrayList<>();
       List<AdjustmentEntity> adjustments = new ArrayList<>();
       List<TotalizerMatrixEntity> totalizerMatrices = new ArrayList<>();
       List<ArchiveTrailerEntity> archiveTrailers = new ArrayList<>();
@@ -121,8 +123,8 @@ public class ProcessRedeEeVcService {
           case "028" -> archiveTrailers.add(buildArchiveTrailer(line, lineNumber, processedFile));
           case "029" -> icPlusTransactions.add(buildIcPlusTransaction(line, lineNumber, processedFile, summaries));
           case "033" -> requestNotices.add(buildRequestNotice(line, lineNumber, processedFile, summaries, true));
-          case "034", "035", "036" -> mergeOrAddEcommerceTransaction(
-            transactions,
+          case "034", "035", "036" -> addIfValid(
+            ecommerceComplements,
             buildEcommerceTransaction(line, lineNumber, processedFile, summaries)
           );
           case "040" -> auxiliaryConsultations.add(buildRechargeAsAuxiliaryConsultation(line, lineNumber, processedFile));
@@ -136,6 +138,17 @@ public class ProcessRedeEeVcService {
 
       if (processedFile.getOriginFile() == null) {
         throw new IllegalStateException("Header 002 não encontrado: " + file.getFileName());
+      }
+
+      int ignoredEcommerceComplements = mergeEcommerceComplements(transactions, ecommerceComplements);
+      ignored += ignoredEcommerceComplements;
+
+      if (ignoredEcommerceComplements > 0) {
+        log.info(
+          "ℹ Rede EEVC: {} complemento(s) 034/035/036 ignorado(s) por não possuir transação principal equivalente no arquivo {}",
+          ignoredEcommerceComplements,
+          file.getFileName()
+        );
       }
 
       installments.addAll(buildInstallments(transactions, layoutInstallments));
@@ -193,7 +206,7 @@ public class ProcessRedeEeVcService {
         log.warn("⚠ EEVC {} possui identificadores não mapeados: {}", file.getFileName(), unidentified);
       }
 
-      moveFileService.moveAfterCommit(file, paths.getProcessed());
+      moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
       if (collector != null) {
         collector.logSummary(log, file.getFileName().toString());
       }
@@ -201,7 +214,7 @@ public class ProcessRedeEeVcService {
     } catch (DataIntegrityViolationException ex) {
       log.error("⚠ Arquivo EEVC {} já processado anteriormente.", file.getFileName());
       if (processedFile != null) processedFile.setStatus(FileStatusEnum.DUPLICATE);
-      moveFileService.moveAfterRollback(file, paths.getDuplicate());
+      moveFileService.moveAfterRollback(file, paths.getDuplicate(), processedFile == null ? null : processedFile.getDateFile());
       throw ex;
     } catch (Exception ex) {
       log.error("❌ Erro ao processar EEVC {}: {}", file.getFileName(), safeMessage(ex), ex);
@@ -209,7 +222,7 @@ public class ProcessRedeEeVcService {
         processedFile.setStatus(FileStatusEnum.ERROR);
         processedFile.setErrorMessage(safeMessage(ex));
       }
-      moveFileService.moveAfterRollback(file, paths.getError());
+      moveFileService.moveAfterRollback(file, paths.getError(), processedFile == null ? null : processedFile.getDateFile());
       throw new IllegalStateException(ex);
     } finally {
       warningCollector.remove();
@@ -265,9 +278,9 @@ public class ProcessRedeEeVcService {
     summary.setRecordType(FileParserUtils.extractStringLine(line, "0-3", lineNumber));
     summary.setSummaryType(layout.summaryType);
     summary.setLineNumber(lineNumber);
-    summary.setStatusPaymentBank(STATUS_PENDING);
-    summary.setCreditOrderStatus(RECONCILIATION_PENDING);
-    summary.setTransactionsStatus(RECONCILIATION_PENDING);
+    summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
+    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
     summary.setRvNumber(FileParserUtils.extractIntegerLine(line, "12-21", lineNumber));
     summary.setBank(FileParserUtils.extractStringLine(line, "21-24", lineNumber));
     summary.setAgency(agency);
@@ -304,8 +317,8 @@ public class ProcessRedeEeVcService {
     tx.setSalesSummary(summary);
     tx.setRvNumber(rvNumber);
     tx.setStatusAudit(STATUS_PENDING);
-    tx.setStatusPaymentBank(STATUS_PENDING);
-    tx.setStatusTransaction(RECONCILIATION_PENDING);
+    tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    tx.setStatusTransaction(StatusReconciliationEnum.PENDING);
     tx.setStatusTransactionReason(0);
 
     if (layout == TransactionLayout.DOLLAR) {
@@ -419,19 +432,19 @@ public class ProcessRedeEeVcService {
     tx.setFirstInstallmentValue(BigDecimal.ZERO);
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);
     tx.setStatusAudit(STATUS_PENDING);
-    tx.setStatusPaymentBank(STATUS_PENDING);
-    tx.setStatusTransaction(RECONCILIATION_PENDING);
+    tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    tx.setStatusTransaction(StatusReconciliationEnum.PENDING);
     tx.setStatusTransactionReason(0);
     return tx;
   }
 
-  private RedeRequestNoticeEntity buildRequestNotice(String line, int lineNumber, ProcessedFileEntity processedFile, List<SalesSummaryEntity> summaries, boolean ecommerce) {
+  private RequestNoticeEntity buildRequestNotice(String line, int lineNumber, ProcessedFileEntity processedFile, List<SalesSummaryEntity> summaries, boolean ecommerce) {
     Integer pvNumber = FileParserUtils.extractIntegerLine(line, "3-12", lineNumber);
     Integer rvNumber = FileParserUtils.extractIntegerLine(line, "12-21", lineNumber);
     AcquirerEntity acquirer = safeAcquirer();
     EstablishmentEntity establishment = safeEstablishment(pvNumber);
 
-    RedeRequestNoticeEntity notice = new RedeRequestNoticeEntity();
+    RequestNoticeEntity notice = new RequestNoticeEntity();
     notice.setLineNumber(lineNumber);
     notice.setRecordType(FileParserUtils.extractStringLine(line, "0-3", lineNumber));
     notice.setPvNumber(pvNumber);
@@ -480,7 +493,7 @@ public class ProcessRedeEeVcService {
     adjustment.setRecordType(FileParserUtils.extractStringLine(line, "0-3", lineNumber));
     adjustment.setSourceRecordIdentifier("011");
     adjustment.setAdjustmentType("EEVC_CREDIT_ADJUSTMENT");
-    adjustment.setAdjustmentStatus(STATUS_PENDING);
+    adjustment.setAdjustmentStatus(AdjustmentStatusEnum.PENDING);
     adjustment.setPvNumber(pvNumber);
     adjustment.setPvNumberAdjustment(pvNumber);
     adjustment.setRvNumberAdjustment(rvNumber);
@@ -490,7 +503,7 @@ public class ProcessRedeEeVcService {
     adjustment.setLiquidValue(safeMoney(line, "52-67", lineNumber, "credit_value", "adjustment"));
     adjustment.setNet(FileParserUtils.extractStringLine(line, "67-68", lineNumber));
     adjustment.setRawAdjustmentCode(FileParserUtils.extractStringLine(line, "88-90", lineNumber));
-    adjustment.setAdjustmentReason(FileParserUtils.extractIntegerLine(line, "88-90", lineNumber));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(FileParserUtils.extractIntegerLine(line, "88-90", lineNumber)));
     adjustment.setAdjustmentDescription(FileParserUtils.extractStringLine(line, "90-118", lineNumber));
     adjustment.setAdjustmentReason2(FileParserUtils.extractIntegerLine(line, "119-123", lineNumber));
     SalesSummaryEntity summary = findSummary(summaries, pvNumber, rvNumber);
@@ -643,7 +656,32 @@ public class ProcessRedeEeVcService {
   }
 
   private void addIfValid(List<TransactionAcqEntity> transactions, TransactionAcqEntity tx) {
+    if (tx == null) {
+      return;
+    }
+
     mergeOrAddRedeTransaction(transactions, tx);
+  }
+
+  /**
+   * Adiciona a transação à coleção ou mescla com um registro equivalente já lido.
+   *
+   * <p>Este método atua somente nas coleções temporárias da importação. Os registros
+   * 034/035/036 continuam armazenados apenas em {@code ecommerceComplements} e nunca
+   * são persistidos diretamente como uma nova transação.</p>
+   */
+  private void mergeOrAddRedeTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity transaction) {
+    Optional<TransactionAcqEntity> existing = transactions.stream()
+      .filter(candidate -> Objects.equals(candidate.getRecordType(), transaction.getRecordType()))
+      .filter(candidate -> isSameRedeTransaction(candidate, transaction))
+      .findFirst();
+
+    if (existing.isPresent()) {
+      mergeRedeTransaction(existing.get(), transaction);
+      return;
+    }
+
+    transactions.add(transaction);
   }
 
   private BigDecimal safeMoney(String line, String range, int lineNumber, String field, String context) {
@@ -804,7 +842,6 @@ public class ProcessRedeEeVcService {
     }
   }
 
-
   private void ensureSalesSummariesBankingDomicile(List<SalesSummaryEntity> summaries) {
     if (summaries == null || summaries.isEmpty()) {
       return;
@@ -952,25 +989,58 @@ public class ProcessRedeEeVcService {
     }
   }
 
-  private void mergeOrAddEcommerceTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity ecommerceTx) {
-    mergeOrAddRedeTransaction(transactions, ecommerceTx);
+  /**
+   * Associa os registros complementares de e-commerce às transações principais.
+   *
+   * <p>Os registros 034, 035 e 036 nunca representam uma nova venda e, por isso,
+   * jamais são adicionados à lista de transações. Eles somente enriquecem a venda
+   * principal equivalente já encontrada no mesmo arquivo:</p>
+   *
+   * <ul>
+   *   <li>034 complementa 008;</li>
+   *   <li>035 complementa 012;</li>
+   *   <li>036 complementa 018.</li>
+   * </ul>
+   *
+   * @return quantidade de complementos descartados por falta de transação principal.
+   */
+  private int mergeEcommerceComplements(List<TransactionAcqEntity> transactions, List<TransactionAcqEntity> ecommerceComplements) {
+    int ignored = 0;
+
+    for (TransactionAcqEntity complement : ecommerceComplements) {
+      String expectedMainRecordType = expectedMainRecordType(complement.getRecordType());
+
+      Optional<TransactionAcqEntity> mainTransaction = transactions.stream()
+        .filter(tx -> Objects.equals(expectedMainRecordType, tx.getRecordType()))
+        .filter(tx -> isSameRedeTransaction(tx, complement))
+        .findFirst();
+
+      if (mainTransaction.isEmpty()) {
+        ignored++;
+        log.debug(
+          "Complemento Rede EEVC ignorado: recordType={}, linha={}, rv={}, nsu={}, autorização={}",
+          complement.getRecordType(),
+          complement.getLineNumber(),
+          complement.getRvNumber(),
+          complement.getNsu(),
+          complement.getAuthorization()
+        );
+        continue;
+      }
+
+      mergeRedeTransaction(mainTransaction.get(), complement);
+    }
+
+    return ignored;
   }
 
-  private void mergeOrAddRedeTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity incoming) {
-    if (incoming == null) {
-      return;
-    }
-
-    Optional<TransactionAcqEntity> existing = transactions.stream()
-      .filter(tx -> isSameRedeTransaction(tx, incoming))
-      .findFirst();
-
-    if (existing.isPresent()) {
-      mergeRedeTransaction(existing.get(), incoming);
-      return;
-    }
-
-    transactions.add(incoming);
+  private String expectedMainRecordType(String ecommerceRecordType) {
+    return switch (ecommerceRecordType) {
+      case "034" -> "008";
+      case "035" -> "012";
+      case "036" -> "018";
+      default -> null;
+    };
   }
 
   private void mergeRedeTransaction(TransactionAcqEntity target, TransactionAcqEntity source) {
@@ -1104,13 +1174,18 @@ public class ProcessRedeEeVcService {
 
     boolean ecommercePair = isEcommerceRecordType(a.getRecordType()) || isEcommerceRecordType(b.getRecordType());
 
+    // O complemento de e-commerce pode trazer a data operacional anterior à data/hora
+    // registrada na transação principal. Para esse par específico aceitamos diferença
+    // máxima de um dia; para transações comuns continuamos exigindo o mesmo dia.
+    boolean dateCriteria = compatibleSaleDate(a.getSaleDate(), b.getSaleDate(), ecommercePair);
+
     return Objects.equals(a.getRvNumber(), b.getRvNumber())
       && Objects.equals(a.getNsu(), b.getNsu())
       && compatibleAuthorization(a.getAuthorization(), b.getAuthorization())
       && sameMoney(a.getGrossValue(), b.getGrossValue())
       && sameCardNumber(a.getCardNumber(), b.getCardNumber())
       && sameEstablishment(a, b)
-      && (sameDay(a.getSaleDate(), b.getSaleDate()) || ecommercePair);
+      && dateCriteria;
   }
 
   private boolean sameEstablishment(TransactionAcqEntity a, TransactionAcqEntity b) {
@@ -1141,7 +1216,6 @@ public class ProcessRedeEeVcService {
     return normalized.isBlank() ? null : normalized;
   }
 
-
   private boolean compatibleAuthorization(String a, String b) {
     String aa = normalizeAuth(a);
     String bb = normalizeAuth(b);
@@ -1167,12 +1241,13 @@ public class ProcessRedeEeVcService {
     return normalized.replaceFirst("^0+(?!$)", "");
   }
 
-  private boolean sameDay(OffsetDateTime a, OffsetDateTime b) {
+  private boolean compatibleSaleDate(OffsetDateTime a, OffsetDateTime b, boolean ecommercePair) {
     if (a == null || b == null) {
-      return Objects.equals(a, b);
+      return ecommercePair || Objects.equals(a, b);
     }
 
-    return Objects.equals(a.toLocalDate(), b.toLocalDate());
+    long differenceDays = Math.abs(ChronoUnit.DAYS.between(a.toLocalDate(), b.toLocalDate()));
+    return ecommercePair ? differenceDays <= 1 : differenceDays == 0;
   }
 
   private boolean sameMoney(BigDecimal a, BigDecimal b) {

@@ -9,6 +9,7 @@ import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -30,12 +31,14 @@ public class TransactionsAcqMinimalModel extends RepresentationModel<@NonNull Tr
   private Integer statusTransaction;
   private Integer statusTransactionReason;
 
+  private OffsetDateTime saleDate;
   private OffsetDateTime saleReconciliationDate;
+
+  private BigDecimal grossValue;
 
   private String tid;
   private String cardNumber;
   private String authorization;
-  private OffsetDateTime saleDate;
 
   private FlagMinimalModel flag;
   private CompanyMinimalModel company;

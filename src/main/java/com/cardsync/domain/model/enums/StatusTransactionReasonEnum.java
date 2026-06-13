@@ -18,11 +18,47 @@ public enum StatusTransactionReasonEnum {
   FLAG_MISMATCH(3),
   DIFFERENT_PLANS(4),
   SCHEDULED(5),
+
+  /**
+   * Motivo genérico de cancelamento. Usado como fallback quando a adquirente
+   * informa cancelamento, mas o arquivo não traz detalhe suficiente para
+   * classificar o motivo com segurança.
+   */
   CANCEL_VENDAS(6),
   CHARGEBACK(7),
   VALUE_MISMATCH(8),
   ACQUIRER_MISMATCH(9),
-  AMBIGUOUS_MATCH(10);
+  AMBIGUOUS_MATCH(10),
+
+  /**
+   * Cancelamento informado pela adquirente, sem uma causa operacional mais específica.
+   */
+  CANCELLATION_ACQUIRER(11),
+
+  /**
+   * Cancelamento por estorno/desfazimento informado no ajuste da adquirente.
+   */
+  CANCELLATION_REFUND(12),
+
+  /**
+   * Cancelamento/devolução do valor da venda ao portador/cliente.
+   */
+  CANCELLATION_RETURN(13),
+
+  /**
+   * Cancelamento por duplicidade de venda/cobrança.
+   */
+  CANCELLATION_DUPLICATE(14),
+
+  /**
+   * Cancelamento por suspeita/confirmação de fraude informada pela adquirente.
+   */
+  CANCELLATION_FRAUD(15),
+
+  /**
+   * Cancelamento por erro operacional, erro de captura, processamento ou lançamento.
+   */
+  CANCELLATION_OPERATIONAL_ERROR(16);
 
   private final int code;
 

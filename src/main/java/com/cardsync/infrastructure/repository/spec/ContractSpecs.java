@@ -47,26 +47,21 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
       spec = spec.and(offsetDateTimePeriod("endDate", a.periodEndDate(), a.endDate(), true));
       spec = spec.and(offsetDateTimePeriod("startDate", a.periodStartDate(), a.startDate(), true));
 
-      spec = spec.and(
-        inPath(a.company(), value -> {
+      spec = spec.and(inPath(a.company(), value -> {
           try {
             return UUID.fromString(value);
           } catch (Exception e) {
             return null;
           }
-        }, "company", "id")
-      );
+        }, "company", "id"));
 
-      spec = spec.and(
-        inPath(a.acquirer(), value -> {
+      spec = spec.and(inPath(a.acquirer(), value -> {
           try {
             return UUID.fromString(value);
           } catch (Exception e) {
             return null;
           }
-        }, "acquirer", "id")
-      );
-
+        }, "acquirer", "id"));
       spec = spec.and(
         inPath(a.createdBy(), value -> {
           try {
@@ -91,10 +86,12 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
 
     if (!isBlank(query.globalFilter())) {
       String gf = query.globalFilter();
+      // contains em "description" é aceitável (campo texto livre sem índice dedicado).
+      // startsWithPath para fantasyName usa LIKE prefixo sem LOWER() desnecessário.
       spec = spec.and(anyOf(
         contains("description", gf),
-        containsPath(gf, "company", "fantasyName"),
-        containsPath(gf, "acquirer", "fantasyName")
+        startsWithPath(gf, "company", "fantasyName"),
+        startsWithPath(gf, "acquirer", "fantasyName")
       ));
     }
 

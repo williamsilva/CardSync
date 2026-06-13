@@ -1,28 +1,139 @@
 package com.cardsync.core.reconciliation;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
-public record BankReconciliationResult(
-  int releasesAnalyzed,
-  int releasesReconciled,
-  int releasesMatchedByCreditOrders,
-  int releasesMatchedByInstallments,
-  int creditOrdersReconciled,
-  int installmentsReconciled,
-  int transactionsUpdated,
-  int releasesWithoutMatch,
-  int releasesSkippedMissingContext,
-  int candidateGroupsSkippedBySafetyCap,
-  BigDecimal totalReleaseValueReconciled,
-  BigDecimal totalCreditOrderValueReconciled,
-  BigDecimal totalInstallmentValueReconciled
-) {
+@Getter
+@Setter
+@Builder(toBuilder = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class BankReconciliationResult {
 
-  public static Builder builder() {
-    return new Builder();
+  private BankReconciliationTriggerType trigger;
+  private BankReconciliationMode mode;
+
+  private int releasesAnalyzed;
+  private int releasesReconciled;
+  private int releasesMatchedByCreditOrders;
+  private int releasesMatchedByInstallments;
+  private int creditOrdersReconciled;
+  private int installmentsReconciled;
+  private int transactionsUpdated;
+  private int releasesWithoutMatch;
+  private int releasesKeptPending;
+  private int releasesSkippedMissingContext;
+  private int candidateGroupsSkippedBySafetyCap;
+
+  private BigDecimal totalReleaseValueReconciled;
+  private BigDecimal totalCreditOrderValueReconciled;
+  private BigDecimal totalInstallmentValueReconciled;
+
+  private OffsetDateTime startedAt;
+  private OffsetDateTime finishedAt;
+
+  public static Counter counter(BankReconciliationTriggerType trigger, BankReconciliationMode mode) {
+    return Counter.builder()
+      .trigger(trigger)
+      .mode(mode)
+      .startedAt(OffsetDateTime.now())
+      .build();
   }
 
-  public static class Builder {
+  /**
+   * Compatibilidade com chamadas antigas no estilo Java record.
+   *
+   * O resultado foi convertido para classe Lombok para permitir @Builder, @NoArgsConstructor
+   * e serialização mais flexível. Porém alguns schedulers/controllers ainda podem chamar
+   * result.releasesAnalyzed() em vez de result.getReleasesAnalyzed().
+   */
+  public BankReconciliationTriggerType trigger() {
+    return trigger;
+  }
+
+  public BankReconciliationMode mode() {
+    return mode;
+  }
+
+  public int releasesAnalyzed() {
+    return releasesAnalyzed;
+  }
+
+  public int releasesReconciled() {
+    return releasesReconciled;
+  }
+
+  public int releasesMatchedByCreditOrders() {
+    return releasesMatchedByCreditOrders;
+  }
+
+  public int releasesMatchedByInstallments() {
+    return releasesMatchedByInstallments;
+  }
+
+  public int creditOrdersReconciled() {
+    return creditOrdersReconciled;
+  }
+
+  public int installmentsReconciled() {
+    return installmentsReconciled;
+  }
+
+  public int transactionsUpdated() {
+    return transactionsUpdated;
+  }
+
+  public int releasesWithoutMatch() {
+    return releasesWithoutMatch;
+  }
+
+  public int releasesKeptPending() {
+    return releasesKeptPending;
+  }
+
+  public int releasesSkippedMissingContext() {
+    return releasesSkippedMissingContext;
+  }
+
+  public int candidateGroupsSkippedBySafetyCap() {
+    return candidateGroupsSkippedBySafetyCap;
+  }
+
+  public BigDecimal totalReleaseValueReconciled() {
+    return totalReleaseValueReconciled;
+  }
+
+  public BigDecimal totalCreditOrderValueReconciled() {
+    return totalCreditOrderValueReconciled;
+  }
+
+  public BigDecimal totalInstallmentValueReconciled() {
+    return totalInstallmentValueReconciled;
+  }
+
+  public OffsetDateTime startedAt() {
+    return startedAt;
+  }
+
+  public OffsetDateTime finishedAt() {
+    return finishedAt;
+  }
+
+  @Getter
+  @Setter
+  @Builder(toBuilder = true)
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class Counter {
+
+    private BankReconciliationTriggerType trigger;
+    private BankReconciliationMode mode;
     private int releasesAnalyzed;
     private int releasesReconciled;
     private int releasesMatchedByCreditOrders;
@@ -31,48 +142,83 @@ public record BankReconciliationResult(
     private int installmentsReconciled;
     private int transactionsUpdated;
     private int releasesWithoutMatch;
+    private int releasesKeptPending;
     private int releasesSkippedMissingContext;
     private int candidateGroupsSkippedBySafetyCap;
+
+    @Builder.Default
     private BigDecimal totalReleaseValueReconciled = BigDecimal.ZERO;
+
+    @Builder.Default
     private BigDecimal totalCreditOrderValueReconciled = BigDecimal.ZERO;
+
+    @Builder.Default
     private BigDecimal totalInstallmentValueReconciled = BigDecimal.ZERO;
 
-    public void releaseAnalyzed() { releasesAnalyzed++; }
+    private OffsetDateTime startedAt;
+
+    public void releaseAnalyzed() {
+      releasesAnalyzed++;
+    }
+
     public void releaseReconciled(BigDecimal value) {
       releasesReconciled++;
       totalReleaseValueReconciled = totalReleaseValueReconciled.add(nvl(value));
     }
+
     public void matchedByCreditOrders(int count, BigDecimal value) {
       releasesMatchedByCreditOrders++;
       creditOrdersReconciled += count;
       totalCreditOrderValueReconciled = totalCreditOrderValueReconciled.add(nvl(value));
     }
+
     public void matchedByInstallments(int count, BigDecimal value) {
       releasesMatchedByInstallments++;
       installmentsReconciled += count;
       totalInstallmentValueReconciled = totalInstallmentValueReconciled.add(nvl(value));
     }
-    public void transactionsUpdated(int count) { transactionsUpdated += count; }
-    public void releaseWithoutMatch() { releasesWithoutMatch++; }
-    public void releaseSkippedMissingContext() { releasesSkippedMissingContext++; }
-    public void candidateGroupSkippedBySafetyCap() { candidateGroupsSkippedBySafetyCap++; }
 
-    public BankReconciliationResult build() {
-      return new BankReconciliationResult(
-        releasesAnalyzed,
-        releasesReconciled,
-        releasesMatchedByCreditOrders,
-        releasesMatchedByInstallments,
-        creditOrdersReconciled,
-        installmentsReconciled,
-        transactionsUpdated,
-        releasesWithoutMatch,
-        releasesSkippedMissingContext,
-        candidateGroupsSkippedBySafetyCap,
-        totalReleaseValueReconciled,
-        totalCreditOrderValueReconciled,
-        totalInstallmentValueReconciled
-      );
+    public void transactionsUpdated(int count) {
+      transactionsUpdated += count;
+    }
+
+    public void releaseWithoutMatch() {
+      releasesWithoutMatch++;
+    }
+
+    public void releaseKeptPending() {
+      releasesKeptPending++;
+    }
+
+    public void releaseSkippedMissingContext() {
+      releasesSkippedMissingContext++;
+    }
+
+    public void candidateGroupSkippedBySafetyCap() {
+      candidateGroupsSkippedBySafetyCap++;
+    }
+
+    public BankReconciliationResult toResult() {
+      return BankReconciliationResult.builder()
+        .trigger(trigger)
+        .mode(mode)
+        .releasesAnalyzed(releasesAnalyzed)
+        .releasesReconciled(releasesReconciled)
+        .releasesMatchedByCreditOrders(releasesMatchedByCreditOrders)
+        .releasesMatchedByInstallments(releasesMatchedByInstallments)
+        .creditOrdersReconciled(creditOrdersReconciled)
+        .installmentsReconciled(installmentsReconciled)
+        .transactionsUpdated(transactionsUpdated)
+        .releasesWithoutMatch(releasesWithoutMatch)
+        .releasesKeptPending(releasesKeptPending)
+        .releasesSkippedMissingContext(releasesSkippedMissingContext)
+        .candidateGroupsSkippedBySafetyCap(candidateGroupsSkippedBySafetyCap)
+        .totalReleaseValueReconciled(totalReleaseValueReconciled)
+        .totalCreditOrderValueReconciled(totalCreditOrderValueReconciled)
+        .totalInstallmentValueReconciled(totalInstallmentValueReconciled)
+        .startedAt(startedAt)
+        .finishedAt(OffsetDateTime.now())
+        .build();
     }
 
     private BigDecimal nvl(BigDecimal value) {

@@ -14,6 +14,7 @@ public record TransactionAcqSalesFilter(
   String tid,
   String cvNsu,
   String machine,
+  String rvNumber,
   String cardNumber,
   String authorization,
 

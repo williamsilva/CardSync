@@ -17,19 +17,23 @@ public enum Cnab240BankLayout {
   ),
   ITAU(
     "341", "Itau", "Itaú",
-    "53-58", "65-70", "71-72",
+    "52-57", "65-70", "71-72",
     "108-111", "111-113", "113-133", "133-134",
     "134-142", "142-150", "150-168", "168-169",
-    "169-172", "172-176", "176-201", "201-240",
+    // Itaú: Nº do documento ocupa as posições 235-240 do layout (0-based 234-240).
+    // As posições 202-234 contêm agência/conta de origem e inscrição do emitente.
+    "169-172", "172-176", "176-201", "234-240",
     true,
     Set.of("E")
   ),
   BRADESCO(
     "237", "Bradesco", "Bradesco",
-    "53-58", "65-70", "70-71",
+    "52-57", "58-70", "70-71",
     "108-111", "111-113", "113-133", "133-134",
     "134-142", "142-150", "150-168", "168-169",
-    "169-172", "172-176", "176-201", "201-240",
+    // Bradesco: Nº do documento ocupa as posições 202-208 do layout (0-based 201-208).
+    // As posições 209-240 são a "2ª linha do extrato" e não devem entrar no documento.
+    "169-172", "172-176", "176-201", "201-208",
     true,
     Set.of("E")
   );

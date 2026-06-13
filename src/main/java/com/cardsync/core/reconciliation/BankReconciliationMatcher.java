@@ -22,8 +22,8 @@ class BankReconciliationMatcher {
     ValueExtractor<T> extractor,
     BigDecimal targetValue,
     BigDecimal tolerance,
-    int recursiveLimit,
-    long safeCapCents
+    long safeCapCents,
+    long dpMaxCents
   ) {
     if (targetValue == null || candidates == null || candidates.isEmpty()) return MatchResult.notMatched();
 
@@ -35,6 +35,7 @@ class BankReconciliationMatcher {
 
     if (sorted.isEmpty()) return MatchResult.notMatched();
 
+    // 1) Match por candidato único.
     for (T candidate : sorted) {
       BigDecimal value = extractor.value(candidate);
       if (sameAmount(value, targetValue, safeTolerance)) {
@@ -42,6 +43,7 @@ class BankReconciliationMatcher {
       }
     }
 
+    // 2) Match pela soma total de todos os candidatos.
     BigDecimal total = sum(sorted, extractor);
     if (sameAmount(total, targetValue, safeTolerance)) {
       return MatchResult.matched(sorted, total, false);
@@ -53,62 +55,96 @@ class BankReconciliationMatcher {
       return MatchResult.skipped();
     }
 
-    MatchResult greedyDesc = greedySubset(sorted.stream()
-      .sorted((a, b) -> extractor.value(b).compareTo(extractor.value(a)))
-      .toList(), extractor, targetValue, safeTolerance);
-    if (greedyDesc.matched()) return greedyDesc;
-
-    MatchResult greedyAsc = greedySubset(sorted, extractor, targetValue, safeTolerance);
-    if (greedyAsc.matched()) return greedyAsc;
-
-    int limit = recursiveLimit <= 0 ? 30 : recursiveLimit;
-    if (sorted.size() > limit) return MatchResult.notMatched();
-
-    return recursiveSubset(sorted, extractor, targetValue, safeTolerance, 0, BigDecimal.ZERO, new ArrayList<>());
-  }
-
-  private <T> MatchResult greedySubset(List<T> candidates, ValueExtractor<T> extractor, BigDecimal targetValue, BigDecimal tolerance) {
-    List<T> selected = new ArrayList<>();
-    BigDecimal sum = BigDecimal.ZERO;
-    BigDecimal maxAllowed = targetValue.add(tolerance);
-
-    for (T candidate : candidates) {
-      BigDecimal value = extractor.value(candidate);
-      BigDecimal next = sum.add(value);
-      if (next.compareTo(maxAllowed) <= 0) {
-        selected.add(candidate);
-        sum = next;
-      }
-      if (sameAmount(sum, targetValue, tolerance)) {
-        return MatchResult.matched(selected, sum, false);
-      }
-    }
-    return MatchResult.notMatched();
-  }
-
-  private <T> MatchResult recursiveSubset(
-    List<T> candidates,
-    ValueExtractor<T> extractor,
-    BigDecimal targetValue,
-    BigDecimal tolerance,
-    int index,
-    BigDecimal sum,
-    List<T> selected
-  ) {
-    if (sameAmount(sum, targetValue, tolerance)) {
-      return MatchResult.matched(new ArrayList<>(selected), sum, false);
-    }
-    if (index >= candidates.size() || sum.compareTo(targetValue.add(tolerance)) > 0) {
+    // 3) Subconjunto exato via programação dinâmica em centavos.
+    //    Substitui a antiga heurística gulosa (que perdia combinações válidas) e a
+    //    recursão exponencial (limitada a 30 itens). A DP é exata e polinomial
+    //    (O(n × alvoCents)), encontrando um subconjunto cuja soma esteja dentro da
+    //    tolerância sempre que ele existir.
+    if (targetCents > dpMaxCents) {
+      log.info(
+        "Subconjunto não tentado: alvo {} excede o teto de DP ({} centavos). "
+          + "Aumente reconciliation.subset-dp-max-cents se precisar conciliar valores maiores por composição.",
+        targetValue, dpMaxCents
+      );
       return MatchResult.notMatched();
     }
 
-    T current = candidates.get(index);
-    selected.add(current);
-    MatchResult withCurrent = recursiveSubset(candidates, extractor, targetValue, tolerance, index + 1, sum.add(extractor.value(current)), selected);
-    if (withCurrent.matched()) return withCurrent;
+    return subsetSumByCents(sorted, extractor, targetValue, safeTolerance);
+  }
 
-    selected.remove(selected.size() - 1);
-    return recursiveSubset(candidates, extractor, targetValue, tolerance, index + 1, sum, selected);
+  /**
+   * Subset-sum exato em centavos. Procura um subconjunto cuja soma fique entre
+   * (alvo - tolerância) e (alvo + tolerância). Usa DP de alcançabilidade com
+   * reconstrução do subconjunto. Complexidade O(n × maxCents) de tempo e memória.
+   */
+  private <T> MatchResult subsetSumByCents(
+    List<T> candidates,
+    ValueExtractor<T> extractor,
+    BigDecimal targetValue,
+    BigDecimal tolerance
+  ) {
+    long toleranceCents = toCents(tolerance);
+    long targetCents = toCents(targetValue);
+    long maxCents = targetCents + toleranceCents;
+    long minCents = Math.max(0, targetCents - toleranceCents);
+
+    if (maxCents <= 0) return MatchResult.notMatched();
+
+    int n = candidates.size();
+    long[] valueCents = new long[n];
+    for (int i = 0; i < n; i++) {
+      valueCents[i] = toCents(extractor.value(candidates.get(i)));
+    }
+
+    // reachable[s] = true se a soma 's' centavos é atingível por algum subconjunto.
+    // parentItem[s] = índice do item usado para alcançar 's' pela primeira vez (reconstrução).
+    boolean[] reachable = new boolean[(int) maxCents + 1];
+    int[] parentItem = new int[(int) maxCents + 1];
+    long[] parentSum = new long[(int) maxCents + 1];
+    reachable[0] = true;
+
+    for (int i = 0; i < n; i++) {
+      long v = valueCents[i];
+      if (v <= 0 || v > maxCents) continue;
+      // percorre de cima para baixo para usar cada item no máximo uma vez (0/1 knapsack)
+      for (long s = maxCents - v; s >= 0; s--) {
+        if (reachable[(int) s] && !reachable[(int) (s + v)]) {
+          reachable[(int) (s + v)] = true;
+          parentItem[(int) (s + v)] = i;
+          parentSum[(int) (s + v)] = s;
+        }
+      }
+    }
+
+    // procura a soma alcançável mais próxima do alvo dentro da janela de tolerância
+    long bestSum = -1;
+    long bestDiff = Long.MAX_VALUE;
+    for (long s = minCents; s <= maxCents; s++) {
+      if (reachable[(int) s]) {
+        long diff = Math.abs(s - targetCents);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestSum = s;
+          if (diff == 0) break;
+        }
+      }
+    }
+
+    if (bestSum < 0) {
+      return MatchResult.notMatched();
+    }
+
+    // reconstrói o subconjunto a partir de parentItem/parentSum
+    List<T> selected = new ArrayList<>();
+    long cursor = bestSum;
+    while (cursor > 0) {
+      int item = parentItem[(int) cursor];
+      selected.add(candidates.get(item));
+      cursor = parentSum[(int) cursor];
+    }
+
+    BigDecimal matchedValue = BigDecimal.valueOf(bestSum).movePointLeft(2);
+    return MatchResult.matched(selected, matchedValue, false);
   }
 
   private <T> BigDecimal sum(List<T> candidates, ValueExtractor<T> extractor) {

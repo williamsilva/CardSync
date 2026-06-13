@@ -10,11 +10,13 @@ import com.cardsync.infrastructure.repository.spec.ContractAuditSpecs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -27,11 +29,18 @@ public class ContractAuditService {
 
   @Transactional(readOnly = true)
   public Page<ContractAuditModel> divergentFees(Pageable pageable, ListQueryDto<ContractAuditModelFilter> query) {
-      Specification<ContractAuditEntity> spec = contractAuditSpecs.fromQuery(query);
-    Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+    Specification<ContractAuditEntity> filterSpec = contractAuditSpecs.fromQueryForTotals(query);
+    Specification<ContractAuditEntity> dataSpec   = contractAuditSpecs.fromQuery(query);
 
-    return contractAuditRepository
-      .findAll(spec, unsortedPageable)
-      .map(contractAuditModelAssembler::toModel);
+    long total = contractAuditRepository.count(filterSpec);
+
+    List<ContractAuditModel> content = total == 0
+      ? List.of()
+      : contractAuditRepository.findAll(dataSpec, pageable)
+      .stream()
+      .map(contractAuditModelAssembler::toModel)
+      .toList();
+
+    return new PageImpl<>(content, pageable, total);
   }
 }

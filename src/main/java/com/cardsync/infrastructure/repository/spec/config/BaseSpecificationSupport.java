@@ -1,6 +1,7 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
 import com.cardsync.domain.model.enums.PeriodEnum;
+import com.cardsync.domain.filter.query.SortDto;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -9,6 +10,7 @@ import jakarta.persistence.criteria.FetchParent;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
@@ -21,8 +23,10 @@ import java.time.Year;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -52,6 +56,61 @@ public abstract class BaseSpecificationSupport<T> {
 
     return (root, query, cb) ->
       cb.like(cb.lower(root.get(field).as(String.class)), like(normalized));
+  }
+
+  /**
+   * Busca por prefixo em campo String — usa LIKE 'valor%' que aproveita índices B-tree.
+   * Preferir sobre {@link #contains} em campos indexados como authorization e nsu.
+   */
+  protected Specification<T> startsWith(String value, String field) {
+    if (isBlank(value)) {
+      return alwaysTrue();
+    }
+
+    String normalized = normalize(value);
+
+    return (root, query, cb) ->
+      cb.like(cb.lower(root.get(field).as(String.class)), normalized + "%");
+  }
+
+  /**
+   * Filtro global para campo NSU (Long): usa igualdade exata quando o valor for numérico,
+   * ou prefixo de string quando não for. Evita CAST implícito com LIKE bilateral que
+   * invalidaria o índice idx_acq_nsu / idx_erp_nsu.
+   */
+  protected Specification<T> nsuGlobalFilter(String value, String field) {
+    if (isBlank(value)) {
+      return alwaysTrue();
+    }
+
+    String trimmed = value.trim();
+
+    try {
+      Long nsuValue = Long.parseLong(trimmed);
+      return (root, query, cb) -> cb.equal(root.get(field), nsuValue);
+    } catch (NumberFormatException ignored) {
+      // valor não numérico — usa prefixo para não invalidar índice
+      String normalized = normalize(trimmed);
+      return (root, query, cb) ->
+        cb.like(root.get(field).as(String.class), normalized + "%");
+    }
+  }
+
+  /**
+   * Busca por prefixo em campo de associação — usa LIKE 'valor%'.
+   * Equivalente a {@link #containsPath} mas sem o % inicial, aproveitando índices.
+   */
+  protected Specification<T> startsWithPath(String value, String association, String field) {
+    if (isBlank(value)) {
+      return alwaysTrue();
+    }
+
+    String normalized = normalize(value);
+
+    return (root, query, cb) -> {
+      Expression<String> path = cb.lower(root.join(association, JoinType.LEFT).get(field).as(String.class));
+      return cb.like(path, normalized + "%");
+    };
   }
 
   @SuppressWarnings("SameParameterValue")
@@ -1059,5 +1118,130 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   protected record DateRange(LocalDate start, LocalDate end) {
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Sort infrastructure
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Resolve de uma chave de campo para uma Expression de ordenação.
+   * Retornar {@code null} silencia aquele campo (sem ORDER BY).
+   */
+  @FunctionalInterface
+  protected interface SortField<T> {
+    Expression<?> resolve(Root<T> root, CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending);
+  }
+
+  /**
+   * Cria uma Specification de ordenação a partir de um mapa declarativo de campos.
+   * O mapa define APENAS os campos que precisam de tratamento especial (alias, join, subquery).
+   * Campos não declarados são resolvidos por reflexão direta no root ({@link #directRootPathOrNull}).
+   *
+   * <p><b>Atenção:</b> {@code Map.of()} aceita no máximo 10 entradas. Para mais de 10 campos,
+   * use {@code Map.ofEntries(Map.entry("campo", resolver), ...)}.
+   *
+   * <p>Uso nos specs:
+   * <pre>{@code
+   * // Até 10 campos — Map.of
+   * private Specification<MyEntity> orderByTableSort(List<SortDto> sort) {
+   *   return tableSort(sort, "saleDate", Map.of(
+   *     "conciliationDate",    sortField("saleReconciliationDate"),
+   *     "company",             sortJoin("company", "fantasyName"),
+   *     "expectedPaymentDate", (r, q, cb, d) -> installmentDateSort(r, cb, d)
+   *   ));
+   * }
+   *
+   * // Mais de 10 campos — Map.ofEntries
+   * private Specification<MyEntity> orderByTableSort(List<SortDto> sort) {
+   *   return tableSort(sort, "expectedPaymentDate", Map.ofEntries(
+   *     Map.entry("nsu",    sortJoin("transaction", "nsu")),
+   *     Map.entry("cvNsu",  sortJoin("transaction", "nsu")),
+   *     Map.entry("flag",   sortJoin("transaction", "flag", "name")),
+   *     // ... demais campos
+   *   ));
+   * }
+   * }</pre>
+   *
+   * @param sort          lista de SortDto do request
+   * @param defaultField  campo de fallback quando sort estiver vazio (ex: "saleDate")
+   * @param fieldMap      mapa de alias → resolver; campos ausentes resolvem pelo nome direto
+   */
+  protected Specification<T> tableSort(
+    List<SortDto> sort,
+    String defaultField,
+    Map<String, SortField<T>> fieldMap
+  ) {
+    return (root, query, cb) -> {
+      if (isCountQuery(query)) {
+        return cb.conjunction();
+      }
+
+      List<Order> orders = new ArrayList<>();
+
+      if (sort != null) {
+        for (SortDto item : sort) {
+          if (item == null || item.field() == null || item.field().isBlank() || item.order() == null) {
+            continue;
+          }
+
+          boolean ascending = item.order() == 1;
+          String fieldName = item.field().trim();
+
+          SortField<T> resolver = fieldMap.get(fieldName);
+
+          Expression<?> expression = resolver != null
+            ? resolver.resolve(root, query, cb, !ascending)
+            : directRootPathOrNull(root, fieldName);
+
+          if (expression == null) {
+            continue;
+          }
+
+          orders.add(ascending ? cb.asc(expression) : cb.desc(expression));
+        }
+      }
+
+      if (orders.isEmpty() && defaultField != null) {
+        Expression<?> def = directRootPathOrNull(root, defaultField);
+        if (def != null) {
+          orders.add(cb.desc(def));
+        }
+      }
+
+      orders.add(cb.desc(root.get("id")));
+      query.orderBy(orders);
+      query.distinct(true);
+
+      return cb.conjunction();
+    };
+  }
+
+  /** Atalho para campos de join simples: join(assoc).get(attr) */
+  protected SortField<T> sortJoin(String association, String attribute) {
+    return (root, query, cb, descending) -> join(root, association).get(attribute);
+  }
+
+  /** Atalho para campos de join duplo: join(assoc1).join(assoc2).get(attr) */
+  protected SortField<T> sortJoin(String association1, String association2, String attribute) {
+    return (root, query, cb, descending) -> join(join(root, association1), association2).get(attribute);
+  }
+
+  /** Atalho para alias simples sem join: root.get(physicalField) */
+  protected SortField<T> sortField(String physicalField) {
+    return (root, query, cb, descending) -> root.get(physicalField);
+  }
+
+  /**
+   * Tenta resolver {@code field} diretamente no root.
+   * Retorna {@code null} se o campo não existir (silencia o ORDER BY).
+   */
+  @SuppressWarnings("unchecked")
+  protected <V> Path<V> directRootPathOrNull(Root<T> root, String field) {
+    try {
+      return field == null || field.isBlank() ? null : (Path<V>) root.get(field);
+    } catch (IllegalArgumentException ex) {
+      return null;
+    }
   }
 }

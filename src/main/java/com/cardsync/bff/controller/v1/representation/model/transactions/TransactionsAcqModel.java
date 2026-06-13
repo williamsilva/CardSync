@@ -31,12 +31,12 @@ public class TransactionsAcqModel extends RepresentationModel<@NonNull Transacti
   private Integer modality;
   private Integer lineNumber;
   private Integer installment;
-  private Integer statusTransaction;
   private Integer statusTransactionReason;
 
   private String tid;
   private String cardNumber;
   private String authorization;
+  private String statusTransaction;
 
   private BigDecimal mdrRate;
   private BigDecimal flexRate;

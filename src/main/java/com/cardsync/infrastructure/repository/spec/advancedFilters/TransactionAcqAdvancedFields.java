@@ -31,6 +31,7 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     spec = spec.and(contains(filter.tid(), "tid"));
     spec = spec.and(contains(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.machine(), "machine"));
+    spec = spec.and(contains(filter.rvNumber(), "rvNumber"));
     spec = spec.and(contains(filter.cardNumber(), "cardNumber"));
     spec = spec.and(contains(filter.authorization(), "authorization"));
 

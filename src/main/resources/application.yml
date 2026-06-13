@@ -13,6 +13,11 @@ spring:
       hibernate:
         default_batch_fetch_size: 100
 
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=10m
+
   jackson:
     time-zone: UTC
 
@@ -33,76 +38,155 @@ server:
 
 cardsync:
   app:
+    # Timezone de negócio usada por schedulers, cálculos de início/fim de dia e logs operacionais.
     business-zone: America/Sao_Paulo
+
+  maintenance:
+    # Cron do ANALYZE TABLE (domingo 02h por padrão).
+    # Desativar com ANALYZE_TABLE_ENABLED=false se o banco já faz manutenção automática.
+    analyze-table-cron: ${ANALYZE_TABLE_CRON:0 0 2 * * SUN}
 
 # File processing migrated from Nimbus API
 file-processing:
+  # Diretório raiz dos arquivos processados pelo CardSync.
   base-path: C:/cardsync/files
+
+  # Diretórios base derivados do base-path.
   base-bank: ${file-processing.base-path}/bank
   base-acquirer: ${file-processing.base-path}/acquirer
 
   erp:
+    # PV padrão usado quando o arquivo ERP não informa estabelecimento/PV.
     default-pv-number: ${ERP_DEFAULT_PV_NUMBER:}
+
+    # Define se o ERP informa a empresa no arquivo. Quando false, o sistema usa fallback por configuração/contexto.
     informs-company: ${ERP_INFORMS_COMPANY:false}
+
+    # Dados padrão de empresa usados quando o ERP não informa empresa e o fallback estiver habilitado.
     default-company-cnpj: ${ERP_DEFAULT_COMPANY_CNPJ:}
     default-company-name: ${ERP_DEFAULT_COMPANY_NAME:}
+
+    # Grupo de PV padrão usado em cargas ERP sem contexto completo de estabelecimento.
     default-pv-group-number: ${ERP_DEFAULT_PV_GROUP_NUMBER:}
+
+    # Define se o ERP informa estabelecimento no arquivo. Quando false, usa default-pv-number/default-establishment-name.
     informs-establishment: ${ERP_INFORMS_ESTABLISHMENT:false}
+
+    # Nome comercial padrão usado em arquivos ERP sem identificação clara.
     default-commercial-name: ${ERP_DEFAULT_COMMERCIAL_NAME:ERP}
+
+    # Nome padrão do estabelecimento quando não vier no arquivo ERP.
     default-establishment-name: ${ERP_DEFAULT_ESTABLISHMENT_NAME:}
 
   scheduler:
-    enabled: false
-    erp-enabled: false
-    bank-enabled: false
-    rede-enabled: false
-    log-idle-cycles: false
-    erp-cron: "0 0/5 * * * *"
-    rede-cron: "0 0/5 * * * *"
-    bank-cron: "0 0/5 * * * *"
-    erp-acquirer-reconciliation-cron: ${ERP_ACQUIRER_RECONCILIATION_CRON:0 0/15 * * * *}
-    erp-acquirer-fee-reconciliation-cron: ${ERP_ACQUIRER_FEE_RECONCILIATION_CRON:0 10/15 * * * *}
+    # Liga/desliga geral dos agendamentos automáticos do CardSync.
+    # Endpoints manuais continuam funcionando mesmo com esta flag false.
+    enabled: ${CARDSYNC_SCHEDULER_ENABLED:true}
 
-    erp-acquirer-reconciliation-enabled: ${ERP_ACQUIRER_RECONCILIATION_SCHEDULER_ENABLED:false}
-    erp-acquirer-fee-reconciliation-enabled: ${ERP_ACQUIRER_FEE_RECONCILIATION_SCHEDULER_ENABLED:false}
+    # ÚNICO agendamento automático recomendado para produção.
+    # Executa a esteira completa em ordem:
+    # 1) processamento ERP
+    # 2) processamento Rede/adquirente
+    # 3) processamento Banco/CNAB
+    # 4) conciliações financeiras completas
+    complete-pipeline-enabled: ${CARDSYNC_COMPLETE_PIPELINE_ENABLED:true}
+
+    # Cron Spring com 6 campos.
+    # Padrão: a cada 5 minutos.
+    complete-pipeline-cron: ${CARDSYNC_COMPLETE_PIPELINE_CRON:0 0/30 * * * *}
+
+    # Quando true, se uma etapa falhar, as próximas etapas da esteira não executam.
+    complete-pipeline-stop-on-step-error: ${CARDSYNC_COMPLETE_PIPELINE_STOP_ON_STEP_ERROR:true}
+
+    # Quando true, registra logs quando o scheduler acorda mas está desabilitado.
+    # Em produção, normalmente false para evitar poluição nos logs.
+    log-idle-cycles: ${CARDSYNC_SCHEDULER_LOG_IDLE_CYCLES:false}
 
   systems:
 
     erp:
+      # Pasta de entrada dos arquivos ERP.
       input: ${file-processing.base-path}/ERP/input
+      # Arquivos com erro de processamento.
       error: ${file-processing.base-path}/ERP/error
+      # Arquivos processados com sucesso ou com warnings controlados.
       processed: ${file-processing.base-path}/ERP/processed
+      # Arquivos duplicados já processados anteriormente.
       duplicate: ${file-processing.base-path}/ERP/duplicate
 
     acquirer:
       rede:
+        # Pasta de entrada dos arquivos Rede/adquirente.
         input: ${file-processing.base-acquirer}/REDE/input
+        # Arquivos com erro de processamento.
         error: ${file-processing.base-acquirer}/REDE/error
+        # Arquivos processados com sucesso ou com warnings controlados.
         processed: ${file-processing.base-acquirer}/REDE/processed
+        # Arquivos duplicados já processados anteriormente.
         duplicate: ${file-processing.base-acquirer}/REDE/duplicate
 
     bank:
       itau:
+        # Pasta de entrada dos arquivos CNAB Itaú.
         input: ${file-processing.base-bank}/ITAU/input
+        # Arquivos com erro de processamento.
         error: ${file-processing.base-bank}/ITAU/error
+        # Arquivos processados com sucesso ou com warnings controlados.
         processed: ${file-processing.base-bank}/ITAU/processed
+        # Arquivos duplicados já processados anteriormente.
         duplicate: ${file-processing.base-bank}/ITAU/duplicate
 
       santander:
+        # Pasta de entrada dos arquivos CNAB Santander.
         input: ${file-processing.base-bank}/SANTANDER/input
+        # Arquivos com erro de processamento.
         error: ${file-processing.base-bank}/SANTANDER/error
+        # Arquivos processados com sucesso ou com warnings controlados.
         processed: ${file-processing.base-bank}/SANTANDER/processed
+        # Arquivos duplicados já processados anteriormente.
         duplicate: ${file-processing.base-bank}/SANTANDER/duplicate
 
       bradesco:
+        # Pasta de entrada dos arquivos CNAB Bradesco.
         input: ${file-processing.base-bank}/BRADESCO/input
+        # Arquivos com erro de processamento.
         error: ${file-processing.base-bank}/BRADESCO/error
+        # Arquivos processados com sucesso ou com warnings controlados.
         processed: ${file-processing.base-bank}/BRADESCO/processed
+        # Arquivos duplicados já processados anteriormente.
         duplicate: ${file-processing.base-bank}/BRADESCO/duplicate
 
-    reconciliation:
-      recursive-limit: 30
-      date-tolerance-days: 7
-      value-tolerance: "0.05"
-      safe-cap-cents: 50000000
-      reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:true}
+  reconciliation:
+    # Limite máximo de candidatos para tentativa de combinação/subset recursivo.
+    # Evita explosão combinatória em conciliações bancárias com muitos lançamentos candidatos.
+    recursive-limit: ${RECONCILIATION_RECURSIVE_LIMIT:30}
+
+    # Tolerância de dias para conciliação por data.
+    # Exemplo: 7 permite comparar vencimento/previsão/liquidação dentro de uma janela de 7 dias.
+    date-tolerance-days: ${RECONCILIATION_DATE_TOLERANCE_DAYS:7}
+
+    # Tolerância monetária para diferença de centavos em conciliações.
+    # Exemplo: "0.05" permite divergência de até 5 centavos.
+    value-tolerance: ${RECONCILIATION_VALUE_TOLERANCE:0.05}
+
+    # Limite de segurança em centavos para algoritmos de combinação/DP.
+    # Evita consumo excessivo de memória/CPU em grupos muito grandes.
+    safe-cap-cents: ${RECONCILIATION_SAFE_CAP_CENTS:50000000}
+
+    # Por padrão, a conciliação ERP x adquirente NÃO reprocessa vendas já conciliadas.
+    # Ative apenas para auditoria/reprocessamento controlado.
+    reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:false}
+
+    # Por padrão, a conciliação Banco x adquirente NÃO reprocessa lançamentos já conciliados.
+    # Ative apenas para auditoria/reprocessamento controlado.
+    reconcile-already-reconciled-bank-acquirer: ${BANK_ACQUIRER_RECONCILE_ALREADY_RECONCILED:false}
+
+    # Por padrão, a etapa de cancelamentos informados pela adquirente ignora vendas já canceladas.
+    # Ative apenas para auditoria/reprocessamento controlado.
+    reprocess-acquirer-sale-cancellations: ${ACQUIRER_SALE_CANCELLATION_REPROCESS:false}
+
+    # Modo da conciliação Banco x adquirente.
+    bank-mode: ${BANK_RECONCILIATION_MODE:CREDIT_ORDER_FIRST}
+
+    # Lançamentos bancários recentes sem match permanecem pendentes por esta janela.
+    bank-mark-not-reconciled-after-days: ${BANK_MARK_NOT_RECONCILED_AFTER_DAYS:3}

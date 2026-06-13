@@ -12,19 +12,14 @@ import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.TransactionErpTableFields;
 import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Order;
-import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Root;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
@@ -72,10 +67,12 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
 
+        // Usa nsuGlobalFilter (equals ou prefixo) e startsWith para authorization
+        // para aproveitar os índices idx_erp_nsu e idx_erp_authorization.
         spec = spec.and(
           anyOf(
-            contains(gf, "nsu"),
-            contains(gf, "authorization")
+            nsuGlobalFilter(gf, "nsu"),
+            startsWith(gf, "authorization")
           )
         );
       }
@@ -104,6 +101,9 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
 
         var bankingDomicile = fetchIfNotFetched(root, "bankingDomicile");
         fetchIfNotFetched(bankingDomicile, "bank");
+
+        // distinct apenas na query de dados
+        query.distinct(true);
       }
 
       return cb.conjunction();
@@ -111,75 +111,20 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
   }
 
   private Specification<TransactionErpEntity> orderByTableSort(List<SortDto> sort) {
-    return (root, query, cb) -> {
-      if (isCountQuery(query)) {
-        return cb.conjunction();
-      }
-
-      List<Order> orders = new ArrayList<>();
-
-      if (sort != null) {
-        for (SortDto item : sort) {
-          if (item == null || item.field() == null || item.field().isBlank() || item.order() == null) {
-            continue;
-          }
-
-          boolean ascending = item.order() == 1;
-          Expression<?> expression = sortExpression(root, query, cb, item.field().trim(), !ascending);
-
-          if (expression == null) {
-            continue;
-          }
-
-          orders.add(ascending ? cb.asc(expression) : cb.desc(expression));
-        }
-      }
-
-      if (orders.isEmpty()) {
-        orders.add(cb.desc(root.get("saleDate")));
-      }
-
-      orders.add(cb.desc(root.get("id")));
-      query.orderBy(orders);
-
-      return cb.conjunction();
-    };
+    return tableSort(sort, "saleDate", Map.of(
+      "conciliationDate",    sortField("saleReconciliationDate"),
+      "company",             sortJoin("company", "fantasyName"),
+      "establishment",       sortJoin("establishment", "pvNumber"),
+      "acquirer",            sortJoin("acquirer", "fantasyName"),
+      "flag",                sortJoin("flag", "name"),
+      "adjustmentValue",     sortJoin("adjustment", "adjustmentValue"),
+      "expectedPaymentDate", (root, query, cb, desc) -> installmentDateSort(root, cb, desc)
+    ));
   }
 
-  private Expression<?> sortExpression(Root<TransactionErpEntity> root, CriteriaQuery<?> query,
-                                       CriteriaBuilder cb, String field, boolean descending) {
-    return switch (field) {
-      case "saleDate" -> root.get("saleDate");
-      case "conciliationDate" -> root.get("saleReconciliationDate");
-      case "expectedPaymentDate" -> expectedPaymentDateSortExpression(root, query, cb, descending);
-
-      case "company" -> join(root, "company").get("fantasyName");
-      case "establishment" -> join(root, "establishment").get("pvNumber");
-      case "acquirer" -> join(root, "acquirer").get("fantasyName");
-      case "flag" -> join(root, "flag").get("name");
-      case "adjustmentValue" -> join(root, "adjustment").get("adjustmentValue");
-
-      default -> directRootPathOrNull(root, field);
-    };
-  }
-
-  private Expression<LocalDate> expectedPaymentDateSortExpression(
-    Root<TransactionErpEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending) {
-    var subquery = query.subquery(LocalDate.class);
-    Root<TransactionErpEntity> correlatedRoot = subquery.correlate(root);
-    Join<?, ?> installments = correlatedRoot.join("installments", JoinType.LEFT);
-    Expression<LocalDate> expectedPaymentDate = installments.get("expectedPaymentDate");
-
-    subquery.select(descending ? cb.greatest(expectedPaymentDate) : cb.least(expectedPaymentDate));
-
-    return subquery;
-  }
-
-  private Path<?> directRootPathOrNull(Root<TransactionErpEntity> root, String field) {
-    try {
-      return root.get(field);
-    } catch (IllegalArgumentException ex) {
-      return null;
-    }
+  private Expression<LocalDate> installmentDateSort(
+    Root<TransactionErpEntity> root, CriteriaBuilder cb, boolean descending) {
+    Expression<LocalDate> date = join(root, "installments").get("expectedPaymentDate");
+    return descending ? cb.greatest(date) : cb.least(date);
   }
 }

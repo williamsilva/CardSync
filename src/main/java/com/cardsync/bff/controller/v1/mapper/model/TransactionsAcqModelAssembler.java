@@ -54,10 +54,11 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
     model.setInstallment(entity.getInstallment());
     model.setDiscountValue(entity.getDiscountValue());
     model.setAuthorization(entity.getAuthorization());
-    model.setStatusTransaction(entity.getStatusTransaction());
+    model.setStatusTransaction(entity.getStatusTransaction().name());
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
     model.setStatusTransactionReason(entity.getStatusTransactionReason());
     model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
+
     model.setInstallments(installments.stream()
       .map(TransactionsAcqModelAssembler::toInstallmentModel)
       .toList());

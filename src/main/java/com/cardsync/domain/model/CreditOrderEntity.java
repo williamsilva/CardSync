@@ -1,5 +1,7 @@
 package com.cardsync.domain.model;
 
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -8,6 +10,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Getter
 @Setter
@@ -62,4 +65,20 @@ public class CreditOrderEntity extends AuditableEntityBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private ReleasesBankEntity releaseBank;
+
+  public StatusReconciliationEnum getSalesSummaryStatus() {
+    return StatusReconciliationEnum.fromCode(salesSummaryStatus);
+  }
+
+  public void setSalesSummaryStatus(StatusReconciliationEnum salesSummaryStatus) {
+    this.salesSummaryStatus = Optional.ofNullable(salesSummaryStatus).orElse(StatusReconciliationEnum.NULL).getCode();
+  }
+
+  public StatusPaymentBankEnum getStatusPaymentBank() {
+    return StatusPaymentBankEnum.fromCode(statusPaymentBank);
+  }
+
+  public void setStatusPaymentBank(StatusPaymentBankEnum statusPaymentBank) {
+    this.statusPaymentBank = (statusPaymentBank!=null ? statusPaymentBank:StatusPaymentBankEnum.NULL).getCode();
+  }
 }

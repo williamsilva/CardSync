@@ -11,14 +11,11 @@ import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.InstallmentsAcqTableFields;
-import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.Order;
-import jakarta.persistence.criteria.Root;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAcqEntity> {
@@ -65,7 +62,8 @@ public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAc
 
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
-        spec = spec.and(anyOf(containsPath(gf, "transaction", "nsu")));
+        // startsWithPath usa JOIN + LIKE prefixo — aproveita idx_inst_acq_transaction via transaction.nsu
+        spec = spec.and(anyOf(startsWithPath(gf, "transaction", "nsu")));
       }
     }
 
@@ -104,6 +102,9 @@ public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAc
         var salesSummary = fetchIfNotFetched(transaction, "salesSummary");
         var bankingDomicile = fetchIfNotFetched(salesSummary, "bankingDomicile");
         fetchIfNotFetched(bankingDomicile, "bank");
+
+        // distinct apenas na query de dados
+        query.distinct(true);
       }
 
       return cb.conjunction();
@@ -111,75 +112,26 @@ public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAc
   }
 
   private Specification<InstallmentAcqEntity> orderByTableSort(List<SortDto> sort) {
-    return (root, query, cb) -> {
-      if (isCountQuery(query)) {
-        return cb.conjunction();
-      }
-
-      List<Order> orders = new ArrayList<>();
-
-      if (sort != null) {
-        for (SortDto item : sort) {
-          if (item == null || item.field() == null || item.field().isBlank() || item.order() == null) {
-            continue;
-          }
-
-          Expression<?> expression = sortExpression(root, item.field().trim());
-
-          if (expression == null) {
-            continue;
-          }
-
-          boolean ascending = item.order() == 1;
-          orders.add(ascending ? cb.asc(expression) : cb.desc(expression));
-        }
-      }
-
-      if (orders.isEmpty()) {
-        orders.add(cb.desc(root.get("expectedPaymentDate")));
-      }
-
-      orders.add(cb.desc(root.get("id")));
-      query.orderBy(orders);
-
-      return cb.conjunction();
-    };
-  }
-
-  private Expression<?> sortExpression(Root<InstallmentAcqEntity> root, String field) {
-    return switch (field) {
-      case "id" -> root.get("id");
-      case "grossValue" -> root.get("grossValue");
-      case "paymentDate" -> root.get("paymentDate");
-      case "liquidValue" -> root.get("liquidValue");
-      case "installment" -> root.get("installment");
-      case "discountValue" -> root.get("discountValue");
-      case "expectedPaymentDate" -> root.get("expectedPaymentDate");
-
-      case "paymentStatus" -> root.get("paymentStatus");
-      case "cancellationDate" -> root.get("cancellationDate");
-      case "installmentStatus" -> root.get("installmentStatus");
-      case "reconciliationBankProcessedAt" -> root.get("reconciliationBankProcessedAt");
-
-      case "tid" -> join(root, "transaction").get("tid");
-      case "machine" -> join(root, "transaction").get("machine");
-      case "capture" -> join(root, "transaction").get("capture");
-      case "cvNsu", "nsu" -> join(root, "transaction").get("nsu");
-      case "saleDate" -> join(root, "transaction").get("saleDate");
-      case "modality" -> join(root, "transaction").get("modality");
-      case "cardNumber" -> join(root, "transaction").get("cardNumber");
-      case "authorization" -> join(root, "transaction").get("authorization");
-      case "transactionStatus", "saleStatus" -> join(root, "transaction").get("transactionStatus");
-      case "saleReconciliationDate", "conciliationDate" -> join(root, "transaction").get("saleReconciliationDate");
-
-      case "flag" -> join(join(root, "transaction"), "flag").get("name");
-      case "company" -> join(join(root, "transaction"), "company").get("fantasyName");
-      case "acquirer" -> join(join(root, "transaction"), "acquirer").get("fantasyName");
-      case "processedFile" -> join(join(root, "transaction"), "processedFile").get("file");
-      case "establishment" -> join(join(root, "transaction"), "establishment").get("pvNumber");
-      case "adjustmentValue" -> join(join(root, "transaction"), "adjustment").get("adjustmentValue");
-
-      default -> nestedPathOrDirectRootPath(root, field);
-    };
+    return tableSort(sort, "expectedPaymentDate", Map.ofEntries(
+      Map.entry("cvNsu",                 sortJoin("transaction", "nsu")),
+      Map.entry("nsu",                   sortJoin("transaction", "nsu")),
+      Map.entry("tid",                   sortJoin("transaction", "tid")),
+      Map.entry("machine",               sortJoin("transaction", "machine")),
+      Map.entry("capture",               sortJoin("transaction", "capture")),
+      Map.entry("saleDate",              sortJoin("transaction", "saleDate")),
+      Map.entry("modality",              sortJoin("transaction", "modality")),
+      Map.entry("cardNumber",            sortJoin("transaction", "cardNumber")),
+      Map.entry("authorization",         sortJoin("transaction", "authorization")),
+      Map.entry("transactionStatus",     sortJoin("transaction", "transactionStatus")),
+      Map.entry("saleStatus",            sortJoin("transaction", "transactionStatus")),
+      Map.entry("saleReconciliationDate",sortJoin("transaction", "saleReconciliationDate")),
+      Map.entry("conciliationDate",      sortJoin("transaction", "saleReconciliationDate")),
+      Map.entry("flag",                  sortJoin("transaction", "flag", "name")),
+      Map.entry("company",               sortJoin("transaction", "company", "fantasyName")),
+      Map.entry("acquirer",              sortJoin("transaction", "acquirer", "fantasyName")),
+      Map.entry("processedFile",         sortJoin("transaction", "processedFile", "file")),
+      Map.entry("establishment",         sortJoin("transaction", "establishment", "pvNumber")),
+      Map.entry("adjustmentValue",       sortJoin("transaction", "adjustment", "adjustmentValue"))
+    ));
   }
 }

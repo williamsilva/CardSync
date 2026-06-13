@@ -196,4 +196,17 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
     @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses
   );
 
+  @Query("""
+    select distinct e
+      from TransactionErpEntity e
+      join fetch e.transactionAcq ta
+      left join fetch e.installments
+      left join fetch e.adjustment
+     where ta.id in :transactionAcqIds
+     order by e.saleDate asc, e.id asc
+  """)
+  List<TransactionErpEntity> findByTransactionAcqIdsForCancellationReconciliation(
+    @Param("transactionAcqIds") Collection<UUID> transactionAcqIds
+  );
+
 }

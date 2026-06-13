@@ -10,12 +10,12 @@ import java.util.List;
 public final class PageableMapper {
   private PageableMapper() {}
 
-  public static Pageable toPageable(int page, int size, List<SortDto> sort) {
-    if (page < 0) page = 0;
-    if (size <= 0) size = 20;
+  public static Pageable toPageable(Integer page, Integer size, List<SortDto> sort) {
+    int pageNumber = (page == null || page < 0) ? 0 : page;
+    int pageSize = (size == null || size <= 0) ? 20 : size;
 
     Sort s = toSort(sort);
-    return PageRequest.of(page, size, s);
+    return PageRequest.of(pageNumber, pageSize, s);
   }
 
   private static Sort toSort(List<SortDto> sort) {

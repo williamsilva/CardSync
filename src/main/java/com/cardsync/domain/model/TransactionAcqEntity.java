@@ -1,6 +1,8 @@
 package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 
 @Getter
@@ -47,9 +50,9 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private Integer statusAudit;
   private Integer installment;
   private Integer statusTransaction;
-  private Integer feeReconciliationStatus = FeeReconciliationStatusEnum.PENDING.getCode();
   private Integer statusPaymentBank;
   private Integer statusTransactionReason;
+  private Integer feeReconciliationStatus = FeeReconciliationStatusEnum.PENDING.getCode();
 
   private BigDecimal mdrRate;
   private BigDecimal flexRate;
@@ -87,4 +90,20 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   @OrderBy("installment ASC")
   @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<InstallmentAcqEntity> installments = new LinkedHashSet<>();
+
+  public StatusPaymentBankEnum getStatusPaymentBank() {
+    return StatusPaymentBankEnum.fromCode(statusPaymentBank);
+  }
+
+  public void setStatusPaymentBank(StatusPaymentBankEnum statusPaymentBank) {
+    this.statusPaymentBank = (statusPaymentBank!=null ? statusPaymentBank:StatusPaymentBankEnum.NULL).getCode();
+  }
+
+  public StatusReconciliationEnum getStatusTransaction() {
+    return StatusReconciliationEnum.fromCode(statusTransaction);
+  }
+
+  public void setStatusTransaction(StatusReconciliationEnum statusTransaction) {
+    this.statusTransaction = Optional.ofNullable(statusTransaction).orElse(StatusReconciliationEnum.NULL).getCode();
+  }
 }

@@ -18,7 +18,8 @@ public enum StatusTransactionEnum {
   MANUALLY_RECONCILED(3),
   NOT_RECONCILED(4),
   CANCELED(5),
-  DELETED(6);
+  DELETED(6),
+  PARTIALLY_RECONCILED(7);
 
   private final int code;
 
@@ -26,9 +27,6 @@ public enum StatusTransactionEnum {
     this.code = code;
   }
 
-  /*
-   * Lookup O(1)
-   */
   private static final Map<Integer, StatusTransactionEnum> BY_CODE =
     Arrays.stream(values())
       .collect(Collectors.toUnmodifiableMap(StatusTransactionEnum::getCode, Function.identity()));
@@ -37,17 +35,10 @@ public enum StatusTransactionEnum {
     Arrays.stream(values())
       .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
 
-  /*
-   * Converte código do banco -> enum
-   */
   public static StatusTransactionEnum fromCode(Integer code) {
-
-    if (code == null) {
-      return null;
-    }
+    if (code == null) return null;
 
     StatusTransactionEnum value = BY_CODE.get(code);
-
     if (value == null) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
@@ -58,17 +49,10 @@ public enum StatusTransactionEnum {
     return value;
   }
 
-  /*
-   * Converte string -> enum
-   */
   public static StatusTransactionEnum fromName(String name) {
-
-    if (name == null || name.isBlank()) {
-      return null;
-    }
+    if (name == null || name.isBlank()) return null;
 
     StatusTransactionEnum value = BY_NAME.get(name.trim().toUpperCase());
-
     if (value == null) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
@@ -79,11 +63,7 @@ public enum StatusTransactionEnum {
     return value;
   }
 
-  /*
-   * Enum -> código do banco
-   */
   public static Integer toCode(StatusTransactionEnum status) {
     return status != null ? status.code : null;
   }
-
 }

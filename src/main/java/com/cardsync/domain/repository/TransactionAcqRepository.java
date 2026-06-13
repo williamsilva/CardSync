@@ -243,4 +243,48 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     Pageable pageable
   );
 
+
+
+  @Query("""
+    select distinct tx
+      from TransactionAcqEntity tx
+      left join fetch tx.acquirer
+      left join fetch tx.flag
+      left join fetch tx.company
+      left join fetch tx.establishment
+      left join fetch tx.adjustment
+      left join fetch tx.salesSummary ss
+      left join fetch ss.bankingDomicile
+      left join fetch tx.installments ia
+      left join fetch ia.adjustment
+      left join fetch ia.creditOrder
+      left join fetch ia.releaseBank
+     where ss.id = :salesSummaryId
+     order by tx.saleDate asc, tx.id asc
+  """)
+  List<TransactionAcqEntity> findBySalesSummaryIdForAcquirerSaleSummaryReconciliation(
+    @Param("salesSummaryId") UUID salesSummaryId
+  );
+
+  @Query("""
+    select distinct tx
+      from TransactionAcqEntity tx
+      left join fetch tx.acquirer
+      left join fetch tx.flag
+      left join fetch tx.company
+      left join fetch tx.establishment
+      left join fetch tx.adjustment
+      left join fetch tx.salesSummary ss
+      left join fetch ss.bankingDomicile
+      left join fetch tx.installments ia
+      left join fetch ia.adjustment
+      left join fetch ia.creditOrder
+      left join fetch ia.releaseBank
+     where ss.id in :salesSummaryIds
+     order by ss.rvDate asc, tx.saleDate asc, tx.id asc
+  """)
+  List<TransactionAcqEntity> findBySalesSummaryIdsForAcquirerSaleSummaryReconciliation(
+    @Param("salesSummaryIds") Collection<UUID> salesSummaryIds
+  );
+
 }

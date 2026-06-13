@@ -11,11 +11,13 @@ import com.cardsync.domain.service.support.TransactionTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.InstallmentsAcqSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,13 +30,19 @@ public class InstallmentsAcqService {
 
   @Transactional(readOnly = true)
   public Page<InstallmentAcqModel> search(Pageable pageable, ListQueryDto<InstallmentsAcqFilter> query) {
-    Specification<InstallmentAcqEntity> spec = installmentsAcqSpecs.fromQuery(query);
+    Specification<InstallmentAcqEntity> filterSpec = installmentsAcqSpecs.fromQueryForTotals(query);
+    Specification<InstallmentAcqEntity> dataSpec   = installmentsAcqSpecs.fromQuery(query);
 
-    Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+    long total = installmentAcqRepository.count(filterSpec);
 
-    return installmentAcqRepository
-      .findAll(spec, unsortedPageable)
-      .map(installmentAcqModelAssembler::toModel);
+    List<InstallmentAcqModel> content = total == 0
+      ? List.of()
+      : installmentAcqRepository.findAll(dataSpec, pageable)
+      .stream()
+      .map(installmentAcqModelAssembler::toModel)
+      .toList();
+
+    return new PageImpl<>(content, pageable, total);
   }
 
   @Transactional(readOnly = true)

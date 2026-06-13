@@ -3,27 +3,21 @@ package com.cardsync.domain.service;
 import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingAcqModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingErpModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingOtherDivergenceModelAssembler;
-import com.cardsync.bff.controller.v1.mapper.model.ContractAuditModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ConciliationWaitingOtherDivergencePair;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
-import com.cardsync.domain.filter.ContractAuditModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
-import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
-import com.cardsync.domain.model.enums.StatusTransactionEnum;
-import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
-import com.cardsync.domain.repository.ContractAuditRepository;
+import com.cardsync.domain.model.enums.*;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingOtherDivergenceSpecs;
-import com.cardsync.infrastructure.repository.spec.ContractAuditSpecs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -53,42 +47,61 @@ public class ConciliationWaitingService {
 
   private final ConciliationWaitingAcqModelAssembler conciliationWaitingAcqModelAssembler;
   private final ConciliationWaitingErpModelAssembler conciliationWaitingErpModelAssembler;
-
   private final ConciliationWaitingOtherDivergenceModelAssembler conciliationWaitingOtherDivergenceModelAssembler;
 
   @Transactional(readOnly = true)
   public Page<ConciliationWaitingModel> missingAcquirer(Pageable pageable, ListQueryDto<ConciliationWaitingModelFilter> query) {
-    Specification<TransactionErpEntity> spec = conciliationWaitingErpSpecs.fromQuery(query);
-    Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+    Specification<TransactionErpEntity> filterSpec = conciliationWaitingErpSpecs.fromQueryForTotals(query);
+    Specification<TransactionErpEntity> dataSpec   = conciliationWaitingErpSpecs.fromQuery(query);
 
-    return transactionErpRepository
-      .findAll(spec, unsortedPageable)
-      .map(conciliationWaitingErpModelAssembler::toModel);
+    long total = transactionErpRepository.count(filterSpec);
+
+    List<ConciliationWaitingModel> content = total == 0
+      ? List.of()
+      : transactionErpRepository.findAll(dataSpec, pageable)
+      .stream()
+      .map(conciliationWaitingErpModelAssembler::toModel)
+      .toList();
+
+    return new PageImpl<>(content, pageable, total);
   }
 
   @Transactional(readOnly = true)
   public Page<ConciliationWaitingModel> missingErp(Pageable pageable, ListQueryDto<ConciliationWaitingModelFilter> query) {
-    Specification<TransactionAcqEntity> spec = conciliationWaitingAcqSpecs.fromQuery(query);
-    Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+    Specification<TransactionAcqEntity> filterSpec = conciliationWaitingAcqSpecs.fromQueryForTotals(query);
+    Specification<TransactionAcqEntity> dataSpec   = conciliationWaitingAcqSpecs.fromQuery(query);
 
-    return transactionAcqRepository
-      .findAll(spec, unsortedPageable)
-      .map(conciliationWaitingAcqModelAssembler::toModel);
+    long total = transactionAcqRepository.count(filterSpec);
+
+    List<ConciliationWaitingModel> content = total == 0
+      ? List.of()
+      : transactionAcqRepository.findAll(dataSpec, pageable)
+      .stream()
+      .map(conciliationWaitingAcqModelAssembler::toModel)
+      .toList();
+
+    return new PageImpl<>(content, pageable, total);
   }
 
   @Transactional(readOnly = true)
   public Page<ConciliationWaitingModel> otherDivergences(Pageable pageable, ListQueryDto<ConciliationWaitingModelFilter> query) {
-    Specification<TransactionErpEntity> spec = conciliationWaitingOtherDivergenceSpecs.fromQuery(query);
-    Pageable unsortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+    Specification<TransactionErpEntity> filterSpec = conciliationWaitingOtherDivergenceSpecs.fromQueryForTotals(query);
+    Specification<TransactionErpEntity> dataSpec   = conciliationWaitingOtherDivergenceSpecs.fromQuery(query);
 
-    Page<TransactionErpEntity> erpPage = transactionErpRepository.findAll(spec, unsortedPageable);
+    long total = transactionErpRepository.count(filterSpec);
 
-    return erpPage
+    List<ConciliationWaitingModel> content = total == 0
+      ? List.of()
+      : transactionErpRepository.findAll(dataSpec, pageable)
+      .stream()
       .map(erp -> new ConciliationWaitingOtherDivergencePair(
         erp,
         findOtherDivergenceAcquirerCandidate(erp).orElse(null)
       ))
-      .map(conciliationWaitingOtherDivergenceModelAssembler::toModel);
+      .map(conciliationWaitingOtherDivergenceModelAssembler::toModel)
+      .toList();
+
+    return new PageImpl<>(content, pageable, total);
   }
 
   @Transactional
@@ -120,7 +133,7 @@ public class ConciliationWaitingService {
     ));
 
     acq.setSaleReconciliationDate(now);
-    acq.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode());
+    acq.setStatusTransaction(StatusReconciliationEnum.RECONCILED);
     acq.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED.getCode());
 
     copyAcquirerInstallmentsToErp(erp, acq);
@@ -176,7 +189,16 @@ public class ConciliationWaitingService {
   }
 
   @Transactional
-  public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(UUID erpTransactionId) {
+  public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(UUID erpTransactionId, ErpMarkDeletedRequestModel model) {
+    return markErpAsDeletedMissingAcquirer(erpTransactionId, model.reason(), model.observations());
+  }
+
+  @Transactional
+  public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(
+    UUID erpTransactionId,
+    String reason,
+    String observations
+  ) {
     TransactionErpEntity erp = findErp(erpTransactionId);
 
     if (erp.getTransactionAcq() != null) {
@@ -191,19 +213,20 @@ public class ConciliationWaitingService {
     erp.setDeletedDate(now);
     erp.setStatusTransaction(StatusTransactionEnum.DELETED.getCode());
     erp.setStatusTransactionReason(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ.getCode());
-    erp.setReasonExclusionStatus(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ.getCode());
+    erp.setReasonExclusionStatus(resolveExclusionReason(reason).getCode());
     erp.setObservations(appendObservation(
       erp.getObservations(),
-      "Venda marcada como excluída porque não foi localizada na adquirente."
+      buildDeletionObservation(reason, observations)
     ));
 
     transactionErpRepository.save(erp);
 
     log.info(
-      "🗑️ Venda ERP marcada como excluída por ausência na adquirente. erpId={}, nsu={}, authorization={}",
+      "🗑️ Venda ERP marcada como excluída por ausência na adquirente. erpId={}, nsu={}, authorization={}, reason={}",
       erp.getId(),
       erp.getNsu(),
-      erp.getAuthorization()
+      erp.getAuthorization(),
+      reason
     );
 
     return new ErpAcquirerResolutionResultModel(
@@ -215,14 +238,32 @@ public class ConciliationWaitingService {
     );
   }
 
+  private StatusTransactionReasonExclusionEnum resolveExclusionReason(String reason) {
+    StatusTransactionReasonExclusionEnum resolved = StatusTransactionReasonExclusionEnum.fromName(reason);
+    return resolved != null ? resolved : StatusTransactionReasonExclusionEnum.OTHER;
+  }
+
+  private String buildDeletionObservation(String reason, String observations) {
+    String base = "Venda marcada como excluída porque não foi localizada na adquirente.";
+
+    StringBuilder sb = new StringBuilder(base);
+    if (reason != null && !reason.isBlank()) {
+      sb.append(" Motivo: ").append(reason.trim()).append('.');
+    }
+    if (observations != null && !observations.isBlank()) {
+      sb.append(' ').append(observations.trim());
+    }
+    return sb.toString();
+  }
+
   @Transactional
-  public ErpAcquirerBatchResolutionResultModel markErpAsDeletedMissingAcquirerBatch(List<UUID> erpTransactionIds) {
-    List<UUID> ids = normalizeIds(erpTransactionIds);
+  public ErpAcquirerBatchResolutionResultModel markErpAsDeletedMissingAcquirerBatch(ErpAcquirerBatchRequestModel request) {
+    List<UUID> ids = normalizeIds(request.transactionIds());
     List<ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel> items = new ArrayList<>();
 
     for (UUID id : ids) {
       try {
-        ErpAcquirerResolutionResultModel result = markErpAsDeletedMissingAcquirer(id);
+        ErpAcquirerResolutionResultModel result = markErpAsDeletedMissingAcquirer(id, request.reason(), request.observations());
         items.add(new ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel(
           id,
           result.erpId(),
@@ -247,10 +288,10 @@ public class ConciliationWaitingService {
 
   @Transactional(readOnly = true)
   public TransactionTotalsModel missingAcquirerTotals(ListQueryDto<ConciliationWaitingModelFilter> query) {
-    Specification<TransactionAcqEntity> spec = conciliationWaitingAcqSpecs.fromQueryForTotals(query);
+    Specification<TransactionErpEntity> spec = conciliationWaitingErpSpecs.fromQueryForTotals(query);
 
     return totalsQueryService.totals(
-      TransactionAcqEntity.class,
+      TransactionErpEntity.class,
       spec,
       "grossValue",
       "discountValue",
@@ -262,10 +303,10 @@ public class ConciliationWaitingService {
 
   @Transactional(readOnly = true)
   public TransactionTotalsModel missingErpTotals(ListQueryDto<ConciliationWaitingModelFilter> query) {
-    Specification<TransactionErpEntity> spec = conciliationWaitingErpSpecs.fromQueryForTotals(query);
+    Specification<TransactionAcqEntity> spec = conciliationWaitingAcqSpecs.fromQueryForTotals(query);
 
     return totalsQueryService.totals(
-      TransactionErpEntity.class,
+      TransactionAcqEntity.class,
       spec,
       "grossValue",
       "discountValue",

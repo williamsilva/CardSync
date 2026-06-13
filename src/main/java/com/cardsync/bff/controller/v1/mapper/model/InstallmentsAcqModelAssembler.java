@@ -49,7 +49,7 @@ public class InstallmentsAcqModelAssembler extends RepresentationModelAssemblerS
           .cardNumber(transaction.getCardNumber())
           .installment(transaction.getInstallment())
           .authorization(transaction.getAuthorization())
-          .statusTransaction(transaction.getStatusTransaction())
+          .statusTransaction(transaction.getStatusTransaction().getCode())
           .saleReconciliationDate(transaction.getSaleReconciliationDate())
           .statusTransactionReason(transaction.getStatusTransactionReason())
           .capture(transaction.getCapture() == null ? null : transaction.getCapture())

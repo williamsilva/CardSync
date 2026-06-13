@@ -15,6 +15,7 @@
 
     <modelmapper.version>3.2.1</modelmapper.version>
     <springdoc.version>3.0.1</springdoc.version>
+    <shedlock.version>5.16.0</shedlock.version>
   </properties>
 
   <parent>
@@ -151,6 +152,18 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
+    </dependency>
+
+    <!-- ShedLock: trava distribuída para o agendamento da esteira em ambiente com múltiplas instâncias -->
+    <dependency>
+      <groupId>net.javacrumbs.shedlock</groupId>
+      <artifactId>shedlock-spring</artifactId>
+      <version>${shedlock.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.javacrumbs.shedlock</groupId>
+      <artifactId>shedlock-provider-jdbc-template</artifactId>
+      <version>${shedlock.version}</version>
     </dependency>
 
   </dependencies>

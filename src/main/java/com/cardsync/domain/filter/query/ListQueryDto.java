@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 public record ListQueryDto<TAdvanced>(
-  int page,
-  int size,
+  Integer page,
+  Integer size,
   List<SortDto> sort,
   Map<String, ColumnFilterDto> tableFilters,
   String globalFilter,

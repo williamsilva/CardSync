@@ -5,6 +5,7 @@ import com.cardsync.domain.filter.query.FilterRuleDto;
 import com.cardsync.domain.filter.query.RangeValue;
 import com.cardsync.domain.model.enums.PeriodEnum;
 import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
@@ -105,7 +106,10 @@ public class SpecificationFactory {
     Object raw = rule == null ? null : rule.value();
 
     return (root, query, cb) -> {
-      if (field.requiresDistinct()) {
+      // Aplica distinct apenas na query de dados — nunca na count query.
+      // Aplicar distinct no COUNT gera COUNT(DISTINCT id) com JOIN desnecessário,
+      // o que invalida o uso de índice e causa full scan.
+      if (field.requiresDistinct() && !isCountQuery(query)) {
         query.distinct(true);
       }
 
@@ -313,6 +317,10 @@ public class SpecificationFactory {
       case "notEquals" -> cb.notEqual(expression, typed);
       default -> cb.equal(expression, typed);
     };
+  }
+
+  private boolean isCountQuery(CriteriaQuery<?> query) {
+    return Long.class.equals(query.getResultType()) || long.class.equals(query.getResultType());
   }
 
   private boolean isTextNumberMatchMode(String matchMode) {

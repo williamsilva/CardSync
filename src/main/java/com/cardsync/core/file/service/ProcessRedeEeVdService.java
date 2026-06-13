@@ -37,8 +37,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ProcessRedeEeVdService {
-  private static final int STATUS_PENDING = StatusPaymentBankEnum.PENDING.getCode();
-  private static final int TRANSACTION_PENDING = StatusTransactionEnum.PENDING.getCode();
+
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("ddMMyyyy");
   private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HHmmss");
 
@@ -46,27 +45,34 @@ public class ProcessRedeEeVdService {
     "00", "01", "02", "03", "04", "05", "08", "09", "11", "13", "17", "18", "19", "20"
   );
 
+  private final BankingDomicileResolver bankingDomicileResolver;
+
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
-  private final BankingDomicileResolver bankingDomicileResolver;
-  private final ProcessedFileRepository processedFileRepository;
+  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
+
+  private final AdjustmentRepository adjustmentRepository;
   private final SalesSummaryRepository salesSummaryRepository;
+  private final ProcessedFileRepository processedFileRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final InstallmentAcqRepository installmentAcqRepository;
-  private final AdjustmentRepository adjustmentRepository;
-  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
-  private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
   private final RedeEeVdTotalizerRepository redeEeVdTotalizerRepository;
-  private final RedeNegotiatedTransactionRepository redeNegotiatedTransactionRepository;
   private final RedeIcPlusTransactionRepository redeIcPlusTransactionRepository;
+  private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
+  private final RedeNegotiatedTransactionRepository redeNegotiatedTransactionRepository;
+
+  public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
+    processFile(file, paths, null);
+  }
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-  public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
+  public void processFile(Path file, FileProcessingProperties.FilePaths paths, String contentHash) {
     ProcessedFileEntity processedFile = null;
     try {
       log.info("▶ Iniciando processamento Rede EEVD: {}", file.getFileName());
-      List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+      List<String> lines = Files.readAllLines(file, StandardCharsets.ISO_8859_1);
       processedFile = createProcessedFile(file, lines.size());
+      processedFile.setContentHash(contentHash);
       processedFile.markProcessing();
 
       List<SalesSummaryEntity> summaries = new ArrayList<>();
@@ -169,7 +175,7 @@ public class ProcessRedeEeVdService {
       redeEeVdTotalizerRepository.saveAll(totalizers);
       redeNegotiatedTransactionRepository.saveAll(negotiatedTransactions);
       redeIcPlusTransactionRepository.saveAll(icPlusTransactions);
-      moveFileService.moveAfterCommit(file, paths.getProcessed());
+      moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
 
       if (!unidentified.isEmpty()) {
         log.warn("⚠ EEVD {} possui identificadores não mapeados: {}", file.getFileName(), unidentified);
@@ -178,7 +184,7 @@ public class ProcessRedeEeVdService {
     } catch (DataIntegrityViolationException ex) {
       log.error("⚠ Arquivo EEVD {} já processado anteriormente.", file.getFileName());
       if (processedFile != null) processedFile.setStatus(FileStatusEnum.DUPLICATE);
-      moveFileService.moveAfterRollback(file, paths.getDuplicate());
+      moveFileService.moveAfterRollback(file, paths.getDuplicate(), processedFile == null ? null : processedFile.getDateFile());
       throw ex;
     } catch (Exception ex) {
       log.error("❌ Erro ao processar EEVD {}: {}", file.getFileName(), safeMessage(ex), ex);
@@ -186,7 +192,7 @@ public class ProcessRedeEeVdService {
         processedFile.setStatus(FileStatusEnum.ERROR);
         processedFile.setErrorMessage(safeMessage(ex));
       }
-      moveFileService.moveAfterRollback(file, paths.getError());
+      moveFileService.moveAfterRollback(file, paths.getError(), processedFile == null ? null : processedFile.getDateFile());
       throw new IllegalStateException(ex);
     }
   }
@@ -241,9 +247,9 @@ public class ProcessRedeEeVdService {
     summary.setManualGenerated(false);
     summary.setRvDate(parseDate(col(c, 3)));
     summary.setFirstInstallmentCreditDate(parseDate(col(c, 2)));
-    summary.setStatusPaymentBank(STATUS_PENDING);
-    summary.setCreditOrderStatus(STATUS_PENDING);
-    summary.setTransactionsStatus(TRANSACTION_PENDING);
+    summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
+    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
     summary.setModality(resolveSummaryModality(col(c, 9)));
     summary.setAcquirer(acquirer);
     summary.setCompany(company);
@@ -299,7 +305,7 @@ public class ProcessRedeEeVdService {
     adjustment.setAdjustmentDate(parseDate(col(c, 3)));
     adjustment.setAdjustmentValue(money(col(c, 4)));
     adjustment.setAdjustmentType(col(c, 5));
-    adjustment.setAdjustmentReason(toInteger(col(c, 6)));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(toInteger(col(c, 6))));
     adjustment.setAdjustmentDescription(col(c, 7));
     adjustment.setCardNumber(col(c, 8));
     adjustment.setTransactionDate(parseDate(col(c, 9)));
@@ -543,9 +549,9 @@ public class ProcessRedeEeVdService {
     tx.setRvNumber(rvNumber);
     tx.setInstallment(1);
     tx.setModality(ModalityEnum.CASH_DEBIT.getCode());
-    tx.setStatusAudit(STATUS_PENDING);
-    tx.setStatusPaymentBank(STATUS_PENDING);
-    tx.setStatusTransaction(TRANSACTION_PENDING);
+    tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    tx.setStatusAudit(StatusPaymentBankEnum.PENDING.getCode());
+    tx.setStatusTransaction(StatusReconciliationEnum.PENDING);
     tx.setStatusTransactionReason(0);
     tx.setTipValue(BigDecimal.ZERO);
     tx.setFlexRate(BigDecimal.ZERO);
@@ -566,7 +572,7 @@ public class ProcessRedeEeVdService {
     installment.setDiscountValue(zero(tx.getDiscountValue()));
     installment.setLiquidValue(zero(tx.getLiquidValue()));
     installment.setAdjustmentValue(BigDecimal.ZERO);
-    installment.setStatusPaymentBank(STATUS_PENDING);
+    installment.setStatusPaymentBank(StatusPaymentBankEnum.PENDING.getCode());
     installment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
     installment.setExpectedPaymentDate(tx.getCreditDate() != null ? tx.getCreditDate() : tx.getSalesSummary() != null ? tx.getSalesSummary().getFirstInstallmentCreditDate() : null);
     installments.add(installment);
@@ -694,10 +700,19 @@ public class ProcessRedeEeVdService {
 
   private BigDecimal money(String value) {
     if (value == null || value.isBlank() || value.matches("0+")) return BigDecimal.ZERO;
-    String normalized = value.trim().replace(".", "").replace(",", ".");
     try {
-      if (normalized.matches("-?\\d+")) return new BigDecimal(normalized).movePointLeft(2);
-      return new BigDecimal(normalized);
+      String v = value.trim();
+      if (v.contains(",")) {
+        // Formato brasileiro: "1234,56" — separador decimal explícito.
+        // Remove separador de milhar (ponto) e converte vírgula para ponto.
+        return new BigDecimal(v.replace(".", "").replace(",", "."));
+      }
+      if (v.contains(".")) {
+        // Formato decimal com ponto: "1234.56" — não é centavos, é valor real.
+        return new BigDecimal(v);
+      }
+      // Inteiro puro: "123456" — formato 9(n)V99 do layout (os 2 últimos dígitos são centavos).
+      return new BigDecimal(v).movePointLeft(2);
     } catch (Exception ex) {
       return BigDecimal.ZERO;
     }

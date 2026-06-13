@@ -1,5 +1,6 @@
 package com.cardsync.core.file.config;
 
+import com.cardsync.core.reconciliation.BankReconciliationMode;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,10 +24,21 @@ public class FileProcessingProperties {
   private String baseAcquirer;
   private String baseBank;
 
-  private Systems systems = new Systems();
-  private Scheduler scheduler = new Scheduler();
   private Erp erp = new Erp();
+  private Systems systems = new Systems();
+  private Calendar calendar = new Calendar();
+  private Scheduler scheduler = new Scheduler();
   private Reconciliation reconciliation = new Reconciliation();
+
+  @Getter
+  @Setter
+  @ToString
+  public static class Calendar {
+    /**
+     * Define se o grupo ERP deve ser esperado diariamente na agenda de arquivos.
+     */
+    private boolean erpEnabled = true;
+  }
 
   @Getter
   @Setter
@@ -149,6 +161,31 @@ public class FileProcessingProperties {
     private String invalid;
     private String processed;
     private String duplicate;
+
+    /**
+     * Garante que todas as pastas configuradas existam, criando-as (e os pais)
+     * quando necessário. Deve ser chamado antes de listar/mover arquivos, para
+     * que a ausência de uma pasta não derrube o processamento.
+     */
+    public void ensureDirectories() {
+      createDirectory(input);
+      createDirectory(error);
+      createDirectory(invalid);
+      createDirectory(processed);
+      createDirectory(duplicate);
+      createDirectory(log);
+    }
+
+    private void createDirectory(String path) {
+      if (path == null || path.isBlank()) {
+        return;
+      }
+      try {
+        java.nio.file.Files.createDirectories(java.nio.file.Paths.get(path));
+      } catch (java.io.IOException ex) {
+        throw new IllegalStateException("Não foi possível criar a pasta de processamento: " + path, ex);
+      }
+    }
   }
 
   @Getter
@@ -189,43 +226,46 @@ public class FileProcessingProperties {
   public static class Scheduler {
 
     /**
-     * Liga/desliga geral do agendamento.
+     * Liga/desliga geral dos agendamentos automáticos.
      * Os endpoints manuais continuam funcionando mesmo quando o scheduler estiver desabilitado.
      */
-    private boolean enabled = false;
+    private boolean enabled = true;
 
-    /** Liga/desliga o agendamento do ERP. */
-    private boolean erpEnabled = true;
+    /**
+     * Único agendamento automático recomendado.
+     * Executa a esteira completa: ERP -> Rede/adquirente -> Banco/CNAB -> conciliações financeiras.
+     */
+    private boolean completePipelineEnabled = true;
 
-    /** Liga/desliga o agendamento da Rede/adquirentes. */
-    private boolean redeEnabled = true;
+    /**
+     * Cron de 6 campos do Spring para a esteira completa.
+     * Default: a cada 5 minutos.
+     */
+    private String completePipelineCron = "0 0/5 * * * *";
 
-    /** Liga/desliga o agendamento bancário. */
-    private boolean bankEnabled = true;
+    /**
+     * Quando true, se uma etapa falhar, as próximas etapas da esteira completa não executam.
+     */
+    private boolean completePipelineStopOnStepError = true;
 
-    /** Cron de 6 campos do Spring. Default: a cada 5 minutos. */
-    private String erpCron = "0 0/5 * * * *";
+    /**
+     * Apenas para logs/status, indicando se o scheduler deve registrar ciclos sem execução.
+     */
+    private boolean logIdleCycles = false;
 
-    /** Cron de 6 campos do Spring. Default: a cada 10 minutos. */
-    private String redeCron = "0 0/10 * * * *";
+    /**
+     * Trava distribuída (ShedLock): tempo máximo que o lock da esteira é mantido caso a
+     * instância que o adquiriu caia sem liberá-lo. Deve ser maior que a duração máxima
+     * esperada de uma execução completa. Formato ISO-8601 de duração (ex.: PT30M).
+     */
+    private String lockAtMostFor = "PT30M";
 
-    /** Cron de 6 campos do Spring. Default: a cada 5 minutos. */
-    private String bankCron = "0 0/5 * * * *";
-
-    /** Liga/desliga o agendamento da conciliação ERP x adquirente. */
-    private boolean erpAcquirerReconciliationEnabled = false;
-
-    /** Cron de 6 campos do Spring para conciliação ERP x adquirente. Default: a cada 15 minutos. */
-    private String erpAcquirerReconciliationCron = "0 0/15 * * * *";
-
-    /** Liga/desliga o agendamento da conciliação de taxas ERP x adquirente. */
-    private boolean erpAcquirerFeeReconciliationEnabled = false;
-
-    /** Cron de 6 campos do Spring para conciliação de taxas ERP x adquirente. Default: a cada 15 minutos, deslocado em 10 minutos. */
-    private String erpAcquirerFeeReconciliationCron = "0 10/15 * * * *";
-
-    /** Apenas para logs/status, indicando se o scheduler deve registrar ciclos sem arquivos. */
-    private boolean logIdleCycles = true;
+    /**
+     * Trava distribuída (ShedLock): tempo mínimo que o lock é mantido após o início,
+     * mesmo que a esteira termine antes. Evita reexecução imediata por relógios levemente
+     * dessincronizados entre instâncias. Formato ISO-8601 de duração (ex.: PT10S).
+     */
+    private String lockAtLeastFor = "PT10S";
   }
 
   @Getter
@@ -237,6 +277,14 @@ public class FileProcessingProperties {
      * Tolerância máxima, em dias, entre a data prevista/origem e a data do lançamento bancário.
      */
     private int dateToleranceDays = 7;
+
+    /**
+     * Janela máxima, em dias, entre a data de venda do ERP e a da adquirente na
+     * conciliação de transações MANUAIS com NSU/autorização invertidos. Como essas
+     * vendas são digitadas manualmente, a data pode divergir bastante; por isso a
+     * janela é maior que a da conciliação principal. Default 60 dias.
+     */
+    private int manualSwapSaleDateToleranceDays = 60;
 
     /**
      * Tolerância monetária absoluta. String para evitar perda de precisão no binder.
@@ -254,10 +302,41 @@ public class FileProcessingProperties {
     private long safeCapCents = 50_000_000L;
 
     /**
+     * Teto de centavos para a busca de subconjunto por programação dinâmica.
+     * A DP aloca arrays proporcionais ao alvo em centavos; este limite evita uso
+     * excessivo de memória para alvos muito altos. Acima dele, o subconjunto não é
+     * tentado (o release fica pendente). Default R$ 50.000,00 (~arrays de poucos MB).
+     */
+    private long subsetDpMaxCents = 5_000_000L;
+
+    /**
      * Por padrão, a conciliação ERP x adquirente ignora vendas já conciliadas.
      * Ative apenas quando precisar reprocessar/corrigir conciliações antigas.
      */
     private boolean reconcileAlreadyReconciledErpAcquirerSales = false;
+
+    /**
+     * Por padrão, a conciliação Banco x adquirente ignora lançamentos já conciliados.
+     * Ative apenas para auditoria/reprocessamento controlado.
+     */
+    private boolean reconcileAlreadyReconciledBankAcquirer = false;
+
+    /**
+     * Por padrão, a etapa de cancelamentos informados pela adquirente ignora vendas já canceladas.
+     * Ative apenas quando precisar reprocessar/corrigir cancelamentos antigos.
+     */
+    private boolean reprocessAcquirerSaleCancellations = false;
+
+    /**
+     * Modo da conciliação Banco x adquirente. Default: ordem de crédito primeiro e parcelas como fallback.
+     */
+    private BankReconciliationMode bankMode = BankReconciliationMode.CREDIT_ORDER_FIRST;
+
+    /**
+     * Mantém lançamentos recentes como pendentes para aguardar chegada do arquivo da adquirente.
+     * Após este número de dias, o lançamento sem match passa a NOT_RECONCILED.
+     */
+    private int bankMarkNotReconciledAfterDays = 3;
 
     public BigDecimal valueToleranceAsBigDecimal() {
       if (valueTolerance == null || valueTolerance.isBlank()) {

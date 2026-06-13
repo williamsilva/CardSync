@@ -1,5 +1,7 @@
 package com.cardsync.domain.model;
 
+import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
+import com.cardsync.domain.model.enums.AdjustmentStatusEnum;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
@@ -22,27 +24,25 @@ public class AdjustmentEntity extends AuditableEntityBase {
 
   private Long nsu;
   private Long letterNumber;
-  private String letterReference;
   private Long numberDebitOrder;
 
-  private Integer lineNumber;
-  private Boolean ecommerce;
   private Integer pvNumber;
-  private Integer installmentNumber;
-  private Integer installmentTotal;
-  private Integer adjustmentSequence;
+  private Boolean ecommerce;
+  private Integer lineNumber;
   private Integer rvNumberOriginal;
   private Integer pvNumberOriginal;
   private Integer adjustmentStatus;
   private Integer adjustmentReason;
+  private Integer installmentTotal;
+  private Integer installmentNumber;
   private Integer adjustmentReason2;
+  private Integer adjustmentSequence;
   private Integer rvNumberAdjustment;
   private Integer pvNumberAdjustment;
   private Integer rvNumberInstallmentAdjusted;
   private Integer rvNumberInstallmentOriginal;
 
   private String tid;
-  private String ecommerceOrderNumber;
   private String net;
   private String debitType;
   private String cardNumber;
@@ -50,8 +50,10 @@ public class AdjustmentEntity extends AuditableEntityBase {
   private String authorization;
   private String adjustmentType;
   private String referenceMonth;
-  private String adjustmentDescription;
+  private String letterReference;
   private String rawAdjustmentCode;
+  private String ecommerceOrderNumber;
+  private String adjustmentDescription;
   private String sourceRecordIdentifier;
 
   private LocalDate letterDate;
@@ -63,7 +65,10 @@ public class AdjustmentEntity extends AuditableEntityBase {
   private LocalDate transactionDate;
   private LocalDate originalDueDate;
 
+  private BigDecimal grossValue;
+  private BigDecimal liquidValue;
   private BigDecimal pendingValue;
+  private BigDecimal discountValue;
   private BigDecimal totalDebitValue;
   private BigDecimal adjustmentValue;
   private BigDecimal transactionValue;
@@ -72,9 +77,6 @@ public class AdjustmentEntity extends AuditableEntityBase {
   private BigDecimal originalValueInstallment;
   private BigDecimal cancellationValueRequested;
   private BigDecimal originalGrossSalesSummaryValue;
-  private BigDecimal grossValue;
-  private BigDecimal liquidValue;
-  private BigDecimal discountValue;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private FlagEntity rvFlagAdjustment;
@@ -99,4 +101,22 @@ public class AdjustmentEntity extends AuditableEntityBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private ProcessedFileEntity processedFile;
+
+  public AdjustmentStatusEnum getAdjustmentStatus() {
+    AdjustmentStatusEnum value = AdjustmentStatusEnum.fromCode(adjustmentStatus);
+    return value != null ? value : AdjustmentStatusEnum.NULL;
+  }
+
+  public void setAdjustmentStatus(AdjustmentStatusEnum adjustmentStatus) {
+    this.adjustmentStatus = (adjustmentStatus!=null ? adjustmentStatus:AdjustmentStatusEnum.NULL).getCode();
+  }
+
+  public AdjustmentReasonEnum getAdjustmentReason() {
+    AdjustmentReasonEnum value = AdjustmentReasonEnum.fromCode(adjustmentReason);
+    return value != null ? value : AdjustmentReasonEnum.NULL;
+  }
+
+  public void setAdjustmentReason(AdjustmentReasonEnum adjustmentReason) {
+    this.adjustmentReason = (adjustmentReason!=null ? adjustmentReason:AdjustmentReasonEnum.NULL).getCode();
+  }
 }

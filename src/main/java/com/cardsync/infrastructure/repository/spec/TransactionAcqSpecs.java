@@ -12,19 +12,14 @@ import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.TransactionAcqTableFields;
 import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
-import jakarta.persistence.criteria.Join;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Order;
-import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Root;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
@@ -72,11 +67,14 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
 
+        // Usa nsuGlobalFilter (equals ou prefixo) e startsWith para authorization
+        // para aproveitar os índices idx_acq_nsu e idx_acq_authorization.
+        // containsPath("establishment","pvNumber") foi removido: join + CAST + LIKE bilateral
+        // não usa índice e degrada queries sem filtro de estabelecimento.
         spec = spec.and(
           anyOf(
-            containsPath(gf, "establishment", "pvNumber"),
-            contains(gf, "nsu"),
-            contains(gf, "authorization")
+            nsuGlobalFilter(gf, "nsu"),
+            startsWith(gf, "authorization")
           )
         );
       }
@@ -107,6 +105,7 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
         var bankingDomicile = fetchIfNotFetched(salesSummary, "bankingDomicile");
         fetchIfNotFetched(bankingDomicile, "bank");
 
+        // distinct apenas na query de dados — evita COUNT(DISTINCT id) com 9 JOINs desnecessários
         query.distinct(true);
       }
 
@@ -115,79 +114,24 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
   }
 
   private Specification<TransactionAcqEntity> orderByTableSort(List<SortDto> sort) {
-    return (root, query, cb) -> {
-      if (isCountQuery(query)) {
-        return cb.conjunction();
-      }
-
-      List<Order> orders = new ArrayList<>();
-
-      if (sort != null) {
-        for (SortDto item : sort) {
-          if (item == null || item.field() == null || item.field().isBlank() || item.order() == null) {
-            continue;
-          }
-
-          boolean ascending = item.order() == 1;
-          Expression<?> expression = sortExpression(root, query, cb, item.field().trim(), !ascending);
-
-          if (expression == null) {
-            continue;
-          }
-
-          orders.add(ascending ? cb.asc(expression) : cb.desc(expression));
-        }
-      }
-
-      if (orders.isEmpty()) {
-        orders.add(cb.desc(root.get("saleDate")));
-      }
-
-      orders.add(cb.desc(root.get("id")));
-
-      query.orderBy(orders);
-      query.distinct(true);
-
-      return cb.conjunction();
-    };
+    return tableSort(sort, "saleDate", Map.of(
+      "conciliationDate",    sortField("saleReconciliationDate"),
+      "saleStatus",          sortField("transactionStatus"),
+      "captureEnum",         sortField("capture"),
+      "captureType",         sortField("capture"),
+      "company",             sortJoin("company", "fantasyName"),
+      "establishment",       sortJoin("establishment", "pvNumber"),
+      "acquirer",            sortJoin("acquirer", "fantasyName"),
+      "flag",                sortJoin("flag", "name"),
+      "adjustmentValue",     sortJoin("adjustment", "adjustmentValue"),
+      "expectedPaymentDate", (root, query, cb, desc) -> installmentDateSort(root, cb, desc)
+    ));
   }
 
-  private Expression<?> sortExpression(Root<TransactionAcqEntity> root, CriteriaQuery<?> query,
-                                       CriteriaBuilder cb, String field, boolean descending) {
-    return switch (field) {
-      case "conciliationDate" -> root.get("saleReconciliationDate");
-      case "expectedPaymentDate" -> expectedPaymentDateSortExpression(root, query, cb, descending);
-
-      case "company" -> join(root, "company").get("fantasyName");
-      case "establishment" -> join(root, "establishment").get("pvNumber");
-      case "acquirer" -> join(root, "acquirer").get("fantasyName");
-      case "flag" -> join(root, "flag").get("name");
-      case "adjustmentValue" -> join(root, "adjustment").get("adjustmentValue");
-
-      case "saleStatus" -> root.get("transactionStatus");
-      case "captureEnum", "captureType" -> root.get("capture");
-
-      default -> directRootPathOrNull(root, field);
-    };
-  }
-
-  private Expression<LocalDate> expectedPaymentDateSortExpression(
-    Root<TransactionAcqEntity> root, CriteriaQuery<?> query, CriteriaBuilder cb, boolean descending) {
-    var subquery = query.subquery(LocalDate.class);
-    Root<TransactionAcqEntity> correlatedRoot = subquery.correlate(root);
-    Join<?, ?> installments = correlatedRoot.join("installments", JoinType.LEFT);
-    Expression<LocalDate> creditDate = installments.get("expectedPaymentDate");
-
-    subquery.select(descending ? cb.greatest(creditDate) : cb.least(creditDate));
-
-    return subquery;
-  }
-
-  private Path<?> directRootPathOrNull(Root<TransactionAcqEntity> root, String field) {
-    try {
-      return root.get(field);
-    } catch (IllegalArgumentException ex) {
-      return null;
-    }
+  /** Ordena pelo menor/maior expectedPaymentDate das parcelas via JOIN agregado. */
+  private Expression<LocalDate> installmentDateSort(
+    Root<TransactionAcqEntity> root, CriteriaBuilder cb, boolean descending) {
+    Expression<LocalDate> date = join(root, "installments").get("expectedPaymentDate");
+    return descending ? cb.greatest(date) : cb.least(date);
   }
 }

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,10 +24,50 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     left join fetch rb.flag
     left join fetch rb.bank
     left join fetch rb.processedFile
-    where rb.reconciliationStatus = :pendingStatus
+    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus = :pendingStatus)
       and rb.releaseDate is not null
       and rb.releaseValue is not null
     order by rb.releaseDate asc, rb.releaseValue asc
   """)
-  List<ReleasesBankEntity> findPendingForBankReconciliation(@Param("pendingStatus") Integer pendingStatus);
+  List<ReleasesBankEntity> findForBankReconciliation(
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("reprocessAlreadyReconciled") boolean reprocessAlreadyReconciled
+  );
+
+  @Query("""
+    select rb
+    from ReleasesBankEntity rb
+    left join fetch rb.company
+    left join fetch rb.acquirer
+    left join fetch rb.establishment
+    left join fetch rb.bankingDomicile
+    left join fetch rb.flag
+    left join fetch rb.bank
+    left join fetch rb.processedFile
+    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus = :pendingStatus)
+      and rb.company.id = :companyId
+      and rb.bankingDomicile.id = :bankingDomicileId
+      and (:acquirerId is null or rb.acquirer.id = :acquirerId)
+      and (:flagId is null or rb.flag.id = :flagId)
+      and (
+        :modalityPaymentBank is null
+        or rb.modalityPaymentBank is null
+        or rb.modalityPaymentBank = :modalityPaymentBank
+      )
+      and rb.releaseDate between :dateFrom and :dateTo
+      and rb.releaseValue is not null
+    order by rb.releaseDate asc, rb.releaseValue asc
+  """)
+  List<ReleasesBankEntity> findCandidatesForCreditOrder(
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("reprocessAlreadyReconciled") boolean reprocessAlreadyReconciled,
+    @Param("companyId") UUID companyId,
+    @Param("acquirerId") UUID acquirerId,
+    @Param("bankingDomicileId") UUID bankingDomicileId,
+    @Param("flagId") UUID flagId,
+    @Param("modalityPaymentBank") Integer modalityPaymentBank,
+    @Param("dateFrom") LocalDate dateFrom,
+    @Param("dateTo") LocalDate dateTo
+  );
+
 }
