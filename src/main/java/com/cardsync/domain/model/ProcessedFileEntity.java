@@ -82,6 +82,16 @@ public class ProcessedFileEntity extends AuditableEntityBase {
   @JoinColumn(name = "origin_file_id", nullable = false)
   private OriginFileEntity originFile;
 
+  /**
+   * Domicílio identificado no cabeçalho do arquivo bancário.
+
+   * Mantido diretamente no arquivo processado para que CNABs sem lançamentos
+   * (somente header/trailer ou saldo) também sejam reconhecidos no calendário.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "banking_domicile_id")
+  private BankingDomicileEntity bankingDomicile;
+
   @OneToMany(mappedBy = "processedFile", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<ProcessedFileErrorEntity> errors = new ArrayList<>();
 

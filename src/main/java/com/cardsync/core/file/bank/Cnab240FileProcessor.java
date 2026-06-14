@@ -39,6 +39,7 @@ public class Cnab240FileProcessor {
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
+  private final BankingDomicileResolver bankingDomicileResolver;
   private final BankStatementClassifierService bankStatementClassifierService;
 
   private final BankRepository bankRepository;
@@ -146,11 +147,17 @@ public class Cnab240FileProcessor {
       processedFileRepository.save(processedFile);
       releasesBankRepository.saveAll(releases);
 
-      BankingDomicileEntity archiveDomicile = releases.stream()
-        .map(ReleasesBankEntity::getBankingDomicile)
-        .filter(Objects::nonNull)
-        .findFirst()
-        .orElse(null);
+      // Prioriza o domicílio identificado no header do arquivo. Arquivos CNAB sem
+      // movimento não possuem segmentos de lançamento e, portanto, não geram
+      // ReleasesBank. Nesses casos, agência e conta ainda precisam ser usadas na
+      // montagem da pasta de destino.
+      BankingDomicileEntity archiveDomicile = Optional
+        .ofNullable(processedFile.getBankingDomicile())
+        .orElseGet(() -> releases.stream()
+          .map(ReleasesBankEntity::getBankingDomicile)
+          .filter(Objects::nonNull)
+          .findFirst()
+          .orElse(null));
 
       moveFileService.moveAfterCommitBank(
         file,
@@ -213,6 +220,28 @@ public class Cnab240FileProcessor {
   private void applyHeaderFile(ProcessedFileEntity processedFile, String line, int lineNumber, Cnab240BankLayout layout) {
     processedFile.setCommercialName(FileParserUtils.extractStringLine(line, "72-102", lineNumber));
     processedFile.setDateFile(FileParserUtils.extractDateLine(line, "143-151", lineNumber));
+
+    // O domicílio precisa ser identificado no cabeçalho, e não apenas nos segmentos
+    // de lançamento. Arquivos sem movimento não geram ReleasesBank, mas continuam
+    // sendo arquivos válidos recebidos para uma conta específica.
+    String cnpj = onlyDigits(FileParserUtils.extractStringLine(line, "18-32", lineNumber));
+    Integer agency = FileParserUtils.extractIntegerLine(line, layout.getAgencyRange(), lineNumber);
+    Integer currentAccount = FileParserUtils.extractIntegerLine(line, layout.getCurrentAccountRange(), lineNumber);
+    CompanyEntity company = companyByCnpj(cnpj).orElse(null);
+
+    bankingDomicileResolver.resolve(layout.getBankCode(), agency, currentAccount, company)
+      .ifPresentOrElse(
+        processedFile::setBankingDomicile,
+        () -> log.warn(
+          "⚠ Domicílio bancário não identificado no header CNAB. arquivo={}, banco={}, agencia={}, conta={}, cnpj={}",
+          processedFile.getFile(),
+          layout.getBankCode(),
+          agency,
+          currentAccount,
+          cnpj
+        )
+      );
+
     String version = FileParserUtils.extractStringLine(line, "163-166", lineNumber);
     if (version != null && !version.isBlank()) {
       processedFile.setVersion("CNAB240 v" + version.trim() + " - " + layout.getDisplayName());

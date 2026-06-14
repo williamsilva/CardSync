@@ -61,7 +61,7 @@ class BankReconciliationMatcher {
     //    (O(n × alvoCents)), encontrando um subconjunto cuja soma esteja dentro da
     //    tolerância sempre que ele existir.
     if (targetCents > dpMaxCents) {
-      log.info(
+      log.debug(
         "Subconjunto não tentado: alvo {} excede o teto de DP ({} centavos). "
           + "Aumente reconciliation.subset-dp-max-cents se precisar conciliar valores maiores por composição.",
         targetValue, dpMaxCents

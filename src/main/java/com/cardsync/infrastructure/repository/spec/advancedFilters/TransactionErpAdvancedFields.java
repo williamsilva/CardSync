@@ -27,13 +27,15 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     }
 
     // Filtros diretos da Venda
-    spec = spec.and(saleDate(filter));
-    spec = spec.and(expectedPaymentDate(filter));
     spec = spec.and(contains(filter.tid(), "tid"));
     spec = spec.and(contains(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.machine(), "machine"));
     spec = spec.and(contains(filter.cardNumber(), "cardNumber"));
     spec = spec.and(contains(filter.authorization(), "authorization"));
+
+    spec = spec.and(offsetDateTimePeriod("saleDate", filter.periodSaleDate(), filter.saleDate(), true));
+    spec = spec.and(localDatePeriodJoin("installments", "expectedPaymentDate", filter.periodExpectedPaymentDate(),
+      filter.expectedPaymentDate(), true));
 
     spec = spec.and(currencyRangeValue("grossValue", filter.grossValueStart(), filter.grossValueEnd()));
     spec = spec.and(currencyRangeValue("liquidValue", filter.liquidValueStart(), filter.liquidValueEnd()));
@@ -50,33 +52,9 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
     spec = spec.and(inPath(filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
 
     // Filtros aninhados no Ajuste
-    spec = spec.and(currencyRangeValuePath(
-      filter.adjustmentValueStart(),
-      filter.adjustmentValueEnd(),
-      "adjustment",
-      "adjustmentValue"
-    ));
+    spec = spec.and(currencyRangeValuePath(filter.adjustmentValueStart(), filter.adjustmentValueEnd(),"adjustment","adjustmentValue"));
 
     return spec;
-  }
-
-  private Specification<TransactionErpEntity> saleDate(TransactionErpSalesFilter filter) {
-    return offsetDateTimePeriod(
-      "saleDate",
-      filter.periodSaleDate(),
-      filter.saleDate(),
-      true
-    );
-  }
-
-  private Specification<TransactionErpEntity> expectedPaymentDate(TransactionErpSalesFilter filter) {
-    return localDatePeriodJoin(
-      "installments",
-      "expectedPaymentDate",
-      filter.periodExpectedPaymentDate(),
-      filter.expectedPaymentDate(),
-      true
-    );
   }
 
 }

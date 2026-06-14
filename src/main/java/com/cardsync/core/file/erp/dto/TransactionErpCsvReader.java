@@ -149,6 +149,27 @@ public class TransactionErpCsvReader {
     }
   }
 
+  /**
+   * Identifica relatórios TEF válidos que não possuem movimento no período.
+   * Esses arquivos contêm o cabeçalho esperado e uma linha como "0 transações",
+   * portanto devem ser registrados como processados, sem gerar vendas.
+   */
+  public boolean isNoMovementReport(Path file) throws Exception {
+    List<String> lines = Files.readAllLines(file, FILE_CHARSET);
+    int headerIndex = findHeaderIndex(lines);
+    if (headerIndex < 0) {
+      return false;
+    }
+
+    for (int i = headerIndex + 1; i < lines.size(); i++) {
+      String normalized = normalize(lines.get(i));
+      if (normalized.matches(".*\\b0\\s+transacoes\\b.*")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private int findHeaderIndex(List<String> lines) {
     for (int i = 0; i < lines.size(); i++) {
       String normalized = normalize(lines.get(i));
@@ -191,6 +212,11 @@ public class TransactionErpCsvReader {
     for (int j = headerIndex + 1; j < Math.min(headerIndex + 10, lines.size()); j++) {
       String dataLine = lines.get(j);
       if (dataLine == null || dataLine.isBlank()) continue;
+      String normalizedDataLine = normalize(dataLine);
+      if (normalizedDataLine.matches(".*\\b0\\s+transacoes\\b.*")) {
+        return true;
+      }
+
       List<String> dataColumns = splitCsv(dataLine, delimiter);
       long nonBlank = dataColumns.stream().filter(v -> v != null && !v.isBlank()).count();
       if (nonBlank >= 2) return true;

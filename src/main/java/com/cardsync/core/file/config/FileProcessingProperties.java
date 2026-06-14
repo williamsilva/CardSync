@@ -49,25 +49,25 @@ public class FileProcessingProperties {
 
     /**
      * Compatibilidade com formato antigo:
-     *
+
      * file-processing.systems.rede
-     *
+
      * O novo formato recomendado é:
-     *
+
      * file-processing.systems.acquirer.rede
      */
     private FilePaths rede = new FilePaths();
 
     /**
      * Novo agrupador de adquirentes:
-     *
+
      * file-processing.systems.acquirer.rede
      */
     private Acquirer acquirer = new Acquirer();
 
     /**
      * Agrupador bancário:
-     *
+
      * file-processing.systems.bank.itau
      * file-processing.systems.bank.santander
      * file-processing.systems.bank.bradesco
@@ -328,9 +328,15 @@ public class FileProcessingProperties {
     private boolean reprocessAcquirerSaleCancellations = false;
 
     /**
-     * Modo da conciliação Banco x adquirente. Default: ordem de crédito primeiro e parcelas como fallback.
+     * Modo legado da conciliação Banco x adquirente.
+     * A execução automática atual é dirigida exclusivamente pelas ordens de crédito elegíveis.
      */
-    private BankReconciliationMode bankMode = BankReconciliationMode.CREDIT_ORDER_FIRST;
+    private BankReconciliationMode bankMode = BankReconciliationMode.CREDIT_ORDER_ONLY;
+
+    /**
+     * Quantidade máxima de ordens de crédito carregadas e processadas por lote.
+     */
+    private int bankBatchSize = 500;
 
     /**
      * Mantém lançamentos recentes como pendentes para aguardar chegada do arquivo da adquirente.

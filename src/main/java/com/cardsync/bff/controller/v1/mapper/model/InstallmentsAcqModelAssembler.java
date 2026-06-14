@@ -5,6 +5,8 @@ import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankingDomicileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.*;
 import com.cardsync.domain.model.*;
@@ -101,6 +103,7 @@ public class InstallmentsAcqModelAssembler extends RepresentationModelAssemblerS
     return BankingDomicileMinimalModel.builder()
       .id(domicile.getId())
       .agency(domicile.getAgency())
+      .statusDate(domicile.getStatusDate())
       .currentAccount(domicile.getCurrentAccount())
       .bank(toBank(domicile.getBank()))
       .build();

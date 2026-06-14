@@ -41,6 +41,10 @@ cardsync:
     # Timezone de negócio usada por schedulers, cálculos de início/fim de dia e logs operacionais.
     business-zone: America/Sao_Paulo
 
+    # Data de implantação do CardSync. Dias anteriores são considerados completos
+    # na agenda de arquivos, pois ainda não existia expectativa de recebimento.
+    implantation-date: ${CARDSYNC_IMPLANTATION_DATE:2024-07-01}
+
   maintenance:
     # Cron do ANALYZE TABLE (domingo 02h por padrão).
     # Desativar com ANALYZE_TABLE_ENABLED=false se o banco já faz manutenção automática.
@@ -185,8 +189,11 @@ file-processing:
     # Ative apenas para auditoria/reprocessamento controlado.
     reprocess-acquirer-sale-cancellations: ${ACQUIRER_SALE_CANCELLATION_REPROCESS:false}
 
-    # Modo da conciliação Banco x adquirente.
-    bank-mode: ${BANK_RECONCILIATION_MODE:CREDIT_ORDER_FIRST}
+    # A conciliação bancária é dirigida somente por ordens de crédito elegíveis.
+    bank-mode: ${BANK_RECONCILIATION_MODE:CREDIT_ORDER_ONLY}
+
+    # Quantidade de ordens carregadas e processadas por lote.
+    bank-batch-size: ${BANK_RECONCILIATION_BATCH_SIZE:500}
 
     # Lançamentos bancários recentes sem match permanecem pendentes por esta janela.
     bank-mark-not-reconciled-after-days: ${BANK_MARK_NOT_RECONCILED_AFTER_DAYS:3}

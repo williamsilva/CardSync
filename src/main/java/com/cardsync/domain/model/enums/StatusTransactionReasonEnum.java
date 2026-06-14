@@ -58,7 +58,13 @@ public enum StatusTransactionReasonEnum {
   /**
    * Cancelamento por erro operacional, erro de captura, processamento ou lançamento.
    */
-  CANCELLATION_OPERATIONAL_ERROR(16);
+  CANCELLATION_OPERATIONAL_ERROR(16),
+
+  /**
+   * Venda manual já analisada também com NSU/autorização invertidos e sem correspondência.
+   * Evita repetir a mesma tentativa automática em todas as execuções da esteira.
+   */
+  MANUAL_SWAP_NOT_FOUND(17);
 
   private final int code;
 

@@ -38,15 +38,23 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProcessFileErpService {
+
+  private static final Pattern REPORT_DATE_IN_FILE_NAME =
+    Pattern.compile("(?:^|[^0-9])(\\d{2})[-_](\\d{2})[-_](\\d{4})(?:[^0-9]|$)");
+  private static final DateTimeFormatter REPORT_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MM-uuuu");
 
   private final TransactionErpMapper transactionErpMapper;
   private final TransactionErpCsvReader transactionErpCsvReader;
@@ -125,6 +133,22 @@ public class ProcessFileErpService {
       processedFileRepository.save(processedFile);
 
       if (rows.isEmpty()) {
+        if (transactionErpCsvReader.isNoMovementReport(file)) {
+          processedFile.setProcessedLines(0);
+          processedFile.setIgnoredLines(0);
+          processedFile.setWarningLines(0);
+          processedFile.setErrorLines(0);
+          processedFile.setPendingContractLines(0);
+          processedFile.setPendingBusinessContextLines(0);
+
+          String message = "Arquivo ERP válido sem movimento de vendas no período; transações importadas=0.";
+          finishFile(processedFile, FileStatusEnum.PROCESSED, message);
+          moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
+          log.info("ℹ Arquivo ERP {} processado sem movimento de vendas. dataArquivo={}, status={}",
+            file.getFileName(), processedFile.getDateFile(), FileStatusEnum.PROCESSED);
+          return;
+        }
+
         processedFile.setErrorLines(1);
         processedFile.setIgnoredLines(1);
         processedFile.setErrorMessage("Arquivo ERP vazio ou sem cabeçalho válido.");
@@ -263,7 +287,7 @@ public class ProcessFileErpService {
     processedFile.setDateImport(OffsetDateTime.now());
     processedFile.setDateProcessing(OffsetDateTime.now());
     processedFile.setFile(file.getFileName().toString());
-    processedFile.setDateFile(resolveDateFile(rows));
+    processedFile.setDateFile(resolveDateFile(file, rows));
     processedFile.setTypeFile("Relatório de transações TEF");
     processedFile.setVersion("MultiVendas TEF");
 
@@ -374,13 +398,39 @@ public class ProcessFileErpService {
     return message.length() > 500 ? message.substring(0, 500) : message;
   }
 
-  private LocalDate resolveDateFile(List<TransactionErpCsvDto> rows) {
-    return rows.stream()
+  private LocalDate resolveDateFile(Path file, List<TransactionErpCsvDto> rows) {
+    LocalDate transactionDate = rows.stream()
       .map(TransactionErpCsvDto::getSaleDate)
       .filter(Objects::nonNull)
       .min(Comparator.naturalOrder())
       .map(OffsetDateTime::toLocalDate)
-      .orElse(LocalDate.now());
+      .orElse(null);
+
+    if (transactionDate != null) {
+      return transactionDate;
+    }
+
+    LocalDate fileNameDate = resolveDateFromFileName(file);
+    return fileNameDate != null ? fileNameDate : LocalDate.now();
+  }
+
+  private LocalDate resolveDateFromFileName(Path file) {
+    if (file == null || file.getFileName() == null) {
+      return null;
+    }
+
+    Matcher matcher = REPORT_DATE_IN_FILE_NAME.matcher(file.getFileName().toString());
+    if (!matcher.find()) {
+      return null;
+    }
+
+    String value = matcher.group(1) + "-" + matcher.group(2) + "-" + matcher.group(3);
+    try {
+      return LocalDate.parse(value, REPORT_DATE_FORMATTER);
+    } catch (DateTimeParseException ex) {
+      log.debug("Data não reconhecida no nome do arquivo ERP {}: {}", file.getFileName(), value);
+      return null;
+    }
   }
 
   private record RowProcessingResult(

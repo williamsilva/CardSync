@@ -7,12 +7,26 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity, UUID>, JpaSpecificationExecutor<ReleasesBankEntity> {
+
+  /**
+   * Retorna os pares arquivo processado x domicílio bancário identificados durante
+   * a importação. O DISTINCT impede que várias linhas do mesmo CNAB sejam contadas
+   * como vários arquivos para o mesmo domicílio.
+   */
+  @Query("""
+    select distinct rb.processedFile.id, rb.bankingDomicile.id
+      from ReleasesBankEntity rb
+     where rb.processedFile.id in :processedFileIds
+       and rb.bankingDomicile is not null
+  """)
+  List<Object[]> findProcessedFileBankingDomiciles(
+    @Param("processedFileIds") List<UUID> processedFileIds
+  );
 
   @Query("""
     select rb
@@ -24,7 +38,7 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     left join fetch rb.flag
     left join fetch rb.bank
     left join fetch rb.processedFile
-    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus = :pendingStatus)
+    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
       and rb.releaseDate is not null
       and rb.releaseValue is not null
     order by rb.releaseDate asc, rb.releaseValue asc
@@ -44,30 +58,18 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     left join fetch rb.flag
     left join fetch rb.bank
     left join fetch rb.processedFile
-    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus = :pendingStatus)
-      and rb.company.id = :companyId
-      and rb.bankingDomicile.id = :bankingDomicileId
-      and (:acquirerId is null or rb.acquirer.id = :acquirerId)
-      and (:flagId is null or rb.flag.id = :flagId)
-      and (
-        :modalityPaymentBank is null
-        or rb.modalityPaymentBank is null
-        or rb.modalityPaymentBank = :modalityPaymentBank
-      )
+    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
       and rb.releaseDate between :dateFrom and :dateTo
       and rb.releaseValue is not null
+      and rb.company.id = :companyId
     order by rb.releaseDate asc, rb.releaseValue asc
   """)
-  List<ReleasesBankEntity> findCandidatesForCreditOrder(
+  List<ReleasesBankEntity> findAvailableForCreditOrderBatch(
     @Param("pendingStatus") Integer pendingStatus,
     @Param("reprocessAlreadyReconciled") boolean reprocessAlreadyReconciled,
     @Param("companyId") UUID companyId,
-    @Param("acquirerId") UUID acquirerId,
-    @Param("bankingDomicileId") UUID bankingDomicileId,
-    @Param("flagId") UUID flagId,
-    @Param("modalityPaymentBank") Integer modalityPaymentBank,
-    @Param("dateFrom") LocalDate dateFrom,
-    @Param("dateTo") LocalDate dateTo
+    @Param("dateFrom") java.time.LocalDate dateFrom,
+    @Param("dateTo") java.time.LocalDate dateTo
   );
 
 }

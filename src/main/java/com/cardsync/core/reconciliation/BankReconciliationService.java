@@ -12,6 +12,7 @@ import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BankReconciliationService {
 
+  private static final int PAYMENT_PENDING = StatusPaymentBankEnum.PENDING.getCode();
   private static final int STATUS_PENDING = BankReconciliationStatus.PENDING.getCode();
+  private static final int PAYMENT_PARTIAL = StatusPaymentBankEnum.PARTIALLY_PAID.getCode();
   private static final int STATUS_LIQUIDATED = BankReconciliationStatus.RECONCILED.getCode();
   private static final int STATUS_NOT_RECONCILED = BankReconciliationStatus.NOT_RECONCILED.getCode();
   private static final int STATUS_INSTALLMENT_RECONCILED = BankReconciliationStatus.INSTALLMENT_RECONCILED.getCode();
@@ -44,6 +47,7 @@ public class BankReconciliationService {
    */
   private static final int SUMMARY_RECONCILED_STATUS = StatusReconciliationEnum.RECONCILED.getCode();
 
+  private final EntityManager entityManager;
   private final BankReconciliationMatcher matcher;
   private final FileProcessingProperties properties;
   private final CreditOrderRepository creditOrderRepository;
@@ -58,72 +62,153 @@ public class BankReconciliationService {
   @Transactional
   public BankReconciliationResult reconcilePending(BankReconciliationTriggerType trigger) {
     FileProcessingProperties.Reconciliation config = properties.getReconciliation();
-    BankReconciliationMode mode = normalizeMode(config.getBankMode());
+    BankReconciliationMode mode = BankReconciliationMode.CREDIT_ORDER_ONLY;
     BankReconciliationResult.Counter result = BankReconciliationResult.counter(trigger, mode);
 
-    List<CreditOrderEntity> eligibleOrders = creditOrderRepository.findEligibleForBankReconciliation(
-      STATUS_PENDING,
-      SUMMARY_RECONCILED_STATUS
+    List<UUID> eligibleOrderIds = creditOrderRepository.findEligibleIdsForBankReconciliation(
+      SUMMARY_RECONCILED_STATUS,
+      PAYMENT_PENDING,
+      PAYMENT_PARTIAL
     );
 
+    int batchSize = Math.max(config.getBankBatchSize(), 1);
+    int totalBatches = (eligibleOrderIds.size() + batchSize - 1) / batchSize;
+
     log.info(
-      "📌 Iniciando conciliação Banco x Adquirente por ordens de pagamento: trigger={}, modo={}, ordensElegiveis={}, toleranciaDias={}, toleranciaValor={}, reprocessarConciliados={}",
+      "📌 Iniciando conciliação Banco x Adquirente dirigida por ordens: trigger={}, ordensElegiveis={}, tamanhoLote={}, " +
+        "totalLotes={}, toleranciaDias={}, toleranciaValor={}",
       trigger.getCode(),
-      mode,
-      eligibleOrders.size(),
+      eligibleOrderIds.size(),
+      batchSize,
+      totalBatches,
       config.getDateToleranceDays(),
-      config.valueToleranceAsBigDecimal(),
-      config.isReconcileAlreadyReconciledBankAcquirer()
+      config.valueToleranceAsBigDecimal()
     );
 
     Set<UUID> reconciledOrderIds = new HashSet<>();
     Set<UUID> analyzedReleaseIds = new HashSet<>();
 
-    if (mode.shouldTryCreditOrders()) {
-      reconcileEligibleCreditOrders(
-        eligibleOrders,
-        reconciledOrderIds,
-        analyzedReleaseIds,
-        config,
-        result
+    for (int offset = 0, batchNumber = 1; offset < eligibleOrderIds.size(); offset += batchSize, batchNumber++) {
+      int endIndex = Math.min(offset + batchSize, eligibleOrderIds.size());
+      List<UUID> batchIds = eligibleOrderIds.subList(offset, endIndex);
+
+      List<CreditOrderEntity> batchOrders = creditOrderRepository.findEligibleByIdsForBankReconciliation(
+        batchIds,
+        SUMMARY_RECONCILED_STATUS,
+        PAYMENT_PENDING,
+        PAYMENT_PARTIAL
+      );
+
+      java.util.Map<UUID, List<CreditOrderEntity>> ordersByCompany = new java.util.LinkedHashMap<>();
+      for (CreditOrderEntity order : batchOrders) {
+        UUID companyId = idOrNull(order.getCompany());
+        if (companyId == null) {
+          log.warn(
+            "⚠ Ordem ignorada por falta de empresa. creditOrder={}, releaseDate={}, releaseValue={}",
+            order.getId(), order.getReleaseDate(), order.getReleaseValue()
+          );
+          continue;
+        }
+        ordersByCompany.computeIfAbsent(companyId, ignored -> new java.util.ArrayList<>()).add(order);
+      }
+
+      int reconciledBeforeBatch = result.toResult().getCreditOrdersReconciled();
+      int releasesBeforeBatch = result.toResult().getReleasesReconciled();
+
+      for (var entry : ordersByCompany.entrySet()) {
+        UUID companyId = entry.getKey();
+        List<CreditOrderEntity> companyOrders = entry.getValue();
+
+        LocalDate minOrderDate = companyOrders.stream()
+          .map(CreditOrderEntity::getReleaseDate)
+          .filter(Objects::nonNull)
+          .min(LocalDate::compareTo)
+          .orElse(null);
+        LocalDate maxOrderDate = companyOrders.stream()
+          .map(CreditOrderEntity::getReleaseDate)
+          .filter(Objects::nonNull)
+          .max(LocalDate::compareTo)
+          .orElse(null);
+
+        if (minOrderDate == null || maxOrderDate == null) continue;
+
+        List<ReleasesBankEntity> companyReleases = releasesBankRepository.findAvailableForCreditOrderBatch(
+          STATUS_PENDING,
+          config.isReconcileAlreadyReconciledBankAcquirer(),
+          companyId,
+          minOrderDate,
+          maxOrderDate.plusDays(config.getDateToleranceDays())
+        );
+
+        reconcileEligibleCreditOrders(
+          companyOrders,
+          companyReleases,
+          reconciledOrderIds,
+          analyzedReleaseIds,
+          config,
+          result
+        );
+      }
+
+      entityManager.flush();
+      entityManager.clear();
+
+      BankReconciliationResult partial = result.toResult();
+      log.info(
+        "📦 Lote {}/{} concluído: ordensCarregadas={}, ordensConciliadasNoLote={}, releasesConciliadosNoLote={}, totalOrdensConciliadas={}",
+        batchNumber,
+        totalBatches,
+        batchOrders.size(),
+        partial.getCreditOrdersReconciled() - reconciledBeforeBatch,
+        partial.getReleasesReconciled() - releasesBeforeBatch,
+        partial.getCreditOrdersReconciled()
       );
     }
 
-    if (mode.shouldTryInstallmentsAfterCreditOrders() || mode.shouldTryInstallmentsFirst()) {
-      reconcilePendingReleasesByInstallments(config, analyzedReleaseIds, result);
-    }
+    BankReconciliationResult partialResult = result.toResult();
+    result.setReleasesWithoutMatch(Math.max(0, eligibleOrderIds.size() - partialResult.getCreditOrdersReconciled()));
 
     BankReconciliationResult built = result.toResult();
+    BigDecimal reconciledDifference = built.getTotalReleaseValueReconciled()
+      .subtract(built.getTotalCreditOrderValueReconciled())
+      .abs();
+
     log.info(
-      "📘 RESUMO FINAL CONCILIAÇÃO BANCO x ADQUIRENTE: trigger={}, modo={}, ordensElegiveis={}, ordensConciliadas={}, releasesAnalisados={}, releasesConciliados={}, porOrdensCredito={}, porParcelas={}, parcelasConciliadas={}, transacoesAtualizadas={}, semMatch={}, mantidosPendentes={}, semContexto={}, gruposIgnoradosSafetyCap={}, valorBancoConciliado={}, valorOrdensConciliado={}, valorParcelasConciliado={}",
+      "📘 RESUMO FINAL CONCILIAÇÃO BANCO x ADQUIRENTE: trigger={}, modo={}, ordensElegiveis={}, ordensConciliadas={}, " +
+        "ordensSemMatch={}, releasesAnalisados={}, releasesConciliados={}, gruposIgnoradosLimite={}, " +
+        "valorBancoConciliado={}, valorOrdensConciliado={}, diferença={}",
       built.getTrigger().getCode(),
       built.getMode(),
-      eligibleOrders.size(),
+      eligibleOrderIds.size(),
       built.getCreditOrdersReconciled(),
+      built.getReleasesWithoutMatch(),
       built.getReleasesAnalyzed(),
       built.getReleasesReconciled(),
-      built.getReleasesMatchedByCreditOrders(),
-      built.getReleasesMatchedByInstallments(),
-      built.getInstallmentsReconciled(),
-      built.getTransactionsUpdated(),
-      built.getReleasesWithoutMatch(),
-      built.getReleasesKeptPending(),
-      built.getReleasesSkippedMissingContext(),
       built.getCandidateGroupsSkippedBySafetyCap(),
       built.getTotalReleaseValueReconciled(),
       built.getTotalCreditOrderValueReconciled(),
-      built.getTotalInstallmentValueReconciled()
+      reconciledDifference
     );
     return built;
   }
 
   private void reconcileEligibleCreditOrders(
     List<CreditOrderEntity> eligibleOrders,
+    List<ReleasesBankEntity> candidateReleases,
     Set<UUID> reconciledOrderIds,
     Set<UUID> analyzedReleaseIds,
     FileProcessingProperties.Reconciliation config,
     BankReconciliationResult.Counter result
   ) {
+    // Lançamentos já conciliados nesta execução não podem ser reusados.
+    Set<UUID> reconciledReleaseIds = new HashSet<>();
+
+    // Os lançamentos recebidos já são do contexto da empresa do lote; descarta os
+    // sem contexto obrigatório (seriam ignorados de qualquer forma).
+    List<ReleasesBankEntity> validReleases = candidateReleases.stream()
+      .filter(this::hasRequiredContext)
+      .toList();
+
     for (CreditOrderEntity seedOrder : eligibleOrders) {
       if (!isOrderStillEligible(seedOrder, reconciledOrderIds)) continue;
 
@@ -139,8 +224,8 @@ public class BankReconciliationService {
         continue;
       }
 
-      List<ReleasesBankEntity> releases = findCandidateReleases(seedOrder, config).stream()
-        .filter(this::hasRequiredContext)
+      List<ReleasesBankEntity> releases = validReleases.stream()
+        .filter(release -> release.getId() == null || !reconciledReleaseIds.contains(release.getId()))
         .filter(release -> isCreditOrderCandidateCompatible(release, seedOrder, config.getDateToleranceDays()))
         .sorted(candidateReleaseComparator(seedOrder))
         .toList();
@@ -170,6 +255,9 @@ public class BankReconciliationService {
           .map(CreditOrderEntity::getId)
           .filter(Objects::nonNull)
           .forEach(reconciledOrderIds::add);
+        if (release.getId() != null) {
+          reconciledReleaseIds.add(release.getId());
+        }
         reconciled = true;
         break;
       }
@@ -181,27 +269,6 @@ public class BankReconciliationService {
         );
       }
     }
-  }
-
-  private List<ReleasesBankEntity> findCandidateReleases(
-    CreditOrderEntity order,
-    FileProcessingProperties.Reconciliation config
-  ) {
-    int toleranceDays = Math.max(config.getDateToleranceDays(), 0);
-    LocalDate dateFrom = order.getReleaseDate();
-    LocalDate dateTo = order.getReleaseDate().plusDays(toleranceDays);
-
-    return releasesBankRepository.findCandidatesForCreditOrder(
-      STATUS_PENDING,
-      config.isReconcileAlreadyReconciledBankAcquirer(),
-      order.getCompany().getId(),
-      idOrNull(order.getAcquirer()),
-      order.getBankingDomicile().getId(),
-      idOrNull(order.getFlag()),
-      modalityPaymentBankFromCreditOrder(order),
-      dateFrom,
-      dateTo
-    );
   }
 
   private BankReconciliationMatcher.MatchResult selectOrdersIncludingSeed(
@@ -274,7 +341,7 @@ public class BankReconciliationService {
     result.releaseReconciled(release.getReleaseValue());
     result.transactionsUpdated(propagateReleaseStatusTransactions(release));
 
-    log.info(
+    log.debug(
       "✅ Ordem(ns) de pagamento conciliada(s) com lançamento bancário. ordemInicial={}, releaseBank={}, tipoMatch={}, ordens={}, valorRelease={}, valorOrdens={}",
       orders.getFirst().getId(), release.getId(), matchType, orders.size(), release.getReleaseValue(), selected.matchedValue()
     );
@@ -334,53 +401,6 @@ public class BankReconciliationService {
       .thenComparing(release -> nvl(release.getReleaseValue()).subtract(nvl(order.getReleaseValue())).abs());
   }
 
-  private Integer modalityPaymentBankFromCreditOrder(CreditOrderEntity order) {
-    return switch (paymentKindFromCreditOrder(order)) {
-      case DEBIT -> 1;
-      case CREDIT -> 2;
-      default -> null;
-    };
-  }
-
-  private BankReconciliationMatcher.MatchResult tryReconcileByConfiguredMode(
-    ReleasesBankEntity release,
-    FileProcessingProperties.Reconciliation config,
-    BankReconciliationMode mode,
-    BankReconciliationResult.Counter result
-  ) {
-    if (mode.shouldTryInstallmentsFirst()) {
-      return reconcileByInstallmentsWithStats(release, config, result);
-    }
-
-    if (mode.shouldTryCreditOrders()) {
-      BankReconciliationMatcher.MatchResult creditOrderResult = reconcileByCreditOrdersWithStats(release, config, result);
-      if (creditOrderResult.matched() || !mode.shouldTryInstallmentsAfterCreditOrders()) {
-        return creditOrderResult;
-      }
-    }
-
-    if (mode.shouldTryInstallmentsAfterCreditOrders()) {
-      return reconcileByInstallmentsWithStats(release, config, result);
-    }
-
-    return matcher.notMatched();
-  }
-
-  private BankReconciliationMatcher.MatchResult reconcileByCreditOrdersWithStats(
-    ReleasesBankEntity release,
-    FileProcessingProperties.Reconciliation config,
-    BankReconciliationResult.Counter result
-  ) {
-    BankReconciliationMatcher.MatchResult creditOrderResult = reconcileByCreditOrders(release, config);
-    if (creditOrderResult.skippedBySafetyCap()) {
-      result.candidateGroupSkippedBySafetyCap();
-    }
-    if (creditOrderResult.matched()) {
-      result.matchedByCreditOrders(creditOrderResult.itemsMatched(), creditOrderResult.matchedValue());
-    }
-    return creditOrderResult;
-  }
-
   private BankReconciliationMatcher.MatchResult reconcileByInstallmentsWithStats(
     ReleasesBankEntity release,
     FileProcessingProperties.Reconciliation config,
@@ -394,66 +414,6 @@ public class BankReconciliationService {
       result.matchedByInstallments(installmentResult.itemsMatched(), installmentResult.matchedValue());
     }
     return installmentResult;
-  }
-
-  private BankReconciliationMatcher.MatchResult reconcileByCreditOrders(ReleasesBankEntity release, FileProcessingProperties.Reconciliation config) {
-    int toleranceDays = config.getDateToleranceDays();
-    BigDecimal valueTolerance = config.valueToleranceAsBigDecimal();
-    LocalDate dateFrom = release.getReleaseDate().minusDays(toleranceDays);
-    LocalDate dateTo = release.getReleaseDate();
-
-    ReconciliationMatchContext releaseContext = contextOf(release);
-    List<CreditOrderEntity> candidates = creditOrderRepository.findPendingForBankRelease(
-        STATUS_PENDING,
-        SUMMARY_RECONCILED_STATUS,
-        release.getCompany().getId(),
-        idOrNull(release.getAcquirer()),
-        release.getBankingDomicile().getId(),
-        idOrNull(release.getFlag()),
-        release.getModalityPaymentBank(),
-        dateFrom,
-        dateTo
-      ).stream()
-      .filter(order -> isCreditOrderCandidateCompatible(release, order, toleranceDays))
-      .sorted(Comparator.comparingInt(
-        (CreditOrderEntity order) -> releaseContext.strength(contextOf(order))).reversed())
-      .toList();
-
-    BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
-      candidates,
-      CreditOrderEntity::getReleaseValue,
-      release.getReleaseValue(),
-      valueTolerance,
-      config.getSafeCapCents(),
-      config.getSubsetDpMaxCents()
-    );
-
-    if (!selected.matched()) return selected;
-
-    List<CreditOrderEntity> orders = selected.typedItems();
-    BankReconciliationMatchType matchType = BankReconciliationMatchType.creditOrderByCount(orders.size());
-
-    for (CreditOrderEntity order : orders) {
-      order.setReleaseBank(release);
-      order.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
-      order.setReconciliationStatus(STATUS_LIQUIDATED);
-      order.setCreditStatus(STATUS_LIQUIDATED);
-      updateSalesSummaryFromCreditOrder(order);
-      propagateCreditOrderToInstallments(order, release);
-    }
-
-    release.setNumberCreditOrders(orders.size());
-    release.setNumberReconciliations(safeInt(release.getNumberReconciliations()) + orders.size());
-    release.setReconciliationStatus(STATUS_LIQUIDATED);
-
-    creditOrderRepository.saveAll(orders);
-    releasesBankRepository.save(release);
-
-    log.info(
-      "✅ Release bancário conciliado por ordem de crédito. releaseBank={}, tipoMatch={}, ordens={}, valorRelease={}, valorOrdens={}",
-      release.getId(), matchType, orders.size(), release.getReleaseValue(), selected.matchedValue()
-    );
-    return selected;
   }
 
   private BankReconciliationMatcher.MatchResult reconcileByInstallments(ReleasesBankEntity release, FileProcessingProperties.Reconciliation config) {
@@ -606,7 +566,8 @@ public class BankReconciliationService {
       idOrNull(release.getAcquirer()),
       idOrNull(release.getEstablishment()),
       idOrNull(release.getFlag()),
-      paymentKindFromBank(release.getModalityPaymentBank(), release.getDescriptionHistoricalBank(), release.getComplementRelease(), release.getDocumentComplementNumber())
+      paymentKindFromBank(release.getModalityPaymentBank(), release.getDescriptionHistoricalBank(),
+        release.getComplementRelease(), release.getDocumentComplementNumber())
     );
   }
 
@@ -709,10 +670,6 @@ public class BankReconciliationService {
     if (release.getReleaseDate() == null) return true;
     LocalDate limitDate = LocalDate.now().minusDays(days);
     return !release.getReleaseDate().isAfter(limitDate);
-  }
-
-  private BankReconciliationMode normalizeMode(BankReconciliationMode mode) {
-    return mode == null ? BankReconciliationMode.CREDIT_ORDER_FIRST : mode;
   }
 
   private BigDecimal netInstallmentValue(InstallmentAcqEntity installment) {

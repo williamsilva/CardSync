@@ -64,6 +64,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     update SalesSummaryEntity ss
        set ss.transactionsStatus = :status
      where ss.id in :ids
+       and (ss.transactionsStatus is null or ss.transactionsStatus <> :status)
   """)
   int updateTransactionsStatusByIds(
     @Param("ids") Collection<UUID> ids,
@@ -113,6 +114,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     update SalesSummaryEntity ss
        set ss.creditOrderStatus = :status
      where ss.id in :ids
+       and (ss.creditOrderStatus is null or ss.creditOrderStatus <> :status)
   """)
   int updateCreditOrderStatusByIds(
     @Param("ids") Collection<UUID> ids,
@@ -124,6 +126,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     update SalesSummaryEntity ss
        set ss.manualGenerated = :manualGenerated
      where ss.id in :ids
+       and (ss.manualGenerated is null or ss.manualGenerated <> :manualGenerated)
   """)
   int updateManualGeneratedByIds(
     @Param("ids") Collection<UUID> ids,

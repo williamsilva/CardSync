@@ -38,12 +38,7 @@ public class BankStatementClassifierService {
     Optional<BankingDomicileEntity> domicile = bankingDomicileResolver.resolve(layout != null ? layout.getBankCode() : null, agency, currentAccount, companyFromCnab);
     domicile.ifPresent(classification::setBankingDomicile);
 
-    Optional<EstablishmentEntity> establishment = resolveEstablishment(classification.getPvCandidates())
-      .or(() -> domicile.map(BankingDomicileEntity::getEstablishment));
-    establishment.ifPresent(classification::setEstablishment);
-
     CompanyEntity company = companyFromCnab;
-    if (company == null && establishment.isPresent()) company = establishment.get().getCompany();
     if (company == null && domicile.isPresent()) company = domicile.get().getCompany();
     classification.setCompany(company);
 

@@ -262,7 +262,8 @@ public class ConciliationAnalysisService {
     List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerReconciliation(
       reconcileAlreadyReconciled,
       pendingStatuses,
-      EXCLUDED_CARD_RECONCILIATION_MODALITY
+      EXCLUDED_CARD_RECONCILIATION_MODALITY,
+      StatusTransactionReasonEnum.NULL.getCode()
     );
 
     int analyzed = 0;

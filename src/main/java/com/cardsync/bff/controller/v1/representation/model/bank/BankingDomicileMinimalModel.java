@@ -1,9 +1,10 @@
-package com.cardsync.bff.controller.v1.representation.model.transactions;
+package com.cardsync.bff.controller.v1.representation.model.bank;
 
 import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Getter
@@ -18,6 +19,8 @@ public class BankingDomicileMinimalModel extends RepresentationModel<@NonNull Ba
 
   private Integer agency;
   private Integer currentAccount;
+
+  private OffsetDateTime statusDate;
 
   private BankMinimalModel bank;
 }

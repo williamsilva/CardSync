@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -182,6 +183,16 @@ public class ProcessRedeEeVcService {
           + ", unidentified=" + unidentified);
 
       ensureSalesSummariesBankingDomicile(summaries);
+
+      int alreadyPersisted = removeAlreadyPersisted(transactions);
+      if (alreadyPersisted > 0) {
+        ignored += alreadyPersisted;
+        log.info(
+          "ℹ Rede EEVC: {} transação(ões) já existente(s) no banco ignorada(s) (reprocessamento) no arquivo {}",
+          alreadyPersisted,
+          file.getFileName()
+        );
+      }
 
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
@@ -670,6 +681,51 @@ public class ProcessRedeEeVcService {
    * 034/035/036 continuam armazenados apenas em {@code ecommerceComplements} e nunca
    * são persistidos diretamente como uma nova transação.</p>
    */
+  /**
+   * Remove do lote as transações que já existem no banco (mesma identidade natural),
+   * evitando duplicação quando o mesmo conjunto de vendas é reprocessado em um arquivo
+   * com bytes diferentes (que escapa da guarda por hash de conteúdo).
+   *
+   * Estratégia: PULAR a transação já existente (não reinsere e não sobrescreve), para
+   * preservar o estado de conciliação/ajustes já aplicado à transação no banco.
+   *
+   * @return quantidade de transações removidas do lote por já existirem.
+   */
+  private int removeAlreadyPersisted(List<TransactionAcqEntity> transactions) {
+    if (transactions.isEmpty()) {
+      return 0;
+    }
+
+    Set<Long> nsus = transactions.stream()
+      .map(TransactionAcqEntity::getNsu)
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+
+    if (nsus.isEmpty()) {
+      return 0;
+    }
+
+    List<TransactionAcqEntity> existing = transactionAcqRepository.findExistingByNsus(nsus);
+    if (existing.isEmpty()) {
+      return 0;
+    }
+
+    int removed = 0;
+    Iterator<TransactionAcqEntity> it = transactions.iterator();
+    while (it.hasNext()) {
+      TransactionAcqEntity candidate = it.next();
+      boolean duplicate = existing.stream()
+        .anyMatch(persisted -> Objects.equals(persisted.getRecordType(), candidate.getRecordType())
+          && isSameRedeTransaction(persisted, candidate));
+      if (duplicate) {
+        it.remove();
+        removed++;
+      }
+    }
+
+    return removed;
+  }
+
   private void mergeOrAddRedeTransaction(List<TransactionAcqEntity> transactions, TransactionAcqEntity transaction) {
     Optional<TransactionAcqEntity> existing = transactions.stream()
       .filter(candidate -> Objects.equals(candidate.getRecordType(), transaction.getRecordType()))

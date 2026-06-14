@@ -4,6 +4,8 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.Reconcil
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
 import jakarta.persistence.EntityManager;
@@ -53,9 +55,15 @@ public class ConciliationManualSwapReconciliationService {
     // sobrou pendente após a conciliação principal.
     List<Integer> pendingStatuses = conciliationAnalysisService.erpAcquirerPendingStatusCodes();
 
-    List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerReconciliation(
-      false,
+    List<UUID> erpIds = transactionErpRepository.findIdsForManualSwapReconciliation(
       pendingStatuses,
+      CaptureEnum.MANUAL.getCode(),
+      List.of(
+        StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ.getCode(),
+        StatusTransactionReasonEnum.VALUE_MISMATCH.getCode(),
+        StatusTransactionReasonEnum.ACQUIRER_MISMATCH.getCode(),
+        StatusTransactionReasonEnum.AMBIGUOUS_MATCH.getCode()
+      ),
       ConciliationAnalysisService.EXCLUDED_CARD_RECONCILIATION_MODALITY
     );
 
@@ -128,10 +136,22 @@ public class ConciliationManualSwapReconciliationService {
           conciliationAnalysisService.findBestAcquirerMatchForReconciliation(erp, identityCandidates, true);
 
         switch (matchResult.status()) {
-          case NOT_MATCHED -> notMatched++;
-          case VALUE_DIVERGENCE -> valueDivergences++;
-          case ACQUIRER_DIVERGENCE -> acquirerDivergences++;
-          case AMBIGUOUS -> ambiguousMatches++;
+          case NOT_MATCHED -> {
+            notMatched++;
+            markManualSwapAttempted(erp, changedErpSales);
+          }
+          case VALUE_DIVERGENCE -> {
+            valueDivergences++;
+            markManualSwapAttempted(erp, changedErpSales);
+          }
+          case ACQUIRER_DIVERGENCE -> {
+            acquirerDivergences++;
+            markManualSwapAttempted(erp, changedErpSales);
+          }
+          case AMBIGUOUS -> {
+            ambiguousMatches++;
+            markManualSwapAttempted(erp, changedErpSales);
+          }
           case MATCHED -> {
             TransactionAcqEntity acq = matchResult.acquirerSale();
             matched++;
@@ -202,6 +222,20 @@ public class ConciliationManualSwapReconciliationService {
       acquirerDivergences,
       ambiguousMatches
     );
+  }
+
+  private void markManualSwapAttempted(
+    TransactionErpEntity erp,
+    List<TransactionErpEntity> changedErpSales
+  ) {
+    boolean changed = conciliationAnalysisService.applyErpReconciliationStatus(
+      erp,
+      StatusReconciliationEnum.PENDING,
+      StatusTransactionReasonEnum.MANUAL_SWAP_NOT_FOUND
+    );
+    if (changed) {
+      changedErpSales.add(erp);
+    }
   }
 
   private boolean isManualCapture(TransactionErpEntity erp) {

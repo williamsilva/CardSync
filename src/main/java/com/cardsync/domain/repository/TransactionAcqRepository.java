@@ -19,9 +19,16 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
 
   Optional<TransactionAcqEntity> findFirstByNsuAndAuthorization(Long nsu, String authorization);
 
-  Optional<TransactionAcqEntity> findFirstByNsu(Long nsu);
+  /**
+   * Carrega transações já persistidas cujo NSU esteja no conjunto informado.
+   * Usado para deduplicação em nível de transação durante o reprocessamento de
+   * arquivos (o mesmo conjunto de vendas pode chegar em arquivos com bytes
+   * diferentes, escapando da guarda por hash de conteúdo).
+   */
+  @Query("select t from TransactionAcqEntity t where t.nsu in :nsus")
+  List<TransactionAcqEntity> findExistingByNsus(@Param("nsus") Collection<Long> nsus);
 
-  Optional<TransactionAcqEntity> findFirstByAuthorization(String authorization);
+  Optional<TransactionAcqEntity> findFirstByNsu(Long nsu);
 
   Optional<TransactionAcqEntity> findFirstBySalesSummary_IdAndNsuAndAuthorizationOrderBySaleDateDesc(
     UUID salesSummaryId,
@@ -48,72 +55,6 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     Integer rvNumber,
     Long nsu
   );
-
-  @Query(
-    value = """
-      select distinct a
-        from TransactionAcqEntity a
-        left join fetch a.acquirer
-        left join fetch a.flag
-        left join fetch a.company
-        left join fetch a.establishment
-        left join fetch a.adjustment
-        left join fetch a.salesSummary ss
-        left join fetch ss.bankingDomicile
-       where not exists (
-         select 1
-           from TransactionErpEntity e
-          where e.transactionAcq = a
-       )
-         and (:includeAlreadyReconciled = true
-              or (a.saleReconciliationDate is null
-                  and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
-    """,
-    countQuery = """
-      select count(a)
-        from TransactionAcqEntity a
-       where not exists (
-         select 1
-           from TransactionErpEntity e
-          where e.transactionAcq = a
-       )
-         and (:includeAlreadyReconciled = true
-              or (a.saleReconciliationDate is null
-                  and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
-    """
-  )
-  Page<TransactionAcqEntity> findMissingInErpForManualResolutionPage(
-    Pageable pageable,
-    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
-    @Param("pendingStatuses") Collection<Integer> pendingStatuses
-  );
-
-  @Query("""
-    select distinct a
-      from TransactionAcqEntity a
-      left join fetch a.acquirer
-      left join fetch a.flag
-      left join fetch a.company
-      left join fetch a.establishment
-      left join fetch a.adjustment
-      left join fetch a.salesSummary ss
-      left join fetch ss.bankingDomicile
-     where not exists (
-       select 1
-         from TransactionErpEntity e
-        where e.transactionAcq = a
-     )
-       and (:includeAlreadyReconciled = true
-            or (a.saleReconciliationDate is null
-                and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
-     order by a.saleDate desc, a.id desc
-  """)
-  List<TransactionAcqEntity> findMissingInErpForManualResolution(
-    Pageable pageable,
-    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
-    @Param("pendingStatuses") Collection<Integer> pendingStatuses
-  );
-
 
   @Query("""
     select a.id
@@ -156,7 +97,6 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
      order by a.saleDate asc, a.id asc
   """)
   List<TransactionAcqEntity> findBatchForMissingInErpStatusClassification(@Param("ids") Collection<UUID> ids);
-
 
   @Query("""
     select distinct a
@@ -204,7 +144,6 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("excludedModality") Integer excludedModality
   );
 
-
   @Query("""
     select distinct a
       from TransactionAcqEntity a
@@ -219,7 +158,6 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
      where a.id = :id
   """)
   Optional<TransactionAcqEntity> findForManualResolutionById(@Param("id") UUID id);
-
 
   @Query("""
     select distinct a
@@ -242,49 +180,4 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("acquirerId") UUID acquirerId,
     Pageable pageable
   );
-
-
-
-  @Query("""
-    select distinct tx
-      from TransactionAcqEntity tx
-      left join fetch tx.acquirer
-      left join fetch tx.flag
-      left join fetch tx.company
-      left join fetch tx.establishment
-      left join fetch tx.adjustment
-      left join fetch tx.salesSummary ss
-      left join fetch ss.bankingDomicile
-      left join fetch tx.installments ia
-      left join fetch ia.adjustment
-      left join fetch ia.creditOrder
-      left join fetch ia.releaseBank
-     where ss.id = :salesSummaryId
-     order by tx.saleDate asc, tx.id asc
-  """)
-  List<TransactionAcqEntity> findBySalesSummaryIdForAcquirerSaleSummaryReconciliation(
-    @Param("salesSummaryId") UUID salesSummaryId
-  );
-
-  @Query("""
-    select distinct tx
-      from TransactionAcqEntity tx
-      left join fetch tx.acquirer
-      left join fetch tx.flag
-      left join fetch tx.company
-      left join fetch tx.establishment
-      left join fetch tx.adjustment
-      left join fetch tx.salesSummary ss
-      left join fetch ss.bankingDomicile
-      left join fetch tx.installments ia
-      left join fetch ia.adjustment
-      left join fetch ia.creditOrder
-      left join fetch ia.releaseBank
-     where ss.id in :salesSummaryIds
-     order by ss.rvDate asc, tx.saleDate asc, tx.id asc
-  """)
-  List<TransactionAcqEntity> findBySalesSummaryIdsForAcquirerSaleSummaryReconciliation(
-    @Param("salesSummaryIds") Collection<UUID> salesSummaryIds
-  );
-
 }

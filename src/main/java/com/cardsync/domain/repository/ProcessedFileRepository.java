@@ -18,19 +18,18 @@ public interface ProcessedFileRepository extends JpaRepository<ProcessedFileEnti
   JpaSpecificationExecutor<ProcessedFileEntity> {
 
   Optional<ProcessedFileEntity> findFirstByContentHash(String contentHash);
-
   Optional<ProcessedFileEntity> findFirstByFileAndOriginFile(String file, OriginFileEntity originFile);
 
   @Query("""
     select pf
       from ProcessedFileEntity pf
       left join fetch pf.originFile
+      left join fetch pf.bankingDomicile bd
+      left join fetch bd.bank
+      left join fetch bd.company
      where pf.dateFile between :startDate and :endDate
      order by pf.dateFile asc, pf.file asc
     """)
-    List<ProcessedFileEntity> findCalendarFiles(
-      @Param("startDate") LocalDate startDate,
-      @Param("endDate") LocalDate endDate
-  );
+  List<ProcessedFileEntity> findCalendarFiles(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
 }

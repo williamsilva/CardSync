@@ -1,7 +1,7 @@
 package com.cardsync.bff.controller.v1.mapper.model;
 
 import com.cardsync.bff.controller.v1.BankController;
-import com.cardsync.bff.controller.v1.representation.model.BankMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
 import com.cardsync.domain.model.BankEntity;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
@@ -21,6 +21,7 @@ public class BankMinimalModelAssembler extends RepresentationModelAssemblerSuppo
     model.setId(entity.getId());
     model.setName(entity.getName());
     model.setCode(entity.getCode());
+    model.setStatus(entity.getStatus());
 
     return model;
   }

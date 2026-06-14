@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,59 +16,44 @@ import java.util.UUID;
 public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, UUID>, JpaSpecificationExecutor<CreditOrderEntity> {
 
   @Query("""
-    select co
+    select co.id
     from CreditOrderEntity co
-    left join fetch co.salesSummary ss
-    left join fetch co.acquirer
-    left join fetch co.flag
-    left join fetch co.company
-    left join fetch co.bankingDomicile
     where co.releaseBank is null
-      and (co.reconciliationStatus is null or co.reconciliationStatus = :pendingStatus)
       and co.salesSummaryStatus = :summaryReconciledStatus
-      and co.company.id = :companyId
-      and co.bankingDomicile.id = :bankingDomicileId
-      and (:acquirerId is null or co.acquirer.id = :acquirerId)
-      and (:flagId is null or co.flag.id = :flagId)
-      and (
-        :modalityPaymentBank is null
-        or (:modalityPaymentBank = 1 and co.transactionType = 1)
-        or (:modalityPaymentBank = 2 and co.transactionType in (2, 3, 4, 5))
-      )
-      and co.releaseDate between :dateFrom and :dateTo
-    order by co.releaseDate asc, co.releaseValue asc
-  """)
-  List<CreditOrderEntity> findPendingForBankRelease(
-    @Param("pendingStatus") Integer pendingStatus,
-    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
-    @Param("companyId") UUID companyId,
-    @Param("acquirerId") UUID acquirerId,
-    @Param("bankingDomicileId") UUID bankingDomicileId,
-    @Param("flagId") UUID flagId,
-    @Param("modalityPaymentBank") Integer modalityPaymentBank,
-    @Param("dateFrom") LocalDate dateFrom,
-    @Param("dateTo") LocalDate dateTo
-  );
-
-
-  @Query("""
-    select co
-    from CreditOrderEntity co
-    left join fetch co.salesSummary ss
-    left join fetch co.acquirer
-    left join fetch co.flag
-    left join fetch co.company
-    left join fetch co.bankingDomicile
-    where co.releaseBank is null
-      and (co.reconciliationStatus is null or co.reconciliationStatus = :pendingStatus)
-      and co.salesSummaryStatus = :summaryReconciledStatus
+      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
       and co.releaseDate is not null
       and co.releaseValue is not null
-    order by co.releaseDate asc, co.releaseValue asc
+      and co.company is not null
+      and co.bankingDomicile is not null
+    order by co.releaseDate asc, co.id asc
   """)
-  List<CreditOrderEntity> findEligibleForBankReconciliation(
-    @Param("pendingStatus") Integer pendingStatus,
-    @Param("summaryReconciledStatus") Integer summaryReconciledStatus
+  List<UUID> findEligibleIdsForBankReconciliation(
+    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
+    @Param("paymentPendingStatus") Integer paymentPendingStatus,
+    @Param("paymentPartialStatus") Integer paymentPartialStatus
+  );
+
+  @Query("""
+    select distinct co
+    from CreditOrderEntity co
+    left join fetch co.salesSummary
+    left join fetch co.acquirer
+    left join fetch co.flag
+    left join fetch co.company
+    left join fetch co.bankingDomicile
+    where co.id in :ids
+      and co.releaseBank is null
+      and co.salesSummaryStatus = :summaryReconciledStatus
+      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
+      and co.releaseDate is not null
+      and co.releaseValue is not null
+    order by co.releaseDate asc, co.id asc
+  """)
+  List<CreditOrderEntity> findEligibleByIdsForBankReconciliation(
+    @Param("ids") List<UUID> ids,
+    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
+    @Param("paymentPendingStatus") Integer paymentPendingStatus,
+    @Param("paymentPartialStatus") Integer paymentPartialStatus
   );
 
   @Transactional

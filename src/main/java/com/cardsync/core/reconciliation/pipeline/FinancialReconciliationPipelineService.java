@@ -5,6 +5,7 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.Reconcil
 import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
 import com.cardsync.core.conciliation.analysis.ConciliationManualSwapReconciliationService;
 import com.cardsync.core.reconciliation.BankReconciliationResult;
+import com.cardsync.core.reconciliation.BankReconciliationTriggerType;
 import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.cancellation.AcquirerSaleCancellationResult;
 import com.cardsync.core.reconciliation.cancellation.AcquirerSaleCancellationService;
@@ -227,7 +228,11 @@ public class FinancialReconciliationPipelineService {
   private FinancialReconciliationStepResult runCreditOrderBankRelease(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
-    BankReconciliationResult r = bankReconciliationService.reconcilePending();
+    BankReconciliationTriggerType bankTrigger = trigger == FinancialReconciliationTriggerType.MANUAL
+      ? BankReconciliationTriggerType.MANUAL
+      : BankReconciliationTriggerType.SCHEDULER_BANK_RECONCILIATION;
+
+    BankReconciliationResult r = bankReconciliationService.reconcilePending(bankTrigger);
 
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.CREDIT_ORDER_BANK_RELEASE)

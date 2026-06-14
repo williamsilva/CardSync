@@ -1,18 +1,30 @@
 package com.cardsync.bff.controller.v1.representation.model.holiday;
 
 import com.cardsync.domain.model.enums.StatusEnum;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.hateoas.RepresentationModel;
+import org.springframework.hateoas.server.core.Relation;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record HolidayModel(
-  UUID id,
-  LocalDate holidayDate,
-  String name,
-  StatusEnum status,
-  OffsetDateTime statusDate,
-  OffsetDateTime createdAt,
-  OffsetDateTime updatedAt
-) {
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Relation(collectionRelation = "content")
+public class HolidayModel extends RepresentationModel<HolidayModel>{
+
+  private UUID id;
+  private String name;
+  private StatusEnum status;
+
+  private LocalDate holidayDate;
+  private OffsetDateTime statusDate;
+  private OffsetDateTime createdAt;
+  private OffsetDateTime updatedAt;
 }

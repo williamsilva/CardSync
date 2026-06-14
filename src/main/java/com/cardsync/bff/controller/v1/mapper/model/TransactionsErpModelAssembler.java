@@ -5,9 +5,9 @@ import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.BankMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.BankingDomicileMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankingDomicileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.InstallmentErpModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsErpModel;
 import com.cardsync.domain.model.BankEntity;
@@ -110,6 +110,7 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
       model.setBankingDomicile(BankingDomicileMinimalModel.builder()
           .id(entity.getBankingDomicile().getId())
           .agency(entity.getBankingDomicile().getAgency())
+          .statusDate(entity.getBankingDomicile().getStatusDate())
           .currentAccount(entity.getBankingDomicile().getCurrentAccount())
           .bank(entity.getBankingDomicile().getBank() == null ? null: toBank(entity.getBankingDomicile().getBank()))
         .build());

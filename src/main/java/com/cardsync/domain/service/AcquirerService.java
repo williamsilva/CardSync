@@ -232,10 +232,7 @@ public class AcquirerService {
   }
 
   @Transactional
-  public AcquirerEntity addEstablishmentRelations(
-    UUID acquirerId,
-    List<AcquirerEstablishmentRelationItemInput> items
-  ) {
+  public AcquirerEntity addEstablishmentRelations(UUID acquirerId, List<AcquirerEstablishmentRelationItemInput> items) {
     AcquirerEntity acquirer = getById(acquirerId);
 
     if (items == null || items.isEmpty()) {

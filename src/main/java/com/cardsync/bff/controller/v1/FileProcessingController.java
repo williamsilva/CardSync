@@ -87,9 +87,7 @@ public class FileProcessingController {
 
   @GetMapping("/files/calendar")
   @CheckSecurity.FileProcessing.CanRead
-  public ImportedFileCalendarModel importedFilesCalendar(
-    @RequestParam(required = false) YearMonth month
-  ) {
+  public ImportedFileCalendarModel importedFilesCalendar(@RequestParam(required = false) YearMonth month) {
     return reportService.importedFilesCalendar(month);
   }
 

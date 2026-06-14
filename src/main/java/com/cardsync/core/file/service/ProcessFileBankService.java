@@ -8,6 +8,7 @@ import com.cardsync.core.file.util.FileUtil;
 import com.cardsync.core.file.util.MoveFileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -38,6 +39,7 @@ public class ProcessFileBankService {
     int processed = 0;
     int invalid = 0;
     int errors = 0;
+    int duplicates = 0;
     int scanned = 0;
 
     for (var entry : bankPaths.entrySet()) {
@@ -48,10 +50,11 @@ public class ProcessFileBankService {
       processed += result.processed();
       invalid += result.invalid();
       errors += result.errors();
+      duplicates += result.duplicates();
     }
 
-    log.info("✅ Processamento bancário finalizado: bancosConfigurados={}, arquivosEncontrados={}, processados={}, invalidos={}, erros={}",
-      bankPaths.size(), scanned, processed, invalid, errors);
+    log.info("✅ Processamento bancário finalizado: bancosConfigurados={}, arquivosEncontrados={}, processados={}, duplicados={}, invalidos={}, erros={}",
+      bankPaths.size(), scanned, processed, duplicates, invalid, errors);
 
     if (errors > 0) {
       log.warn("⚠ Processamento bancário teve {} erro(s) e {} arquivo(s) processado(s). "
@@ -63,6 +66,7 @@ public class ProcessFileBankService {
     int processed = 0;
     int invalid = 0;
     int errors = 0;
+    int duplicates = 0;
     int scanned = 0;
 
     paths.ensureDirectories();
@@ -70,7 +74,7 @@ public class ProcessFileBankService {
     Path inputPath = Paths.get(paths.getInput());
     if (!Files.exists(inputPath)) {
       log.info("ℹ Pasta bancária {} ainda não existe: {}", bankKey, inputPath);
-      return new BankProcessingResult(0, 0, 0, 0);
+      return new BankProcessingResult(0, 0, 0, 0, 0);
     }
 
     try (DirectoryStream<Path> files = Files.newDirectoryStream(inputPath)) {
@@ -91,6 +95,7 @@ public class ProcessFileBankService {
           FileResult result = validateAndProcess(bankKey, file, paths);
           if (result == FileResult.PROCESSED) processed++;
           if (result == FileResult.INVALID) invalid++;
+          if (result == FileResult.DUPLICATE) duplicates++;
           if (result == FileResult.ERROR) errors++;
         } catch (Exception ex) {
           errors++;
@@ -109,7 +114,7 @@ public class ProcessFileBankService {
       log.error("❌ Erro ao acessar/processar pasta bancária {}: {}", bankKey, ex.getMessage(), ex);
     }
 
-    return new BankProcessingResult(scanned, processed, invalid, errors);
+    return new BankProcessingResult(scanned, processed, duplicates, invalid, errors);
   }
 
   private FileResult validateAndProcess(String bankKey, Path file, FileProcessingProperties.FilePaths paths) {
@@ -130,16 +135,74 @@ public class ProcessFileBankService {
 
       moveFileService.moveNowBank(file, invalidDestination(paths), null, null, null);
       return FileResult.INVALID;
-    } catch (Exception ex) {
-      log.error("❌ Erro ao processar arquivo bancário {} em {}: {}", file.getFileName(), bankKey, ex.getMessage(), ex);
+    } catch (DataIntegrityViolationException ex) {
+      if (isAlreadyProcessedFile(ex)) {
+        log.info("ℹ Arquivo bancário '{}' já foi processado anteriormente e não será importado novamente.",
+          file.getFileName());
 
-      if (Files.exists(file)) {
-        moveFileService.moveNowBank(file, paths.getError(), null, null, null);
-      } else {
-        log.warn("⚠ Arquivo bancário {} já foi movido por outro fluxo; ignorando novo movimento para erro.", file.getFileName());
+        if (Files.exists(file)) {
+          moveFileService.moveNowBank(file, paths.getDuplicate(), null, null, null);
+        } else {
+          log.info("ℹ Arquivo bancário '{}' já foi movido pelo fluxo de duplicidade.", file.getFileName());
+        }
+        return FileResult.DUPLICATE;
       }
-      return FileResult.ERROR;
+
+      return handleProcessingError(bankKey, file, paths, ex);
+    } catch (Exception ex) {
+      return handleProcessingError(bankKey, file, paths, ex);
     }
+  }
+
+  private FileResult handleProcessingError(
+    String bankKey,
+    Path file,
+    FileProcessingProperties.FilePaths paths,
+    Exception ex
+  ) {
+    log.error("❌ Não foi possível processar o arquivo bancário '{}' do banco {}. Motivo: {}",
+      file.getFileName(), bankKey, friendlyErrorMessage(ex));
+    log.debug("Detalhes técnicos do erro no arquivo bancário '{}'.", file.getFileName(), ex);
+
+    if (Files.exists(file)) {
+      moveFileService.moveNowBank(file, paths.getError(), null, null, null);
+    } else {
+      log.warn("⚠ Arquivo bancário '{}' já foi movido; não foi necessário enviá-lo novamente para a pasta de erro.",
+        file.getFileName());
+    }
+    return FileResult.ERROR;
+  }
+
+  private boolean isAlreadyProcessedFile(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null && (
+        message.contains("uk_cs_processed_file_file_origin")
+          || message.contains("Duplicate entry") && message.contains("cs_processed_file")
+      )) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
+  }
+
+  private String friendlyErrorMessage(Throwable throwable) {
+    Throwable current = throwable;
+    String lastMessage = null;
+
+    while (current != null) {
+      if (current.getMessage() != null && !current.getMessage().isBlank()) {
+        lastMessage = current.getMessage();
+      }
+      current = current.getCause();
+    }
+
+    if (lastMessage == null || lastMessage.isBlank()) {
+      return "ocorreu uma falha inesperada durante a importação";
+    }
+    return lastMessage;
   }
 
   private String invalidDestination(FileProcessingProperties.FilePaths paths) {
@@ -150,10 +213,11 @@ public class ProcessFileBankService {
 
   private enum FileResult {
     PROCESSED,
+    DUPLICATE,
     INVALID,
     ERROR
   }
 
-  private record BankProcessingResult(int scanned, int processed, int invalid, int errors) {
+  private record BankProcessingResult(int scanned, int processed, int duplicates, int invalid, int errors) {
   }
 }
