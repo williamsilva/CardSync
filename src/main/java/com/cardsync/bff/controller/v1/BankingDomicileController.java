@@ -1,8 +1,10 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.mapper.model.BankingDomicileMinimalModelAssembler;
 import com.cardsync.bff.controller.v1.mapper.model.BankingDomicileModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.BankingDomicileInput;
 import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.BankingDomicileFilter;
@@ -13,6 +15,7 @@ import com.cardsync.domain.service.BankingDomicileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.web.PagedResourcesAssembler;
+import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,12 +28,19 @@ public class BankingDomicileController {
 
   private final BankingDomicileModelAssembler modelAssembler;
   private final BankingDomicileService bankingDomicileService;
+  private final BankingDomicileMinimalModelAssembler minimalModelAssembler;
   private final PagedResourcesAssembler<BankingDomicileEntity> pagedResourcesAssembler;
 
   @GetMapping("/{id}")
   @CheckSecurity.Register.Companies.CanConsult
   public BankingDomicileModel getById(@PathVariable UUID id) {
     return modelAssembler.toModel(bankingDomicileService.getById(id));
+  }
+
+  @GetMapping("/options-filter")
+  @CheckSecurity.Authenticated
+  public CollectionModel<BankingDomicileMinimalModel> listOptionsFilter() {
+    return minimalModelAssembler.toCollectionModel(bankingDomicileService.listOptionsFilter());
   }
 
   @PostMapping("/search")
@@ -49,10 +59,7 @@ public class BankingDomicileController {
 
   @PutMapping("/{id}")
   @CheckSecurity.Register.Companies.CanChange
-  public BankingDomicileModel update(
-    @PathVariable UUID id,
-    @Valid @RequestBody BankingDomicileInput body
-  ) {
+  public BankingDomicileModel update(@PathVariable UUID id,  @Valid @RequestBody BankingDomicileInput body) {
     return modelAssembler.toModel(bankingDomicileService.update(id, body));
   }
 

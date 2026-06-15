@@ -52,6 +52,7 @@ public class DashboardAuditService {
   private final com.cardsync.infrastructure.repository.spec.config.DateFilterService dateFilterService;
   private final com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs conciliationWaitingErpSpecs;
   private final com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs conciliationWaitingAcqSpecs;
+  private final com.cardsync.core.config.CardsyncAppProperties appProperties;
 
   @Transactional(readOnly = true)
   public AuditSalesSummaryModel salesSummary() {
@@ -64,7 +65,9 @@ public class DashboardAuditService {
     }
 
     LocalDate minDay = today.minusDays(DAYS - 1L);
-    OffsetDateTime start = minDay.atStartOfDay().atOffset(ZoneOffset.UTC);
+    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate effectiveMin = minDay.isBefore(implantationDate) ? implantationDate : minDay;
+    OffsetDateTime start = effectiveMin.atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime end = today.atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
 
     Query q = entityManager.createQuery(

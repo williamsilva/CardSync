@@ -1,16 +1,13 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.mapper.model.NoFileDayModelAssembler;
-import com.cardsync.bff.controller.v1.representation.input.AcquirerInput;
 import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
-import com.cardsync.bff.controller.v1.representation.model.AcquirerModel;
+import com.cardsync.bff.controller.v1.representation.input.NoFileDayInput;
 import com.cardsync.bff.controller.v1.representation.model.nofileday.NoFileDayModel;
-import com.cardsync.bff.controller.v1.representation.model.nofileday.NoFileDayRequestModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.NoFileDayFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
-import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.NoFileDayEntity;
 import com.cardsync.domain.service.NoFileDayService;
 import jakarta.validation.Valid;
@@ -49,21 +46,34 @@ public class NoFileDayController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @CheckSecurity.FileProcessing.CanProcess
-  public NoFileDayModel create(@Valid @RequestBody NoFileDayRequestModel request) {
+  public NoFileDayModel create(@Valid @RequestBody NoFileDayInput request) {
     return modelAssembler.toModel(noFileDayService.create(request));
   }
 
   @PutMapping("/{id}")
   @CheckSecurity.FileProcessing.CanProcess
-  public NoFileDayModel update(@PathVariable UUID id, @Valid @RequestBody NoFileDayRequestModel request) {
+  public NoFileDayModel update(@PathVariable UUID id, @Valid @RequestBody NoFileDayInput request) {
     return modelAssembler.toModel(noFileDayService.update(id, request));
   }
 
+  /**
+   * Exclui um dia sem arquivo pelo identificador.
+   */
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @CheckSecurity.FileProcessing.CanProcess
   public void delete(@PathVariable UUID id) {
     noFileDayService.delete(id);
+  }
+
+  /**
+   * Exclui vários dias sem arquivo em uma única operação.
+   */
+  @DeleteMapping("/bulk")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @CheckSecurity.FileProcessing.CanProcess
+  public void deleteBulk(@Valid @RequestBody ListIdsInput body) {
+    noFileDayService.deleteBulk(body.ids());
   }
 
   @PostMapping("/{id}/activate")

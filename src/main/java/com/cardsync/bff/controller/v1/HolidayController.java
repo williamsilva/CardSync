@@ -1,16 +1,13 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.mapper.model.HolidayModelAssembler;
-import com.cardsync.bff.controller.v1.representation.input.AcquirerInput;
 import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
-import com.cardsync.bff.controller.v1.representation.model.AcquirerModel;
 import com.cardsync.bff.controller.v1.representation.model.holiday.HolidayModel;
-import com.cardsync.bff.controller.v1.representation.model.holiday.HolidayRequestModel;
+import com.cardsync.bff.controller.v1.representation.input.HolidayInput;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.HolidayFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
-import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.HolidayEntity;
 import com.cardsync.domain.service.HolidayService;
 import jakarta.validation.Valid;
@@ -50,13 +47,13 @@ public class HolidayController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @CheckSecurity.FileProcessing.CanProcess
-  public HolidayModel create(@Valid @RequestBody HolidayRequestModel request) {
+  public HolidayModel create(@Valid @RequestBody HolidayInput request) {
     return modelAssembler.toModel(holidayService.create(request));
   }
 
   @PutMapping("/{id}")
   @CheckSecurity.FileProcessing.CanProcess
-  public HolidayModel update(@PathVariable UUID id,  @Valid @RequestBody HolidayRequestModel request) {
+  public HolidayModel update(@PathVariable UUID id,  @Valid @RequestBody HolidayInput request) {
     return modelAssembler.toModel(holidayService.update(id, request));
   }
 

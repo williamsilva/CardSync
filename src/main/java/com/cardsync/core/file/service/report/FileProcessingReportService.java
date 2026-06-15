@@ -15,6 +15,7 @@ import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ProcessedFileFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
+import com.cardsync.domain.model.enums.AcquirerFileTypeEnum;
 import com.cardsync.domain.model.enums.FileGroupEnum;
 import com.cardsync.domain.model.enums.FileStatusEnum;
 import com.cardsync.domain.model.enums.StatusEnum;
@@ -35,7 +36,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.*;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -192,7 +196,7 @@ public class FileProcessingReportService {
     List<BankingDomicileEntity> bankingDomiciles,
     Map<UUID, Set<UUID>> domicileIdsByProcessedFile,
     Set<LocalDate> holidays,
-    List<NoFileDayEntity> noFileDayEntries
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
     List<ImportedFileCalendarItemModel> files = processedFiles.stream()
       .map(this::toCalendarItem)
@@ -225,7 +229,7 @@ public class FileProcessingReportService {
     LocalDate date,
     List<ProcessedFileEntity> files,
     int erpFiles,
-    List<NoFileDayEntity> noFileDayEntries
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
     boolean exempt = isErpExemptOnDate(date, noFileDayEntries);
     int expected = (!exempt && fileProcessingProperties.getCalendar().isErpEnabled()) ? 1 : 0;
@@ -265,7 +269,7 @@ public class FileProcessingReportService {
     LocalDate date,
     List<ProcessedFileEntity> files,
     List<AcquirerEntity> acquirers,
-    List<NoFileDayEntity> noFileDayEntries
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
     List<ProcessedFileEntity> adqFiles = files.stream()
       .filter(file -> file.getGroup() == FileGroupEnum.ADQ)
@@ -273,12 +277,10 @@ public class FileProcessingReportService {
 
     List<ImportedFileEntityStatusModel> entities = acquirers.stream()
       .map(acquirer -> {
-        boolean expectedOnDate = isAcquirerFileRequiredOnDate(date, acquirer, noFileDayEntries);
-        int expectedFiles = expectedOnDate ? expectedAcquirerFiles(acquirer) : 0;
-        int filesReceived = countReceivedAcquirerFiles(adqFiles, acquirer);
-        List<String> missingFiles = expectedOnDate
-          ? resolveMissingAcquirerFiles(adqFiles, acquirer)
-          : List.of();
+        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries);
+        int expectedFiles = expectedTypes.size();
+        int filesReceived = countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes);
+        List<String> missingFiles = resolveMissingAcquirerFiles(adqFiles, acquirer, expectedTypes);
         List<String> presentFiles = resolvePresentAcquirerFiles(adqFiles, acquirer);
 
         return new ImportedFileEntityStatusModel(
@@ -295,13 +297,14 @@ public class FileProcessingReportService {
       .toList();
 
     int expected = acquirers.stream()
-      .filter(acquirer -> isAcquirerFileRequiredOnDate(date, acquirer, noFileDayEntries))
-      .mapToInt(this::expectedAcquirerFiles)
+      .mapToInt(acquirer -> resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries).size())
       .sum();
 
     int received = acquirers.stream()
-      .filter(acquirer -> isAcquirerFileRequiredOnDate(date, acquirer, noFileDayEntries))
-      .mapToInt(acquirer -> countReceivedAcquirerFiles(adqFiles, acquirer))
+      .mapToInt(acquirer -> {
+        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries);
+        return countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes);
+      })
       .sum();
 
     return new ImportedFileGroupStatusModel(resolveStatus(received, expected), received, expected, entities);
@@ -314,7 +317,7 @@ public class FileProcessingReportService {
     List<BankingDomicileEntity> bankingDomiciles,
     Map<UUID, Set<UUID>> domicileIdsByProcessedFile,
     Set<LocalDate> holidays,
-    List<NoFileDayEntity> noFileDayEntries
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
     List<ProcessedFileEntity> bankFiles = files.stream()
       .filter(file -> file.getGroup() == FileGroupEnum.BANK)
@@ -338,12 +341,11 @@ public class FileProcessingReportService {
 
     List<ImportedFileEntityStatusModel> entities = banks.stream()
       .map(bank -> {
-        boolean bankExpectedOnDate = !nonBusinessDay
-          && isBankFileRequiredOnDate(date, bank, noFileDayEntries);
+        boolean bankExpectedOnDate = !nonBusinessDay && isBankExpectedOnDate(bank, date);
 
         List<BankingDomicileEntity> expectedDomiciles = bankExpectedOnDate
           ? domicilesByBank.getOrDefault(bank.getId(), List.of()).stream()
-          .filter(domicile -> isBankingDomicileExpectedOnDate(domicile, date))
+          .filter(domicile -> isBankingDomicileFileRequiredOnDate(date, domicile, noFileDayEntries))
           .toList()
           : List.of();
 
@@ -380,9 +382,9 @@ public class FileProcessingReportService {
     int expected = nonBusinessDay
       ? 0
       : banks.stream()
-      .filter(bank -> isBankFileRequiredOnDate(date, bank, noFileDayEntries))
+      .filter(bank -> isBankExpectedOnDate(bank, date))
       .mapToInt(bank -> (int) domicilesByBank.getOrDefault(bank.getId(), List.of()).stream()
-        .filter(domicile -> isBankingDomicileExpectedOnDate(domicile, date))
+        .filter(domicile -> isBankingDomicileFileRequiredOnDate(date, domicile, noFileDayEntries))
         .count())
       .sum();
 
@@ -391,9 +393,9 @@ public class FileProcessingReportService {
     int receivedDomiciles = nonBusinessDay
       ? 0
       : banks.stream()
-      .filter(bank -> isBankFileRequiredOnDate(date, bank, noFileDayEntries))
+      .filter(bank -> isBankExpectedOnDate(bank, date))
       .flatMap(bank -> domicilesByBank.getOrDefault(bank.getId(), List.of()).stream())
-      .filter(domicile -> isBankingDomicileExpectedOnDate(domicile, date))
+      .filter(domicile -> isBankingDomicileFileRequiredOnDate(date, domicile, noFileDayEntries))
       .map(BankingDomicileEntity::getId)
       .filter(receivedDomicileIds::contains)
       .distinct()
@@ -564,60 +566,69 @@ public class FileProcessingReportService {
   }
 
   /** ERP isento no dia: existe registro NoFileDay do grupo ERP nessa data. */
-  private boolean isErpExemptOnDate(LocalDate date, List<NoFileDayEntity> entries) {
+  private boolean isErpExemptOnDate(LocalDate date, List<com.cardsync.domain.model.NoFileDayEntity> entries) {
     return entries.stream().anyMatch(e ->
       e.getFileGroup() == FileGroupEnum.ERP && date.equals(e.getNoFileDate()));
   }
 
   /**
-   * Indica se a adquirente deve enviar arquivo na data consultada.
-
-   * A adquirente precisa estar vigente na data e não pode existir um registro ativo
-   * de NoFileDay para o grupo ADQ, seja geral ou específico para a adquirente.
+   * Retorna os tipos de arquivo que a adquirente ainda deve enviar na data.
+   * Cada NoFileDay de ADQ remove somente o tipo informado.
    */
-  private boolean isAcquirerFileRequiredOnDate(
+  private Set<String> resolveExpectedAcquirerFileTypes(
     LocalDate date,
     AcquirerEntity acquirer,
     List<NoFileDayEntity> entries
   ) {
-    if (!isAcquirerExpectedOnDate(acquirer, date)) return false;
+    if (!isAcquirerExpectedOnDate(acquirer, date)) return Set.of();
 
-    return entries.stream().noneMatch(entry ->
-      entry.getFileGroup() == FileGroupEnum.ADQ
-        && date.equals(entry.getNoFileDate())
-        && (entry.getAcquirer() == null
+    Set<String> expectedTypes = new HashSet<>(isRedeAcquirer(acquirer)
+      ? REDE_REQUIRED_FILE_TYPES
+      : Set.of(AcquirerFileTypeEnum.GENERIC.name()));
+
+    entries.stream()
+      .filter(entry -> entry.getFileGroup() == FileGroupEnum.ADQ)
+      .filter(entry -> date.equals(entry.getNoFileDate()))
+      .filter(entry -> entry.getAcquirer() == null
         || (acquirer.getId() != null && acquirer.getId().equals(idOfAcquirer(entry))))
-    );
+      .forEach(entry -> {
+        AcquirerFileTypeEnum exemptType = entry.getAcquirerFileType();
+        if (exemptType == null) {
+          expectedTypes.clear();
+        } else {
+          expectedTypes.remove(exemptType.name());
+        }
+      });
+
+    return Set.copyOf(expectedTypes);
   }
 
   /**
-   * Indica se o banco deve enviar arquivo na data consultada.
-
-   * O banco precisa estar vigente na data e não pode existir um registro ativo de
-   * NoFileDay para o grupo BANK na própria data ou no dia anterior. O registro pode
-   * ser geral ou específico para o banco.
+   * Indica se o domicílio bancário deve enviar arquivo na data.
+   * A isenção pode ser geral ou específica para o domicílio e também vale para
+   * o dia seguinte, preservando a regra dos arquivos bancários de liquidação.
    */
-  private boolean isBankFileRequiredOnDate(
+  private boolean isBankingDomicileFileRequiredOnDate(
     LocalDate date,
-    BankEntity bank,
+    BankingDomicileEntity domicile,
     List<NoFileDayEntity> entries
   ) {
-    if (!isBankExpectedOnDate(bank, date)) return false;
+    if (!isBankingDomicileExpectedOnDate(domicile, date)) return false;
 
     return entries.stream().noneMatch(entry ->
       entry.getFileGroup() == FileGroupEnum.BANK
         && (date.equals(entry.getNoFileDate()) || date.minusDays(1).equals(entry.getNoFileDate()))
-        && (entry.getBank() == null
-        || (bank.getId() != null && bank.getId().equals(idOfBank(entry))))
+        && (entry.getBankingDomicile() == null
+        || (domicile.getId() != null && domicile.getId().equals(idOfBankingDomicile(entry))))
     );
   }
 
-  private UUID idOfBank(NoFileDayEntity e) {
-    return e.getBank() != null ? e.getBank().getId() : null;
+  private UUID idOfBankingDomicile(NoFileDayEntity entry) {
+    return entry.getBankingDomicile() != null ? entry.getBankingDomicile().getId() : null;
   }
 
-  private UUID idOfAcquirer(NoFileDayEntity e) {
-    return e.getAcquirer() != null ? e.getAcquirer().getId() : null;
+  private UUID idOfAcquirer(NoFileDayEntity entry) {
+    return entry.getAcquirer() != null ? entry.getAcquirer().getId() : null;
   }
 
   private boolean isAcquirerExpectedOnDate(AcquirerEntity acquirer, LocalDate date) {
@@ -630,7 +641,7 @@ public class FileProcessingReportService {
     return isBeforeStatusChange(date, bank.getStatusDate());
   }
 
-  private boolean isBeforeStatusChange(LocalDate date, OffsetDateTime statusDate) {
+  private boolean isBeforeStatusChange(LocalDate date, java.time.OffsetDateTime statusDate) {
     if (statusDate == null) return false;
     LocalDate changeDate = statusDate.atZoneSameInstant(BUSINESS_ZONE).toLocalDate();
     return date.isBefore(changeDate);
@@ -640,7 +651,10 @@ public class FileProcessingReportService {
     return filesReceived > 0 || !expectedOnDate ? "complete" : "missing";
   }
 
-  private OffsetDateTime resolveStatusDate(OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+  private java.time.OffsetDateTime resolveStatusDate(
+    java.time.OffsetDateTime createdAt,
+    java.time.OffsetDateTime updatedAt
+  ) {
     return updatedAt != null ? updatedAt : createdAt;
   }
 
@@ -658,19 +672,22 @@ public class FileProcessingReportService {
    */
   private int countReceivedAcquirerFiles(
     List<ProcessedFileEntity> adqFiles,
-    AcquirerEntity acquirer
+    AcquirerEntity acquirer,
+    Set<String> expectedTypes
   ) {
     List<ProcessedFileEntity> acquirerFiles = adqFiles.stream()
       .filter(file -> matchesAcquirer(file, acquirer))
       .toList();
 
+    if (expectedTypes.isEmpty()) return 0;
+
     if (!isRedeAcquirer(acquirer)) {
-      return acquirerFiles.isEmpty() ? 0 : 1;
+      return expectedTypes.contains(AcquirerFileTypeEnum.GENERIC.name()) && !acquirerFiles.isEmpty() ? 1 : 0;
     }
 
     return (int) acquirerFiles.stream()
       .map(this::resolveAcquirerSubtype)
-      .filter(REDE_REQUIRED_FILE_TYPES::contains)
+      .filter(expectedTypes::contains)
       .distinct()
       .count();
   }
@@ -705,10 +722,13 @@ public class FileProcessingReportService {
 
   private List<String> resolveMissingAcquirerFiles(
     List<ProcessedFileEntity> adqFiles,
-    AcquirerEntity acquirer
+    AcquirerEntity acquirer,
+    Set<String> expectedTypes
   ) {
+    if (expectedTypes.isEmpty()) return List.of();
+
     if (!isRedeAcquirer(acquirer)) {
-      return countReceivedAcquirerFiles(adqFiles, acquirer) == 0
+      return countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes) == 0
         ? List.of(firstNonBlank(acquirer.getFileIdentifier(), acquirer.getFantasyName(), acquirer.getSocialReason()))
         : List.of();
     }
@@ -719,7 +739,7 @@ public class FileProcessingReportService {
       .filter(REDE_REQUIRED_FILE_TYPES::contains)
       .collect(Collectors.toSet());
 
-    return REDE_REQUIRED_FILE_TYPES.stream()
+    return expectedTypes.stream()
       .filter(requiredType -> !receivedTypes.contains(requiredType))
       .sorted()
       .toList();

@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.InstallmentsAcqFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -23,17 +24,20 @@ public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAc
   private final SpecificationFactory specificationFactory;
   private final InstallmentsAcqTableFields installmentsAcqTableFields;
   private final InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields;
+  private final CardsyncAppProperties appProperties;
 
   public InstallmentsAcqSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     InstallmentsAcqTableFields installmentsAcqTableFields,
-    InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields
+    InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields,
+    CardsyncAppProperties appProperties
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
     this.installmentsAcqTableFields = installmentsAcqTableFields;
     this.installmentsAcqAdvancedFields = installmentsAcqAdvancedFields;
+    this.appProperties = appProperties;
   }
 
   public Specification<InstallmentAcqEntity> fromQuery(ListQueryDto<InstallmentsAcqFilter> query) {
@@ -75,6 +79,8 @@ public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAc
         "modality"
       )
     );
+
+    spec = spec.and(dateJoinGreaterThanOrEqual("transaction", "saleDate", appProperties.getImplantationDate(), false));
 
     return spec;
   }

@@ -14,6 +14,7 @@ import com.cardsync.infrastructure.repository.spec.BankingDomicileSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,12 @@ public class BankingDomicileService {
         ErrorCode.BANKING_DOMICILE_NOT_FOUND,
         "Banking domicile not found for id " + id
       ));
+  }
+
+  @Transactional(readOnly = true)
+  public List<BankingDomicileEntity> listOptionsFilter() {
+    return bankingDomicileRepository
+      .findAll(Sort.by(Sort.Direction.ASC, "company", "bank"));
   }
 
   @Transactional(readOnly = true)

@@ -29,11 +29,14 @@ public class NoFileDayTableFields {
       Map.entry("fileGroup",
         FieldSpec.string("fileGroup", (root, query) -> root.get("fileGroup"))),
 
-      Map.entry("bankId",
-        FieldSpec.joinedUuid("bankId", (root, query) -> root.get("bank").get("id"))),
+      Map.entry("bankingDomicileId",
+        FieldSpec.joinedUuid("bankingDomicileId", (root, query) -> root.get("bankingDomicile").get("id"))),
 
       Map.entry("acquirerId",
         FieldSpec.joinedUuid("acquirerId", (root, query) -> root.get("acquirer").get("id"))),
+
+      Map.entry("acquirerFileType",
+        FieldSpec.string("acquirerFileType", (root, query) -> root.get("acquirerFileType"))),
 
       Map.entry("dayType",
         FieldSpec.enumAsIntegerCode(

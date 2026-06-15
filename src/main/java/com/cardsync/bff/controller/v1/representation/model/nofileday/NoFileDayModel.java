@@ -1,7 +1,8 @@
 package com.cardsync.bff.controller.v1.representation.model.nofileday;
 
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileMinimalModel;
+import com.cardsync.domain.model.enums.AcquirerFileTypeEnum;
 import com.cardsync.domain.model.enums.FileGroupEnum;
 import com.cardsync.domain.model.enums.NoFileDayTypeEnum;
 import com.cardsync.domain.model.enums.StatusEnum;
@@ -30,12 +31,13 @@ public class NoFileDayModel extends RepresentationModel<NoFileDayModel> {
   private FileGroupEnum fileGroup;
   private NoFileDayTypeEnum dayType;
 
-  private BankMinimalModel bank;
   private AcquirerMinimalModel acquirer;
+  private AcquirerFileTypeEnum acquirerFileType;
+  private BankingDomicileMinimalModel bankingDomicile;
 
   private LocalDate noFileDate;
-  private OffsetDateTime statusDate;
   private OffsetDateTime createdAt;
   private OffsetDateTime updatedAt;
+  private OffsetDateTime statusDate;
 
 }

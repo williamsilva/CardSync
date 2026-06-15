@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -30,17 +31,20 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingErpTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields;
+  private final CardsyncAppProperties appProperties;
 
   public ConciliationWaitingErpSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     ConciliationWaitingErpTableFields conciliationWaitingTableFields,
-    ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields
+    ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields,
+    CardsyncAppProperties appProperties
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
+    this.appProperties = appProperties;
   }
 
   public Specification<TransactionErpEntity> fromQuery(ListQueryDto<ConciliationWaitingModelFilter> query) {
@@ -83,6 +87,7 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
     spec = spec.and(Specification.not(inCodes("statusTransaction", List.of(StatusTransactionEnum.DELETED), StatusTransactionEnum::getCode)));
     spec = spec.and(inCodes("statusTransactionReason",
       List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ), StatusTransactionReasonEnum::getCode));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
 
     return spec;
   }

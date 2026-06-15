@@ -1,5 +1,6 @@
 package com.cardsync.domain.filter;
 
+import com.cardsync.domain.model.enums.AcquirerFileTypeEnum;
 import com.cardsync.domain.model.enums.FileGroupEnum;
 import com.cardsync.domain.model.enums.NoFileDayTypeEnum;
 import com.cardsync.domain.model.enums.StatusEnum;
@@ -18,8 +19,9 @@ public record NoFileDayFilter(
   List<StatusEnum> statusEnum,
   List<FileGroupEnum> fileGroup,
   List<NoFileDayTypeEnum> dayType,
+  List<AcquirerFileTypeEnum> acquirerFileType,
 
-  List<String> banks,
+  List<String> bankingDomiciles,
   List<String> companies,
   List<String> acquirers
 ) {

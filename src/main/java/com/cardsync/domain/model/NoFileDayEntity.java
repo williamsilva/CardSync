@@ -1,5 +1,6 @@
 package com.cardsync.domain.model;
 
+import com.cardsync.domain.model.enums.AcquirerFileTypeEnum;
 import com.cardsync.domain.model.enums.FileGroupEnum;
 import com.cardsync.domain.model.enums.NoFileDayTypeEnum;
 import com.cardsync.domain.model.enums.StatusEnum;
@@ -42,12 +43,12 @@ public class NoFileDayEntity extends AuditableEntityBase {
   private String fileGroup;
 
   /**
-   * Quando o grupo é BANK, indica o banco específico que não terá arquivo.
-   * Nulo = todos os bancos do dia.
+   * Quando o grupo é BANK, indica o domicílio bancário específico que não terá arquivo.
+   * Nulo = todos os domicílios bancários do dia.
    */
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "bank_id")
-  private BankEntity bank;
+  @JoinColumn(name = "banking_domicile_id")
+  private BankingDomicileEntity bankingDomicile;
 
   /**
    * Quando o grupo é ADQ, indica a adquirente específica que não terá arquivo.
@@ -56,6 +57,13 @@ public class NoFileDayEntity extends AuditableEntityBase {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "acquirer_id")
   private AcquirerEntity acquirer;
+
+  /**
+   * Tipo de arquivo da adquirente que não será recebido no dia.
+   * Obrigatório para registros do grupo ADQ.
+   */
+  @Column(name = "acquirer_file_type", length = 20)
+  private String acquirerFileType;
 
   @Column(name = "status", nullable = false)
   private Integer status = StatusEnum.ACTIVE.getCode();
@@ -78,6 +86,15 @@ public class NoFileDayEntity extends AuditableEntityBase {
 
   public void setFileGroup(FileGroupEnum group) {
     this.fileGroup = group != null ? group.name() : null;
+  }
+
+
+  public AcquirerFileTypeEnum getAcquirerFileType() {
+    return acquirerFileType != null ? AcquirerFileTypeEnum.valueOf(acquirerFileType) : null;
+  }
+
+  public void setAcquirerFileType(AcquirerFileTypeEnum type) {
+    this.acquirerFileType = type != null ? type.name() : null;
   }
 
   public StatusEnum getStatus() {

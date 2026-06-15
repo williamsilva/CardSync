@@ -1,6 +1,6 @@
 package com.cardsync.domain.service;
 
-import com.cardsync.bff.controller.v1.representation.model.holiday.HolidayRequestModel;
+import com.cardsync.bff.controller.v1.representation.input.HolidayInput;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.HolidayFilter;
@@ -45,7 +45,7 @@ public class HolidayService {
   }
 
   @Transactional
-  public HolidayEntity create(HolidayRequestModel request) {
+  public HolidayEntity create(HolidayInput request) {
     holidayRepository.findByHolidayDate(request.holidayDate()).ifPresent(existing -> {
       throw BusinessException.conflict(ErrorCode.BUSINESS_ERROR,
         "Já existe um feriado cadastrado para " + request.holidayDate());
@@ -57,7 +57,7 @@ public class HolidayService {
   }
 
   @Transactional
-  public HolidayEntity update(UUID id, HolidayRequestModel request) {
+  public HolidayEntity update(UUID id, HolidayInput request) {
     HolidayEntity entity = load(id);
 
     holidayRepository.findByHolidayDate(request.holidayDate())
@@ -208,7 +208,7 @@ public class HolidayService {
       ));
   }
 
-  private void apply(HolidayEntity entity, HolidayRequestModel request) {
+  private void apply(HolidayEntity entity, HolidayInput request) {
     entity.setHolidayDate(request.holidayDate());
     entity.setName(request.name().trim());
     entity.setStatus(request.status() != null ? request.status() : StatusEnum.ACTIVE);

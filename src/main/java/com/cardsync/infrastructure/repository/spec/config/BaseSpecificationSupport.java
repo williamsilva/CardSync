@@ -917,7 +917,7 @@ public abstract class BaseSpecificationSupport<T> {
     );
   }
 
-  private Specification<T> dateJoinGreaterThanOrEqual(
+  protected Specification<T> dateJoinGreaterThanOrEqual(
     String joinField, String dateField, LocalDate value, boolean nullableField) {
     OffsetDateTime start = dateFilterService.startOfBusinessDay(value);
 

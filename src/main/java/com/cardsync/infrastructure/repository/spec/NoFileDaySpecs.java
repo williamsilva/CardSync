@@ -64,8 +64,11 @@ public class NoFileDaySpecs extends BaseSpecificationSupport<NoFileDayEntity> {
   private Specification<NoFileDayEntity> fetchListAssociations() {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
-        fetchIfNotFetched(root, "bank");
         fetchIfNotFetched(root, "acquirer");
+
+        var bankingDomicile = fetchIfNotFetched(root, "bankingDomicile");
+        fetchIfNotFetched(bankingDomicile, "bank");
+        fetchIfNotFetched(bankingDomicile, "company");
 
         query.distinct(true);
       }
@@ -76,7 +79,7 @@ public class NoFileDaySpecs extends BaseSpecificationSupport<NoFileDayEntity> {
   // ─── ordenação declarativa ─────────────────────────────────────────────────
   private Specification<NoFileDayEntity> orderByTableSort(List<SortDto> sort) {
     return tableSort(sort, "noFileDate", Map.of(
-      "bank",     sortJoin("bank", "name"),
+      "bankingDomicile", sortJoin("bankingDomicile", "agency"),
       "acquirer",     sortJoin("acquirer", "fantasyName")
     ));
   }

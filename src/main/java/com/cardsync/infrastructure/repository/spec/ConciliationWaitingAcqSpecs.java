@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -28,17 +29,20 @@ public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<Transa
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingAcqTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields;
+  private final CardsyncAppProperties appProperties;
 
   public ConciliationWaitingAcqSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     ConciliationWaitingAcqTableFields conciliationWaitingTableFields,
-    ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields
+    ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields,
+    CardsyncAppProperties appProperties
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
+    this.appProperties = appProperties;
   }
 
   public Specification<TransactionAcqEntity> fromQuery(ListQueryDto<ConciliationWaitingModelFilter> query) {
@@ -73,6 +77,7 @@ public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<Transa
     spec = spec.and(Specification.not(
       inCodes("modality", getModalityEnum(), ModalityEnum::getCode)
     ));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
 
     return spec;
   }

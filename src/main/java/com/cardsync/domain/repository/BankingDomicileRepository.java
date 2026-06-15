@@ -1,6 +1,7 @@
 package com.cardsync.domain.repository;
 
 import com.cardsync.domain.model.BankingDomicileEntity;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -14,6 +15,14 @@ import java.util.UUID;
 
 @Repository
 public interface BankingDomicileRepository extends JpaRepository<BankingDomicileEntity, UUID>, JpaSpecificationExecutor<BankingDomicileEntity> {
+
+  @Override
+  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "bank"})
+  List<BankingDomicileEntity> findAll(Sort sort);
+
+  @Override
+  @EntityGraph(attributePaths = {"bank", "company"})
+  Optional<BankingDomicileEntity> findById(UUID id);
 
   /**
    * Carrega os domicílios com o banco para a montagem do calendário de arquivos.
@@ -95,4 +104,5 @@ public interface BankingDomicileRepository extends JpaRepository<BankingDomicile
     String accountDigit,
     UUID companyId
   );
+
 }

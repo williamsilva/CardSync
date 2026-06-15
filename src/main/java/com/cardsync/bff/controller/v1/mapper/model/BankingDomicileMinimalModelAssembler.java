@@ -3,7 +3,7 @@ package com.cardsync.bff.controller.v1.mapper.model;
 import com.cardsync.bff.controller.v1.BankingDomicileController;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
-import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileModel;
+import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileMinimalModel;
 import com.cardsync.domain.model.BankEntity;
 import com.cardsync.domain.model.BankingDomicileEntity;
 import com.cardsync.domain.model.CompanyEntity;
@@ -11,25 +11,19 @@ import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSuppor
 import org.springframework.stereotype.Component;
 
 @Component
-public class BankingDomicileModelAssembler extends RepresentationModelAssemblerSupport<BankingDomicileEntity, BankingDomicileModel> {
+public class BankingDomicileMinimalModelAssembler extends RepresentationModelAssemblerSupport<BankingDomicileEntity, BankingDomicileMinimalModel> {
 
-  public BankingDomicileModelAssembler() {
-    super(BankingDomicileController.class, BankingDomicileModel.class);
+  public BankingDomicileMinimalModelAssembler() {
+    super(BankingDomicileController.class, BankingDomicileMinimalModel.class);
   }
 
   @Override
-  public BankingDomicileModel toModel(BankingDomicileEntity entity) {
-    BankingDomicileModel model = createModelWithId(entity.getId(), entity);
+  public BankingDomicileMinimalModel toModel(BankingDomicileEntity entity) {
+    BankingDomicileMinimalModel model = createModelWithId(entity.getId(), entity);
 
     model.setId(entity.getId());
-    model.setStatus(entity.getStatus());
     model.setStatusDate(entity.getStatusDate());
-    model.setAccountOpeningDate(entity.getAccountOpeningDate());
-    model.setAccountClosingDate(entity.getAccountClosingDate());
-    model.setExpectsFile(entity.getExpectsFile());
     model.setAgency(entity.getAgency());
-    model.setCreatedAt(entity.getCreatedAt());
-    model.setUpdatedAt(entity.getUpdatedAt());
     model.setAgencyDigit(entity.getAgencyDigit());
     model.setAccountDigit(entity.getAccountDigit());
     model.setCurrentAccount(entity.getCurrentAccount());
