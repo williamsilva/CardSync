@@ -2,6 +2,9 @@ package com.cardsync.infrastructure.repository.spec.advancedFilters;
 
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
@@ -16,10 +19,14 @@ public class SaleSummaryAdvancedFields extends BaseSpecificationSupport<SalesSum
   }
 
   public Specification<SalesSummaryEntity> advanced(SaleSummaryFilter filter) {
-    if (filter == null) {
-      return Specs.all();
-    }
     Specification<SalesSummaryEntity> spec = Specs.all();
+    if (filter == null) {
+      return spec;
+    }
+
+    spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
+    spec = spec.and(inCodes("transactionsStatus", filter.transactionsStatus(), StatusTransactionEnum::getCode));
+    spec = spec.and(inCodes("creditOrderStatus", filter.creditOrderStatus(), StatusReconciliationEnum::getCode));
 
     spec = spec.and(inPath(filter.flags(), SaleSummaryAdvancedFields::parseUuidOrNull,"flag", "id"));
     spec = spec.and(inPath(filter.companies(), SaleSummaryAdvancedFields::parseUuidOrNull,"company", "id"));

@@ -4,6 +4,7 @@ import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
 import com.cardsync.domain.model.ReleasesBankEntity;
+import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.ReleasesBankAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
@@ -58,6 +59,8 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       );
 
       spec = spec.and(releasesBankAdvancedFields.advanced(query.advanced()));
+      spec = spec.and(inCodes("modalityPaymentBank", getAdjustmentCodes(), ModalityPaymentBankEnum::getCode)
+      );
     }
 
     return spec;
@@ -79,5 +82,14 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       "company",          sortJoin("company", "fantasyName"),
       "acquirer",         sortJoin("acquirer", "fantasyName")
     ));
+  }
+
+  private static List<ModalityPaymentBankEnum> getAdjustmentCodes() {
+    return List.of(
+      ModalityPaymentBankEnum.CASH_DEBIT,
+      ModalityPaymentBankEnum.CASH_CREDIT,
+      ModalityPaymentBankEnum.ANTECIP_CRED
+      //ModalityPaymentBankEnum.PIX_REC
+    );
   }
 }

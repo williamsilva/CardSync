@@ -43,7 +43,7 @@ public class BankReleaseQueryService {
       entity.getAccountingDate(),
       entity.getReleaseValue(),
       entity.getReconciliationStatus(),
-      entity.getModalityPaymentBank(),
+      entity.getModalityPaymentBank().getCode(),
       entity.getHistoricalCodeBank(),
       entity.getReleaseCategoryCode(),
       entity.getDescriptionHistoricalBank(),

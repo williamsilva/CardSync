@@ -9,6 +9,7 @@ import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
@@ -517,12 +518,12 @@ public class BankReconciliationService {
 
     if (allLiquidated) {
       transaction.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
-      transaction.setStatusTransaction(StatusReconciliationEnum.RECONCILED);
+      transaction.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED);
     } else if (anyLiquidated) {
       transaction.setStatusPaymentBank(StatusPaymentBankEnum.DIVERGENT);
     } else {
       transaction.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
-      transaction.setStatusTransaction(StatusReconciliationEnum.PENDING);
+      transaction.setStatusTransaction(StatusTransactionEnum.PENDING);
     }
 
     updateSalesSummaryFromTransaction(transaction);
@@ -532,7 +533,7 @@ public class BankReconciliationService {
     SalesSummaryEntity summary = transaction.getSalesSummary();
     if (summary == null) return;
     summary.setStatusPaymentBank(transaction.getStatusPaymentBank());
-    summary.setTransactionsStatus(transaction.getStatusTransaction());
+    summary.setTransactionsStatus(StatusTransactionEnum.fromCode(StatusTransactionEnum.toCode(transaction.getStatusTransaction())));
   }
 
   private void updateSalesSummaryFromCreditOrder(CreditOrderEntity order) {
@@ -566,7 +567,7 @@ public class BankReconciliationService {
       idOrNull(release.getAcquirer()),
       idOrNull(release.getEstablishment()),
       idOrNull(release.getFlag()),
-      paymentKindFromBank(release.getModalityPaymentBank(), release.getDescriptionHistoricalBank(),
+      paymentKindFromBank(release.getModalityPaymentBank().getCode(), release.getDescriptionHistoricalBank(),
         release.getComplementRelease(), release.getDocumentComplementNumber())
     );
   }

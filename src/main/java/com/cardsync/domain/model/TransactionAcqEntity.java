@@ -2,7 +2,8 @@ package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
-import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -99,11 +100,27 @@ public class TransactionAcqEntity extends AuditableEntityBase {
     this.statusPaymentBank = (statusPaymentBank!=null ? statusPaymentBank:StatusPaymentBankEnum.NULL).getCode();
   }
 
-  public StatusReconciliationEnum getStatusTransaction() {
-    return StatusReconciliationEnum.fromCode(statusTransaction);
+  public StatusTransactionEnum getStatusTransaction() {
+    return StatusTransactionEnum.fromCode(statusTransaction);
   }
 
-  public void setStatusTransaction(StatusReconciliationEnum statusTransaction) {
-    this.statusTransaction = Optional.ofNullable(statusTransaction).orElse(StatusReconciliationEnum.NULL).getCode();
+  public void setStatusTransaction(StatusTransactionEnum statusTransaction) {
+    this.statusTransaction = Optional.ofNullable(statusTransaction).orElse(StatusTransactionEnum.NULL).getCode();
+  }
+
+  public StatusTransactionReasonEnum getStatusTransactionReason() {
+    return StatusTransactionReasonEnum.fromCode(statusTransactionReason);
+  }
+
+  public void setStatusTransactionReason(StatusTransactionReasonEnum statusTransactionReason) {
+    this.statusTransactionReason = StatusTransactionReasonEnum.toCode(statusTransactionReason);
+  }
+
+  public FeeReconciliationStatusEnum getFeeReconciliationStatus() {
+    return FeeReconciliationStatusEnum.fromCode(feeReconciliationStatus);
+  }
+
+  public void setFeeReconciliationStatus(FeeReconciliationStatusEnum feeReconciliationStatus) {
+    this.feeReconciliationStatus = FeeReconciliationStatusEnum.toCode(feeReconciliationStatus);
   }
 }

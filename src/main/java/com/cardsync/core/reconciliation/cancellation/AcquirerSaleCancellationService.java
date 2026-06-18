@@ -37,11 +37,11 @@ public class AcquirerSaleCancellationService {
 
   private static final int BATCH_SIZE = 1_000;
 
+  private final EntityManager entityManager;
   private final FileProcessingProperties properties;
   private final AdjustmentRepository adjustmentRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
-  private final EntityManager entityManager;
 
   /**
    * Cancela vendas quando a adquirente informa cancelamento total via ajuste financeiro.
@@ -148,7 +148,7 @@ public class AcquirerSaleCancellationService {
 
       TransactionErpEntity erp = erpByAcquirerId.get(acq.getId());
       boolean acqAlreadyCanceled = isCanceled(acq.getStatusTransaction().getCode());
-      boolean erpAlreadyCanceled = erp == null || isCanceled(erp.getStatusTransaction());
+      boolean erpAlreadyCanceled = erp == null || isCanceled(StatusTransactionEnum.toCode(erp.getStatusTransaction()));
 
       if (!reprocess && acqAlreadyCanceled && erpAlreadyCanceled) {
         result.skippedAlreadyCanceled++;
@@ -247,10 +247,10 @@ public class AcquirerSaleCancellationService {
     }
 
     boolean changed = false;
-    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, StatusReconciliationEnum.CANCELED);
+    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, StatusTransactionEnum.CANCELED);
     changed |= setIfDifferent(acq::getStatusTransactionReason, acq::setStatusTransactionReason, reasonCode(cancellationReason));
     changed |= setIfDifferent(acq::getStatusPaymentBank, acq::setStatusPaymentBank, StatusPaymentBankEnum.CANCELED);
-    changed |= setIfDifferent(acq::getFeeReconciliationStatus, acq::setFeeReconciliationStatus, FeeReconciliationStatusEnum.RECONCILED.getCode());
+    changed |= setIfDifferent(acq::getFeeReconciliationStatus, acq::setFeeReconciliationStatus, FeeReconciliationStatusEnum.RECONCILED);
     changed |= setIfDifferent(acq::getCanceledDate, acq::setCanceledDate, cancellationDate);
     changed |= setIfDifferent(acq::getSaleReconciliationDate, acq::setSaleReconciliationDate, reconciliationDate);
 
@@ -270,14 +270,14 @@ public class AcquirerSaleCancellationService {
     OffsetDateTime reconciliationDate,
     boolean reprocess
   ) {
-    if (!reprocess && isCanceled(erp.getStatusTransaction())) {
+    if (!reprocess && isCanceled(StatusTransactionEnum.toCode(erp.getStatusTransaction()))) {
       return false;
     }
 
     boolean changed = false;
-    changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, StatusTransactionEnum.CANCELED.getCode());
+    changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, StatusTransactionEnum.CANCELED);
     changed |= setIfDifferent(erp::getStatusTransactionReason, erp::setStatusTransactionReason, reasonCode(cancellationReason));
-    changed |= setIfDifferent(erp::getFeeReconciliationStatus, erp::setFeeReconciliationStatus, FeeReconciliationStatusEnum.RECONCILED.getCode());
+    changed |= setIfDifferent(erp::getFeeReconciliationStatus, erp::setFeeReconciliationStatus, FeeReconciliationStatusEnum.RECONCILED);
     changed |= setIfDifferent(erp::getCanceledDate, erp::setCanceledDate, cancellationDate);
     changed |= setIfDifferent(erp::getSaleReconciliationDate, erp::setSaleReconciliationDate, reconciliationDate);
 
@@ -382,8 +382,8 @@ public class AcquirerSaleCancellationService {
     return StatusTransactionReasonEnum.CANCEL_VENDAS;
   }
 
-  private Integer reasonCode(StatusTransactionReasonEnum reason) {
-    return firstNonNull(reason, StatusTransactionReasonEnum.CANCEL_VENDAS).getCode();
+  private StatusTransactionReasonEnum reasonCode(StatusTransactionReasonEnum reason) {
+    return firstNonNull(reason, StatusTransactionReasonEnum.CANCEL_VENDAS);
   }
 
   private String normalizeText(String value) {

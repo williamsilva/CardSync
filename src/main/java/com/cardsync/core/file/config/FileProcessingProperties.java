@@ -328,6 +328,24 @@ public class FileProcessingProperties {
     private boolean reprocessAcquirerSaleCancellations = false;
 
     /**
+     * Por padrão, a conciliação de taxas ERP x adquirente ignora transações já processadas.
+     * Ative apenas quando precisar reprocessar/corrigir taxas de conciliações antigas.
+     */
+    private boolean reprocessErpAcquirerFees = false;
+
+    /**
+     * Por padrão, a conciliação Venda ADQ x resumo ignora resumos já conciliados.
+     * Ative apenas quando precisar reprocessar/corrigir resumos de vendas.
+     */
+    private boolean reprocessAcquirerSaleSummary = false;
+
+    /**
+     * Por padrão, a conciliação Resumo x ordem de crédito ignora resumos já conciliados.
+     * Ative apenas quando precisar reprocessar/corrigir ordens de crédito vinculadas.
+     */
+    private boolean reprocessSalesSummaryCreditOrder = false;
+
+    /**
      * Modo legado da conciliação Banco x adquirente.
      * A execução automática atual é dirigida exclusivamente pelas ordens de crédito elegíveis.
      */

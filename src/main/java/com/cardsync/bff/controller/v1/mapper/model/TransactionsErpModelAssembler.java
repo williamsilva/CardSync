@@ -15,6 +15,8 @@ import com.cardsync.domain.model.InstallmentErpEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -58,9 +60,9 @@ public class TransactionsErpModelAssembler extends RepresentationModelAssemblerS
     model.setDiscountValue(entity.getDiscountValue());
     model.setAuthorization(entity.getAuthorization());
     model.setAdjustmentValue(getAdjustmentValue(entity));
-    model.setStatusTransaction(entity.getStatusTransaction());
+    model.setStatusTransaction(StatusTransactionEnum.toCode(entity.getStatusTransaction()));
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
-    model.setStatusTransactionReason(entity.getStatusTransactionReason());
+    model.setStatusTransactionReason(StatusTransactionReasonEnum.toCode(entity.getStatusTransactionReason()));
     model.setMissingContractAtSale(entity.getMissingContractAtSale());
     model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
     model.setInstallments(installments.stream()

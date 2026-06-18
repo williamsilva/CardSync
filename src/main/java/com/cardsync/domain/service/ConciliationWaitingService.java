@@ -125,16 +125,16 @@ public class ConciliationWaitingService {
     erp.setCommercialStatus(ErpCommercialStatusEnum.OK);
     erp.setCommercialStatusMessage(null);
     erp.setSaleReconciliationDate(now);
-    erp.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode());
-    erp.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED.getCode());
+    erp.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED);
+    erp.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED);
     erp.setObservations(appendObservation(
       erp.getObservations(),
       "Venda ERP criada automaticamente a partir da venda da adquirente " + acq.getId()
     ));
 
     acq.setSaleReconciliationDate(now);
-    acq.setStatusTransaction(StatusReconciliationEnum.RECONCILED);
-    acq.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED.getCode());
+    acq.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED);
+    acq.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED);
 
     copyAcquirerInstallmentsToErp(erp, acq);
 
@@ -211,8 +211,8 @@ public class ConciliationWaitingService {
     OffsetDateTime now = OffsetDateTime.now();
 
     erp.setDeletedDate(now);
-    erp.setStatusTransaction(StatusTransactionEnum.DELETED.getCode());
-    erp.setStatusTransactionReason(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ.getCode());
+    erp.setStatusTransaction(StatusTransactionEnum.DELETED);
+    erp.setStatusTransactionReason(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ);
     erp.setReasonExclusionStatus(resolveExclusionReason(reason).getCode());
     erp.setObservations(appendObservation(
       erp.getObservations(),
@@ -336,7 +336,7 @@ public class ConciliationWaitingService {
       return Optional.empty();
     }
 
-    StatusTransactionReasonEnum reason = statusReasonOrNull(erp.getStatusTransactionReason());
+    StatusTransactionReasonEnum reason = statusReasonOrNull(erp.getStatusTransactionReason().getCode());
     UUID acquirerId = shouldFilterAcquirer(reason) && erp.getAcquirer() != null
       ? erp.getAcquirer().getId()
       : null;

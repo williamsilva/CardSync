@@ -16,7 +16,6 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
-import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.domain.repository.TransactionAcqRepository;
@@ -106,12 +105,12 @@ public class ErpAcquirerResolutionService {
 
     erp.setTransactionAcq(acq);
     erp.setSaleReconciliationDate(now);
-    erp.setStatusTransaction(StatusTransactionEnum.MANUALLY_RECONCILED.getCode());
-    erp.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED.getCode());
+    erp.setStatusTransaction(StatusTransactionEnum.MANUALLY_RECONCILED);
+    erp.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED);
 
     acq.setSaleReconciliationDate(now);
-    acq.setStatusTransaction(StatusReconciliationEnum.PENDING);
-    acq.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED.getCode());
+    acq.setStatusTransaction(StatusTransactionEnum.PENDING);
+    acq.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED);
 
     erp.setCommercialStatus(ErpCommercialStatusEnum.OK);
     erp.setCommercialStatusMessage(null);

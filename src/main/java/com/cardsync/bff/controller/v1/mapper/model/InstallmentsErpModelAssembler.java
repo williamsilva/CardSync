@@ -19,6 +19,8 @@ import com.cardsync.domain.model.FlagEntity;
 import com.cardsync.domain.model.InstallmentErpEntity;
 import com.cardsync.domain.model.ProcessedFileEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -61,9 +63,9 @@ public class InstallmentsErpModelAssembler extends RepresentationModelAssemblerS
           .cardNumber(transaction.getCardNumber())
           .installment(transaction.getInstallment())
           .authorization(transaction.getAuthorization())
-          .statusTransaction(transaction.getStatusTransaction())
+          .statusTransaction(StatusTransactionEnum.toCode(transaction.getStatusTransaction()))
           .saleReconciliationDate(transaction.getSaleReconciliationDate())
-          .statusTransactionReason(transaction.getStatusTransactionReason())
+          .statusTransactionReason(StatusTransactionReasonEnum.toCode(transaction.getStatusTransactionReason()))
           .missingContractAtSale(transaction.getMissingContractAtSale())
           .capture(transaction.getCapture() == null ? null : transaction.getCapture())
           .modality(transaction.getModality() == null ? null : transaction.getModality())

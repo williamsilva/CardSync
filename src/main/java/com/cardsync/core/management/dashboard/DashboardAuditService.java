@@ -10,6 +10,8 @@ import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.criteria.*;
@@ -25,11 +27,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * Auditoria do dashboard: vendas (TransactionAcq) consolidadas por dia.
@@ -48,11 +46,11 @@ public class DashboardAuditService {
   private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
   private final EntityManager entityManager;
+  private final com.cardsync.core.config.CardsyncAppProperties appProperties;
   private final com.cardsync.domain.repository.AcquirerRepository acquirerRepository;
   private final com.cardsync.infrastructure.repository.spec.config.DateFilterService dateFilterService;
   private final com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs conciliationWaitingErpSpecs;
   private final com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs conciliationWaitingAcqSpecs;
-  private final com.cardsync.core.config.CardsyncAppProperties appProperties;
 
   @Transactional(readOnly = true)
   public AuditSalesSummaryModel salesSummary() {
@@ -64,24 +62,36 @@ public class DashboardAuditService {
       allDays.add(today.minusDays(i)); // do mais recente para o mais antigo
     }
 
+    String offset = currentBusinessOffset();
+
     LocalDate minDay = today.minusDays(DAYS - 1L);
     LocalDate implantationDate = appProperties.getImplantationDate();
     LocalDate effectiveMin = minDay.isBefore(implantationDate) ? implantationDate : minDay;
     OffsetDateTime start = effectiveMin.atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime end = today.atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
 
+    List<Integer> excludedStatuses = List.of(
+      StatusTransactionEnum.DELETED.getCode(),
+      StatusTransactionEnum.CANCELED.getCode()
+    );
+
     Query q = entityManager.createQuery(
-      "select function('date', t.saleDate) as dia, " +
+      "select function('date', function('CONVERT_TZ', t.saleDate, '+00:00', :offset)) as dia, " +
         "       t.acquirer.fantasyName as adquirente, " +
         "       coalesce(sum(t.grossValue),0), " +
         "       count(t.id) " +
         "  from TransactionAcqEntity t " +
         " where t.saleDate >= :start and t.saleDate <= :end " +
-        " group by function('date', t.saleDate), t.acquirer.fantasyName " +
-        " order by function('date', t.saleDate) desc, t.acquirer.fantasyName asc"
+        "   and (t.statusTransaction is null or t.statusTransaction not in :excludedStatuses) " +
+        "   and (t.modality is null or t.modality <> :excludedModality) " +
+        " group by function('date', function('CONVERT_TZ', t.saleDate, '+00:00', :offset)), t.acquirer.fantasyName " +
+        " order by function('date', function('CONVERT_TZ', t.saleDate, '+00:00', :offset)) desc, t.acquirer.fantasyName asc"
     );
     q.setParameter("start", start);
     q.setParameter("end", end);
+    q.setParameter("offset", offset);
+    q.setParameter("excludedStatuses", excludedStatuses);
+    q.setParameter("excludedModality", ModalityEnum.DIGITAL_WALLET.getCode());
 
     List<Object[]> rows = q.getResultList();
 
@@ -121,11 +131,6 @@ public class DashboardAuditService {
     return new AuditSalesSummaryModel(summary, acquirerDetails);
   }
 
-  @Transactional(readOnly = true)
-  public AuditUnreconciledModel unreconciled() {
-    return unreconciled(null);
-  }
-
   /**
    * Reaproveita os MESMOS specs das telas /missing-acquirer e /missing-erp
    * ({@code fromQueryForTotals} = baseFilters), garantindo que a regra de "não
@@ -150,9 +155,15 @@ public class DashboardAuditService {
     // Acumula por adquirente -> (dia -> contadores).
     Map<UUID, AcquirerAccumulator> byAcquirer = new LinkedHashMap<>();
 
-    // Semeia com TODAS as adquirentes cadastradas, para que as sem pendência
-    // apareçam zeradas (count = 0, details = []).
-    for (var acquirer : acquirerRepository.findAll()) {
+    // Semeia com as adquirentes relevantes.
+    // Se o filtro especificar adquirentes, semeia apenas elas; caso contrário, semeia todas
+    // para que as sem pendência apareçam zeradas (count = 0, details = []).
+    List<UUID> filteredAcquirerIds = filteredAcquirerIds(query);
+    List<com.cardsync.domain.model.AcquirerEntity> acquirersToSeed = filteredAcquirerIds.isEmpty()
+      ? acquirerRepository.findAll()
+      : acquirerRepository.findAllById(filteredAcquirerIds);
+
+    for (var acquirer : acquirersToSeed) {
       if (acquirer.getId() != null) {
         byAcquirer.put(
           acquirer.getId(),
@@ -220,6 +231,17 @@ public class DashboardAuditService {
     private long erpAcq = 0;
     private long onlyInErp = 0;
     private long onlyInAcquirer = 0;
+  }
+
+  private List<UUID> filteredAcquirerIds(ListQueryDto<ConciliationWaitingModelFilter> query) {
+    if (query == null || query.advanced() == null) return List.of();
+    List<String> acquirers = query.advanced().acquirers();
+    if (acquirers == null || acquirers.isEmpty()) return List.of();
+    return acquirers.stream()
+      .filter(s -> s != null && !s.isBlank())
+      .map(s -> { try { return UUID.fromString(s); } catch (IllegalArgumentException e) { return null; } })
+      .filter(Objects::nonNull)
+      .toList();
   }
 
   /**

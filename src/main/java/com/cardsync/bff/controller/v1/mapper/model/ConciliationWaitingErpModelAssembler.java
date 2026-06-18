@@ -7,6 +7,7 @@ import com.cardsync.bff.controller.v1.representation.model.EstablishmentMinimalM
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ConciliationWaitingModel;
 import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,7 @@ public class ConciliationWaitingErpModelAssembler extends RepresentationModelAss
     model.setLiquidValue(entity.getLiquidValue());
     model.setInstallment(entity.getInstallment());
     model.setAuthorization(entity.getAuthorization());
-    model.setStatusTransactionReason(entity.getStatusTransactionReason());
+    model.setStatusTransactionReason(StatusTransactionReasonEnum.toCode(entity.getStatusTransactionReason()));
 
     if (entity.getAcquirer() != null) {
       model.setAcquirer(AcquirerMinimalModel.builder()

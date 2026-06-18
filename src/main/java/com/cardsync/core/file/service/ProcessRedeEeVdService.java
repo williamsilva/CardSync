@@ -249,7 +249,7 @@ public class ProcessRedeEeVdService {
     summary.setFirstInstallmentCreditDate(parseDate(col(c, 2)));
     summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
-    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
+    summary.setTransactionsStatus(StatusTransactionEnum.PENDING);
     summary.setModality(resolveSummaryModality(col(c, 9)));
     summary.setAcquirer(acquirer);
     summary.setCompany(company);
@@ -551,8 +551,8 @@ public class ProcessRedeEeVdService {
     tx.setModality(ModalityEnum.CASH_DEBIT.getCode());
     tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     tx.setStatusAudit(StatusPaymentBankEnum.PENDING.getCode());
-    tx.setStatusTransaction(StatusReconciliationEnum.PENDING);
-    tx.setStatusTransactionReason(0);
+    tx.setStatusTransaction(StatusTransactionEnum.PENDING);
+    tx.setStatusTransactionReason(StatusTransactionReasonEnum.NULL);
     tx.setTipValue(BigDecimal.ZERO);
     tx.setFlexRate(BigDecimal.ZERO);
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);

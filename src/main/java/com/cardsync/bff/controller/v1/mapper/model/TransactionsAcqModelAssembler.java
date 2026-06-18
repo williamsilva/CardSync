@@ -12,6 +12,7 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.*;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -58,7 +59,7 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
     model.setAuthorization(entity.getAuthorization());
     model.setStatusTransaction(entity.getStatusTransaction().name());
     model.setSaleReconciliationDate(entity.getSaleReconciliationDate());
-    model.setStatusTransactionReason(entity.getStatusTransactionReason());
+    model.setStatusTransactionReason(StatusTransactionReasonEnum.toCode(entity.getStatusTransactionReason()));
     model.setExpectedPaymentDate(firstInstallment == null ? null : firstInstallment.getExpectedPaymentDate());
 
     model.setInstallments(installments.stream()

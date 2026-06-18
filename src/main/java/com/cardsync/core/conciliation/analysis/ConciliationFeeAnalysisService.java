@@ -162,10 +162,10 @@ public class ConciliationFeeAnalysisService {
 
     boolean changed = false;
     if (erp != null) {
-      changed |= setIfDifferent(erp.getFeeReconciliationStatus(), status.getCode(), erp::setFeeReconciliationStatus);
+      changed |= setIfDifferent(erp.getFeeReconciliationStatus(), status, erp::setFeeReconciliationStatus);
     }
     if (acq != null) {
-      changed |= setIfDifferent(acq.getFeeReconciliationStatus(), status.getCode(), acq::setFeeReconciliationStatus);
+      changed |= setIfDifferent(acq.getFeeReconciliationStatus(), status, acq::setFeeReconciliationStatus);
     }
 
     return changed;

@@ -2,6 +2,8 @@ package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -13,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 
 @Getter
@@ -107,6 +110,30 @@ public class TransactionErpEntity extends AuditableEntityBase {
   @OrderBy("installment ASC")
   @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<InstallmentErpEntity> installments = new LinkedHashSet<>();
+
+  public StatusTransactionEnum getStatusTransaction() {
+    return StatusTransactionEnum.fromCode(statusTransaction);
+  }
+
+  public void setStatusTransaction(StatusTransactionEnum statusTransaction) {
+    this.statusTransaction = Optional.ofNullable(statusTransaction).orElse(StatusTransactionEnum.NULL).getCode();
+  }
+
+  public StatusTransactionReasonEnum getStatusTransactionReason() {
+    return StatusTransactionReasonEnum.fromCode(statusTransactionReason);
+  }
+
+  public void setStatusTransactionReason(StatusTransactionReasonEnum statusTransactionReason) {
+    this.statusTransactionReason = StatusTransactionReasonEnum.toCode(statusTransactionReason);
+  }
+
+  public FeeReconciliationStatusEnum getFeeReconciliationStatus() {
+    return FeeReconciliationStatusEnum.fromCode(feeReconciliationStatus);
+  }
+
+  public void setFeeReconciliationStatus(FeeReconciliationStatusEnum feeReconciliationStatus) {
+    this.feeReconciliationStatus = FeeReconciliationStatusEnum.toCode(feeReconciliationStatus);
+  }
 
   public void addInstallment(InstallmentErpEntity installment) {
     installments.add(installment);

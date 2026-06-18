@@ -1,5 +1,6 @@
 package com.cardsync.core.reconciliation.summary;
 
+import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
@@ -24,9 +25,8 @@ public class AcquirerSaleSummaryReconciliationService {
   private static final int UPDATE_BATCH_SIZE = 1_000;
 
   private static final List<Integer> PENDING_SUMMARY_TRANSACTION_STATUSES = List.of(
-    StatusTransactionEnum.PENDING.getCode(),
-    StatusTransactionEnum.PARTIALLY_RECONCILED.getCode(),
-    StatusTransactionEnum.NOT_RECONCILED.getCode()
+    StatusReconciliationEnum.PENDING.getCode(),
+    StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode()
   );
 
   private static final List<Integer> ELIGIBLE_SALE_STATUSES = List.of(
@@ -41,11 +41,12 @@ public class AcquirerSaleSummaryReconciliationService {
     FeeReconciliationStatusEnum.MISSING_VALID_CONTRACT.getCode()
   );
 
+  private final FileProcessingProperties properties;
   private final SalesSummaryRepository salesSummaryRepository;
 
   /**
    * Etapa 3 - Venda ADQ x resumo.
-   *
+
    * Versão otimizada:
    * - antes: buscava os summaries e depois fazia 1 consulta por summary para carregar transações;
    * - agora: o banco calcula total/elegíveis por SalesSummary em uma única consulta agregada;
@@ -55,17 +56,21 @@ public class AcquirerSaleSummaryReconciliationService {
   public AcquirerSaleSummaryReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
+    boolean reprocess = properties.getReconciliation().isReprocessAcquirerSaleSummary();
+
     log.info(
-      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, pendingSummaryStatuses={}, eligibleSaleStatuses={}, eligibleFeeStatuses={}, updateBatchSize={}",
+      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, pendingSummaryStatuses={}, eligibleSaleStatuses={}, eligibleFeeStatuses={}, updateBatchSize={}, reprocess={}",
       trigger,
       PENDING_SUMMARY_TRANSACTION_STATUSES,
       ELIGIBLE_SALE_STATUSES,
       ELIGIBLE_FEE_STATUSES,
-      UPDATE_BATCH_SIZE
+      UPDATE_BATCH_SIZE,
+      reprocess
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
     List<AcquirerSaleSummaryStats> stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(
+      reprocess,
       PENDING_SUMMARY_TRANSACTION_STATUSES,
       ELIGIBLE_SALE_STATUSES,
       ELIGIBLE_FEE_STATUSES

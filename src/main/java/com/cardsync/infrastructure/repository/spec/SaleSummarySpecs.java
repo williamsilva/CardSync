@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -19,17 +20,20 @@ import java.util.Map;
 @Component
 public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final SaleSummaryTableFields saleSummaryTableFields;
   private final SaleSummaryAdvancedFields saleSummaryAdvancedFields;
 
   public SaleSummarySpecs(
     DateFilterService dateFilterService,
+    CardsyncAppProperties appProperties,
     SpecificationFactory specificationFactory,
     SaleSummaryTableFields saleSummaryTableFields,
     SaleSummaryAdvancedFields saleSummaryAdvancedFields
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.saleSummaryTableFields = saleSummaryTableFields;
     this.saleSummaryAdvancedFields = saleSummaryAdvancedFields;
@@ -60,6 +64,7 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
       spec = spec.and(saleSummaryAdvancedFields.advanced(query.advanced()));
     }
 
+    spec = spec.and(dateGreaterThanOrEqual("rvDate", appProperties.getImplantationDate(), false));
     return spec;
   }
 
@@ -80,10 +85,10 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
 
   private Specification<SalesSummaryEntity> orderByTableSort(List<SortDto> sort) {
     return tableSort(sort, "pvNumber", Map.of(
+      "flag",             sortJoin("flag", "name"),
       "conciliationDate", sortField("saleReconciliationDate"),
       "company",          sortJoin("company", "fantasyName"),
       "acquirer",         sortJoin("acquirer", "fantasyName"),
-      "flag",             sortJoin("flag", "name"),
       "adjustmentValue",  sortJoin("adjustment", "adjustmentValue")
     ));
   }

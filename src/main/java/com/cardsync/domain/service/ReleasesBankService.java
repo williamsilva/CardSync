@@ -1,7 +1,7 @@
 package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.mapper.model.ReleasesBankModelAssembler;
-import com.cardsync.bff.controller.v1.representation.model.transactions.ReleasesBankModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;

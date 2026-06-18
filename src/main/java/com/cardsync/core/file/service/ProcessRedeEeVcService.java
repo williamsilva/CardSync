@@ -160,6 +160,18 @@ public class ProcessRedeEeVcService {
         collector.addProcessedFileErrors(processedFile, "REDE_EEVC_MONETARY_OUT_OF_RANGE");
       }
 
+      ensureSalesSummariesBankingDomicile(summaries);
+
+      int alreadyPersisted = removeAlreadyPersisted(transactions);
+      if (alreadyPersisted > 0) {
+        ignored += alreadyPersisted;
+        log.info(
+          "ℹ Rede EEVC: {} transação(ões) já existente(s) no banco ignorada(s) (reprocessamento) no arquivo {}",
+          alreadyPersisted,
+          file.getFileName()
+        );
+      }
+
       processedFile.setProcessedLines(recognized);
       processedFile.setIgnoredLines(ignored);
       processedFile.setWarningLines(warnings);
@@ -181,18 +193,6 @@ public class ProcessRedeEeVcService {
           + ", avisosLayout=" + (collector == null ? 0 : collector.totalWarnings())
           + ", ids=" + countsByIdentifier
           + ", unidentified=" + unidentified);
-
-      ensureSalesSummariesBankingDomicile(summaries);
-
-      int alreadyPersisted = removeAlreadyPersisted(transactions);
-      if (alreadyPersisted > 0) {
-        ignored += alreadyPersisted;
-        log.info(
-          "ℹ Rede EEVC: {} transação(ões) já existente(s) no banco ignorada(s) (reprocessamento) no arquivo {}",
-          alreadyPersisted,
-          file.getFileName()
-        );
-      }
 
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
@@ -291,7 +291,7 @@ public class ProcessRedeEeVcService {
     summary.setLineNumber(lineNumber);
     summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
-    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
+    summary.setTransactionsStatus(StatusTransactionEnum.PENDING);
     summary.setRvNumber(FileParserUtils.extractIntegerLine(line, "12-21", lineNumber));
     summary.setBank(FileParserUtils.extractStringLine(line, "21-24", lineNumber));
     summary.setAgency(agency);
@@ -329,8 +329,8 @@ public class ProcessRedeEeVcService {
     tx.setRvNumber(rvNumber);
     tx.setStatusAudit(STATUS_PENDING);
     tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
-    tx.setStatusTransaction(StatusReconciliationEnum.PENDING);
-    tx.setStatusTransactionReason(0);
+    tx.setStatusTransaction(StatusTransactionEnum.PENDING);
+    tx.setStatusTransactionReason(StatusTransactionReasonEnum.NULL);
 
     if (layout == TransactionLayout.DOLLAR) {
       return fillDollarTransaction(tx, line, lineNumber, acquirer);
@@ -444,8 +444,8 @@ public class ProcessRedeEeVcService {
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);
     tx.setStatusAudit(STATUS_PENDING);
     tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
-    tx.setStatusTransaction(StatusReconciliationEnum.PENDING);
-    tx.setStatusTransactionReason(0);
+    tx.setStatusTransaction(StatusTransactionEnum.PENDING);
+    tx.setStatusTransactionReason(StatusTransactionReasonEnum.NULL);
     return tx;
   }
 

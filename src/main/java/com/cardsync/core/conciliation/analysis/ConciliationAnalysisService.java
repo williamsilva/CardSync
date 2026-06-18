@@ -110,9 +110,11 @@ public class ConciliationAnalysisService {
 
   @Transactional
   public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees(String trigger) {
+    boolean reprocess = fileProcessingProperties.getReconciliation().isReprocessErpAcquirerFees();
     List<Integer> reconciledStatuses = erpAcquirerReconciledStatusCodes();
     List<Integer> pendingFeeStatuses = pendingFeeReconciliationStatusCodes();
     List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerFeeReconciliation(
+      reprocess,
       reconciledStatuses,
       EXCLUDED_CARD_RECONCILIATION_MODALITY,
       pendingFeeStatuses
@@ -130,13 +132,14 @@ public class ConciliationAnalysisService {
 
     log.info(
       "📌 Iniciando conciliação de taxas ERP x Adquirente. trigger={}, totalErpPendentesTaxa={}, batchSize={}, " +
-        "totalBatches={}, statusVenda={}, statusTaxaPendente={}",
+        "totalBatches={}, statusVenda={}, statusTaxaPendente={}, reprocess={}",
       trigger,
       erpIds.size(),
       ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE,
       totalBatches,
       reconciledStatuses,
-      pendingFeeStatuses
+      pendingFeeStatuses,
+      reprocess
     );
 
     for (int start = 0; start < erpIds.size(); start += ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE) {
@@ -146,6 +149,7 @@ public class ConciliationAnalysisService {
 
       List<TransactionErpEntity> erpBatch = transactionErpRepository.findBatchForErpAcquirerFeeReconciliation(
         batchIds,
+        reprocess,
         reconciledStatuses,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         pendingFeeStatuses
@@ -262,8 +266,7 @@ public class ConciliationAnalysisService {
     List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerReconciliation(
       reconcileAlreadyReconciled,
       pendingStatuses,
-      EXCLUDED_CARD_RECONCILIATION_MODALITY,
-      StatusTransactionReasonEnum.NULL.getCode()
+      EXCLUDED_CARD_RECONCILIATION_MODALITY
     );
 
     int analyzed = 0;
@@ -672,7 +675,7 @@ public class ConciliationAnalysisService {
     StatusTransactionReasonEnum normalizedReason = normalizeReasonForStatus(status, reason);
 
     boolean changed = false;
-    changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, status.getCode());
+    changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, StatusTransactionEnum.fromCode(status.getCode()));
     changed |= setIfDifferent(erp::getStatusTransactionReason, erp::setStatusTransactionReason, reasonCode(normalizedReason));
     return changed;
   }
@@ -686,7 +689,7 @@ public class ConciliationAnalysisService {
     StatusTransactionReasonEnum normalizedReason = normalizeReasonForStatus(status, reason);
 
     boolean changed = false;
-    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, status);
+    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, StatusTransactionEnum.fromCode(status.getCode()));
     changed |= setIfDifferent(acq::getStatusTransactionReason, acq::setStatusTransactionReason, reasonCode(normalizedReason));
     return changed;
   }
@@ -731,12 +734,11 @@ public class ConciliationAnalysisService {
   }
 
   private boolean isFinalAcquirerStatusTransaction(TransactionAcqEntity acq) {
-    return isFinalStatusTransaction(acq.getStatusTransaction().getCode());
+    return isFinalStatusTransaction(acq.getStatusTransaction());
   }
 
-  private boolean isFinalStatusTransaction(Integer status) {
-    return Objects.equals(status, StatusTransactionEnum.CANCELED.getCode())
-      || Objects.equals(status, StatusTransactionEnum.DELETED.getCode());
+  private boolean isFinalStatusTransaction(StatusTransactionEnum status) {
+    return status == StatusTransactionEnum.CANCELED || status == StatusTransactionEnum.DELETED;
   }
 
   private int classifyAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses) {
@@ -748,7 +750,7 @@ public class ConciliationAnalysisService {
         PageRequest.of(0, ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE),
         reconcileAlreadyReconciled,
         pendingStatuses,
-        StatusTransactionEnum.NOT_RECONCILED.getCode(),
+        StatusTransactionEnum.PENDING.getCode(),
         StatusTransactionReasonEnum.NULL.getCode(),
         EXCLUDED_CARD_RECONCILIATION_MODALITY
       );
@@ -833,22 +835,18 @@ public class ConciliationAnalysisService {
       return false;
     }
 
-    return isPendingStatusTransaction(acq.getStatusTransaction().getCode())
+    return isPendingStatusTransaction(acq.getStatusTransaction())
       && acq.getSaleReconciliationDate() == null;
   }
 
-  private boolean isPendingStatusTransaction(Integer status) {
-    if (status == null) {
-      return true;
-    }
-
-    return Objects.equals(status, StatusTransactionEnum.NULL.getCode())
-      || Objects.equals(status, StatusTransactionEnum.PENDING.getCode())
-      || Objects.equals(status, StatusTransactionEnum.NOT_RECONCILED.getCode());
+  private boolean isPendingStatusTransaction(StatusTransactionEnum status) {
+    return status == null
+      || status == StatusTransactionEnum.NULL
+      || status == StatusTransactionEnum.PENDING;
   }
 
-  private Integer reasonCode(StatusTransactionReasonEnum reason) {
-    return reason != null ? reason.getCode() : StatusTransactionReasonEnum.NULL.getCode();
+  private StatusTransactionReasonEnum reasonCode(StatusTransactionReasonEnum reason) {
+    return reason != null ? reason : StatusTransactionReasonEnum.NULL;
   }
 
   private AdjustmentEntity resolveAcquirerAdjustment(TransactionAcqEntity acq) {
@@ -917,8 +915,7 @@ public class ConciliationAnalysisService {
   List<Integer> erpAcquirerPendingStatusCodes() {
     return List.of(
       StatusTransactionEnum.NULL.getCode(),
-      StatusTransactionEnum.PENDING.getCode(),
-      StatusTransactionEnum.NOT_RECONCILED.getCode()
+      StatusTransactionEnum.PENDING.getCode()
     );
   }
 

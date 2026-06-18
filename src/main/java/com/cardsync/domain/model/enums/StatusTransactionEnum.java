@@ -16,10 +16,8 @@ public enum StatusTransactionEnum {
   PENDING(1),
   AUTOMATICALLY_RECONCILED(2),
   MANUALLY_RECONCILED(3),
-  NOT_RECONCILED(4),
-  CANCELED(5),
-  DELETED(6),
-  PARTIALLY_RECONCILED(7);
+  DELETED(4),
+  CANCELED(5);
 
   private final int code;
 

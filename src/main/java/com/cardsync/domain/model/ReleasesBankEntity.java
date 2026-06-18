@@ -1,5 +1,7 @@
 package com.cardsync.domain.model;
 
+import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
+import com.cardsync.domain.model.enums.ReleaseCategoryEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -8,6 +10,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Getter
 @Setter
@@ -28,8 +31,8 @@ public class ReleasesBankEntity extends AuditableEntityBase {
   private Integer releaseCategoryCode;
   private Integer reconciliationStatus;
   private Integer typeComplementRelease;
-  private Integer companyRegistrationType;
   private Integer numberReconciliations;
+  private Integer companyRegistrationType;
 
   private String recordType;
   private String segmentCode;
@@ -66,4 +69,20 @@ public class ReleasesBankEntity extends AuditableEntityBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private BankingDomicileEntity bankingDomicile;
+
+  public ModalityPaymentBankEnum getModalityPaymentBank() {
+    return ModalityPaymentBankEnum.fromCode(modalityPaymentBank);
+  }
+
+  public void setModalityPaymentBank(ModalityPaymentBankEnum value) {
+    this.modalityPaymentBank = Optional.ofNullable(value).orElse(ModalityPaymentBankEnum.NULL).getCode();
+  }
+
+  public ReleaseCategoryEnum getReleaseCategory() {
+    return ReleaseCategoryEnum.fromCode(releaseCategory);
+  }
+
+  public void setReleaseCategory(ReleaseCategoryEnum value) {
+    this.releaseCategory = Optional.ofNullable(value).orElse(ReleaseCategoryEnum.NULL).getCode();
+  }
 }

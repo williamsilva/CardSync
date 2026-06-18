@@ -10,6 +10,7 @@ import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.Banki
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.*;
 import com.cardsync.domain.model.*;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -53,7 +54,7 @@ public class InstallmentsAcqModelAssembler extends RepresentationModelAssemblerS
           .authorization(transaction.getAuthorization())
           .statusTransaction(transaction.getStatusTransaction().getCode())
           .saleReconciliationDate(transaction.getSaleReconciliationDate())
-          .statusTransactionReason(transaction.getStatusTransactionReason())
+          .statusTransactionReason(StatusTransactionReasonEnum.toCode(transaction.getStatusTransactionReason()))
           .capture(transaction.getCapture() == null ? null : transaction.getCapture())
           .modality(transaction.getModality() == null ? null : transaction.getModality())
 

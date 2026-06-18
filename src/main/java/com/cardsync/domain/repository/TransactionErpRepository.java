@@ -28,16 +28,14 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
       from TransactionErpEntity e
      where (:includeAlreadyReconciled = true
             or (e.saleReconciliationDate is null
-                and (e.statusTransaction is null or e.statusTransaction in :pendingStatuses)
-                and (e.statusTransactionReason is null or e.statusTransactionReason = :nullReasonCode)))
+                and (e.statusTransaction is null or e.statusTransaction in :pendingStatuses)))
        and (e.modality is not null and e.modality <> :excludedModality)
      order by e.saleDate asc, e.id asc
   """)
   List<UUID> findIdsForErpAcquirerReconciliation(
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
-    @Param("excludedModality") Integer excludedModality,
-    @Param("nullReasonCode") Integer nullReasonCode
+    @Param("excludedModality") Integer excludedModality
   );
 
   @Query("""
@@ -105,11 +103,12 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and e.modality <> :excludedModality
        and ta.modality is not null
        and ta.modality <> :excludedModality
-       and (e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
-       and (ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
+       and (:includeAlreadyProcessed = true or e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
+       and (:includeAlreadyProcessed = true or ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
      order by e.saleDate asc, e.id asc
   """)
   List<UUID> findIdsForErpAcquirerFeeReconciliation(
+    @Param("includeAlreadyProcessed") boolean includeAlreadyProcessed,
     @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,
     @Param("excludedModality") Integer excludedModality,
     @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses
@@ -141,12 +140,13 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and e.modality <> :excludedModality
        and ta.modality is not null
        and ta.modality <> :excludedModality
-       and (e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
-       and (ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
+       and (:includeAlreadyProcessed = true or e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
+       and (:includeAlreadyProcessed = true or ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
      order by e.saleDate asc, e.id asc
   """)
   List<TransactionErpEntity> findBatchForErpAcquirerFeeReconciliation(
     @Param("ids") Collection<UUID> ids,
+    @Param("includeAlreadyProcessed") boolean includeAlreadyProcessed,
     @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,
     @Param("excludedModality") Integer excludedModality,
     @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses

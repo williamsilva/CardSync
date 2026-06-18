@@ -1,5 +1,6 @@
 package com.cardsync.core.reconciliation.summary;
 
+import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.*;
@@ -14,7 +15,6 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -32,7 +32,7 @@ public class SalesSummaryCreditOrderReconciliationService {
 
   /**
    * Etapa 5 - Resumo x ordem de pagamento.
-   *
+
    * Regra de dependência: somente resumos cuja conciliação Venda ADQ x Resumo (etapa 4)
    * ficou TOTALMENTE conciliada participam desta etapa. O campo {@code transactionsStatus}
    * é gravado pela etapa 4 usando {@link StatusReconciliationEnum}; portanto a elegibilidade
@@ -43,12 +43,12 @@ public class SalesSummaryCreditOrderReconciliationService {
     StatusReconciliationEnum.RECONCILED.getCode()
   );
 
-  private static final List<Integer> PENDING_CREDIT_ORDER_STATUSES = List.of(
-    StatusPaymentBankEnum.PENDING.getCode(),
-    StatusPaymentBankEnum.PARTIALLY_PAID.getCode(),
-    StatusPaymentBankEnum.NOT_PAID.getCode()
+  private static final List<Integer> PENDING_SUMMARY_CREDIT_ORDER_STATUSES = List.of(
+    StatusReconciliationEnum.PENDING.getCode(),
+    StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode()
   );
 
+  private final FileProcessingProperties properties;
   private final SalesSummaryRepository salesSummaryRepository;
   private final CreditOrderRepository creditOrderRepository;
 
@@ -56,20 +56,24 @@ public class SalesSummaryCreditOrderReconciliationService {
   public SalesSummaryCreditOrderReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
+    boolean reprocess = properties.getReconciliation().isReprocessSalesSummaryCreditOrder();
+
     log.info(
-      "📌 Etapa 4 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}",
+      "📌 Etapa 4 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}, reprocess={}",
       trigger,
       ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
-      PENDING_CREDIT_ORDER_STATUSES,
+      PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
       UPDATE_BATCH_SIZE,
-      GENERATION_BATCH_SIZE
+      GENERATION_BATCH_SIZE,
+      reprocess
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
 
     List<SalesSummaryCreditOrderStats> stats = salesSummaryRepository.findStatsForSalesSummaryCreditOrderReconciliation(
+      reprocess,
       ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
-      PENDING_CREDIT_ORDER_STATUSES
+      PENDING_SUMMARY_CREDIT_ORDER_STATUSES
     );
 
     log.info(

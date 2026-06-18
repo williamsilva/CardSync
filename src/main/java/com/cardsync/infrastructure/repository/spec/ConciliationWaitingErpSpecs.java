@@ -28,10 +28,10 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingErpTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields;
-  private final CardsyncAppProperties appProperties;
 
   public ConciliationWaitingErpSpecs(
     DateFilterService dateFilterService,
@@ -41,10 +41,10 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
     CardsyncAppProperties appProperties
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
-    this.appProperties = appProperties;
   }
 
   public Specification<TransactionErpEntity> fromQuery(ListQueryDto<ConciliationWaitingModelFilter> query) {
@@ -84,10 +84,10 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
     }
 
     spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
     spec = spec.and(Specification.not(inCodes("statusTransaction", List.of(StatusTransactionEnum.DELETED), StatusTransactionEnum::getCode)));
     spec = spec.and(inCodes("statusTransactionReason",
       List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ), StatusTransactionReasonEnum::getCode));
-    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
 
     return spec;
   }

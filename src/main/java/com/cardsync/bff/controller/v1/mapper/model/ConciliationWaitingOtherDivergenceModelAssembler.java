@@ -14,6 +14,8 @@ import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.domain.model.FlagEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import org.jspecify.annotations.NonNull;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -49,7 +51,7 @@ public class ConciliationWaitingOtherDivergenceModelAssembler extends Representa
     model.setAuthorization(erp.getAuthorization());
     model.setAcquirer(toAcquirer(erp.getAcquirer()));
     model.setEstablishment(toEstablishment(erp.getEstablishment()));
-    model.setStatusTransactionReason(erp.getStatusTransactionReason());
+    model.setStatusTransactionReason(StatusTransactionReasonEnum.toCode(erp.getStatusTransactionReason()));
 
     model.setErp(toErpSide(erp));
     model.setAcquirerTransaction(toAcqSide(acq));
@@ -74,8 +76,8 @@ public class ConciliationWaitingOtherDivergenceModelAssembler extends Representa
     side.setDiscountValue(erp.getDiscountValue());
     side.setInstallment(erp.getInstallment());
     side.setAuthorization(erp.getAuthorization());
-    side.setStatusTransaction(erp.getStatusTransaction());
-    side.setStatusTransactionReason(erp.getStatusTransactionReason());
+    side.setStatusTransaction(StatusTransactionEnum.toCode(erp.getStatusTransaction()));
+    side.setStatusTransactionReason(StatusTransactionReasonEnum.toCode(erp.getStatusTransactionReason()));
     side.setAcquirer(toAcquirer(erp.getAcquirer()));
     side.setFlag(toFlag(erp.getFlag()));
     side.setCompany(toCompany(erp.getCompany()));
@@ -101,7 +103,7 @@ public class ConciliationWaitingOtherDivergenceModelAssembler extends Representa
     side.setInstallment(acq.getInstallment());
     side.setAuthorization(acq.getAuthorization());
     side.setStatusTransaction(acq.getStatusTransaction().getCode());
-    side.setStatusTransactionReason(acq.getStatusTransactionReason());
+    side.setStatusTransactionReason(StatusTransactionReasonEnum.toCode(acq.getStatusTransactionReason()));
     side.setAcquirer(toAcquirer(acq.getAcquirer()));
     side.setFlag(toFlag(acq.getFlag()));
     side.setCompany(toCompany(acq.getCompany()));

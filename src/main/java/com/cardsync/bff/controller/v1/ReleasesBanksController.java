@@ -1,6 +1,6 @@
 package com.cardsync.bff.controller.v1;
 
-import com.cardsync.bff.controller.v1.representation.model.transactions.ReleasesBankModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ReleasesBankFilter;

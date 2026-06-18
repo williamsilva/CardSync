@@ -92,7 +92,7 @@ public class ErpPendingSaleService {
           installmentErpGenerator.generate(tx, feeResult.paymentTermDays()).forEach(tx::addInstallment);
           tx.setCommercialStatus(ErpCommercialStatusEnum.PENDING_CONTRACT);
           tx.setCommercialStatusMessage("Venda ainda pendente de contrato/taxa vigente após reprocessamento.");
-          tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
+          tx.setStatusTransaction(StatusTransactionEnum.PENDING);
           stillPendingContract++;
           log.warn("⚠ Pendência ERP ainda sem contrato. id={}, nsu={}, company={}, establishment={}, parcelas={}",
             tx.getId(), tx.getNsu(),
@@ -120,7 +120,7 @@ public class ErpPendingSaleService {
       tx.setCommercialStatus(ErpCommercialStatusEnum.PENDING_ESTABLISHMENT);
     }
     tx.setCommercialStatusMessage("Venda ainda pendente de empresa/PV/estabelecimento após reprocessamento.");
-    tx.setStatusTransaction(StatusTransactionEnum.PENDING.getCode());
+    tx.setStatusTransaction(StatusTransactionEnum.PENDING);
   }
 
   private ErpPendingSaleModel toModel(TransactionErpEntity tx) {

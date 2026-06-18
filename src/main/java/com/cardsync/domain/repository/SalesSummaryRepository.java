@@ -49,11 +49,12 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       from TransactionAcqEntity tx
       join tx.salesSummary ss
      where ss.id is not null
-       and (ss.transactionsStatus is null or ss.transactionsStatus in :pendingSummaryStatuses)
+       and (:includeAlreadyReconciled = true or ss.transactionsStatus is null or ss.transactionsStatus in :pendingSummaryStatuses)
      group by ss.id
      order by min(ss.rvDate) asc, ss.id asc
   """)
   List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliation(
+    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingSummaryStatuses") Collection<Integer> pendingSummaryStatuses,
     @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
     @Param("eligibleFeeStatuses") Collection<Integer> eligibleFeeStatuses
@@ -86,12 +87,13 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     )
       from SalesSummaryEntity ss
       left join CreditOrderEntity co on co.salesSummary.id = ss.id
-     where ss.transactionsStatus in :eligibleTransactionStatuses
-       and (ss.creditOrderStatus is null or ss.creditOrderStatus in :pendingCreditOrderStatuses)
+     where (:includeAlreadyReconciled = true or ss.transactionsStatus in :eligibleTransactionStatuses)
+       and (:includeAlreadyReconciled = true or ss.creditOrderStatus is null or ss.creditOrderStatus in :pendingCreditOrderStatuses)
      group by ss.id
      order by min(ss.rvDate) asc, ss.id asc
   """)
   List<SalesSummaryCreditOrderStats> findStatsForSalesSummaryCreditOrderReconciliation(
+    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("eligibleTransactionStatuses") Collection<Integer> eligibleTransactionStatuses,
     @Param("pendingCreditOrderStatuses") Collection<Integer> pendingCreditOrderStatuses
   );
