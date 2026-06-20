@@ -67,6 +67,20 @@ public abstract class CsPermissions {
   protected static final String PERM_FILE_PROCESSING_PROCESS = "PERM_FILE_PROCESSING_PROCESS";
   protected static final String PERM_FILE_PROCESSING_REPROCESS = "PERM_FILE_PROCESSING_REPROCESS";
 
+  /* Permission for Holidays */
+  protected static final String PERM_HOLIDAY_CONSULT = "PERM_HOLIDAYS_CONSULT";
+  protected static final String PERM_HOLIDAY_CREATE = "PERM_HOLIDAYS_CREATE";
+  protected static final String PERM_HOLIDAY_CHANGE = "PERM_HOLIDAYS_CHANGE";
+  protected static final String PERM_HOLIDAY_DELETE = "PERM_HOLIDAYS_DELETE";
+  protected static final String PERM_HOLIDAY_ACTIVE_OR_INACTIVE = "PERM_HOLIDAYS_ACTIVE_OR_INACTIVE";
+
+  /* Permission for No File Days */
+  protected static final String PERM_NO_FILE_DAY_CONSULT = "PERM_NO_FILE_DAY_CONSULT";
+  protected static final String PERM_NO_FILE_DAY_CREATE = "PERM_NO_FILE_DAY_CREATE";
+  protected static final String PERM_NO_FILE_DAY_CHANGE = "PERM_NO_FILE_DAY_CHANGE";
+  protected static final String PERM_NO_FILE_DAY_DELETE = "PERM_NO_FILE_DAY_DELETE";
+  protected static final String PERM_NO_FILE_DAY_ACTIVE_OR_INACTIVE = "PERM_NO_FILE_DAY_ACTIVE_OR_INACTIVE";
+
   /* Permission for Anticipation */
   protected static final String PERM_ANTICIPATION_CONSULT = "PERM_ANTICIPATION_CONSULT";
 

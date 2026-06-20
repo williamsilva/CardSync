@@ -131,11 +131,14 @@ public class FileProcessingReportService {
     List<BankEntity> banks = bankRepository.findAllByOrderByNameAsc();
     List<BankingDomicileEntity> bankingDomiciles =
       bankingDomicileRepository.findAllForImportedFilesCalendar();
+    int calendarYear = selectedMonth.getYear();
     Set<LocalDate> holidays = holidayRepository
-      .findAllByHolidayDateBetweenOrderByHolidayDateAsc(startDate.minusDays(1), endDate)
+      .findActiveForCalendarRange(startDate.minusDays(1), endDate)
       .stream()
-      .filter(holiday -> holiday.getStatus() == StatusEnum.ACTIVE)
-      .map(HolidayEntity::getHolidayDate)
+      .map(h -> Boolean.TRUE.equals(h.getRecurring())
+        ? h.getHolidayDate().withYear(calendarYear)
+        : h.getHolidayDate())
+      .filter(d -> !d.isBefore(startDate.minusDays(1)) && !d.isAfter(endDate))
       .collect(Collectors.toUnmodifiableSet());
 
     // Dias marcados como "sem arquivo" (cs_no_file_day): por grupo (ERP/ADQ/BANK) e,

@@ -6,12 +6,17 @@ import com.cardsync.bff.controller.v1.representation.model.management.AuditSales
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel;
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel.AcquirerGroup;
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel.DayDetail;
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.repository.AcquirerRepository;
+import com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs;
+import com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs;
+import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.criteria.*;
@@ -46,11 +51,11 @@ public class DashboardAuditService {
   private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
   private final EntityManager entityManager;
-  private final com.cardsync.core.config.CardsyncAppProperties appProperties;
-  private final com.cardsync.domain.repository.AcquirerRepository acquirerRepository;
-  private final com.cardsync.infrastructure.repository.spec.config.DateFilterService dateFilterService;
-  private final com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs conciliationWaitingErpSpecs;
-  private final com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs conciliationWaitingAcqSpecs;
+  private final CardsyncAppProperties appProperties;
+  private final DateFilterService dateFilterService;
+  private final AcquirerRepository acquirerRepository;
+  private final ConciliationWaitingErpSpecs conciliationWaitingErpSpecs;
+  private final ConciliationWaitingAcqSpecs conciliationWaitingAcqSpecs;
 
   @Transactional(readOnly = true)
   public AuditSalesSummaryModel salesSummary() {
@@ -143,14 +148,12 @@ public class DashboardAuditService {
     // ONLY_IN_ERP: mesma definição de /missing-acquirer.
     List<Object[]> erpRows = aggregateByAcquirerAndDay(
       TransactionErpEntity.class,
-      conciliationWaitingErpSpecs.fromQueryForTotals(query)
-    );
+      conciliationWaitingErpSpecs.fromQueryForTotals(query));
 
     // ONLY_IN_ACQUIRER: mesma definição de /missing-erp.
     List<Object[]> acqRows = aggregateByAcquirerAndDay(
       TransactionAcqEntity.class,
-      conciliationWaitingAcqSpecs.fromQueryForTotals(query)
-    );
+      conciliationWaitingAcqSpecs.fromQueryForTotals(query));
 
     // Acumula por adquirente -> (dia -> contadores).
     Map<UUID, AcquirerAccumulator> byAcquirer = new LinkedHashMap<>();

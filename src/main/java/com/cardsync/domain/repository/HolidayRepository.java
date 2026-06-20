@@ -24,6 +24,23 @@ public interface HolidayRepository extends JpaRepository<HolidayEntity, UUID>, J
 
   Optional<HolidayEntity> findByRecurringAndHolidayDate(Boolean recurring, LocalDate holidayDate);
 
+  /**
+   * Retorna feriados ativos não-recorrentes no intervalo de datas E todos os feriados recorrentes
+   * ativos (ano=1900). O chamador deve expandir os recorrentes para o ano do calendário.
+   */
+  @org.springframework.data.jpa.repository.Query("""
+    SELECT h FROM HolidayEntity h
+    WHERE h.status = 1
+      AND (
+        (h.recurring = false AND h.holidayDate BETWEEN :startDate AND :endDate)
+        OR h.recurring = true
+      )
+    """)
+  List<HolidayEntity> findActiveForCalendarRange(
+    @org.springframework.data.repository.query.Param("startDate") LocalDate startDate,
+    @org.springframework.data.repository.query.Param("endDate") LocalDate endDate
+  );
+
   /** Retorna feriados ativos que cobrem a data: específicos com data exata OU recorrentes com mesmo dia/mês. */
   @org.springframework.data.jpa.repository.Query("""
     SELECT h FROM HolidayEntity h

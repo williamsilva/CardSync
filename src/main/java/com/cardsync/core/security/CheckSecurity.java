@@ -244,6 +244,60 @@ public @interface CheckSecurity {
       @PreAuthorize("@csSecurity.canActiveOrInactiveContracts()")
       @interface CanActiveOrInactive {}
     }
+
+    @interface Holidays {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultHolidays()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canCreateHolidays()")
+      @interface CanCreate {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canChangeHolidays()")
+      @interface CanChange {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canDeleteHolidays()")
+      @interface CanDelete {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveHolidays()")
+      @interface CanActiveOrInactive {}
+    }
+
+    @interface NoFileDays {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultNoFileDays()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canCreateNoFileDays()")
+      @interface CanCreate {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canChangeNoFileDays()")
+      @interface CanChange {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canDeleteNoFileDays()")
+      @interface CanDelete {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveNoFileDays()")
+      @interface CanActiveOrInactive {}
+    }
   }
 
   @interface FileProcessing {

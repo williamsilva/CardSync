@@ -140,19 +140,19 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/reconcile")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.FileProcessing.CanProcess
   public ReconcileErpAcquirerResultModel reconcileErpVsAcquirer() {
     return conciliationAnalysisService.reconcileErpWithAcquirerBusinessContext();
   }
 
   @PostMapping("/reconcile-manual-swapped")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.FileProcessing.CanProcess
   public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
     return conciliationManualSwapReconciliationService.reconcileManualSwapped();
   }
 
   @PostMapping("/reconcile-fees")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.FileProcessing.CanProcess
   public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
     return conciliationAnalysisService.reconcileErpAcquirerFees();
   }

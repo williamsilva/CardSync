@@ -208,4 +208,46 @@ public class CsSecurity extends CsDefaultSecurityMethod {
   public boolean canActiveOrInactiveContracts() {
     return hasAllWriteScope() && hasAuthority(PERM_CONTRACTS_ACTIVE_OR_INACTIVE);
   }
+
+  /* Holidays */
+  public boolean canConsultHolidays() {
+    return hasAllReadScope() && hasAuthority(PERM_HOLIDAY_CONSULT);
+  }
+
+  public boolean canCreateHolidays() {
+    return hasAllWriteScope() && hasAuthority(PERM_HOLIDAY_CREATE);
+  }
+
+  public boolean canChangeHolidays() {
+    return hasAllWriteScope() && hasAuthority(PERM_HOLIDAY_CHANGE);
+  }
+
+  public boolean canDeleteHolidays() {
+    return hasAllWriteScope() && hasAuthority(PERM_HOLIDAY_DELETE);
+  }
+
+  public boolean canActiveOrInactiveHolidays() {
+    return hasAllWriteScope() && hasAuthority(PERM_HOLIDAY_ACTIVE_OR_INACTIVE);
+  }
+
+  /* No File Days */
+  public boolean canConsultNoFileDays() {
+    return hasAllReadScope() && hasAuthority(PERM_NO_FILE_DAY_CONSULT);
+  }
+
+  public boolean canCreateNoFileDays() {
+    return hasAllWriteScope() && hasAuthority(PERM_NO_FILE_DAY_CREATE);
+  }
+
+  public boolean canChangeNoFileDays() {
+    return hasAllWriteScope() && hasAuthority(PERM_NO_FILE_DAY_CHANGE);
+  }
+
+  public boolean canDeleteNoFileDays() {
+    return hasAllWriteScope() && hasAuthority(PERM_NO_FILE_DAY_DELETE);
+  }
+
+  public boolean canActiveOrInactiveNoFileDays() {
+    return hasAllWriteScope() && hasAuthority(PERM_NO_FILE_DAY_ACTIVE_OR_INACTIVE);
+  }
 }

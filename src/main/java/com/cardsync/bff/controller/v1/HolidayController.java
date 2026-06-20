@@ -37,7 +37,7 @@ public class HolidayController {
   private final PagedResourcesAssembler<HolidayEntity> pagedResourcesAssembler;
 
   @PostMapping("/search")
-  @CheckSecurity.Register.Companies.CanConsult
+  @CheckSecurity.Register.Holidays.CanConsult
   public PagedModel<HolidayModel> search(@RequestBody ListQueryDto<HolidayFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
     var page = holidayService.search(pageable, body);
@@ -57,56 +57,56 @@ public class HolidayController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Register.Holidays.CanCreate
   public HolidayModel create(@Valid @RequestBody HolidayInput request) {
     return modelAssembler.toModel(holidayService.create(request));
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Register.Holidays.CanChange
   public HolidayModel update(@PathVariable UUID id,  @Valid @RequestBody HolidayInput request) {
     return modelAssembler.toModel(holidayService.update(id, request));
   }
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Register.Holidays.CanDelete
   public void delete(@PathVariable UUID id) {
     holidayService.delete(id);
   }
 
   @PostMapping("/{id}/activate")
-  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
+  @CheckSecurity.Register.Holidays.CanActiveOrInactive
   public void activate(@PathVariable UUID id) {
     holidayService.activate(id);
   }
 
   @PostMapping("/{id}/deactivate")
-  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
+  @CheckSecurity.Register.Holidays.CanActiveOrInactive
   public void deactivate(@PathVariable UUID id) {
     holidayService.deactivate(id);
   }
 
   @PostMapping("/{id}/block")
-  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
+  @CheckSecurity.Register.Holidays.CanActiveOrInactive
   public void block(@PathVariable UUID id) {
     holidayService.block(id);
   }
 
   @PostMapping("/activate")
-  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
+  @CheckSecurity.Register.Holidays.CanActiveOrInactive
   public void activateBulk(@Valid @RequestBody ListIdsInput body) {
     holidayService.activateBulk(body.ids());
   }
 
   @PostMapping("/deactivate")
-  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
+  @CheckSecurity.Register.Holidays.CanActiveOrInactive
   public void deactivateBulk(@Valid @RequestBody ListIdsInput body) {
     holidayService.deactivateBulk(body.ids());
   }
 
   @PostMapping("/block")
-  @CheckSecurity.Register.Acquirers.CanActiveOrInactive
+  @CheckSecurity.Register.Holidays.CanActiveOrInactive
   public void blockBulk(@Valid @RequestBody ListIdsInput body) {
     holidayService.blockBulk(body.ids());
   }
