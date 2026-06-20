@@ -2,12 +2,12 @@ package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.mapper.model.AdjustmentChargeBackRequestsModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentChargeBackRequestsModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.domain.filter.AdjustmentChargeBackRequestsFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.RequestNoticeEntity;
 import com.cardsync.domain.repository.RequestNoticeRepository;
-import com.cardsync.domain.service.support.AdjustmentTotalsQueryService;
+import com.cardsync.domain.service.support.ValueTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.AdjustmentChargeBackRequestsSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,7 +24,7 @@ import java.util.List;
 public class AdjustmentChargeBackRequestsService {
 
   private final RequestNoticeRepository adjustmentRepository;
-  private final AdjustmentTotalsQueryService totalsQueryService;
+  private final ValueTotalsQueryService totalsQueryService;
   private final AdjustmentChargeBackRequestsSpecs adjustmentSpecs;
   private final AdjustmentChargeBackRequestsModelAssembler adjustmentModelAssembler;
 
@@ -53,7 +53,7 @@ public class AdjustmentChargeBackRequestsService {
   }
 
   @Transactional(readOnly = true)
-  public AdjustmentTotalsModel totals(ListQueryDto<AdjustmentChargeBackRequestsFilter> query) {
+  public ValueTotalsModel totals(ListQueryDto<AdjustmentChargeBackRequestsFilter> query) {
     Specification<RequestNoticeEntity> spec = adjustmentSpecs.fromQueryForTotals(query);
     return totalsQueryService.totals(RequestNoticeEntity.class, spec,"adjustmentValue");
   }

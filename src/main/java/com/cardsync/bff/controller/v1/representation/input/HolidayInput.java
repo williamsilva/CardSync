@@ -16,6 +16,9 @@ public record HolidayInput(
   @Size(max = 150)
   String name,
 
-  StatusEnum status
+  StatusEnum status,
+
+  /** Quando true, o feriado se repete todo ano. O ano de holidayDate é ignorado. */
+  Boolean recurring
 ) {
 }

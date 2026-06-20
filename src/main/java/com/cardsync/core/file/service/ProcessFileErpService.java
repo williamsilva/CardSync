@@ -32,10 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.stream.Stream;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -43,6 +43,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -77,8 +78,17 @@ public class ProcessFileErpService {
     int processed = 0;
     int errors = 0;
 
-    try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(paths.getInput()), "*.csv")) {
-      for (Path file : stream) {
+    Path inputPath = Paths.get(paths.getInput()).toAbsolutePath().normalize();
+    Path logPath = paths.getLog() != null ? Paths.get(paths.getLog()).toAbsolutePath().normalize() : null;
+
+    try (Stream<Path> walk = Files.walk(inputPath)) {
+      List<Path> files = walk
+        .filter(Files::isRegularFile)
+        .filter(f -> f.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".csv"))
+        .filter(f -> logPath == null || !f.toAbsolutePath().normalize().startsWith(logPath))
+        .toList();
+
+      for (Path file : files) {
         try {
           processFile(file, paths);
           processed++;

@@ -37,8 +37,7 @@ public class BankingDomicileEntity extends AuditableEntityBase {
   @Column(name = "account_opening_date", nullable = false)
   private LocalDate accountOpeningDate;
 
-  @NotNull
-  @Column(name = "account_closing_date", nullable = false)
+  @Column(name = "account_closing_date")
   private LocalDate accountClosingDate;
 
   @NotNull
@@ -84,13 +83,16 @@ public class BankingDomicileEntity extends AuditableEntityBase {
 
   public void activate() {
     setStatus(StatusEnum.ACTIVE);
+    this.accountClosingDate = null;
   }
 
   public void inactivate() {
     setStatus(StatusEnum.INACTIVE);
+    this.accountClosingDate = LocalDate.now();
   }
 
   public void block() {
     setStatus(StatusEnum.BLOCKED);
+    this.accountClosingDate = LocalDate.now();
   }
 }

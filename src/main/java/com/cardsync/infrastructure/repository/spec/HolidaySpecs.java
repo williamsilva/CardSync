@@ -12,6 +12,8 @@ import com.cardsync.infrastructure.repository.spec.config.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+
 @Component
 public class HolidaySpecs extends BaseSpecificationSupport<HolidayEntity> {
 
@@ -41,10 +43,41 @@ public class HolidaySpecs extends BaseSpecificationSupport<HolidayEntity> {
     if (query.advanced() != null) {
       var a = query.advanced();
       spec = spec.and(contains("name", a.name()));
-      spec = spec.and(localDateEquals("holidayDate", a.holidayDate(), false));
+      spec = spec.and(holidayDateFilter(a.holidayDate()));
+      spec = spec.and(equalsTo("recurring", a.recurring()));
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
     }
 
-    return spec.and(orderByDesc("holidayDate"));
+    return spec.and(orderByMonthDay());
+  }
+
+  /** Matches specific holidays by exact date OR recurring holidays by same month/day (ignoring year). */
+  private Specification<HolidayEntity> holidayDateFilter(LocalDate date) {
+    if (date == null) return alwaysTrue();
+    return (root, query, cb) -> cb.or(
+      cb.and(
+        cb.equal(root.get("recurring"), false),
+        cb.equal(root.get("holidayDate"), date)
+      ),
+      cb.and(
+        cb.equal(root.get("recurring"), true),
+        cb.equal(cb.function("MONTH", Integer.class, root.get("holidayDate")), date.getMonthValue()),
+        cb.equal(cb.function("DAY", Integer.class, root.get("holidayDate")), date.getDayOfMonth())
+      )
+    );
+  }
+
+  /** Orders by calendar position (month, day) so recurring and specific holidays interleave naturally. */
+  private Specification<HolidayEntity> orderByMonthDay() {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        query.orderBy(
+          cb.asc(cb.function("MONTH", Integer.class, root.get("holidayDate"))),
+          cb.asc(cb.function("DAY", Integer.class, root.get("holidayDate"))),
+          cb.desc(root.get("holidayDate"))
+        );
+      }
+      return cb.conjunction();
+    };
   }
 }

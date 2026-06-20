@@ -21,6 +21,7 @@ public class HolidayModel extends RepresentationModel<HolidayModel>{
 
   private UUID id;
   private String name;
+  private Boolean recurring;
   private StatusEnum status;
 
   private LocalDate holidayDate;

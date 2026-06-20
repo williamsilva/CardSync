@@ -1,6 +1,6 @@
 package com.cardsync.domain.service.support;
 
-import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Tuple;
@@ -11,18 +11,18 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 
 @Component
-public class AdjustmentTotalsQueryService {
+public class ValueTotalsQueryService {
 
   @PersistenceContext
   private EntityManager entityManager;
 
-  public <T> AdjustmentTotalsModel totals(Class<T> entityClass, Specification<T> spec, String totalField) {
+  public <T> ValueTotalsModel totals(Class<T> entityClass, Specification<T> spec, String totalField) {
     CriteriaBuilder cb = entityManager.getCriteriaBuilder();
     CriteriaQuery<Tuple> cq = cb.createTupleQuery();
     Root<T> root = cq.from(entityClass);
 
     Expression<BigDecimal> totalValue = root.get(totalField).as(BigDecimal.class);
-    cq.multiselect(sumOrZero(cb, totalValue).alias("totalValue"),  cb.count(root).alias("quantity"));
+    cq.select(cb.tuple(sumOrZero(cb, totalValue), cb.count(root)));
 
     if (spec != null) {
       Predicate predicate = spec.toPredicate(root, cq, cb);
@@ -33,9 +33,9 @@ public class AdjustmentTotalsQueryService {
 
     Tuple tuple = entityManager.createQuery(cq).getSingleResult();
 
-    return new AdjustmentTotalsModel(
-      value(tuple, "totalValue"),
-      tuple.get("quantity", Long.class)
+    return new ValueTotalsModel(
+      zeroIfNull(tuple.get(0, BigDecimal.class)),
+      tuple.get(1, Long.class)
     );
   }
 
@@ -43,8 +43,7 @@ public class AdjustmentTotalsQueryService {
     return cb.coalesce(cb.sum(expression), BigDecimal.ZERO);
   }
 
-  private static BigDecimal value(Tuple tuple, String alias) {
-    BigDecimal value = tuple.get(alias, BigDecimal.class);
+  private static BigDecimal zeroIfNull(BigDecimal value) {
     return value == null ? BigDecimal.ZERO : value;
   }
 }

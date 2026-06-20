@@ -213,7 +213,7 @@ public class BankingDomicileService {
   }
 
   private void validateInput(BankingDomicileInput input) {
-    if (input.accountClosingDate().isBefore(input.accountOpeningDate())) {
+    if (input.accountClosingDate() != null && input.accountClosingDate().isBefore(input.accountOpeningDate())) {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
         "The field 'accountClosingDate' must be equal to or after 'accountOpeningDate'."

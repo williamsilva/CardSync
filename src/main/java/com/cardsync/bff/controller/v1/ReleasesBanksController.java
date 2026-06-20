@@ -1,6 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ReleasesBankFilter;
@@ -20,14 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/bff/v1/releases-bank")
 public class ReleasesBanksController {
 
-  private final ReleasesBankService saleSummaryService;
+  private final ReleasesBankService releasesBankService;
 
   @PostMapping("/search")
   @CheckSecurity.FileProcessing.CanRead
   public PagedModel<ReleasesBankModel> search(@RequestBody ListQueryDto<ReleasesBankFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
-    Page<ReleasesBankModel> page = saleSummaryService.search(pageable, body);
+    Page<ReleasesBankModel> page = releasesBankService.search(pageable, body);
 
     return PagedModel.of(
       page.getContent(),
@@ -42,7 +43,7 @@ public class ReleasesBanksController {
 
   @PostMapping("/totals")
   @CheckSecurity.FileProcessing.CanRead
-  public TransactionTotalsModel totals(@RequestBody ListQueryDto<ReleasesBankFilter> body) {
-    return saleSummaryService.totals(body);
+  public ValueTotalsModel totals(@RequestBody ListQueryDto<ReleasesBankFilter> body) {
+    return releasesBankService.totals(body);
   }
 }

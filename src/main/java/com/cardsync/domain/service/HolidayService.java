@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,29 +47,34 @@ public class HolidayService {
 
   @Transactional
   public HolidayEntity create(HolidayInput request) {
-    holidayRepository.findByHolidayDate(request.holidayDate()).ifPresent(existing -> {
+    boolean recurring = Boolean.TRUE.equals(request.recurring());
+    LocalDate checkDate = normalizeDate(request.holidayDate(), recurring);
+
+    holidayRepository.findByRecurringAndHolidayDate(recurring, checkDate).ifPresent(existing -> {
       throw BusinessException.conflict(ErrorCode.BUSINESS_ERROR,
-        "Já existe um feriado cadastrado para " + request.holidayDate());
+        "Já existe um feriado " + (recurring ? "recorrente" : "específico") + " cadastrado para " + checkDate);
     });
 
     HolidayEntity entity = new HolidayEntity();
     apply(entity, request);
-    return (holidayRepository.save(entity));
+    return holidayRepository.save(entity);
   }
 
   @Transactional
   public HolidayEntity update(UUID id, HolidayInput request) {
     HolidayEntity entity = load(id);
+    boolean recurring = Boolean.TRUE.equals(request.recurring());
+    LocalDate checkDate = normalizeDate(request.holidayDate(), recurring);
 
-    holidayRepository.findByHolidayDate(request.holidayDate())
+    holidayRepository.findByRecurringAndHolidayDate(recurring, checkDate)
       .filter(existing -> !existing.getId().equals(id))
       .ifPresent(existing -> {
         throw BusinessException.conflict(ErrorCode.BUSINESS_ERROR,
-          "Já existe um feriado cadastrado para " + request.holidayDate());
+          "Já existe um feriado " + (recurring ? "recorrente" : "específico") + " cadastrado para " + checkDate);
       });
 
     apply(entity, request);
-    return (holidayRepository.save(entity));
+    return holidayRepository.save(entity);
   }
 
   @Transactional
@@ -209,10 +215,16 @@ public class HolidayService {
   }
 
   private void apply(HolidayEntity entity, HolidayInput request) {
-    entity.setHolidayDate(request.holidayDate());
+    boolean recurring = Boolean.TRUE.equals(request.recurring());
+    entity.setRecurring(recurring);
+    entity.setHolidayDate(normalizeDate(request.holidayDate(), recurring));
     entity.setName(request.name().trim());
     entity.setStatus(request.status() != null ? request.status() : StatusEnum.ACTIVE);
   }
 
-
+  /** Para feriados recorrentes normaliza o ano para 1900; para específicos mantém a data original. */
+  private static LocalDate normalizeDate(LocalDate date, boolean recurring) {
+    if (date == null) return null;
+    return recurring ? date.withYear(1900) : date;
+  }
 }

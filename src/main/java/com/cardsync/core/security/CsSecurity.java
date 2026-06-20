@@ -95,6 +95,15 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_COMPANIES_ACTIVE_OR_INACTIVE);
   }
 
+  /* Banks */
+  public boolean canConsultBanks() {
+    return hasAllReadScope() && hasAuthority(PERM_BANK_CONSULT);
+  }
+
+  public boolean canActiveOrInactiveBanks() {
+    return hasAllWriteScope() && hasAuthority(PERM_BANK_ACTIVE_OR_INACTIVE);
+  }
+
   /* Acquirers */
   public boolean canConsultAcquirers() {
     return hasAllReadScope() && hasAuthority(PERM_ACQUIRER_CONSULT);

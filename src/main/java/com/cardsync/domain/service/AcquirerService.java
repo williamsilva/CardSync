@@ -72,6 +72,8 @@ public class AcquirerService {
     entity.setCnpj(normalizedCnpj);
     entity.setFantasyName(input.fantasyName().trim());
     entity.setSocialReason(input.socialReason().trim());
+    entity.setOpeningDate(input.openingDate());
+    entity.setClosingDate(input.closingDate());
 
     entity.setStatus(StatusEnum.ACTIVE);
 
@@ -90,6 +92,8 @@ public class AcquirerService {
     entity.setCnpj(normalizedCnpj);
     entity.setFantasyName(input.fantasyName().trim());
     entity.setSocialReason(input.socialReason().trim());
+    entity.setOpeningDate(input.openingDate());
+    entity.setClosingDate(input.closingDate());
 
     if (input.status() != null && input.status() != StatusEnum.NULL) {
       entity.setStatus(input.status());
@@ -150,7 +154,7 @@ public class AcquirerService {
           "Only INACTIVE or BLOCKED companies can be activated. Acquirer id: " + entity.getId()
         );
       }
-      entity.setStatus(StatusEnum.ACTIVE);
+      entity.activate();
     });
   }
 
@@ -164,7 +168,7 @@ public class AcquirerService {
           "Only ACTIVE companies can be deactivated. Acquirer id: " + entity.getId()
         );
       }
-      entity.setStatus(StatusEnum.INACTIVE);
+      entity.inactivate();
     });
   }
 
@@ -178,7 +182,7 @@ public class AcquirerService {
           "Only ACTIVE companies can be blocked. Acquirer id: " + entity.getId()
         );
       }
-      entity.setStatus(StatusEnum.BLOCKED);
+      entity.block();
     });
   }
 

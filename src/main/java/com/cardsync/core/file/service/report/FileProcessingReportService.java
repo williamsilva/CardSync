@@ -518,20 +518,11 @@ public class FileProcessingReportService {
    * naquela data e estiver configurado para enviar arquivo bancário.
    */
   private boolean isBankingDomicileExpectedOnDate(BankingDomicileEntity domicile, LocalDate date) {
-    if (domicile == null || date == null
-      || !Boolean.TRUE.equals(domicile.getExpectsFile())
-      || domicile.getAccountOpeningDate() == null
-      || domicile.getAccountClosingDate() == null) {
-      return false;
-    }
-
-    boolean insideAccountPeriod = !date.isBefore(domicile.getAccountOpeningDate())
-      && !date.isAfter(domicile.getAccountClosingDate());
-
-    if (!insideAccountPeriod) return false;
-
-    if (domicile.getStatus() == StatusEnum.ACTIVE) return true;
-    return isBeforeStatusChange(date, domicile.getStatusDate());
+    if (domicile == null || date == null) return false;
+    if (domicile.getStatus() != StatusEnum.ACTIVE) return false;
+    if (domicile.getAccountOpeningDate() != null && date.isBefore(domicile.getAccountOpeningDate())) return false;
+    if (domicile.getAccountClosingDate() != null && date.isAfter(domicile.getAccountClosingDate())) return false;
+    return true;
   }
 
   private Map<UUID, Set<UUID>> loadDomicileIdsByProcessedFile(
@@ -632,38 +623,22 @@ public class FileProcessingReportService {
   }
 
   private boolean isAcquirerExpectedOnDate(AcquirerEntity acquirer, LocalDate date) {
-    if (acquirer.getStatus() == StatusEnum.ACTIVE) return true;
-    return isBeforeStatusChange(date, acquirer.getStatusDate());
+    if (acquirer.getStatus() != StatusEnum.ACTIVE) return false;
+    if (acquirer.getOpeningDate() != null && date.isBefore(acquirer.getOpeningDate())) return false;
+    if (acquirer.getClosingDate() != null && date.isAfter(acquirer.getClosingDate())) return false;
+    return true;
   }
 
   private boolean isBankExpectedOnDate(BankEntity bank, LocalDate date) {
-    if (bank.getStatus() == StatusEnum.ACTIVE) return true;
-    return isBeforeStatusChange(date, bank.getStatusDate());
+    return bank.getStatus() == StatusEnum.ACTIVE;
   }
 
-  private boolean isBeforeStatusChange(LocalDate date, java.time.OffsetDateTime statusDate) {
-    if (statusDate == null) return false;
-    LocalDate changeDate = statusDate.atZoneSameInstant(BUSINESS_ZONE).toLocalDate();
-    return date.isBefore(changeDate);
-  }
-
-  private String resolveEntityFileStatus(int filesReceived, boolean expectedOnDate) {
-    return filesReceived > 0 || !expectedOnDate ? "complete" : "missing";
-  }
 
   private java.time.OffsetDateTime resolveStatusDate(
     java.time.OffsetDateTime createdAt,
     java.time.OffsetDateTime updatedAt
   ) {
     return updatedAt != null ? updatedAt : createdAt;
-  }
-
-  /**
-   * A adquirente REDE entrega três arquivos obrigatórios por dia: EEVC, EEVD e EEFI.
-   * As demais adquirentes continuam exigindo um arquivo diário.
-   */
-  private int expectedAcquirerFiles(AcquirerEntity acquirer) {
-    return isRedeAcquirer(acquirer) ? 3 : 1;
   }
 
   /**

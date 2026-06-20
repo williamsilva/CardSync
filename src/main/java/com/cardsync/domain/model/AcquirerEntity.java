@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,12 @@ public class AcquirerEntity extends AuditableEntityBase {
 
   @Column(name = "status_date")
   private OffsetDateTime statusDate;
+
+  @Column(name = "opening_date")
+  private LocalDate openingDate;
+
+  @Column(name = "closing_date")
+  private LocalDate closingDate;
 
   private String cnpj;
   private String fantasyName;
@@ -56,13 +63,16 @@ public class AcquirerEntity extends AuditableEntityBase {
 
   public void activate() {
     setStatus(StatusEnum.ACTIVE);
+    this.closingDate = null;
   }
 
   public void inactivate() {
     setStatus(StatusEnum.INACTIVE);
+    this.closingDate = LocalDate.now();
   }
 
   public void block() {
     setStatus(StatusEnum.BLOCKED);
+    this.closingDate = LocalDate.now();
   }
 }

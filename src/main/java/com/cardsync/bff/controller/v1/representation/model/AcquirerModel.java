@@ -7,6 +7,7 @@ import lombok.Setter;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +26,8 @@ public class AcquirerModel extends RepresentationModel<AcquirerModel>  {
   private String fantasyName;
   private String socialReason;
   private String fileIdentifier;
+  private LocalDate openingDate;
+  private LocalDate closingDate;
 
   private OffsetDateTime createdAt;
   private UserMinimalModel createdBy;

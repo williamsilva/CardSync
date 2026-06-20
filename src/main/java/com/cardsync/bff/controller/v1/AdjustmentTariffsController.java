@@ -1,7 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTariffsModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.AdjustmentFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
@@ -57,7 +57,7 @@ public class AdjustmentTariffsController {
 
   @PostMapping("/tariffs-totals")
   @CheckSecurity.FileProcessing.CanRead
-  public AdjustmentTotalsModel totals(@RequestBody ListQueryDto<AdjustmentFilter> body) {
+  public ValueTotalsModel totals(@RequestBody ListQueryDto<AdjustmentFilter> body) {
     return adjustmentService.totals(body);
   }
 }

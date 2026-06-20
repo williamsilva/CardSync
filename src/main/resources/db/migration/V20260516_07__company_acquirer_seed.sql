@@ -9,11 +9,11 @@ INSERT INTO cs_company(id, status, type, fantasy_name, social_reason, cnpj, crea
 INSERT INTO cs_acquirer(id, status, cnpj, fantasy_name, social_reason, file_identifier, created_at, updated_at, created_by_id) VALUES
     (UUID_TO_BIN(UUID()), 1, '01425787000104', 'Rede S/A', 'Rede', 'Rede', NOW(), NOW(),
      (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
-    (UUID_TO_BIN(UUID()), 1, '47848271000165', 'Cielo S/A', 'Cielo', 'Cielo', NOW(), NOW(),
+    (UUID_TO_BIN(UUID()), 2, '47848271000165', 'Cielo S/A', 'Cielo', 'Cielo', NOW(), NOW(),
      (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
     (UUID_TO_BIN(UUID()), 2, '22222222222222', 'SafraPay', 'SafraPay', 'SafraPay', NOW(), NOW(),
      (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
-    (UUID_TO_BIN(UUID()), 1, '11111111111111', 'Outra', 'Outra Adquirente', 'Outra', NOW(), NOW(),
+    (UUID_TO_BIN(UUID()), 2, '11111111111111', 'Outra', 'Outra Adquirente', 'Outra', NOW(), NOW(),
      (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br'));
 
 INSERT INTO cs_permissions (id, name, description) VALUES

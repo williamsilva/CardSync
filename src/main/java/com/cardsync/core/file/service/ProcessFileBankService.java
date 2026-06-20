@@ -13,11 +13,12 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.nio.charset.Charset;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -71,19 +72,28 @@ public class ProcessFileBankService {
 
     paths.ensureDirectories();
 
-    Path inputPath = Paths.get(paths.getInput());
+    Path inputPath = Paths.get(paths.getInput()).toAbsolutePath().normalize();
     if (!Files.exists(inputPath)) {
       log.info("ℹ Pasta bancária {} ainda não existe: {}", bankKey, inputPath);
       return new BankProcessingResult(0, 0, 0, 0, 0);
     }
 
-    try (DirectoryStream<Path> files = Files.newDirectoryStream(inputPath)) {
-      boolean hasFiles = false;
-      for (Path file : files) {
-        if (!Files.isRegularFile(file)) continue;
-        hasFiles = true;
-        scanned++;
+    Path invalidPath = paths.getInvalid() != null
+      ? Paths.get(paths.getInvalid()).toAbsolutePath().normalize()
+      : null;
 
+    try (Stream<Path> walk = Files.walk(inputPath)) {
+      List<Path> files = walk
+        .filter(Files::isRegularFile)
+        .filter(f -> invalidPath == null || !f.toAbsolutePath().normalize().startsWith(invalidPath))
+        .toList();
+
+      if (files.isEmpty()) {
+        log.debug("Nenhum arquivo bancário encontrado para {} em {}", bankKey, paths.getInput());
+      }
+
+      for (Path file : files) {
+        scanned++;
         try {
           if (!FileUtil.isTextFile(file)) {
             log.info("ℹ Arquivo bancário {} inválido para {}: não é texto. Movendo para invalid_file.", file.getFileName(), bankKey);
@@ -104,10 +114,6 @@ public class ProcessFileBankService {
             moveFileService.moveNowBank(file, paths.getError(), null, null, null);
           }
         }
-      }
-
-      if (!hasFiles) {
-        log.debug("Nenhum arquivo bancário encontrado para {} em {}", bankKey, paths.getInput());
       }
     } catch (Exception ex) {
       errors++;

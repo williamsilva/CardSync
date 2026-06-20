@@ -333,7 +333,7 @@ public class BankReconciliationService {
 
     release.setNumberCreditOrders(orders.size());
     release.setNumberReconciliations(safeInt(release.getNumberReconciliations()) + orders.size());
-    release.setReconciliationStatus(STATUS_LIQUIDATED);
+    release.setReconciliationStatus(StatusPaymentBankEnum.PAID);
 
     creditOrderRepository.saveAll(orders);
     releasesBankRepository.save(release);
@@ -456,7 +456,7 @@ public class BankReconciliationService {
 
     release.setNumberParcels(installments.size());
     release.setNumberReconciliations(safeInt(release.getNumberReconciliations()) + installments.size());
-    release.setReconciliationStatus(STATUS_LIQUIDATED);
+    release.setReconciliationStatus(StatusPaymentBankEnum.PAID);
 
     installmentAcqRepository.saveAll(installments);
     releasesBankRepository.save(release);
@@ -656,7 +656,7 @@ public class BankReconciliationService {
     }
 
     if (release.getReconciliationStatus() == null || Objects.equals(release.getReconciliationStatus(), STATUS_PENDING)) {
-      release.setReconciliationStatus(STATUS_NOT_RECONCILED);
+      release.setReconciliationStatus(StatusPaymentBankEnum.PAID);
       releasesBankRepository.save(release);
     }
     result.releaseWithoutMatch();

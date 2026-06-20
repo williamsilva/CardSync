@@ -80,6 +80,7 @@ public class FileProcessingProperties {
      */
     private Reconciliation reconciliation;
 
+    /** Retorna os caminhos de um sistema pelo nome (erp, rede). */
     public FilePaths byName(String system) {
       if (system == null) return null;
 
@@ -90,6 +91,10 @@ public class FileProcessingProperties {
       };
     }
 
+    /**
+     * Resolve o caminho Rede preferindo a configuração aninhada em {@code acquirer.rede},
+     * com fallback para a chave legada {@code rede} no nível de systems.
+     */
     public FilePaths redePath() {
       FilePaths nestedRede = acquirer != null ? acquirer.getRede() : null;
       if (hasInput(nestedRede)) {
@@ -113,6 +118,7 @@ public class FileProcessingProperties {
 
     private FilePaths rede = new FilePaths();
 
+    /** Retorna apenas os adquirentes que possuem {@code input} configurado. */
     public Map<String, FilePaths> enabledAcquirers() {
       Map<String, FilePaths> result = new LinkedHashMap<>();
       if (hasInput(rede)) result.put("rede", rede);
@@ -135,6 +141,7 @@ public class FileProcessingProperties {
     private FilePaths santander = new FilePaths();
     private FilePaths bradesco = new FilePaths();
 
+    /** Retorna apenas os bancos que possuem {@code input} configurado. */
     public Map<String, FilePaths> enabledBanks() {
       Map<String, FilePaths> result = new LinkedHashMap<>();
       if (hasInput(itau)) result.put("itau", itau);
@@ -370,6 +377,10 @@ public class FileProcessingProperties {
     }
   }
 
+  /**
+   * Retorna os caminhos de um sistema pelo nome, lançando exceção se {@code input} não estiver
+   * configurado. Aplica os defaults de subpastas antes de retornar.
+   */
   public FilePaths getPathsOrThrow(String system) {
     FilePaths paths = systems == null ? null : systems.byName(system);
 
@@ -382,6 +393,10 @@ public class FileProcessingProperties {
     return paths;
   }
 
+  /**
+   * Retorna o mapa de adquirentes habilitados (possuem {@code input} configurado),
+   * com defaults de subpastas já aplicados.
+   */
   public Map<String, FilePaths> getAcquirerPaths() {
     if (systems == null || systems.getAcquirer() == null) {
       return Map.of();
@@ -392,6 +407,10 @@ public class FileProcessingProperties {
     return result;
   }
 
+  /**
+   * Retorna o mapa de bancos habilitados (possuem {@code input} configurado),
+   * com defaults de subpastas já aplicados.
+   */
   public Map<String, FilePaths> getBankPaths() {
     if (systems == null || systems.getBank() == null) {
       return Map.of();
@@ -402,6 +421,10 @@ public class FileProcessingProperties {
     return result;
   }
 
+  /**
+   * Executado após injeção de propriedades. Aplica os defaults de subpastas para todos
+   * os sistemas e migra {@code systems.reconciliation} para o campo raiz quando presente.
+   */
   @PostConstruct
   void applyDefaults() {
     if (systems == null) {
@@ -426,6 +449,18 @@ public class FileProcessingProperties {
     );
   }
 
+  /**
+   * Preenche subpastas não configuradas com valores padrão derivados de {@code input}.
+   * Estrutura gerada (todas irmãs de {@code input}):
+   * <pre>
+   *   &lt;root&gt;/input/          ← pasta varrida pelo processador
+   *   &lt;root&gt;/error/          ← arquivos que falharam
+   *   &lt;root&gt;/processed/      ← arquivos concluídos com sucesso ou warnings
+   *   &lt;root&gt;/duplicate/      ← arquivos já importados anteriormente
+   *   &lt;root&gt;/invalid_file/   ← arquivos que não passaram na validação de formato
+   * </pre>
+   * Para ERP, cria também {@code input/log/} para os arquivos de log gerados.
+   */
   private void applyFilePathDefaults(String system, FilePaths paths, boolean erpLog) {
     if (paths == null || paths.getInput() == null || paths.getInput().isBlank()) {
       return;
@@ -445,7 +480,7 @@ public class FileProcessingProperties {
     }
 
     if (paths.getInvalid() == null || paths.getInvalid().isBlank()) {
-      paths.setInvalid(input + "/invalid_file");
+      paths.setInvalid(systemRoot + "/invalid_file");
     }
 
     if (paths.getDuplicate() == null || paths.getDuplicate().isBlank()) {
@@ -457,6 +492,11 @@ public class FileProcessingProperties {
     }
   }
 
+  /**
+   * Retorna o diretório pai de {@code input}, assumindo que o caminho termina em {@code /input}.
+   * Usado para derivar as subpastas irmãs (error, processed, etc.).
+   * Se o caminho não terminar em {@code /input}, retorna o próprio caminho.
+   */
   private String parentOfInput(String input) {
     String normalized = normalizePath(input);
     if (normalized == null || normalized.isBlank()) {
@@ -470,6 +510,7 @@ public class FileProcessingProperties {
     return normalized;
   }
 
+  /** Normaliza separadores de caminho para {@code /}, independente do SO. */
   private String normalizePath(String value) {
     return value == null ? null : value.replace('\\', '/');
   }

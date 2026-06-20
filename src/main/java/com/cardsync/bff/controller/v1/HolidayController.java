@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -41,7 +42,17 @@ public class HolidayController {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
     var page = holidayService.search(pageable, body);
 
-    return pagedResourcesAssembler.toModel(page, modelAssembler);
+    HolidayFilter filter = body.advanced();
+    int year = (filter != null && filter.holidayDate() != null)
+      ? filter.holidayDate().getYear()
+      : LocalDate.now().getYear();
+
+    modelAssembler.setTargetYear(year);
+    try {
+      return pagedResourcesAssembler.toModel(page, modelAssembler);
+    } finally {
+      modelAssembler.clearTargetYear();
+    }
   }
 
   @PostMapping

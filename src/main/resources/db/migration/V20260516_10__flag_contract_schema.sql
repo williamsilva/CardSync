@@ -20,7 +20,6 @@ CREATE TABLE cs_flag (
      REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
-
 CREATE TABLE cs_flag_acquirer (
   id BINARY(16) NOT NULL,
   acquirer_id BINARY(16) NOT NULL,

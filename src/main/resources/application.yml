@@ -85,7 +85,7 @@ file-processing:
   scheduler:
     # Liga/desliga geral dos agendamentos automáticos do CardSync.
     # Endpoints manuais continuam funcionando mesmo com esta flag false.
-    enabled: ${CARDSYNC_SCHEDULER_ENABLED:true}
+    enabled: ${CARDSYNC_SCHEDULER_ENABLED:false}
 
     # ÚNICO agendamento automático recomendado para produção.
     # Executa a esteira completa em ordem:
@@ -109,56 +109,21 @@ file-processing:
   systems:
 
     erp:
-      # Pasta de entrada dos arquivos ERP.
       input: ${file-processing.base-path}/ERP/input
-      # Arquivos com erro de processamento.
-      error: ${file-processing.base-path}/ERP/error
-      # Arquivos processados com sucesso ou com warnings controlados.
-      processed: ${file-processing.base-path}/ERP/processed
-      # Arquivos duplicados já processados anteriormente.
-      duplicate: ${file-processing.base-path}/ERP/duplicate
 
     acquirer:
       rede:
-        # Pasta de entrada dos arquivos Rede/adquirente.
         input: ${file-processing.base-acquirer}/REDE/input
-        # Arquivos com erro de processamento.
-        error: ${file-processing.base-acquirer}/REDE/error
-        # Arquivos processados com sucesso ou com warnings controlados.
-        processed: ${file-processing.base-acquirer}/REDE/processed
-        # Arquivos duplicados já processados anteriormente.
-        duplicate: ${file-processing.base-acquirer}/REDE/duplicate
 
     bank:
       itau:
-        # Pasta de entrada dos arquivos CNAB Itaú.
         input: ${file-processing.base-bank}/ITAU/input
-        # Arquivos com erro de processamento.
-        error: ${file-processing.base-bank}/ITAU/error
-        # Arquivos processados com sucesso ou com warnings controlados.
-        processed: ${file-processing.base-bank}/ITAU/processed
-        # Arquivos duplicados já processados anteriormente.
-        duplicate: ${file-processing.base-bank}/ITAU/duplicate
 
       santander:
-        # Pasta de entrada dos arquivos CNAB Santander.
         input: ${file-processing.base-bank}/SANTANDER/input
-        # Arquivos com erro de processamento.
-        error: ${file-processing.base-bank}/SANTANDER/error
-        # Arquivos processados com sucesso ou com warnings controlados.
-        processed: ${file-processing.base-bank}/SANTANDER/processed
-        # Arquivos duplicados já processados anteriormente.
-        duplicate: ${file-processing.base-bank}/SANTANDER/duplicate
 
       bradesco:
-        # Pasta de entrada dos arquivos CNAB Bradesco.
         input: ${file-processing.base-bank}/BRADESCO/input
-        # Arquivos com erro de processamento.
-        error: ${file-processing.base-bank}/BRADESCO/error
-        # Arquivos processados com sucesso ou com warnings controlados.
-        processed: ${file-processing.base-bank}/BRADESCO/processed
-        # Arquivos duplicados já processados anteriormente.
-        duplicate: ${file-processing.base-bank}/BRADESCO/duplicate
 
   reconciliation:
     # Limite máximo de candidatos para tentativa de combinação/subset recursivo.

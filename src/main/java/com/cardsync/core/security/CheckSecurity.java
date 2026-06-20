@@ -88,6 +88,18 @@ public @interface CheckSecurity {
   }
 
   @interface Register {
+    @interface Banks {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canConsultBanks()")
+      @interface CanConsult {}
+
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canActiveOrInactiveBanks()")
+      @interface CanActiveOrInactive {}
+    }
+
     @interface Companies {
         @Target(METHOD)
         @Retention(RUNTIME)

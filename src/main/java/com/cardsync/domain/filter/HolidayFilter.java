@@ -10,6 +10,7 @@ public record HolidayFilter(
   UUID id,
   String name,
   LocalDate holidayDate,
+  Boolean recurring,
   List<StatusEnum> statusEnum
 ) {
 }

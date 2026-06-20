@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 @Slf4j
@@ -29,12 +30,18 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class FinancialReconciliationPipelineService {
 
+  private final AtomicBoolean manualRunning = new AtomicBoolean(false);
+
   private final BankReconciliationService bankReconciliationService;
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final AcquirerSaleCancellationService acquirerSaleCancellationService;
   private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
+
+  public boolean isManualRunning() {
+    return manualRunning.get();
+  }
 
   /**
    * Não manter @Transactional aqui.
@@ -44,33 +51,45 @@ public class FinancialReconciliationPipelineService {
    * Cada serviço interno controla sua própria transação.
    */
   public FinancialReconciliationPipelineResult run(FinancialReconciliationTriggerType trigger) {
+    boolean isManual = trigger == FinancialReconciliationTriggerType.MANUAL;
+
+    if (isManual && !manualRunning.compareAndSet(false, true)) {
+      throw new IllegalStateException("Conciliação financeira manual já está em execução.");
+    }
+
     OffsetDateTime startedAt = OffsetDateTime.now();
 
-    log.info("▶ ESTEIRA DE CONCILIAÇÃO FINANCEIRA iniciada. trigger={}, startedAt={}", trigger, startedAt);
+    try {
+      log.info("▶ ESTEIRA DE CONCILIAÇÃO FINANCEIRA iniciada. trigger={}, startedAt={}", trigger, startedAt);
 
-    FinancialReconciliationPipelineResult result = FinancialReconciliationPipelineResult.builder()
-      .trigger(trigger)
-      .startedAt(startedAt)
-      .build();
+      FinancialReconciliationPipelineResult result = FinancialReconciliationPipelineResult.builder()
+        .trigger(trigger)
+        .startedAt(startedAt)
+        .build();
 
-    result.addStep(executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger)));
-    result.addStep(executePipelineStep("2. Cancelamentos informados pela adquirente", () -> runAcquirerSaleCancellations(trigger)));
-    result.addStep(executePipelineStep("3. Ajustes/taxas ERP x Adquirente", () -> runSaleAdjustments(trigger)));
-    result.addStep(executePipelineStep("4. Venda ADQ x resumo de vendas", () -> runAcquirerSaleSummary(trigger)));
-    result.addStep(executePipelineStep("5. Resumo de vendas x ordem de pagamento", () -> runSalesSummaryCreditOrder(trigger)));
-    result.addStep(executePipelineStep("6. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger)));
+      result.addStep(executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger)));
+      result.addStep(executePipelineStep("2. Cancelamentos informados pela adquirente", () -> runAcquirerSaleCancellations(trigger)));
+      result.addStep(executePipelineStep("3. Ajustes/taxas ERP x Adquirente", () -> runSaleAdjustments(trigger)));
+      result.addStep(executePipelineStep("4. Venda ADQ x resumo de vendas", () -> runAcquirerSaleSummary(trigger)));
+      result.addStep(executePipelineStep("5. Resumo de vendas x ordem de pagamento", () -> runSalesSummaryCreditOrder(trigger)));
+      result.addStep(executePipelineStep("6. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger)));
 
-    OffsetDateTime finishedAt = OffsetDateTime.now();
-    result.setFinishedAt(finishedAt);
+      OffsetDateTime finishedAt = OffsetDateTime.now();
+      result.setFinishedAt(finishedAt);
 
-    log.info(
-      "📘 ESTEIRA DE CONCILIAÇÃO FINANCEIRA FINALIZADA: trigger={}, etapas={}, duraçãoTotal={}s",
-      trigger,
-      result.getSteps().size(),
-      Duration.between(startedAt, finishedAt).toSeconds()
-    );
+      log.info(
+        "📘 ESTEIRA DE CONCILIAÇÃO FINANCEIRA FINALIZADA: trigger={}, etapas={}, duraçãoTotal={}s",
+        trigger,
+        result.getSteps().size(),
+        Duration.between(startedAt, finishedAt).toSeconds()
+      );
 
-    return result;
+      return result;
+    } finally {
+      if (isManual) {
+        manualRunning.set(false);
+      }
+    }
   }
 
   private FinancialReconciliationStepResult executePipelineStep(

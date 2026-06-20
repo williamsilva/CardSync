@@ -19,7 +19,6 @@ public record BankingDomicileInput(
   Integer currentAccount,
   @NotNull
   LocalDate accountOpeningDate,
-  @NotNull
   LocalDate accountClosingDate,
   @NotNull
   Boolean expectsFile,

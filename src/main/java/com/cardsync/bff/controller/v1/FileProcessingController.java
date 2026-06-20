@@ -1,6 +1,5 @@
 package com.cardsync.bff.controller.v1;
 
-import com.cardsync.bff.controller.v1.representation.model.bank.BankReleaseModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.ErpPendingSaleModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.FileProcessingScheduleStatusModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileCalendarModel;
@@ -12,7 +11,6 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Reproc
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.dashboard.FileProcessingDashboardModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.dashboard.FileProcessingDivergenceContextModel;
 import com.cardsync.bff.controller.v1.representation.model.rede.RedeTotalizerModel;
-import com.cardsync.core.file.bank.service.BankReleaseQueryService;
 import com.cardsync.core.file.erp.service.ErpPendingSaleService;
 import com.cardsync.core.file.rede.service.RedeFinancialQueryService;
 import com.cardsync.core.file.service.FileStorageTask;
@@ -51,7 +49,6 @@ public class FileProcessingController {
   private final FileProcessingReportService reportService;
   private final ErpPendingSaleService erpPendingSaleService;
   private final FileProcessingDashboardService dashboardService;
-  private final BankReleaseQueryService bankReleaseQueryService;
   private final RedeFinancialQueryService redeFinancialQueryService;
   private final BankReconciliationService bankReconciliationService;
 
@@ -132,13 +129,7 @@ public class FileProcessingController {
   public Page<RedeTotalizerModel> listRedeTotalizers(Pageable pageable) {
     return redeFinancialQueryService.listTotalizers(pageable);
   }
-
-  @GetMapping("/bank/releases")
-  @CheckSecurity.FileProcessing.CanRead
-  public Page<BankReleaseModel> listBankReleases(Pageable pageable) {
-    return bankReleaseQueryService.list(pageable);
-  }
-
+  
   @GetMapping("/schedules/status")
   @CheckSecurity.FileProcessing.CanRead
   public Map<String, FileProcessingScheduleStatusModel> scheduleStatus() {

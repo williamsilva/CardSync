@@ -2,11 +2,13 @@ package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.mapper.model.ReleasesBankModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.repository.ReleasesBankRepository;
+import com.cardsync.domain.service.support.ValueTotalsQueryService;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.ReleasesBankSpecs;
 import lombok.RequiredArgsConstructor;
@@ -24,8 +26,8 @@ import java.util.List;
 public class ReleasesBankService {
 
   private final ReleasesBankSpecs releasesBankSpecs;
+  private final ValueTotalsQueryService totalsQueryService;
   private final ReleasesBankRepository releasesBankRepository;
-  private final TransactionTotalsQueryService totalsQueryService;
   private final ReleasesBankModelAssembler releasesBankModelAssembler;
 
   @Transactional(readOnly = true)
@@ -46,17 +48,9 @@ public class ReleasesBankService {
   }
 
   @Transactional(readOnly = true)
-  public TransactionTotalsModel totals(ListQueryDto<ReleasesBankFilter> query) {
+  public ValueTotalsModel totals(ListQueryDto<ReleasesBankFilter> query) {
     Specification<ReleasesBankEntity> spec = releasesBankSpecs.fromQueryForTotals(query);
-
-    return totalsQueryService.totals(
-      ReleasesBankEntity.class,
-      spec,
-      "grossValue",
-      "discountValue",
-      "liquidValue",
-      "adjustment",
-      "adjustmentValue"
-    );
+    return totalsQueryService.totals(ReleasesBankEntity.class, spec,"releaseValue");
   }
+
 }

@@ -78,6 +78,16 @@ public class FileStorageTask {
     return bankState.get().toStatus(bankRunning.get());
   }
 
+  public boolean isAnyManualRunning() {
+    return isManualRunning(erpRunning, erpState)
+      || isManualRunning(redeRunning, redeState)
+      || isManualRunning(bankRunning, bankState);
+  }
+
+  private boolean isManualRunning(AtomicBoolean running, AtomicReference<ExecutionState> stateRef) {
+    return running.get() && stateRef.get().getLastTrigger() == FileProcessingTriggerType.MANUAL;
+  }
+
   private boolean execute(
     FileProcessingSystemType system,
     FileProcessingTriggerType trigger,

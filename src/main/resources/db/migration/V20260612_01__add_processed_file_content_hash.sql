@@ -24,10 +24,10 @@ INSERT INTO cs_permissions (id, name, description) VALUES
   (UUID_TO_BIN(UUID()), 'NO_FILE_DAY_DELETE', 'Remove dias sem Arquivos'),
   (UUID_TO_BIN(UUID()), 'NO_FILE_DAY_ACTIVE_OR_INACTIVE', 'Ativa ou Inativa dias sem Arquivos'),
 
-  (UUID_TO_BIN(UUID()), 'BANKS_CONSULT', 'Lista Bancos'),
-  (UUID_TO_BIN(UUID()), 'BANKS_CREATE', 'Cadastra Bancos'),
-  (UUID_TO_BIN(UUID()), 'BANKS_CHANGE', 'Altera Bancos'),
-  (UUID_TO_BIN(UUID()), 'BANKS_ACTIVE_OR_INACTIVE', 'Ativa ou Inativa Bancos');
+  (UUID_TO_BIN(UUID()), 'BANK_CONSULT', 'Lista Bancos'),
+  (UUID_TO_BIN(UUID()), 'BANK_CREATE', 'Cadastra Bancos'),
+  (UUID_TO_BIN(UUID()), 'BANK_CHANGE', 'Altera Bancos'),
+  (UUID_TO_BIN(UUID()), 'BANK_ACTIVE_OR_INACTIVE', 'Ativa ou Inativa Bancos');
 
 INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'ANTICIPATION_CONSULT')),
@@ -51,7 +51,7 @@ INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'NO_FILE_DAY_CHANGE')),
   ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'NO_FILE_DAY_ACTIVE_OR_INACTIVE')),
 
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANKS_CONSULT')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANKS_CREATE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANKS_CHANGE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANKS_ACTIVE_OR_INACTIVE'));
+  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANK_CONSULT')),
+  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANK_CREATE')),
+  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANK_CHANGE')),
+  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'BANK_ACTIVE_OR_INACTIVE'));

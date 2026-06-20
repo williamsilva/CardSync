@@ -6,16 +6,16 @@ import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.RelationAcquirerEstablishmentEntity;
 import com.cardsync.domain.model.RelationAcquirerCompanyEntity;
+import lombok.NonNull;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 
 @Component
-public class AcquirerModelAssembler extends RepresentationModelAssemblerSupport<AcquirerEntity, AcquirerModel> {
+public class AcquirerModelAssembler extends RepresentationModelAssemblerSupport<AcquirerEntity, @NonNull AcquirerModel> {
 
   @Autowired
   private ModelMapper modelMapper;
@@ -25,12 +25,14 @@ public class AcquirerModelAssembler extends RepresentationModelAssemblerSupport<
   }
 
   @Override
-  public AcquirerModel toModel(AcquirerEntity entity) {
+  public AcquirerModel toModel(@NonNull AcquirerEntity entity) {
     AcquirerModel model = createModelWithId(entity.getId(), entity);
 
     model.setId(entity.getId());
     model.setCnpj(entity.getCnpj());
     model.setCreatedAt(entity.getCreatedAt());
+    model.setOpeningDate(entity.getOpeningDate());
+    model.setClosingDate(entity.getClosingDate());
     model.setFantasyName(entity.getFantasyName());
     model.setSocialReason(entity.getSocialReason());
     model.setFileIdentifier(entity.getFileIdentifier());
@@ -67,13 +69,6 @@ public class AcquirerModelAssembler extends RepresentationModelAssemblerSupport<
     );
 
     return model;
-  }
-
-  @Override
-  public CollectionModel<AcquirerModel> toCollectionModel(Iterable<? extends AcquirerEntity> entities) {
-    CollectionModel<AcquirerModel> collectionModel = super.toCollectionModel(entities);
-
-    return collectionModel;
   }
 
   private RelationCompanyModel toCompanyRelationModel(RelationAcquirerCompanyEntity item) {

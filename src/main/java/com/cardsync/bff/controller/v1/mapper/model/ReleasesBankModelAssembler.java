@@ -31,8 +31,13 @@ public class ReleasesBankModelAssembler extends RepresentationModelAssemblerSupp
     model.setId(entity.getId());
     model.setLineNumber(entity.getLineNumber());
     model.setReleaseDate(entity.getReleaseDate());
+    model.setReleaseValue(entity.getReleaseValue());
     model.setReleaseCategory(entity.getReleaseCategory());
+    model.setHistoricalCodeBank(entity.getHistoricalCodeBank());
+    model.setStatusPaymentBank(entity.getReconciliationStatus());
     model.setModalityPaymentBank(entity.getModalityPaymentBank());
+    model.setDocumentComplementNumber(entity.getDocumentComplementNumber());
+    model.setDescriptionHistoricalBank(entity.getDescriptionHistoricalBank());
 
     model.setFlag(toFlag(entity.getFlag()));
     model.setBank(toBank(entity.getBank()));

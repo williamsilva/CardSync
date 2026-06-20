@@ -68,6 +68,11 @@ public class JobSequencialService {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     try {
+      if (fileStorageTask.isAnyManualRunning() || financialReconciliationPipelineService.isManualRunning()) {
+        log.warn("⏭️ Esteira completa ignorada: operação manual em andamento.");
+        return;
+      }
+
       log.info("▶ ESTEIRA COMPLETA CARDSYNC iniciado às {}", startedAt);
 
       executeStep("1. Processamento de arquivos ERP", () -> runFileStep(

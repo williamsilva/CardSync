@@ -50,13 +50,13 @@ public class TransactionTotalsQueryService {
     Expression<BigDecimal> net = root.get(netField).as(BigDecimal.class);
     Expression<BigDecimal> adjustment = adjustmentExpression(cb, root, adjustmentAssociation, adjustmentField);
 
-    cq.multiselect(
+    cq.select(cb.tuple(
       sumOrZero(cb, gross).alias("totalGross"),
       sumOrZero(cb, fee).alias("totalFee"),
       sumOrZero(cb, net).alias("totalNet"),
       sumOrZero(cb, adjustment).alias("totalAdjustment"),
       cb.count(root).alias("quantity")
-    );
+    ));
 
     if (spec != null) {
       Predicate predicate = spec.toPredicate(root, cq, cb);

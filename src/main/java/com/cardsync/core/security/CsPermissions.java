@@ -28,6 +28,10 @@ public abstract class CsPermissions {
   protected static final String PERM_COMPANIES_CONSULT = "PERM_COMPANIES_CONSULT";
   protected static final String PERM_COMPANIES_ACTIVE_OR_INACTIVE = "PERM_COMPANIES_ACTIVE_OR_INACTIVE";
 
+  /* Permission for Banks */
+  protected static final String PERM_BANK_CONSULT = "PERM_BANK_CONSULT";
+  protected static final String PERM_BANK_ACTIVE_OR_INACTIVE = "PERM_BANK_ACTIVE_OR_INACTIVE";
+
   /* Permission for Acquirers */
   protected static final String PERM_ACQUIRER_CHANGE = "PERM_ACQUIRER_CHANGE";
   protected static final String PERM_ACQUIRER_CREATE = "PERM_ACQUIRER_CREATE";

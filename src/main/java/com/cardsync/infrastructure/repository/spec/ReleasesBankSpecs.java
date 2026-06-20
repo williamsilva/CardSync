@@ -59,8 +59,7 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       );
 
       spec = spec.and(releasesBankAdvancedFields.advanced(query.advanced()));
-      spec = spec.and(inCodes("modalityPaymentBank", getAdjustmentCodes(), ModalityPaymentBankEnum::getCode)
-      );
+      spec = spec.and(inCodes("modalityPaymentBank", getModalityPaymentBank(), ModalityPaymentBankEnum::getCode));
     }
 
     return spec;
@@ -84,7 +83,7 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
     ));
   }
 
-  private static List<ModalityPaymentBankEnum> getAdjustmentCodes() {
+  private static List<ModalityPaymentBankEnum> getModalityPaymentBank() {
     return List.of(
       ModalityPaymentBankEnum.CASH_DEBIT,
       ModalityPaymentBankEnum.CASH_CREDIT,

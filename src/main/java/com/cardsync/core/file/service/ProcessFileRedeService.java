@@ -12,12 +12,13 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.Normalizer;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -40,12 +41,20 @@ public class ProcessFileRedeService {
     int processed = 0;
     int errors = 0;
 
-    try (DirectoryStream<Path> files = Files.newDirectoryStream(Paths.get(paths.getInput()))) {
-      boolean hasFiles = false;
-      for (Path file : files) {
-        if (!Files.isRegularFile(file)) continue;
-        hasFiles = true;
+    Path inputPath = Paths.get(paths.getInput()).toAbsolutePath().normalize();
+    if (!Files.exists(inputPath)) {
+      log.warn("⚠ Nenhum arquivo Rede encontrado em {}", paths.getInput());
+      return;
+    }
 
+    try (Stream<Path> walk = Files.walk(inputPath)) {
+      List<Path> files = walk.filter(Files::isRegularFile).toList();
+
+      if (files.isEmpty()) {
+        log.warn("⚠ Nenhum arquivo Rede encontrado em {}", paths.getInput());
+      }
+
+      for (Path file : files) {
         try {
           if (!FileUtil.isTextFile(file)) {
             moveFileService.moveNow(file, paths.getInvalid());
@@ -79,10 +88,6 @@ public class ProcessFileRedeService {
             moveFileService.moveNow(file, paths.getError());
           }
         }
-      }
-
-      if (!hasFiles) {
-        log.warn("⚠ Nenhum arquivo Rede encontrado em {}", paths.getInput());
       }
 
       if (errors > 0) {

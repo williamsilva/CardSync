@@ -2,12 +2,12 @@ package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.mapper.model.AdjustmentTariffsModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTariffsModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTotalsModel;
+import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.domain.filter.AdjustmentFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.repository.AdjustmentRepository;
-import com.cardsync.domain.service.support.AdjustmentTotalsQueryService;
+import com.cardsync.domain.service.support.ValueTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.AdjustmentTariffsSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,7 +25,7 @@ public class AdjustmentTariffsService {
 
   private final AdjustmentTariffsSpecs adjustmentSpecs;
   private final AdjustmentRepository adjustmentRepository;
-  private final AdjustmentTotalsQueryService totalsQueryService;
+  private final ValueTotalsQueryService totalsQueryService;
   private final AdjustmentTariffsModelAssembler adjustmentModelAssembler;
 
   /**
@@ -53,7 +53,7 @@ public class AdjustmentTariffsService {
   }
 
   @Transactional(readOnly = true)
-  public AdjustmentTotalsModel totals(ListQueryDto<AdjustmentFilter> query) {
+  public ValueTotalsModel totals(ListQueryDto<AdjustmentFilter> query) {
     Specification<AdjustmentEntity> spec = adjustmentSpecs.fromQueryForTotals(query);
     return totalsQueryService.totals(AdjustmentEntity.class, spec,"adjustmentValue");
   }

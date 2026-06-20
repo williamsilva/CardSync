@@ -21,11 +21,15 @@ import java.util.Objects;
 @Table(name = "cs_holiday")
 public class HolidayEntity extends AuditableEntityBase {
 
-  @Column(name = "holiday_date", nullable = false, unique = true)
+  @Column(name = "holiday_date", nullable = false)
   private LocalDate holidayDate;
 
   @Column(name = "name", length = 150, nullable = false)
   private String name;
+
+  /** Quando true, o feriado se repete todo ano; somente dia/mês de holidayDate são considerados. */
+  @Column(name = "recurring", nullable = false)
+  private Boolean recurring = Boolean.FALSE;
 
   @Column(name = "status", nullable = false)
   private Integer status = StatusEnum.ACTIVE.getCode();

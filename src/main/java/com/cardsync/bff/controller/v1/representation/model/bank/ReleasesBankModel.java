@@ -8,10 +8,12 @@ import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.Banki
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
 import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
 import com.cardsync.domain.model.enums.ReleaseCategoryEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
 import org.springframework.hateoas.server.core.Relation;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -25,10 +27,17 @@ public class ReleasesBankModel extends RepresentationModel<@NonNull ReleasesBank
   private UUID id;
 
   private Integer lineNumber;
-  private ReleaseCategoryEnum releaseCategory;
-  private ModalityPaymentBankEnum modalityPaymentBank;
+  private Integer historicalCodeBank;
+
+  private String documentComplementNumber;
+  private String descriptionHistoricalBank;
 
   private LocalDate releaseDate;
+  private BigDecimal releaseValue;
+
+  private ReleaseCategoryEnum releaseCategory;
+  private StatusPaymentBankEnum statusPaymentBank;
+  private ModalityPaymentBankEnum modalityPaymentBank;
 
   private FlagMinimalModel flag;
   private BankMinimalModel bank;
