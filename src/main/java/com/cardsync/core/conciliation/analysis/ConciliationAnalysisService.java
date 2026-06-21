@@ -1,6 +1,7 @@
 package com.cardsync.core.conciliation.analysis;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.*;
@@ -41,6 +42,7 @@ public class ConciliationAnalysisService {
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final FileProcessingProperties fileProcessingProperties;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final ConciliationFeeAnalysisService feeAnalysisService;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
 
@@ -1079,6 +1081,17 @@ public class ConciliationAnalysisService {
       if (sameIdentity.isEmpty()) {
         return ErpAcquirerMatchResult.notMatched();
       }
+    } else {
+      int backwardDays = erpAcquirerPreviousDaysLookback();
+      int forwardDays = erpAcquirerFutureDaysLookback();
+      if (backwardDays > 0 || forwardDays > 0) {
+        sameIdentity = sameIdentity.stream()
+          .filter(acq -> withinAsymmetricSaleDateWindow(erp.getSaleDate(), acq.getSaleDate(), backwardDays, forwardDays))
+          .toList();
+        if (sameIdentity.isEmpty()) {
+          return ErpAcquirerMatchResult.notMatched();
+        }
+      }
     }
 
     List<TransactionAcqEntity> sameValue = sameIdentity.stream()
@@ -1139,6 +1152,29 @@ public class ConciliationAnalysisService {
     FileProcessingProperties.Reconciliation reconciliation = fileProcessingProperties.getReconciliation();
     int days = reconciliation != null ? reconciliation.getManualSwapSaleDateToleranceDays() : 60;
     return days > 0 ? days : 60;
+  }
+
+  private int erpAcquirerPreviousDaysLookback() {
+    return reconciliationSettingsService.getErpAcquirerPreviousDaysLookback();
+  }
+
+  private int erpAcquirerFutureDaysLookback() {
+    return reconciliationSettingsService.getErpAcquirerFutureDaysLookback();
+  }
+
+  /**
+   * Janela assimétrica em torno da data de venda do ERP. Permite que a adquirente tenha
+   * registrado a transação até {@code backwardDays} dias antes ou até {@code forwardDays}
+   * dias depois da data do ERP.
+   */
+  private boolean withinAsymmetricSaleDateWindow(
+    OffsetDateTime erpSaleDate, OffsetDateTime acqSaleDate, int backwardDays, int forwardDays
+  ) {
+    if (erpSaleDate == null || acqSaleDate == null) return false;
+    LocalDate erpDate = erpSaleDate.toLocalDate();
+    LocalDate acqDate = acqSaleDate.toLocalDate();
+    return !acqDate.isBefore(erpDate.minusDays(backwardDays))
+        && !acqDate.isAfter(erpDate.plusDays(forwardDays));
   }
 
   /**

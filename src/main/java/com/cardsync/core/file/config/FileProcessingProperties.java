@@ -369,6 +369,20 @@ public class FileProcessingProperties {
      */
     private int bankMarkNotReconciledAfterDays = 3;
 
+    /**
+     * Fallback estático para o lookback retroativo de data na conciliação ERP x adquirente.
+     * O valor efetivo em runtime vem de {@code ReconciliationSettingsService} (banco de dados).
+     * Este campo serve apenas de default quando nenhuma configuração foi salva.
+     */
+    private int erpAcquirerPreviousDaysLookback = 0;
+
+    /**
+     * Fallback estático para o lookback futuro de data na conciliação ERP x adquirente.
+     * Usado quando o ERP registra a venda antes da adquirente (data ADQ posterior ao ERP).
+     * O valor efetivo em runtime vem de {@code ReconciliationSettingsService} (banco de dados).
+     */
+    private int erpAcquirerFutureDaysLookback = 0;
+
     public BigDecimal valueToleranceAsBigDecimal() {
       if (valueTolerance == null || valueTolerance.isBlank()) {
         return new BigDecimal("0.05");

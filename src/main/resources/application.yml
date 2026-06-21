@@ -174,3 +174,11 @@ file-processing:
     # Por padrão, a conciliação Resumo x ordem de crédito NÃO reprocessa resumos já conciliados.
     # Ative apenas para auditoria/reprocessamento controlado.
     reprocess-sales-summary-credit-order: ${REPROCESS_SALES_SUMMARY_CREDIT_ORDER:false}
+
+    # Fallback estático para dias retroativos na conciliação ERP x adquirente.
+    # O valor efetivo em runtime vem da tabela cs_reconciliation_settings (editável via UI).
+    erp-acquirer-previous-days-lookback: ${ERP_ACQUIRER_PREVIOUS_DAYS_LOOKBACK:0}
+
+    # Fallback estático para dias futuros (ADQ posterior ao ERP) na conciliação ERP x adquirente.
+    # O valor efetivo em runtime vem da tabela cs_reconciliation_settings (editável via UI).
+    erp-acquirer-future-days-lookback: ${ERP_ACQUIRER_FUTURE_DAYS_LOOKBACK:0}

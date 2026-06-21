@@ -1,0 +1,51 @@
+package com.cardsync.core.conciliation;
+
+import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationSettingsModel;
+import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationSettingsRequest;
+import com.cardsync.domain.model.ReconciliationSettingsEntity;
+import com.cardsync.domain.repository.ReconciliationSettingsRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class ReconciliationSettingsService {
+
+  private final ReconciliationSettingsRepository repository;
+
+  @Transactional(readOnly = true)
+  public ReconciliationSettingsModel getSettings() {
+    return repository.findFirstBy()
+      .map(s -> new ReconciliationSettingsModel(
+        s.getErpAcquirerPreviousDaysLookback(),
+        s.getErpAcquirerFutureDaysLookback()))
+      .orElse(new ReconciliationSettingsModel(0, 0));
+  }
+
+  @Transactional(readOnly = true)
+  public int getErpAcquirerPreviousDaysLookback() {
+    return repository.findFirstBy()
+      .map(ReconciliationSettingsEntity::getErpAcquirerPreviousDaysLookback)
+      .orElse(0);
+  }
+
+  @Transactional(readOnly = true)
+  public int getErpAcquirerFutureDaysLookback() {
+    return repository.findFirstBy()
+      .map(ReconciliationSettingsEntity::getErpAcquirerFutureDaysLookback)
+      .orElse(0);
+  }
+
+  @Transactional
+  public ReconciliationSettingsModel update(ReconciliationSettingsRequest request) {
+    ReconciliationSettingsEntity settings = repository.findFirstBy()
+      .orElseGet(ReconciliationSettingsEntity::new);
+    settings.setErpAcquirerPreviousDaysLookback(request.erpAcquirerPreviousDaysLookback());
+    settings.setErpAcquirerFutureDaysLookback(request.erpAcquirerFutureDaysLookback());
+    settings = repository.save(settings);
+    return new ReconciliationSettingsModel(
+      settings.getErpAcquirerPreviousDaysLookback(),
+      settings.getErpAcquirerFutureDaysLookback());
+  }
+}
