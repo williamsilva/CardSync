@@ -160,6 +160,38 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
   Optional<TransactionAcqEntity> findForManualResolutionById(@Param("id") UUID id);
 
   @Query("""
+    select a.id
+      from TransactionAcqEntity a
+     where a.statusTransaction = :canceledStatus
+       and function('YEAR', a.saleDate) = :year
+       and function('MONTH', a.saleDate) = :month
+     order by a.saleDate asc, a.id asc
+  """)
+  List<UUID> findCancelledAcqIdsForMonthReprocess(
+    @Param("canceledStatus") Integer canceledStatus,
+    @Param("year") int year,
+    @Param("month") int month
+  );
+
+  @Query("""
+    select distinct a
+      from TransactionAcqEntity a
+      left join fetch a.acquirer
+      left join fetch a.flag
+      left join fetch a.company
+      left join fetch a.establishment
+      left join fetch a.installments
+      left join fetch a.adjustment
+      left join fetch a.salesSummary ss
+      left join fetch ss.bankingDomicile
+     where a.id in :ids
+     order by a.saleDate asc, a.id asc
+  """)
+  List<TransactionAcqEntity> findBatchForCancelledMonthReprocess(
+    @Param("ids") Collection<UUID> ids
+  );
+
+  @Query("""
     select distinct a
       from TransactionAcqEntity a
       left join fetch a.acquirer

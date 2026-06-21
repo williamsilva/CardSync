@@ -165,4 +165,21 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
     @Param("transactionAcqIds") Collection<UUID> transactionAcqIds
   );
 
+  @Query("""
+    select distinct e
+      from TransactionErpEntity e
+      left join fetch e.installments
+      left join fetch e.adjustment
+     where e.nsu = :nsu
+       and lower(e.authorization) = lower(:authorization)
+       and e.acquirer.id = :acquirerId
+       and e.transactionAcq is null
+     order by e.saleDate asc, e.id asc
+  """)
+  List<TransactionErpEntity> findUnlinkedByNsuAuthorizationAndAcquirerForCancellationReprocess(
+    @Param("nsu") Long nsu,
+    @Param("authorization") String authorization,
+    @Param("acquirerId") UUID acquirerId
+  );
+
 }

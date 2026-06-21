@@ -5,11 +5,13 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.Transact
 import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
 import com.cardsync.core.conciliation.analysis.ConciliationManualSwapReconciliationService;
 import com.cardsync.core.conciliation.analysis.ErpAcquirerResolutionService;
+import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
 import com.cardsync.domain.service.ConciliationWaitingService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.hateoas.PagedModel;
@@ -26,6 +28,7 @@ public class ConciliationWaitingController {
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final ErpAcquirerResolutionService erpAcquirerResolutionService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
+  private final ErpCancellationReprocessService erpCancellationReprocessService;
 
   @PostMapping("/missing-acquirer")
   @CheckSecurity.FileProcessing.CanRead
@@ -113,6 +116,15 @@ public class ConciliationWaitingController {
     return conciliationWaitingService.createErpFromAcquirerBatch(request.transactionIds());
   }
 
+  @PatchMapping("/erp/{erpId}/update-identity")
+  @CheckSecurity.FileProcessing.CanProcess
+  public ErpAcquirerResolutionResultModel updateErpIdentity(
+    @PathVariable UUID erpId,
+    @RequestBody ErpUpdateIdentityRequest request
+  ) {
+    return conciliationWaitingService.updateErpIdentity(erpId, request);
+  }
+
   @PostMapping("/erp/{erpId}/mark-deleted")
   @CheckSecurity.FileProcessing.CanProcess
   public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(
@@ -169,5 +181,13 @@ public class ConciliationWaitingController {
       acquirerTransactionId,
       truthSource
     );
+  }
+
+  @PostMapping("/reprocess-erp-cancellations")
+  @CheckSecurity.FileProcessing.CanProcess
+  public ErpCancellationReprocessResult reprocessErpCancellations(
+    @Valid @RequestBody ErpCancellationReprocessRequest request
+  ) {
+    return erpCancellationReprocessService.reprocess(request.year(), request.month());
   }
 }

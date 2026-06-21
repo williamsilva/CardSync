@@ -257,6 +257,37 @@ public class ConciliationWaitingService {
   }
 
   @Transactional
+  public ErpAcquirerResolutionResultModel updateErpIdentity(UUID erpId, ErpUpdateIdentityRequest request) {
+    TransactionErpEntity erp = findErp(erpId);
+
+    if (!Objects.equals(erp.getCapture(), CaptureEnum.MANUAL.getCode())) {
+      throw BusinessException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        "Edição de NSU e autorização permitida apenas para vendas com captura manual."
+      );
+    }
+
+    erp.setNsu(request.nsu());
+    erp.setAuthorization(request.authorization() != null ? request.authorization().trim() : null);
+    transactionErpRepository.save(erp);
+
+    log.info(
+      "✏️ Identidade da venda ERP manual atualizada. erpId={}, nsu={}, authorization={}",
+      erp.getId(),
+      erp.getNsu(),
+      erp.getAuthorization()
+    );
+
+    return new ErpAcquirerResolutionResultModel(
+      erp.getId(),
+      null,
+      "UPDATE_ERP_IDENTITY",
+      "OK",
+      "NSU e autorização atualizados com sucesso."
+    );
+  }
+
+  @Transactional
   public ErpAcquirerBatchResolutionResultModel markErpAsDeletedMissingAcquirerBatch(ErpAcquirerBatchRequestModel request) {
     List<UUID> ids = normalizeIds(request.transactionIds());
     List<ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel> items = new ArrayList<>();
