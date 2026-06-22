@@ -35,10 +35,10 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
 
   public ConciliationWaitingErpSpecs(
     DateFilterService dateFilterService,
+    CardsyncAppProperties appProperties,
     SpecificationFactory specificationFactory,
     ConciliationWaitingErpTableFields conciliationWaitingTableFields,
-    ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields,
-    CardsyncAppProperties appProperties
+    ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
     this.appProperties = appProperties;
@@ -86,8 +86,7 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
     spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));
     spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
     spec = spec.and(Specification.not(inCodes("statusTransaction", List.of(StatusTransactionEnum.DELETED), StatusTransactionEnum::getCode)));
-    spec = spec.and(inCodes("statusTransactionReason",
-      List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ), StatusTransactionReasonEnum::getCode));
+    spec = spec.and(inCodes("statusTransactionReason", List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ), StatusTransactionReasonEnum::getCode));
 
     return spec;
   }

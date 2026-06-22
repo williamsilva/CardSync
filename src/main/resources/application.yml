@@ -155,6 +155,10 @@ file-processing:
     # Ative apenas para auditoria/reprocessamento controlado.
     reconcile-already-reconciled-erp-acquirer-sales: ${ERP_ACQUIRER_RECONCILE_ALREADY_RECONCILED:false}
 
+    # Por padrão, a conciliação Resumo de vendas x TransactionAcq processa apenas resumos com
+    # transactionsStatus nulo ou pendente. Ative para reprocessar resumos já conciliados (auditoria/correção).
+    reprocess-sales-summary-transactions: ${REPROCESS_SALES_SUMMARY_TRANSACTIONS:false}
+
     # Por padrão, a conciliação Banco x adquirente NÃO reprocessa lançamentos já conciliados.
     # Ative apenas para auditoria/reprocessamento controlado.
     reconcile-already-reconciled-bank-acquirer: ${BANK_ACQUIRER_RECONCILE_ALREADY_RECONCILED:false}

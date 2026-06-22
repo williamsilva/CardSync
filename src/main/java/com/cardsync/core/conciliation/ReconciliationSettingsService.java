@@ -19,8 +19,9 @@ public class ReconciliationSettingsService {
     return repository.findFirstBy()
       .map(s -> new ReconciliationSettingsModel(
         s.getErpAcquirerPreviousDaysLookback(),
-        s.getErpAcquirerFutureDaysLookback()))
-      .orElse(new ReconciliationSettingsModel(0, 0));
+        s.getErpAcquirerFutureDaysLookback(),
+        s.getReconciliationLookbackMonths()))
+      .orElse(new ReconciliationSettingsModel(0, 0, 6));
   }
 
   @Transactional(readOnly = true)
@@ -37,15 +38,24 @@ public class ReconciliationSettingsService {
       .orElse(0);
   }
 
+  @Transactional(readOnly = true)
+  public int getReconciliationLookbackMonths() {
+    return repository.findFirstBy()
+      .map(ReconciliationSettingsEntity::getReconciliationLookbackMonths)
+      .orElse(6);
+  }
+
   @Transactional
   public ReconciliationSettingsModel update(ReconciliationSettingsRequest request) {
     ReconciliationSettingsEntity settings = repository.findFirstBy()
       .orElseGet(ReconciliationSettingsEntity::new);
     settings.setErpAcquirerPreviousDaysLookback(request.erpAcquirerPreviousDaysLookback());
     settings.setErpAcquirerFutureDaysLookback(request.erpAcquirerFutureDaysLookback());
+    settings.setReconciliationLookbackMonths(request.reconciliationLookbackMonths());
     settings = repository.save(settings);
     return new ReconciliationSettingsModel(
       settings.getErpAcquirerPreviousDaysLookback(),
-      settings.getErpAcquirerFutureDaysLookback());
+      settings.getErpAcquirerFutureDaysLookback(),
+      settings.getReconciliationLookbackMonths());
   }
 }

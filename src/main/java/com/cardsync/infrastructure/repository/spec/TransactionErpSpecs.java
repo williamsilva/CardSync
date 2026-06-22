@@ -25,23 +25,23 @@ import java.util.Map;
 @Component
 public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final TransactionErpTableFields transactionErpTableFields;
   private final TransactionErpAdvancedFields transactionErpAdvancedFields;
-  private final CardsyncAppProperties appProperties;
 
   public TransactionErpSpecs(
+    CardsyncAppProperties appProperties,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     TransactionErpTableFields transactionErpFields,
-    TransactionErpAdvancedFields transactionErpAdvancedFields,
-    CardsyncAppProperties appProperties
+    TransactionErpAdvancedFields transactionErpAdvancedFields
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.transactionErpTableFields = transactionErpFields;
     this.transactionErpAdvancedFields = transactionErpAdvancedFields;
-    this.appProperties = appProperties;
   }
 
   public Specification<TransactionErpEntity> fromQuery(ListQueryDto<TransactionErpSalesFilter> query) {

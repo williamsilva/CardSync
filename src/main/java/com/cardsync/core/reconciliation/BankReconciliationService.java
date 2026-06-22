@@ -39,7 +39,6 @@ public class BankReconciliationService {
   private static final int STATUS_PENDING = BankReconciliationStatus.PENDING.getCode();
   private static final int PAYMENT_PARTIAL = StatusPaymentBankEnum.PARTIALLY_PAID.getCode();
   private static final int STATUS_LIQUIDATED = BankReconciliationStatus.RECONCILED.getCode();
-  private static final int STATUS_NOT_RECONCILED = BankReconciliationStatus.NOT_RECONCILED.getCode();
   private static final int STATUS_INSTALLMENT_RECONCILED = BankReconciliationStatus.INSTALLMENT_RECONCILED.getCode();
 
   /**
@@ -533,7 +532,6 @@ public class BankReconciliationService {
     SalesSummaryEntity summary = transaction.getSalesSummary();
     if (summary == null) return;
     summary.setStatusPaymentBank(transaction.getStatusPaymentBank());
-    summary.setTransactionsStatus(StatusTransactionEnum.fromCode(StatusTransactionEnum.toCode(transaction.getStatusTransaction())));
   }
 
   private void updateSalesSummaryFromCreditOrder(CreditOrderEntity order) {

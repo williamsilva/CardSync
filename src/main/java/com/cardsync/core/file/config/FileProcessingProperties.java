@@ -341,6 +341,13 @@ public class FileProcessingProperties {
     private boolean reprocessErpAcquirerFees = false;
 
     /**
+     * Por padrão, a conciliação de transações ADQ x resumo de vendas processa apenas
+     * resumos com transactionsStatus nulo ou pendente.
+     * Ative para reprocessar resumos já conciliados (auditoria / correção).
+     */
+    private boolean reprocessSalesSummaryTransactions = false;
+
+    /**
      * Por padrão, a conciliação Venda ADQ x resumo ignora resumos já conciliados.
      * Ative apenas quando precisar reprocessar/corrigir resumos de vendas.
      */

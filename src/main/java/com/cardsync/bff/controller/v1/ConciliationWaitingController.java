@@ -6,7 +6,9 @@ import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
 import com.cardsync.core.conciliation.analysis.ConciliationManualSwapReconciliationService;
 import com.cardsync.core.conciliation.analysis.ErpAcquirerResolutionService;
 import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
+import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.core.security.CheckSecurity;
+import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
@@ -27,8 +29,9 @@ public class ConciliationWaitingController {
   private final ConciliationWaitingService conciliationWaitingService;
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final ErpAcquirerResolutionService erpAcquirerResolutionService;
-  private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final ErpCancellationReprocessService erpCancellationReprocessService;
+  private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
+  private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
 
   @PostMapping("/missing-acquirer")
   @CheckSecurity.FileProcessing.CanRead
@@ -154,19 +157,21 @@ public class ConciliationWaitingController {
   @PostMapping("/reconcile")
   @CheckSecurity.FileProcessing.CanProcess
   public ReconcileErpAcquirerResultModel reconcileErpVsAcquirer() {
-    return conciliationAnalysisService.reconcileErpWithAcquirerBusinessContext();
+    ReconcileErpAcquirerResultModel result = conciliationAnalysisService.reconcileRedeErpWithAcquirer();
+    salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
+    return result;
   }
 
   @PostMapping("/reconcile-manual-swapped")
   @CheckSecurity.FileProcessing.CanProcess
   public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
-    return conciliationManualSwapReconciliationService.reconcileManualSwapped();
+    return conciliationManualSwapReconciliationService.reconcileRedeManualSwapped();
   }
 
   @PostMapping("/reconcile-fees")
   @CheckSecurity.FileProcessing.CanProcess
   public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
-    return conciliationAnalysisService.reconcileErpAcquirerFees();
+    return conciliationAnalysisService.reconcileRedeErpAcquirerFees();
   }
 
   @PostMapping("/reconcile-manually")

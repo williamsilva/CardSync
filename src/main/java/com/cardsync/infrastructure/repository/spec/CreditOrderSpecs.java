@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.CreditOrderFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -19,17 +20,20 @@ import java.util.Map;
 @Component
 public class CreditOrderSpecs extends BaseSpecificationSupport<CreditOrderEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final CreditOrderTableFields creditOrderTableFields;
   private final CreditOrderAdvancedFields creditOrderAdvancedFields;
 
   public CreditOrderSpecs(
+    CardsyncAppProperties appProperties,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     CreditOrderTableFields creditOrderTableFields,
     CreditOrderAdvancedFields creditOrderAdvancedFields
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.creditOrderTableFields = creditOrderTableFields;
     this.creditOrderAdvancedFields = creditOrderAdvancedFields;
@@ -58,6 +62,8 @@ public class CreditOrderSpecs extends BaseSpecificationSupport<CreditOrderEntity
       );
 
       spec = spec.and(creditOrderAdvancedFields.advanced(query.advanced()));
+
+      spec = spec.and(dateGreaterThanOrEqual("rvDate", appProperties.getImplantationDate(), false));
     }
 
     return spec;

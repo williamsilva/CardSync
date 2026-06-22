@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -72,15 +73,20 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
             or a.statusTransaction <> :notReconciledStatus
             or a.statusTransactionReason is null
             or a.statusTransactionReason = :nullReason)
+       and a.saleDate >= :implantationDate
+       and a.saleDate >= :lookbackDate
+       and upper(a.acquirer.fileIdentifier) = 'REDE'
      order by a.saleDate asc, a.id asc
   """)
-  List<UUID> findIdsForMissingInErpStatusClassification(
+  List<UUID> findRedeAcqIdsForMissingInErpClassification(
     Pageable pageable,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("notReconciledStatus") Integer notReconciledStatus,
     @Param("nullReason") Integer nullReason,
-    @Param("excludedModality") Integer excludedModality
+    @Param("excludedModality") Integer excludedModality,
+    @Param("implantationDate") OffsetDateTime implantationDate,
+    @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
   @Query("""
@@ -110,15 +116,20 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch ss.bankingDomicile
      where a.nsu in :nsus
        and (a.modality is not null and a.modality <> :excludedModality)
+       and a.saleDate >= :implantationDate
+       and a.saleDate >= :lookbackDate
+       and upper(a.acquirer.fileIdentifier) = 'REDE'
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
   """)
-  List<TransactionAcqEntity> findCandidatesForErpAcquirerReconciliationByNsus(
+  List<TransactionAcqEntity> findRedeAcqCandidatesForReconciliationByNsus(
     @Param("nsus") Collection<Long> nsus,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
-    @Param("excludedModality") Integer excludedModality
+    @Param("excludedModality") Integer excludedModality,
+    @Param("implantationDate") OffsetDateTime implantationDate,
+    @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
   @Query("""
@@ -133,15 +144,20 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch ss.bankingDomicile
      where lower(a.authorization) in :authorizations
        and (a.modality is not null and a.modality <> :excludedModality)
+       and a.saleDate >= :implantationDate
+       and a.saleDate >= :lookbackDate
+       and upper(a.acquirer.fileIdentifier) = 'REDE'
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
   """)
-  List<TransactionAcqEntity> findCandidatesForErpAcquirerReconciliationByAuthorizations(
+  List<TransactionAcqEntity> findRedeAcqCandidatesForReconciliationByAuthorizations(
     @Param("authorizations") Collection<String> authorizations,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
-    @Param("excludedModality") Integer excludedModality
+    @Param("excludedModality") Integer excludedModality,
+    @Param("implantationDate") OffsetDateTime implantationDate,
+    @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
   @Query("""

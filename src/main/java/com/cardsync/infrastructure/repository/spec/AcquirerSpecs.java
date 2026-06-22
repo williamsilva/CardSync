@@ -61,20 +61,6 @@ public class AcquirerSpecs extends BaseSpecificationSupport<AcquirerEntity> {
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
     }
 
-    if (!isBlank(query.globalFilter())) {
-      String gf = query.globalFilter();
-
-      spec = spec.and(
-        anyOf(
-          contains("cnpj", gf),
-          contains("fantasyName", gf),
-          contains("socialReason", gf),
-          containsPath(gf, "createdBy", "name"),
-          containsPath(gf, "createdBy", "userName")
-        )
-      );
-    }
-
     return spec.and(orderByAsc("fantasyName"));
   }
 }

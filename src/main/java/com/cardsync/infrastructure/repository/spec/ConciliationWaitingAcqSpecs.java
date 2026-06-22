@@ -71,13 +71,9 @@ public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<Transa
 
     }
 
-    spec = spec.and(inCodes("statusTransactionReason",
-      List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ERP), StatusTransactionReasonEnum::getCode)
-    );
-    spec = spec.and(Specification.not(
-      inCodes("modality", getModalityEnum(), ModalityEnum::getCode)
-    ));
+    spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));
     spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
+    spec = spec.and(inCodes("statusTransactionReason", List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ERP), StatusTransactionReasonEnum::getCode));
 
     return spec;
   }

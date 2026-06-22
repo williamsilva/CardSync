@@ -2,6 +2,7 @@ package com.cardsync.infrastructure.repository.spec.advancedFilters;
 
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
@@ -24,6 +25,8 @@ public class SaleSummaryAdvancedFields extends BaseSpecificationSupport<SalesSum
       return spec;
     }
 
+    spec = spec.and(inCodes("pvNumber", filter.establishments(), x -> x));
+    spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode));
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("transactionsStatus", filter.transactionsStatus(), StatusTransactionEnum::getCode));
     spec = spec.and(inCodes("creditOrderStatus", filter.creditOrderStatus(), StatusReconciliationEnum::getCode));

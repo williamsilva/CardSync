@@ -109,7 +109,7 @@ public class ErpAcquirerResolutionService {
     erp.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED);
 
     acq.setSaleReconciliationDate(now);
-    acq.setStatusTransaction(StatusTransactionEnum.PENDING);
+    acq.setStatusTransaction(StatusTransactionEnum.MANUALLY_RECONCILED);
     acq.setStatusTransactionReason(StatusTransactionReasonEnum.SCHEDULED);
 
     erp.setCommercialStatus(ErpCommercialStatusEnum.OK);

@@ -1,5 +1,7 @@
 package com.cardsync.core.reconciliation.summary;
 
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +44,9 @@ public class AcquirerSaleSummaryReconciliationService {
     FeeReconciliationStatusEnum.MISSING_VALID_CONTRACT.getCode()
   );
 
+  private final CardsyncAppProperties appProperties;
   private final FileProcessingProperties properties;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
 
   /**
@@ -69,11 +74,16 @@ public class AcquirerSaleSummaryReconciliationService {
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
+    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+
     List<AcquirerSaleSummaryStats> stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(
       reprocess,
       PENDING_SUMMARY_TRANSACTION_STATUSES,
       ELIGIBLE_SALE_STATUSES,
-      ELIGIBLE_FEE_STATUSES
+      ELIGIBLE_FEE_STATUSES,
+      implantationDate,
+      lookbackDate
     );
 
     log.info(
@@ -143,17 +153,31 @@ public class AcquirerSaleSummaryReconciliationService {
       trigger
     );
 
+    int updatedNoTransactions = salesSummaryRepository.markSummariesWithoutTransactionsAsReconciled(
+      reprocess,
+      PENDING_SUMMARY_TRANSACTION_STATUSES,
+      StatusReconciliationEnum.RECONCILED.getCode()
+    );
+    counter.summariesWithoutTransactions = updatedNoTransactions;
+
+    log.info(
+      "🔗 Etapa 3 - SalesSummary sem transações marcados como conciliados. trigger={}, atualizados={}",
+      trigger,
+      updatedNoTransactions
+    );
+
     OffsetDateTime finishedAt = OffsetDateTime.now();
     AcquirerSaleSummaryReconciliationResult result = counter.toResult(finishedAt);
 
     log.info(
-      "✅ Etapa 3 - Venda ADQ x resumo finalizada. trigger={}, summariesAnalisados={}, conciliados={}, parciais={}, pendentes={}, bloqueados={}, transactionsAnalisadas={}, elegiveis={}, updatesConciliado={}, updatesParcial={}, updatesPendente={}, duraçãoTotal={}s",
+      "✅ Etapa 3 - Venda ADQ x resumo finalizada. trigger={}, summariesAnalisados={}, conciliados={}, parciais={}, pendentes={}, bloqueados={}, semTransacoes={}, transactionsAnalisadas={}, elegiveis={}, updatesConciliado={}, updatesParcial={}, updatesPendente={}, duraçãoTotal={}s",
       result.getTrigger(),
       result.getSummariesAnalyzed(),
       result.getSummariesReconciled(),
       result.getSummariesPartiallyReconciled(),
       result.getSummariesPending(),
       result.getSummariesBlockedByPreviousStep(),
+      result.getSummariesWithoutTransactions(),
       result.getTransactionsAnalyzed(),
       result.getTransactionsEligible(),
       updatedReconciled,

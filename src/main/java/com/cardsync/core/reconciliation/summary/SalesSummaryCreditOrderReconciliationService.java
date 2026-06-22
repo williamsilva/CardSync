@@ -1,5 +1,7 @@
 package com.cardsync.core.reconciliation.summary;
 
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
@@ -13,11 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -32,15 +38,17 @@ public class SalesSummaryCreditOrderReconciliationService {
 
   /**
    * Etapa 5 - Resumo x ordem de pagamento.
-
-   * Regra de dependência: somente resumos cuja conciliação Venda ADQ x Resumo (etapa 4)
-   * ficou TOTALMENTE conciliada participam desta etapa. O campo {@code transactionsStatus}
-   * é gravado pela etapa 4 usando {@link StatusReconciliationEnum}; portanto a elegibilidade
-   * aqui deve usar o MESMO enum. Resumos parcialmente conciliados NÃO entram (ficam para o
-   * próximo ciclo, quando — e se — forem totalmente conciliados).
+   *
+   * A conciliação com ordem de crédito é independente do estado das transações ADQ.
+   * Um resumo pode ter (ou receber) uma ordem de crédito mesmo que suas transações
+   * individuais ainda estejam parcialmente pendentes. São elegíveis resumos com
+   * {@code transactionsStatus} RECONCILED ou PARTIALLY_RECONCILED. Resumos com
+   * {@code transactionsStatus} NULL (ainda não processados pela Etapa 2) são incluídos
+   * via condição adicional na query do repositório.
    */
   private static final List<Integer> ELIGIBLE_TRANSACTION_SUMMARY_STATUSES = List.of(
-    StatusReconciliationEnum.RECONCILED.getCode()
+    StatusReconciliationEnum.RECONCILED.getCode(),
+    StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode()
   );
 
   private static final List<Integer> PENDING_SUMMARY_CREDIT_ORDER_STATUSES = List.of(
@@ -48,7 +56,9 @@ public class SalesSummaryCreditOrderReconciliationService {
     StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode()
   );
 
+  private final CardsyncAppProperties appProperties;
   private final FileProcessingProperties properties;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
   private final CreditOrderRepository creditOrderRepository;
 
@@ -70,10 +80,15 @@ public class SalesSummaryCreditOrderReconciliationService {
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
 
+    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+
     List<SalesSummaryCreditOrderStats> stats = salesSummaryRepository.findStatsForSalesSummaryCreditOrderReconciliation(
       reprocess,
       ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
-      PENDING_SUMMARY_CREDIT_ORDER_STATUSES
+      PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
+      implantationDate,
+      lookbackDate
     );
 
     log.info(
@@ -82,6 +97,16 @@ public class SalesSummaryCreditOrderReconciliationService {
       stats.size(),
       Duration.between(queryStartedAt, OffsetDateTime.now()).toSeconds()
     );
+
+    long orphanCreditOrders = creditOrderRepository.countWithoutSalesSummary();
+    if (orphanCreditOrders > 0) {
+      log.warn(
+        "⚠️ Etapa 4 - Diagnóstico: {} CreditOrder(s) sem salesSummary vinculado. Esses registros não participam da conciliação e podem indicar falha no processamento dos arquivos de ordem de crédito (RV/PV sem match com SalesSummary).",
+        orphanCreditOrders
+      );
+    } else {
+      log.info("✅ Etapa 4 - Diagnóstico: nenhuma CreditOrder órfã (sem salesSummary). trigger={}", trigger);
+    }
 
     Counter counter = new Counter(trigger, startedAt);
     counter.summariesAnalyzed = stats.size();
@@ -168,6 +193,8 @@ public class SalesSummaryCreditOrderReconciliationService {
       totalBatches
     );
 
+    List<SalesSummaryEntity> notGeneratedSummaries = new ArrayList<>();
+
     int batchNumber = 0;
     for (List<UUID> batchIds : partition(summariesWithoutOrders, GENERATION_BATCH_SIZE)) {
       batchNumber++;
@@ -182,6 +209,7 @@ public class SalesSummaryCreditOrderReconciliationService {
           generatedSummaryIds.add(summary.getId());
         } else {
           notGeneratedSummaryIds.add(summary.getId());
+          notGeneratedSummaries.add(summary);
         }
       }
 
@@ -210,6 +238,9 @@ public class SalesSummaryCreditOrderReconciliationService {
       notGeneratedSummaryIds.size(),
       Duration.between(startedAt, OffsetDateTime.now()).toSeconds()
     );
+
+    logNotGeneratedDistribution(notGeneratedSummaries, trigger);
+    logPvMismatchDiagnosis(notGeneratedSummaries, trigger);
 
     return new GeneratedOrders(generatedSummaryIds, notGeneratedSummaryIds, generatedOrders);
   }
@@ -359,6 +390,107 @@ public class SalesSummaryCreditOrderReconciliationService {
       trigger,
       totalUpdated
     );
+  }
+
+  private void logPvMismatchDiagnosis(List<SalesSummaryEntity> summaries, FinancialReconciliationTriggerType trigger) {
+    if (summaries.isEmpty()) return;
+
+    Set<UUID> acquirerIds = summaries.stream()
+      .filter(ss -> ss.getAcquirer() != null)
+      .map(ss -> ss.getAcquirer().getId())
+      .collect(Collectors.toSet());
+
+    Set<Integer> rvNumbers = summaries.stream()
+      .filter(ss -> ss.getRvNumber() != null)
+      .map(SalesSummaryEntity::getRvNumber)
+      .collect(Collectors.toSet());
+
+    if (acquirerIds.isEmpty() || rvNumbers.isEmpty()) return;
+
+    List<CreditOrderEntity> orphans = creditOrderRepository.findOrphanedByAcquirerIdsAndRvNumbers(acquirerIds, rvNumbers);
+
+    if (orphans.isEmpty()) {
+      log.info(
+        "🔍 Etapa 4 - PV Mismatch: nenhuma CreditOrder órfã com acquirer+rvNumber correspondente aos {} SalesSummary pendentes. Os arquivos EEFI para esses RVs provavelmente não foram importados. trigger={}",
+        summaries.size(), trigger
+      );
+      return;
+    }
+
+    // Para cada órfã que bate por acquirer+rvNumber, verifica se pvCentralizer difere do pvNumber do SalesSummary
+    Map<String, Integer> summaryPvByKey = summaries.stream()
+      .filter(ss -> ss.getAcquirer() != null && ss.getRvNumber() != null && ss.getPvNumber() != null)
+      .collect(Collectors.toMap(
+        ss -> ss.getAcquirer().getId() + ":" + ss.getRvNumber(),
+        SalesSummaryEntity::getPvNumber,
+        (a, b) -> a
+      ));
+
+    long pvMatch = 0;
+    long pvMismatch = 0;
+    Map<String, Long> mismatchPatterns = new java.util.LinkedHashMap<>();
+
+    for (CreditOrderEntity co : orphans) {
+      if (co.getAcquirer() == null || co.getRvNumber() == null) continue;
+      String key = co.getAcquirer().getId() + ":" + co.getRvNumber();
+      Integer summaryPv = summaryPvByKey.get(key);
+      if (summaryPv == null) continue;
+
+      if (summaryPv.equals(co.getPvCentralizer())) {
+        pvMatch++;
+      } else {
+        pvMismatch++;
+        String pattern = "summaryPv=" + summaryPv
+          + " | coPvCentralizer=" + co.getPvCentralizer()
+          + " | coOriginalPv=" + co.getOriginalPvNumber()
+          + " | rv=" + co.getRvNumber();
+        mismatchPatterns.merge(pattern, 1L, (a, b) -> a + b);
+      }
+    }
+
+    if (pvMismatch > 0) {
+      log.warn(
+        "⚠️ Etapa 4 - PV Mismatch: {} CreditOrder(s) órfã(s) têm acquirer+rvNumber correspondente mas pvCentralizer diferente do pvNumber do SalesSummary. trigger={}",
+        pvMismatch, trigger
+      );
+      mismatchPatterns.entrySet().stream()
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+        .limit(20)
+        .forEach(e -> log.warn("   → count={} | {}", e.getValue(), e.getKey()));
+    }
+
+    if (pvMatch > 0) {
+      log.warn(
+        "⚠️ Etapa 4 - PV Match exacto mas ainda órfã: {} CreditOrder(s) com acquirer+rvNumber+pvCentralizer idêntico ao SalesSummary mas salesSummary=NULL. Pode ser bug na ingestão. trigger={}",
+        pvMatch, trigger
+      );
+    }
+
+    if (pvMismatch == 0 && pvMatch == 0) {
+      log.info(
+        "🔍 Etapa 4 - PV Mismatch: {} CreditOrder(s) órfã(s) encontradas por acquirer+rvNumber mas sem cruzamento direto com os SalesSummary pendentes (chaves incompatíveis). trigger={}",
+        orphans.size(), trigger
+      );
+    }
+  }
+
+  private void logNotGeneratedDistribution(List<SalesSummaryEntity> summaries, FinancialReconciliationTriggerType trigger) {
+    if (summaries.isEmpty()) return;
+
+    Map<String, Long> distribution = summaries.stream().collect(Collectors.groupingBy(
+      ss -> "modality=" + ss.getModality()
+        + " | summaryType=" + upper(ss.getSummaryType())
+        + " | recordType=" + upper(ss.getRecordType()),
+      Collectors.counting()
+    ));
+
+    log.info(
+      "🔍 Etapa 4 - Diagnóstico: {} SalesSummary sem CreditOrder e sem geração sintética. trigger={}, distribuição:",
+      summaries.size(), trigger
+    );
+    distribution.entrySet().stream()
+      .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+      .forEach(e -> log.info("   → count={} | {}", e.getValue(), e.getKey()));
   }
 
   private boolean shouldGenerateSyntheticCreditOrder(SalesSummaryEntity summary) {

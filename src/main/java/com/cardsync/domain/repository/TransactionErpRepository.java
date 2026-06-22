@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,12 +31,17 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
             or (e.saleReconciliationDate is null
                 and (e.statusTransaction is null or e.statusTransaction in :pendingStatuses)))
        and (e.modality is not null and e.modality <> :excludedModality)
+       and e.saleDate >= :implantationDate
+       and e.saleDate >= :lookbackDate
+       and upper(e.acquirer.fileIdentifier) = 'REDE'
      order by e.saleDate asc, e.id asc
   """)
-  List<UUID> findIdsForErpAcquirerReconciliation(
+  List<UUID> findRedeErpIdsForReconciliation(
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
-    @Param("excludedModality") Integer excludedModality
+    @Param("excludedModality") Integer excludedModality,
+    @Param("implantationDate") OffsetDateTime implantationDate,
+    @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
   @Query("""
@@ -46,13 +52,18 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and e.capture = :manualCapture
        and e.statusTransactionReason in :sourceReasonCodes
        and (e.modality is not null and e.modality <> :excludedModality)
+       and e.saleDate >= :implantationDate
+       and e.saleDate >= :lookbackDate
+       and upper(e.acquirer.fileIdentifier) = 'REDE'
      order by e.saleDate asc, e.id asc
   """)
-  List<UUID> findIdsForManualSwapReconciliation(
+  List<UUID> findRedeErpIdsForManualSwapReconciliation(
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("manualCapture") Integer manualCapture,
     @Param("sourceReasonCodes") Collection<Integer> sourceReasonCodes,
-    @Param("excludedModality") Integer excludedModality
+    @Param("excludedModality") Integer excludedModality,
+    @Param("implantationDate") OffsetDateTime implantationDate,
+    @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
   @Query("""
@@ -72,7 +83,7 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
      where e.id in :ids
      order by e.saleDate asc, e.id asc
   """)
-  List<TransactionErpEntity> findBatchForErpAcquirerReconciliation(@Param("ids") Collection<UUID> ids);
+  List<TransactionErpEntity> findRedeErpBatchForReconciliation(@Param("ids") Collection<UUID> ids);
 
   @Query("""
     select distinct e
@@ -105,13 +116,18 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and ta.modality <> :excludedModality
        and (:includeAlreadyProcessed = true or e.feeReconciliationStatus is null or e.feeReconciliationStatus in :pendingFeeStatuses)
        and (:includeAlreadyProcessed = true or ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
+       and e.saleDate >= :implantationDate
+       and e.saleDate >= :lookbackDate
+       and upper(e.acquirer.fileIdentifier) = 'REDE'
      order by e.saleDate asc, e.id asc
   """)
-  List<UUID> findIdsForErpAcquirerFeeReconciliation(
+  List<UUID> findRedeErpIdsForFeeReconciliation(
     @Param("includeAlreadyProcessed") boolean includeAlreadyProcessed,
     @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,
     @Param("excludedModality") Integer excludedModality,
-    @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses
+    @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses,
+    @Param("implantationDate") OffsetDateTime implantationDate,
+    @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
   @Query("""
@@ -144,7 +160,7 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and (:includeAlreadyProcessed = true or ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
      order by e.saleDate asc, e.id asc
   """)
-  List<TransactionErpEntity> findBatchForErpAcquirerFeeReconciliation(
+  List<TransactionErpEntity> findRedeErpBatchForFeeReconciliation(
     @Param("ids") Collection<UUID> ids,
     @Param("includeAlreadyProcessed") boolean includeAlreadyProcessed,
     @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,

@@ -1,6 +1,8 @@
 package com.cardsync.core.conciliation.analysis;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconcileErpAcquirerResultModel;
+import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
@@ -14,6 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -40,22 +45,29 @@ import java.util.UUID;
 public class ConciliationManualSwapReconciliationService {
 
   private final EntityManager entityManager;
+  private final CardsyncAppProperties appProperties;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final ConciliationAnalysisService conciliationAnalysisService;
 
   @Transactional
-  public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
-    return reconcileManualSwapped("MANUAL");
+  public ReconcileErpAcquirerResultModel reconcileRedeManualSwapped() {
+    return reconcileRedeManualSwapped("MANUAL");
   }
 
   @Transactional
-  public ReconcileErpAcquirerResultModel reconcileManualSwapped(String trigger) {
+  public ReconcileErpAcquirerResultModel reconcileRedeManualSwapped(String trigger) {
     // Esta etapa nunca reprocessa vendas já conciliadas: ela só atua sobre o que
     // sobrou pendente após a conciliação principal.
     List<Integer> pendingStatuses = conciliationAnalysisService.erpAcquirerPendingStatusCodes();
 
-    List<UUID> erpIds = transactionErpRepository.findIdsForManualSwapReconciliation(
+    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime lookbackDate = LocalDate.now()
+      .minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths())
+      .atStartOfDay().atOffset(ZoneOffset.UTC);
+
+    List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForManualSwapReconciliation(
       pendingStatuses,
       CaptureEnum.MANUAL.getCode(),
       List.of(
@@ -64,7 +76,9 @@ public class ConciliationManualSwapReconciliationService {
         StatusTransactionReasonEnum.ACQUIRER_MISMATCH.getCode(),
         StatusTransactionReasonEnum.AMBIGUOUS_MATCH.getCode()
       ),
-      ConciliationAnalysisService.EXCLUDED_CARD_RECONCILIATION_MODALITY
+      ConciliationAnalysisService.EXCLUDED_CARD_RECONCILIATION_MODALITY,
+      implantationDate,
+      lookbackDate
     );
 
     int analyzed = 0;
@@ -82,7 +96,7 @@ public class ConciliationManualSwapReconciliationService {
     int totalBatches = (int) Math.ceil((double) erpIds.size() / batchSize);
 
     log.info(
-      "📌 Iniciando conciliação ERP x Adquirente (manuais NSU/autorização invertidos). trigger={}, totalErp={}, batchSize={}, totalBatches={}",
+      "📌 Iniciando conciliação ERP Vendas Rede x Adquirente Rede (manuais NSU/autorização invertidos). trigger={}, totalErp={}, batchSize={}, totalBatches={}",
       trigger, erpIds.size(), batchSize, totalBatches
     );
 
@@ -91,7 +105,7 @@ public class ConciliationManualSwapReconciliationService {
       int end = Math.min(start + batchSize, erpIds.size());
       List<UUID> batchIds = erpIds.subList(start, end);
 
-      List<TransactionErpEntity> erpBatch = transactionErpRepository.findBatchForErpAcquirerReconciliation(batchIds);
+      List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForReconciliation(batchIds);
       if (erpBatch.isEmpty()) {
         continue;
       }
@@ -112,7 +126,8 @@ public class ConciliationManualSwapReconciliationService {
       List<TransactionAcqEntity> acquirerCandidates = conciliationAnalysisService.findAcquirerCandidatesForBatchSwapped(
         erpBatch,
         false,
-        pendingStatuses
+        pendingStatuses,
+        lookbackDate
       );
       Map<ConciliationAnalysisService.ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity =
         conciliationAnalysisService.indexAcquirerCandidates(acquirerCandidates);
@@ -205,7 +220,7 @@ public class ConciliationManualSwapReconciliationService {
     }
 
     log.info(
-      "✅ Conciliação ERP x Adquirente (manuais invertidos) finalizada. analisadas={}, conciliadas={}, atualizadas={}, " +
+      "✅ Conciliação ERP Vendas Rede x Adquirente Rede (manuais invertidos) finalizada. analisadas={}, conciliadas={}, atualizadas={}, " +
         "naoConciliadas={}, divergValor={}, divergAdquirente={}, ambiguas={}",
       analyzed, matched, updated, notMatched, valueDivergences, acquirerDivergences, ambiguousMatches
     );
@@ -224,10 +239,7 @@ public class ConciliationManualSwapReconciliationService {
     );
   }
 
-  private void markManualSwapAttempted(
-    TransactionErpEntity erp,
-    List<TransactionErpEntity> changedErpSales
-  ) {
+  private void markManualSwapAttempted(TransactionErpEntity erp, List<TransactionErpEntity> changedErpSales) {
     boolean changed = conciliationAnalysisService.applyErpReconciliationStatus(
       erp,
       StatusReconciliationEnum.PENDING,

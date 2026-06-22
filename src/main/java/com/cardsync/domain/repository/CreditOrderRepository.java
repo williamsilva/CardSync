@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,5 +95,60 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   int updateNullReconciliationStatusBySalesSummaryIds(
     @Param("salesSummaryIds") List<UUID> salesSummaryIds,
     @Param("status") Integer status
+  );
+
+  /**
+   * Diagnóstico: conta CreditOrders sem SalesSummary vinculado.
+   * Um valor > 0 indica que os arquivos de ordem de crédito foram processados mas a
+   * vinculação com o resumo de vendas não foi estabelecida (possível divergência de RV/PV).
+   */
+  @Query("select count(co.id) from CreditOrderEntity co where co.salesSummary is null")
+  long countWithoutSalesSummary();
+
+  /**
+   * Pré-vinculação: retorna IDs de CreditOrder órfãs (salesSummary = NULL) com
+   * acquirer, pvCentralizer e rvNumber preenchidos, dentro do período configurado.
+   */
+  @Query("""
+    select co.id from CreditOrderEntity co
+    where co.salesSummary is null
+      and co.acquirer is not null
+      and co.pvCentralizer is not null
+      and co.rvNumber is not null
+      and co.rvDate >= :implantationDate
+      and co.rvDate >= :lookbackDate
+    order by co.rvDate asc, co.id asc
+  """)
+  List<UUID> findOrphanedIdsWithinDateRange(
+    @Param("implantationDate") LocalDate implantationDate,
+    @Param("lookbackDate") LocalDate lookbackDate
+  );
+
+  /**
+   * Pré-vinculação: carrega CreditOrder órfãs por IDs com acquirer em fetch join.
+   */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.acquirer
+    where co.id in :ids
+      and co.salesSummary is null
+  """)
+  List<CreditOrderEntity> findOrphanedByIds(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Diagnóstico de mismatch PV: busca CreditOrders órfãs (sem salesSummary) que
+   * compartilham acquirer+rvNumber com algum SalesSummary pendente, independentemente
+   * de pvCentralizer. Usado para detectar se a raiz do problema é divergência de PV.
+   */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.acquirer
+    where co.salesSummary is null
+      and co.acquirer.id in :acquirerIds
+      and co.rvNumber in :rvNumbers
+  """)
+  List<CreditOrderEntity> findOrphanedByAcquirerIdsAndRvNumbers(
+    @Param("acquirerIds") Collection<UUID> acquirerIds,
+    @Param("rvNumbers") Collection<Integer> rvNumbers
   );
 }

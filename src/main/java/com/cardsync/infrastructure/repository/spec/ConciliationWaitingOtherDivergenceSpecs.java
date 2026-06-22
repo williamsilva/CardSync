@@ -1,5 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -21,17 +22,20 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingErpTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields;
 
   public ConciliationWaitingOtherDivergenceSpecs(
+    CardsyncAppProperties appProperties,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     ConciliationWaitingErpTableFields conciliationWaitingTableFields,
     ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
@@ -61,20 +65,11 @@ public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSu
 
       spec = spec.and(conciliationWaitingAdvancedFields.advanced(query.advanced()));
 
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-
-        spec = spec.and(
-          anyOf(
-            nsuGlobalFilter(gf, "nsu"),
-            startsWith(gf, "authorization")
-          )
-        );
-      }
     }
 
     spec = spec.and(Specification.not(inCodes("modality", excludedModalities(), ModalityEnum::getCode)));
     spec = spec.and(inCodes("statusTransactionReason", otherDivergenceReasons(), StatusTransactionReasonEnum::getCode));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
 
     return spec;
   }
@@ -86,10 +81,11 @@ public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSu
   private static List<StatusTransactionReasonEnum> otherDivergenceReasons() {
     return List.of(
       StatusTransactionReasonEnum.FLAG_MISMATCH,
-      StatusTransactionReasonEnum.DIFFERENT_PLANS,
       StatusTransactionReasonEnum.VALUE_MISMATCH,
+      StatusTransactionReasonEnum.AMBIGUOUS_MATCH,
+      StatusTransactionReasonEnum.DIFFERENT_PLANS,
       StatusTransactionReasonEnum.ACQUIRER_MISMATCH,
-      StatusTransactionReasonEnum.AMBIGUOUS_MATCH
+      StatusTransactionReasonEnum.MANUAL_SWAP_NOT_FOUND
     );
   }
 

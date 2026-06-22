@@ -82,9 +82,12 @@ public class TransactionTotalsQueryService {
     String adjustmentAssociation,
     String adjustmentField
   ) {
-    if (adjustmentAssociation == null || adjustmentAssociation.isBlank()
-      || adjustmentField == null || adjustmentField.isBlank()) {
+    if (adjustmentField == null || adjustmentField.isBlank()) {
       return cb.literal(BigDecimal.ZERO);
+    }
+
+    if (adjustmentAssociation == null || adjustmentAssociation.isBlank()) {
+      return root.<BigDecimal>get(adjustmentField).as(BigDecimal.class);
     }
 
     Path<BigDecimal> path = root.join(adjustmentAssociation, JoinType.LEFT).get(adjustmentField);

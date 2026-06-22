@@ -1,5 +1,6 @@
 package com.cardsync.domain.filter;
 
+import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
@@ -12,8 +13,9 @@ public record SaleSummaryFilter(
   List<String> flags,
   List<String> companies,
   List<String> acquirers,
-  List<String> establishments,
+  List<Integer> establishments,
 
+  List<ModalityEnum> modality,
   List<StatusPaymentBankEnum> statusPaymentBank,
   List<StatusTransactionEnum> transactionsStatus,
   List<StatusReconciliationEnum> creditOrderStatus

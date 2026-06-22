@@ -55,8 +55,8 @@ public class SaleSummaryService {
       "grossValue",
       "discountValue",
       "liquidValue",
-      "adjustment",
-      "adjustmentValue"
+      null,
+      "adjustedValue"
     );
   }
 }

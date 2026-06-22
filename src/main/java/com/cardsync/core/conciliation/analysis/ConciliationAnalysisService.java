@@ -1,6 +1,7 @@
 package com.cardsync.core.conciliation.analysis;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.*;
@@ -17,6 +18,7 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Consumer;
@@ -42,6 +44,7 @@ public class ConciliationAnalysisService {
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final FileProcessingProperties fileProcessingProperties;
+  private final CardsyncAppProperties appProperties;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final ConciliationFeeAnalysisService feeAnalysisService;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
@@ -106,20 +109,24 @@ public class ConciliationAnalysisService {
   }
 
   @Transactional
-  public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
-    return reconcileErpAcquirerFees("MANUAL");
+  public ReconcileErpAcquirerFeesResultModel reconcileRedeErpAcquirerFees() {
+    return reconcileRedeErpAcquirerFees("MANUAL");
   }
 
   @Transactional
-  public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees(String trigger) {
+  public ReconcileErpAcquirerFeesResultModel reconcileRedeErpAcquirerFees(String trigger) {
     boolean reprocess = fileProcessingProperties.getReconciliation().isReprocessErpAcquirerFees();
     List<Integer> reconciledStatuses = erpAcquirerReconciledStatusCodes();
     List<Integer> pendingFeeStatuses = pendingFeeReconciliationStatusCodes();
-    List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerFeeReconciliation(
+    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime lookbackDate = reconciliationLookbackDate();
+    List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForFeeReconciliation(
       reprocess,
       reconciledStatuses,
       EXCLUDED_CARD_RECONCILIATION_MODALITY,
-      pendingFeeStatuses
+      pendingFeeStatuses,
+      implantationDate,
+      lookbackDate
     );
 
     int analyzed = 0;
@@ -133,7 +140,7 @@ public class ConciliationAnalysisService {
     int totalBatches = (int) Math.ceil((double) erpIds.size() / ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE);
 
     log.info(
-      "📌 Iniciando conciliação de taxas ERP x Adquirente. trigger={}, totalErpPendentesTaxa={}, batchSize={}, " +
+      "📌 Iniciando conciliação de taxas ERP Vendas Rede x Adquirente Rede. trigger={}, totalErpPendentesTaxa={}, batchSize={}, " +
         "totalBatches={}, statusVenda={}, statusTaxaPendente={}, reprocess={}",
       trigger,
       erpIds.size(),
@@ -149,7 +156,7 @@ public class ConciliationAnalysisService {
       int end = Math.min(start + ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE, erpIds.size());
       List<UUID> batchIds = erpIds.subList(start, end);
 
-      List<TransactionErpEntity> erpBatch = transactionErpRepository.findBatchForErpAcquirerFeeReconciliation(
+      List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForFeeReconciliation(
         batchIds,
         reprocess,
         reconciledStatuses,
@@ -220,7 +227,7 @@ public class ConciliationAnalysisService {
     }
 
     log.info(
-      "✅ Conciliação de taxas ERP x Adquirente finalizada. trigger={}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, " +
+      "✅ Conciliação de taxas ERP Vendas Rede x Adquirente Rede finalizada. trigger={}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, " +
         "semContratoValido={}, taxasOk={}, semAdquirente={}",
       trigger,
       analyzed,
@@ -256,19 +263,24 @@ public class ConciliationAnalysisService {
   }
 
   @Transactional
-  public ReconcileErpAcquirerResultModel reconcileErpWithAcquirerBusinessContext() {
-    return reconcileErpWithAcquirerBusinessContext("MANUAL");
+  public ReconcileErpAcquirerResultModel reconcileRedeErpWithAcquirer() {
+    return reconcileRedeErpWithAcquirer("MANUAL");
   }
 
   @Transactional
-  public ReconcileErpAcquirerResultModel reconcileErpWithAcquirerBusinessContext(String trigger) {
+  public ReconcileErpAcquirerResultModel reconcileRedeErpWithAcquirer(String trigger) {
     boolean reconcileAlreadyReconciled = shouldReconcileAlreadyReconciledErpAcquirerSales();
     List<Integer> pendingStatuses = erpAcquirerPendingStatusCodes();
 
-    List<UUID> erpIds = transactionErpRepository.findIdsForErpAcquirerReconciliation(
+    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime lookbackDate = reconciliationLookbackDate();
+
+    List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForReconciliation(
       reconcileAlreadyReconciled,
       pendingStatuses,
-      EXCLUDED_CARD_RECONCILIATION_MODALITY
+      EXCLUDED_CARD_RECONCILIATION_MODALITY,
+      implantationDate,
+      lookbackDate
     );
 
     int analyzed = 0;
@@ -286,7 +298,7 @@ public class ConciliationAnalysisService {
     int totalBatches = (int) Math.ceil((double) erpIds.size() / ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE);
 
     log.info(
-      "📌 Iniciando conciliação ERP x Adquirente em lotes. trigger={}, totalErp={}, batchSize={}, totalBatches={}, reconcileAlreadyReconciled={}",
+      "📌 Iniciando conciliação ERP Vendas Rede x Adquirente Rede em lotes. trigger={}, totalErp={}, batchSize={}, totalBatches={}, reconcileAlreadyReconciled={}",
       trigger,
       erpIds.size(),
       ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE,
@@ -299,7 +311,7 @@ public class ConciliationAnalysisService {
       int end = Math.min(start + ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE, erpIds.size());
       List<UUID> batchIds = erpIds.subList(start, end);
 
-      List<TransactionErpEntity> erpBatch = transactionErpRepository.findBatchForErpAcquirerReconciliation(batchIds);
+      List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForReconciliation(batchIds);
       if (erpBatch.isEmpty()) {
         continue;
       }
@@ -307,7 +319,8 @@ public class ConciliationAnalysisService {
       List<TransactionAcqEntity> acquirerCandidates = findAcquirerCandidatesForBatch(
         erpBatch,
         reconcileAlreadyReconciled,
-        pendingStatuses
+        pendingStatuses,
+        lookbackDate
       );
       Map<ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity = indexAcquirerCandidates(acquirerCandidates);
 
@@ -478,9 +491,11 @@ public class ConciliationAnalysisService {
       );
     }
 
-    int acquirerMissingErpUpdated = classifyAcquirerSalesMissingInErp(
+    int acquirerMissingErpUpdated = classifyRedeAcquirerSalesMissingInErp(
       reconcileAlreadyReconciled,
-      pendingStatuses
+      pendingStatuses,
+      implantationDate,
+      lookbackDate
     );
 
     if (acquirerMissingErpUpdated > 0) {
@@ -488,7 +503,7 @@ public class ConciliationAnalysisService {
     }
 
     log.info(
-      "✅ Conciliação ERP x Adquirente finalizada. trigger={}, analisadas={}, conciliadas={}, atualizadas={}, divergentes={}, " +
+      "✅ Conciliação ERP Vendas Rede x Adquirente Rede finalizada. trigger={}, analisadas={}, conciliadas={}, atualizadas={}, divergentes={}, " +
         "semMatchErp={}, semErpNaAdquirenteAtualizadas={}, valorDivergente={}, adquirenteDivergente={}, ambiguas={}",
       trigger,
       analyzed,
@@ -743,18 +758,20 @@ public class ConciliationAnalysisService {
     return status == StatusTransactionEnum.CANCELED || status == StatusTransactionEnum.DELETED;
   }
 
-  private int classifyAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses) {
+  private int classifyRedeAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses, OffsetDateTime implantationDate, OffsetDateTime lookbackDate) {
     int totalUpdated = 0;
     int batchNumber = 0;
 
     while (true) {
-      List<UUID> acquirerIds = transactionAcqRepository.findIdsForMissingInErpStatusClassification(
+      List<UUID> acquirerIds = transactionAcqRepository.findRedeAcqIdsForMissingInErpClassification(
         PageRequest.of(0, ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE),
         reconcileAlreadyReconciled,
         pendingStatuses,
         StatusTransactionEnum.PENDING.getCode(),
         StatusTransactionReasonEnum.NULL.getCode(),
-        EXCLUDED_CARD_RECONCILIATION_MODALITY
+        EXCLUDED_CARD_RECONCILIATION_MODALITY,
+        implantationDate,
+        lookbackDate
       );
 
       if (acquirerIds.isEmpty()) {
@@ -922,7 +939,8 @@ public class ConciliationAnalysisService {
   }
 
   List<TransactionAcqEntity> findAcquirerCandidatesForBatch(
-    List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses) {
+    List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses,
+    OffsetDateTime lookbackDate) {
     Set<Long> nsus = erpBatch.stream()
       .filter(erp -> !isExcludedFromCardReconciliation(erp))
       .map(TransactionErpEntity::getNsu)
@@ -938,21 +956,27 @@ public class ConciliationAnalysisService {
 
     Map<UUID, TransactionAcqEntity> candidates = new LinkedHashMap<>();
 
+    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+
     if (!nsus.isEmpty()) {
-      transactionAcqRepository.findCandidatesForErpAcquirerReconciliationByNsus(
+      transactionAcqRepository.findRedeAcqCandidatesForReconciliationByNsus(
         nsus,
         reconcileAlreadyReconciled,
         pendingStatuses,
-        EXCLUDED_CARD_RECONCILIATION_MODALITY
+        EXCLUDED_CARD_RECONCILIATION_MODALITY,
+        implantationDate,
+        lookbackDate
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
     if (!authorizations.isEmpty()) {
-      transactionAcqRepository.findCandidatesForErpAcquirerReconciliationByAuthorizations(
+      transactionAcqRepository.findRedeAcqCandidatesForReconciliationByAuthorizations(
         authorizations,
         reconcileAlreadyReconciled,
         pendingStatuses,
-        EXCLUDED_CARD_RECONCILIATION_MODALITY
+        EXCLUDED_CARD_RECONCILIATION_MODALITY,
+        implantationDate,
+        lookbackDate
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
@@ -970,7 +994,8 @@ public class ConciliationAnalysisService {
    * NSU esteja nas AUTORIZAÇÕES do ERP, e ADQ cuja AUTORIZAÇÃO esteja nos NSUs do ERP.
    */
   List<TransactionAcqEntity> findAcquirerCandidatesForBatchSwapped(
-    List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses) {
+    List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses,
+    OffsetDateTime lookbackDate) {
 
     // NSUs candidatos = autorizações do ERP convertidas para número.
     Set<Long> swappedNsus = erpBatch.stream()
@@ -990,21 +1015,27 @@ public class ConciliationAnalysisService {
 
     Map<UUID, TransactionAcqEntity> candidates = new LinkedHashMap<>();
 
+    OffsetDateTime implantationDateSwapped = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+
     if (!swappedNsus.isEmpty()) {
-      transactionAcqRepository.findCandidatesForErpAcquirerReconciliationByNsus(
+      transactionAcqRepository.findRedeAcqCandidatesForReconciliationByNsus(
         swappedNsus,
         reconcileAlreadyReconciled,
         pendingStatuses,
-        EXCLUDED_CARD_RECONCILIATION_MODALITY
+        EXCLUDED_CARD_RECONCILIATION_MODALITY,
+        implantationDateSwapped,
+        lookbackDate
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
     if (!swappedAuthorizations.isEmpty()) {
-      transactionAcqRepository.findCandidatesForErpAcquirerReconciliationByAuthorizations(
+      transactionAcqRepository.findRedeAcqCandidatesForReconciliationByAuthorizations(
         swappedAuthorizations,
         reconcileAlreadyReconciled,
         pendingStatuses,
-        EXCLUDED_CARD_RECONCILIATION_MODALITY
+        EXCLUDED_CARD_RECONCILIATION_MODALITY,
+        implantationDateSwapped,
+        lookbackDate
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
@@ -1160,6 +1191,11 @@ public class ConciliationAnalysisService {
 
   private int erpAcquirerFutureDaysLookback() {
     return reconciliationSettingsService.getErpAcquirerFutureDaysLookback();
+  }
+
+  private OffsetDateTime reconciliationLookbackDate() {
+    int months = reconciliationSettingsService.getReconciliationLookbackMonths();
+    return LocalDate.now().minusMonths(months).atStartOfDay().atOffset(ZoneOffset.UTC);
   }
 
   /**

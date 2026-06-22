@@ -19,4 +19,7 @@ public class ReconciliationSettingsEntity extends AuditableEntityBase {
 
   @Column(name = "erp_acquirer_future_days_lookback", nullable = false)
   private int erpAcquirerFutureDaysLookback = 0;
+
+  @Column(name = "reconciliation_lookback_months", nullable = false)
+  private int reconciliationLookbackMonths = 6;
 }
