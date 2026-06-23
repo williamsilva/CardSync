@@ -23,10 +23,10 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
   }
 
   public Specification<TransactionAcqEntity> advanced(TransactionAcqSalesFilter filter) {
-    if (filter == null) {
-      return Specs.all();
-    }
     Specification<TransactionAcqEntity> spec = Specs.all();
+    if (filter == null) {
+      return spec;
+    }
 
     spec = spec.and(contains(filter.tid(), "tid"));
     spec = spec.and(contains(filter.cvNsu(), "nsu"));

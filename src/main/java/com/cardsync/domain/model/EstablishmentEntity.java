@@ -2,10 +2,13 @@ package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.TypeEstablishmentEnum;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,6 +25,12 @@ public class EstablishmentEntity extends AuditableEntityBase {
   private Integer type;
   private Integer status;
   private Integer pvNumber;
+
+  @Column(name = "opening_date")
+  private LocalDate openingDate;
+
+  @Column(name = "closing_date")
+  private LocalDate closingDate;
 
   @ManyToOne(fetch = FetchType.LAZY)
   private AcquirerEntity acquirer;

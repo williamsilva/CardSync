@@ -8,6 +8,8 @@ import java.util.List;
 public record CreditOrderFilter(
   String rvNumber,
 
+  List<Integer> establishments,
+
   List<StatusPaymentBankEnum> statusPaymentBank,
   List<StatusReconciliationEnum> salesSummaryStatus
 ) {

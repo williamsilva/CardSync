@@ -68,24 +68,9 @@ public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErp
 
       spec = spec.and(transactionErpAdvancedFields.advanced(query.advanced()));
 
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-
-        // Usa nsuGlobalFilter (equals ou prefixo) e startsWith para authorization
-        // para aproveitar os índices idx_erp_nsu e idx_erp_authorization.
-        spec = spec.and(
-          anyOf(
-            nsuGlobalFilter(gf, "nsu"),
-            startsWith(gf, "authorization")
-          )
-        );
-      }
     }
 
-    spec = spec.and(Specification.not(
-      inCodes("modality", getModalityEnum(), ModalityEnum::getCode)
-    ));
-
+    spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));
     spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
 
     return spec;

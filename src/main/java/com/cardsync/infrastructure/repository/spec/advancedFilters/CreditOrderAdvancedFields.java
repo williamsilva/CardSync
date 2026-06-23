@@ -24,7 +24,7 @@ public class CreditOrderAdvancedFields extends BaseSpecificationSupport<CreditOr
     }
 
     spec = spec.and(contains(filter.rvNumber(), "rvNumber"));
-
+    spec = spec.and(inCodes("originalPvNumber", filter.establishments(), x -> x));
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("salesSummaryStatus", filter.salesSummaryStatus(), StatusReconciliationEnum::getCode));
 

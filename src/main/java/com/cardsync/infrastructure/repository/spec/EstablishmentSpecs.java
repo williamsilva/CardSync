@@ -2,10 +2,10 @@ package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.EstablishmentFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
+import com.cardsync.domain.filter.query.SortDto;
+import com.cardsync.infrastructure.repository.spec.advancedFilters.EstablishmentAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.tableFilters.EstablishmentTableFields;
 import com.cardsync.domain.model.EstablishmentEntity;
-import com.cardsync.domain.model.enums.StatusEnum;
-import com.cardsync.domain.model.enums.TypeEstablishmentEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
@@ -13,84 +13,71 @@ import com.cardsync.infrastructure.repository.spec.config.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEntity> {
 
   private final SpecificationFactory specificationFactory;
   private final EstablishmentTableFields establishmentAllowedFields;
+  private final EstablishmentAdvancedFields establishmentAdvancedFields;
 
   public EstablishmentSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
-    EstablishmentTableFields establishmentAllowedFields
+    EstablishmentTableFields establishmentAllowedFields,
+    EstablishmentAdvancedFields establishmentAdvancedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
     this.establishmentAllowedFields = establishmentAllowedFields;
+    this.establishmentAdvancedFields = establishmentAdvancedFields;
   }
 
   public Specification<EstablishmentEntity> fromQuery(ListQueryDto<EstablishmentFilter> query) {
+    Specification<EstablishmentEntity> spec = baseFilters(query)
+      .and(fetchListAssociations());
+
+    return spec.and(orderByTableSort(query == null ? null : query.sort()));
+  }
+
+  public Specification<EstablishmentEntity> baseFilters(ListQueryDto<EstablishmentFilter> query) {
     Specification<EstablishmentEntity> spec = Specs.all();
 
-    spec = spec.and(
-      specificationFactory.fromTableFilters(
-        query.tableFilters(),
-        establishmentAllowedFields.table()
-      )
-    );
-
-    if (query.advanced() != null) {
-      var a = query.advanced();
-
-      spec = spec.and(contains("pvNumber", a.pvNumber()));
-      spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
-      spec = spec.and(inCodes("type", a.typeEnum(), TypeEstablishmentEnum::getCode));
-      spec = spec.and(offsetDateTimePeriod("createdAt", a.periodCreatedAt(), a.createdAt(), true));
-
+    if (query != null) {
       spec = spec.and(
-        inPath(a.company(), value -> {
-          try {
-            return UUID.fromString(value);
-          } catch (Exception e) {
-            return null;
-          }
-        }, "company", "id")
-      );
-
-      spec = spec.and(
-        inPath(a.acquirer(), value -> {
-          try {
-            return UUID.fromString(value);
-          } catch (Exception e) {
-            return null;
-          }
-        }, "acquirer", "id")
-      );
-
-      spec = spec.and(
-        inPath(a.createdBy(), value -> {
-          try {
-            return UUID.fromString(value);
-          } catch (Exception e) {
-            return null;
-          }
-        }, "createdBy", "id")
-      );
-
-    }
-
-    if (!isBlank(query.globalFilter())) {
-      String gf = query.globalFilter();
-
-      spec = spec.and(
-        anyOf(
-          containsPath(gf, "createdBy", "name")
+        specificationFactory.fromTableFilters(
+          query.tableFilters(),
+          establishmentAllowedFields.table()
         )
       );
-    }
 
-    return spec.and(orderByAscPath("company", "fantasyName"));
+      spec = spec.and(establishmentAdvancedFields.advanced(query.advanced()));
+    }
+    return spec;
+  }
+
+  private Specification<EstablishmentEntity> fetchListAssociations() {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        fetchIfNotFetched(root, "createdBy");
+        fetchIfNotFetched(root, "company");
+        fetchIfNotFetched(root, "acquirer");
+
+        // distinct apenas na query de dados
+        query.distinct(true);
+      }
+
+      return cb.conjunction();
+    };
+  }
+
+  private Specification<EstablishmentEntity> orderByTableSort(List<SortDto> sort) {
+    return tableSort(sort, "PvNumber", Map.of(
+      "createdBy",            sortJoin("createdBy", "name"),
+      "company",             sortJoin("company", "fantasyName"),
+      "acquirer",            sortJoin("acquirer", "fantasyName")
+    ));
   }
 }

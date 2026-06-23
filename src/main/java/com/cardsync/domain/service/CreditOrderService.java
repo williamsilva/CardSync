@@ -52,11 +52,9 @@ public class CreditOrderService {
     return totalsQueryService.totals(
       CreditOrderEntity.class,
       spec,
-      "grossValue",
-      "discountValue",
-      "liquidValue",
-      "adjustment",
-      "adjustmentValue"
+      "grossRvValue",
+      "discountRateValue",
+      "releaseValue"
     );
   }
 }
