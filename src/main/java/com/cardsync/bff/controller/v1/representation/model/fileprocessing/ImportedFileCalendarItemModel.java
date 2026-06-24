@@ -5,6 +5,7 @@ import com.cardsync.domain.model.enums.FileStatusEnum;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record ImportedFileCalendarItemModel(
@@ -17,6 +18,7 @@ public record ImportedFileCalendarItemModel(
   String origin,
   FileStatusEnum status,
   LocalDate dateFile,
-  OffsetDateTime dateImport
+  OffsetDateTime dateImport,
+  List<ProcessedFileEstablishmentModel> establishments
 ) {
 }

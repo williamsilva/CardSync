@@ -2,6 +2,7 @@ package com.cardsync.core.file.service.report;
 
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileCalendarDayModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileCalendarItemModel;
+import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileEstablishmentModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileCalendarModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileDayGroupStatusModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileEntityStatusModel;
@@ -22,11 +23,15 @@ import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.domain.repository.BankRepository;
 import com.cardsync.domain.repository.BankingDomicileRepository;
+import com.cardsync.domain.repository.CreditOrderRepository;
+import com.cardsync.domain.repository.EstablishmentRepository;
 import com.cardsync.domain.repository.HolidayRepository;
 import com.cardsync.domain.repository.ProcessedFileErrorRepository;
 import com.cardsync.domain.repository.ProcessedFileRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
+import com.cardsync.domain.repository.SalesSummaryRepository;
 import com.cardsync.infrastructure.repository.spec.ProcessedFileSpecs;
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -42,12 +47,14 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -58,6 +65,7 @@ public class FileProcessingReportService {
 
   private final ProcessedFileSpecs processedFileSpecs;
   private final FileProcessingProperties fileProcessingProperties;
+  private final CardsyncAppProperties cardsyncAppProperties;
   private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Sao_Paulo");
   private static final Set<String> REDE_REQUIRED_FILE_TYPES = Set.of("EEVC", "EEVD", "EEFI");
 
@@ -65,10 +73,13 @@ public class FileProcessingReportService {
   private final HolidayRepository holidayRepository;
   private final AcquirerRepository acquirerRepository;
   private final ReleasesBankRepository releasesBankRepository;
+  private final EstablishmentRepository establishmentRepository;
   private final ProcessedFileRepository processedFileRepository;
   private final BankingDomicileRepository bankingDomicileRepository;
   private final ProcessedFileErrorRepository processedFileErrorRepository;
   private final com.cardsync.domain.repository.NoFileDayRepository noFileDayRepository;
+  private final SalesSummaryRepository salesSummaryRepository;
+  private final CreditOrderRepository creditOrderRepository;
 
   @Transactional(readOnly = true)
   public Page<ProcessedFileModel> list(Pageable pageable) {
@@ -153,13 +164,28 @@ public class FileProcessingReportService {
     Map<LocalDate, List<ProcessedFileEntity>> entitiesByDay = new LinkedHashMap<>();
     startDate.datesUntil(endDate.plusDays(1)).forEach(date -> entitiesByDay.put(date, new ArrayList<>()));
 
-    processedFileRepository.findCalendarFiles(startDate, endDate).forEach(file -> {
+    processedFileRepository.findCalendarFiles(startDate, endDate.plusDays(1)).forEach(file -> {
       if (file.getDateFile() != null) {
-        entitiesByDay.computeIfAbsent(file.getDateFile(), ignored -> new ArrayList<>()).add(file);
+        LocalDate fileDate = (file.getGroup() == FileGroupEnum.ADQ || file.getGroup() == FileGroupEnum.BANK)
+          ? file.getDateFile().minusDays(1)
+          : file.getDateFile();
+        if (!fileDate.isBefore(startDate) && !fileDate.isAfter(endDate)) {
+          entitiesByDay.computeIfAbsent(fileDate, ignored -> new ArrayList<>()).add(file);
+        }
       }
     });
 
     Map<UUID, Set<UUID>> domicileIdsByProcessedFile = loadDomicileIdsByProcessedFile(entitiesByDay);
+
+    Map<UUID, List<ProcessedFileEstablishmentModel>> establishmentsByFileId =
+      loadEstablishmentsByFileId(entitiesByDay, acquirers);
+
+    Map<UUID, List<EstablishmentEntity>> allEstsByAcquirerId = new HashMap<>();
+    if (!acquirers.isEmpty()) {
+      List<UUID> acquirerIds = acquirers.stream().map(AcquirerEntity::getId).toList();
+      establishmentRepository.findAllActiveByAcquirerIds(acquirerIds, StatusEnum.ACTIVE.getCode())
+        .forEach(e -> allEstsByAcquirerId.computeIfAbsent(e.getAcquirer().getId(), k -> new ArrayList<>()).add(e));
+    }
 
     List<ImportedFileCalendarDayModel> days = entitiesByDay.entrySet().stream()
       .map(entry -> toCalendarDay(
@@ -169,14 +195,17 @@ public class FileProcessingReportService {
         banks,
         bankingDomiciles,
         domicileIdsByProcessedFile,
+        establishmentsByFileId,
+        allEstsByAcquirerId,
         holidays,
         noFileDayEntries
       ))
       .toList();
 
     int daysWithFiles = (int) days.stream().filter(ImportedFileCalendarDayModel::hasFiles).count();
+    LocalDate today = LocalDate.now(BUSINESS_ZONE);
     int daysWithoutFiles = (int) days.stream()
-      .filter(day -> !day.future() && !day.hasFiles())
+      .filter(day -> !day.future() && !day.hasFiles() && day.date().isBefore(today))
       .count();
     int totalFiles = days.stream().mapToInt(ImportedFileCalendarDayModel::totalFiles).sum();
 
@@ -198,19 +227,21 @@ public class FileProcessingReportService {
     List<BankEntity> banks,
     List<BankingDomicileEntity> bankingDomiciles,
     Map<UUID, Set<UUID>> domicileIdsByProcessedFile,
+    Map<UUID, List<ProcessedFileEstablishmentModel>> establishmentsByFileId,
+    Map<UUID, List<EstablishmentEntity>> allEstsByAcquirerId,
     Set<LocalDate> holidays,
     List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
     List<ImportedFileCalendarItemModel> files = processedFiles.stream()
-      .map(this::toCalendarItem)
+      .map(f -> toCalendarItem(f, establishmentsByFileId.getOrDefault(f.getId(), List.of())))
       .toList();
 
     int erpFiles = countGroup(files, FileGroupEnum.ERP);
     int adqFiles = countGroup(files, FileGroupEnum.ADQ);
     int bankFiles = countGroup(files, FileGroupEnum.BANK);
 
-    ImportedFileGroupStatusModel erpStatus = buildErpStatus(date, processedFiles, erpFiles, noFileDayEntries);
-    ImportedFileGroupStatusModel adqStatus = buildAcquirerStatus(date, processedFiles, acquirers, noFileDayEntries);
+    ImportedFileGroupStatusModel erpStatus = buildErpStatus(date, processedFiles, erpFiles, noFileDayEntries, holidays);
+    ImportedFileGroupStatusModel adqStatus = buildAcquirerStatus(date, processedFiles, acquirers, noFileDayEntries, establishmentsByFileId, allEstsByAcquirerId, holidays);
     ImportedFileGroupStatusModel bankStatus = buildBankStatus(
       date, processedFiles, banks, bankingDomiciles, domicileIdsByProcessedFile, holidays, noFileDayEntries
     );
@@ -232,9 +263,12 @@ public class FileProcessingReportService {
     LocalDate date,
     List<ProcessedFileEntity> files,
     int erpFiles,
-    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries,
+    Set<LocalDate> holidays
   ) {
-    boolean exempt = isErpExemptOnDate(date, noFileDayEntries);
+    boolean exempt = date.isBefore(cardsyncAppProperties.getImplantationDate())
+      || isErpExemptOnDate(date, noFileDayEntries)
+      || isNonBusinessDay(date, holidays);
     int expected = (!exempt && fileProcessingProperties.getCalendar().isErpEnabled()) ? 1 : 0;
     int received = erpFiles > 0 ? 1 : 0;
 
@@ -272,7 +306,10 @@ public class FileProcessingReportService {
     LocalDate date,
     List<ProcessedFileEntity> files,
     List<AcquirerEntity> acquirers,
-    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries,
+    Map<UUID, List<ProcessedFileEstablishmentModel>> establishmentsByFileId,
+    Map<UUID, List<EstablishmentEntity>> allEstsByAcquirerId,
+    Set<LocalDate> holidays
   ) {
     List<ProcessedFileEntity> adqFiles = files.stream()
       .filter(file -> file.getGroup() == FileGroupEnum.ADQ)
@@ -280,17 +317,79 @@ public class FileProcessingReportService {
 
     List<ImportedFileEntityStatusModel> entities = acquirers.stream()
       .map(acquirer -> {
-        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries);
+        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries, holidays);
         int expectedFiles = expectedTypes.size();
         int filesReceived = countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes);
-        List<String> missingFiles = resolveMissingAcquirerFiles(adqFiles, acquirer, expectedTypes);
-        List<String> presentFiles = resolvePresentAcquirerFiles(adqFiles, acquirer);
+        List<String> missingFiles;
+        List<String> presentFiles;
+        String status;
+
+        if (isRedeAcquirer(acquirer)) {
+          List<ProcessedFileEntity> acquirerFiles = adqFiles.stream()
+            .filter(file -> matchesAcquirer(file, acquirer))
+            .toList();
+
+          Map<String, ProcessedFileEntity> fileBySubtype = new LinkedHashMap<>();
+          acquirerFiles.stream()
+            .filter(file -> REDE_REQUIRED_FILE_TYPES.contains(resolveAcquirerSubtype(file)))
+            .forEach(file -> fileBySubtype.putIfAbsent(resolveAcquirerSubtype(file), file));
+
+          Set<Integer> foundPvNumbers = fileBySubtype.values().stream()
+            .flatMap(file -> establishmentsByFileId.getOrDefault(file.getId(), List.of()).stream())
+            .map(ProcessedFileEstablishmentModel::pvNumber)
+            .collect(Collectors.toSet());
+
+          List<EstablishmentEntity> allActiveEsts = allEstsByAcquirerId
+            .getOrDefault(acquirer.getId(), List.of())
+            .stream()
+            .filter(e -> isEstablishmentActiveOnDate(e, date))
+            .sorted(Comparator.comparingInt(EstablishmentEntity::getPvNumber))
+            .toList();
+
+          List<String> present = new ArrayList<>();
+          for (String subtype : fileBySubtype.keySet().stream().sorted().toList()) {
+            ProcessedFileEntity subtypeFile = fileBySubtype.get(subtype);
+            List<ProcessedFileEstablishmentModel> subtypeEsts =
+              establishmentsByFileId.getOrDefault(subtypeFile.getId(), List.of());
+
+            Set<Integer> displayPvs = subtypeEsts.isEmpty()
+              ? foundPvNumbers
+              : subtypeEsts.stream().map(ProcessedFileEstablishmentModel::pvNumber).collect(Collectors.toSet());
+
+            String estsPart = allActiveEsts.stream()
+              .filter(e -> displayPvs.contains(e.getPvNumber()))
+              .map(e -> "PV " + e.getPvNumber() + (e.getCompany() != null ? " " + e.getCompany().getFantasyName() : ""))
+              .collect(Collectors.joining(" | "));
+
+            present.add(estsPart.isEmpty() ? subtype : subtype + " - " + estsPart);
+          }
+          presentFiles = present;
+
+          List<String> missingEstEntries = allActiveEsts.stream()
+            .filter(e -> !foundPvNumbers.contains(e.getPvNumber()))
+            .map(e -> "PV " + e.getPvNumber() + (e.getCompany() != null ? " - " + e.getCompany().getFantasyName() : ""))
+            .toList();
+
+          List<String> missing = new ArrayList<>();
+          Set<String> receivedSubtypes = fileBySubtype.keySet();
+          expectedTypes.stream().filter(t -> !receivedSubtypes.contains(t)).sorted().forEach(missing::add);
+          missing.addAll(missingEstEntries);
+          missingFiles = missing;
+
+          String fileStatus = resolveStatus(filesReceived, expectedFiles);
+          status = "complete".equals(fileStatus) && !missingEstEntries.isEmpty() ? "partial" : fileStatus;
+
+        } else {
+          missingFiles = resolveMissingAcquirerFiles(adqFiles, acquirer, expectedTypes);
+          presentFiles = resolvePresentAcquirerFiles(adqFiles, acquirer);
+          status = resolveStatus(filesReceived, expectedFiles);
+        }
 
         return new ImportedFileEntityStatusModel(
           firstNonBlank(acquirer.getFantasyName(), acquirer.getSocialReason(), acquirer.getFileIdentifier()),
           filesReceived,
           expectedFiles,
-          resolveStatus(filesReceived, expectedFiles),
+          status,
           acquirer.getStatus() != null ? acquirer.getStatus().name() : StatusEnum.NULL.name(),
           resolveStatusDate(acquirer.getCreatedAt(), acquirer.getStatusDate()),
           missingFiles,
@@ -300,12 +399,12 @@ public class FileProcessingReportService {
       .toList();
 
     int expected = acquirers.stream()
-      .mapToInt(acquirer -> resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries).size())
+      .mapToInt(acquirer -> resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries, holidays).size())
       .sum();
 
     int received = acquirers.stream()
       .mapToInt(acquirer -> {
-        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries);
+        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries, holidays);
         return countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes);
       })
       .sum();
@@ -326,7 +425,7 @@ public class FileProcessingReportService {
       .filter(file -> file.getGroup() == FileGroupEnum.BANK)
       .toList();
 
-    boolean nonBusinessDay = isBankNonBusinessDay(date, holidays);
+    boolean nonBusinessDay = isNonBusinessDay(date, holidays);
 
     Map<UUID, List<BankingDomicileEntity>> domicilesByBank = bankingDomiciles.stream()
       .filter(domicile -> domicile.getBank() != null && domicile.getBank().getId() != null)
@@ -551,12 +650,11 @@ public class FileProcessingReportService {
     return result;
   }
 
-  private boolean isBankNonBusinessDay(LocalDate date, Set<LocalDate> holidays) {
+  private boolean isNonBusinessDay(LocalDate date, Set<LocalDate> holidays) {
     DayOfWeek dayOfWeek = date.getDayOfWeek();
-    return dayOfWeek == DayOfWeek.SUNDAY
-      || dayOfWeek == DayOfWeek.MONDAY
-      || holidays.contains(date)
-      || holidays.contains(date.minusDays(1));
+    return dayOfWeek == DayOfWeek.SATURDAY
+      || dayOfWeek == DayOfWeek.SUNDAY
+      || holidays.contains(date);
   }
 
   /** ERP isento no dia: existe registro NoFileDay do grupo ERP nessa data. */
@@ -572,8 +670,10 @@ public class FileProcessingReportService {
   private Set<String> resolveExpectedAcquirerFileTypes(
     LocalDate date,
     AcquirerEntity acquirer,
-    List<NoFileDayEntity> entries
+    List<NoFileDayEntity> entries,
+    Set<LocalDate> holidays
   ) {
+    if (isNonBusinessDay(date, holidays)) return Set.of();
     if (!isAcquirerExpectedOnDate(acquirer, date)) return Set.of();
 
     Set<String> expectedTypes = new HashSet<>(isRedeAcquirer(acquirer)
@@ -674,20 +774,8 @@ public class FileProcessingReportService {
     List<ProcessedFileEntity> adqFiles,
     AcquirerEntity acquirer
   ) {
-    List<ProcessedFileEntity> acquirerFiles = adqFiles.stream()
+    return adqFiles.stream()
       .filter(file -> matchesAcquirer(file, acquirer))
-      .toList();
-
-    if (isRedeAcquirer(acquirer)) {
-      return acquirerFiles.stream()
-        .map(this::resolveAcquirerSubtype)
-        .filter(REDE_REQUIRED_FILE_TYPES::contains)
-        .distinct()
-        .sorted()
-        .toList();
-    }
-
-    return acquirerFiles.stream()
       .map(this::processedFileDisplayName)
       .distinct()
       .sorted()
@@ -806,7 +894,10 @@ public class FileProcessingReportService {
     return (int) files.stream().filter(file -> file.group() == group).count();
   }
 
-  private ImportedFileCalendarItemModel toCalendarItem(ProcessedFileEntity file) {
+  private ImportedFileCalendarItemModel toCalendarItem(
+    ProcessedFileEntity file,
+    List<ProcessedFileEstablishmentModel> establishments
+  ) {
     String category = resolveCategory(file);
     return new ImportedFileCalendarItemModel(
       file.getId(),
@@ -818,8 +909,91 @@ public class FileProcessingReportService {
       file.getOriginFile() != null ? file.getOriginFile().getCode() : null,
       file.getStatus(),
       file.getDateFile(),
-      file.getDateImport()
+      file.getDateImport(),
+      establishments
     );
+  }
+
+  private Map<UUID, List<ProcessedFileEstablishmentModel>> loadEstablishmentsByFileId(
+    Map<LocalDate, List<ProcessedFileEntity>> entitiesByDay,
+    List<AcquirerEntity> acquirers
+  ) {
+    Map<UUID, LocalDate> fileDateById = new HashMap<>();
+    Set<UUID> adqFileIds = new HashSet<>();
+    entitiesByDay.forEach((date, files) ->
+      files.stream()
+        .filter(f -> f.getGroup() == FileGroupEnum.ADQ || f.getGroup() == FileGroupEnum.BANK)
+        .forEach(f -> {
+          fileDateById.put(f.getId(), date);
+          if (f.getGroup() == FileGroupEnum.ADQ) adqFileIds.add(f.getId());
+        })
+    );
+
+    if (fileDateById.isEmpty()) return Map.of();
+
+    Map<UUID, Set<Integer>> pvNumbersByFileId = new HashMap<>();
+    processedFileRepository.findPvNumbersByFileIds(fileDateById.keySet()).forEach(row -> {
+      UUID fileId = (UUID) row[0];
+      Integer pvNumber = (Integer) row[1];
+      pvNumbersByFileId.computeIfAbsent(fileId, k -> new HashSet<>()).add(pvNumber);
+    });
+
+    // Fallback para arquivos ADQ processados antes da migration cs_processed_file_pv:
+    // busca pvNumbers diretamente em SalesSummary (EEVC/EEVD) e CreditOrder (EEFI).
+    Set<UUID> adqWithoutPv = adqFileIds.stream()
+      .filter(id -> !pvNumbersByFileId.containsKey(id))
+      .collect(Collectors.toSet());
+    if (!adqWithoutPv.isEmpty()) {
+      salesSummaryRepository.findPvNumbersByProcessedFileIds(adqWithoutPv).forEach(row -> {
+        UUID fileId = (UUID) row[0];
+        Integer pvNumber = (Integer) row[1];
+        pvNumbersByFileId.computeIfAbsent(fileId, k -> new HashSet<>()).add(pvNumber);
+      });
+      creditOrderRepository.findPvCentralizerByProcessedFileIds(adqWithoutPv).forEach(row -> {
+        UUID fileId = (UUID) row[0];
+        Integer pvNumber = (Integer) row[1];
+        pvNumbersByFileId.computeIfAbsent(fileId, k -> new HashSet<>()).add(pvNumber);
+      });
+    }
+
+    if (pvNumbersByFileId.isEmpty()) return Map.of();
+
+    Set<Integer> allPvNumbers = pvNumbersByFileId.values().stream()
+      .flatMap(Set::stream)
+      .collect(Collectors.toSet());
+    List<UUID> acquirerIds = acquirers.stream().map(AcquirerEntity::getId).toList();
+
+    // Carrega estabelecimentos ativos em lote; a validação de datas é feita por arquivo
+    Map<Integer, EstablishmentEntity> byPvNumber = new HashMap<>();
+    establishmentRepository.findActiveByAcquirerIdsAndPvNumbers(
+      acquirerIds, allPvNumbers, StatusEnum.ACTIVE.getCode()
+    ).forEach(e -> byPvNumber.put(e.getPvNumber(), e));
+
+    Map<UUID, List<ProcessedFileEstablishmentModel>> result = new HashMap<>();
+    pvNumbersByFileId.forEach((fileId, pvNums) -> {
+      LocalDate fileDate = fileDateById.get(fileId);
+      List<ProcessedFileEstablishmentModel> estabs = pvNums.stream()
+        .map(byPvNumber::get)
+        .filter(Objects::nonNull)
+        .filter(e -> isEstablishmentActiveOnDate(e, fileDate))
+        .map(e -> new ProcessedFileEstablishmentModel(
+          e.getPvNumber(),
+          e.getCompany() != null ? e.getCompany().getFantasyName() : null,
+          e.getCompany() != null ? e.getCompany().getId() : null
+        ))
+        .toList();
+      if (!estabs.isEmpty()) result.put(fileId, estabs);
+    });
+    return result;
+  }
+
+  private boolean isEstablishmentActiveOnDate(EstablishmentEntity e, LocalDate date) {
+    if (date == null) return true;
+    LocalDate opening = e.getOpeningDate();
+    LocalDate closing = e.getClosingDate();
+    if (opening != null && date.isBefore(opening)) return false;
+    if (closing != null && date.isAfter(closing)) return false;
+    return true;
   }
 
   private String resolveCategory(ProcessedFileEntity file) {

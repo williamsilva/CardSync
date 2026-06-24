@@ -44,6 +44,7 @@ public class Cnab240FileProcessor {
   private final CompanyRepository companyRepository;
   private final ReleasesBankRepository releasesBankRepository;
   private final ProcessedFileRepository processedFileRepository;
+  private final com.cardsync.core.file.service.ProcessedFilePvService processedFilePvService;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
   public void processFile(Path file, FileProcessingProperties.FilePaths paths, Cnab240BankLayout layout) {
@@ -142,6 +143,7 @@ public class Cnab240FileProcessor {
           + ", recordTypes=" + recordTypes
           + ", segmentos=" + detailSegments);
 
+      processedFilePvService.collectFromBankReleases(processedFile, releases);
       processedFileRepository.save(processedFile);
       releasesBankRepository.saveAll(releases);
 

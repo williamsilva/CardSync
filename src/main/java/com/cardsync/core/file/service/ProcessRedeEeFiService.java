@@ -56,6 +56,7 @@ public class ProcessRedeEeFiService {
   private final InstallmentUnschedulingRepository installmentUnschedulingRepository;
 
   private final BankingDomicileResolver bankingDomicileResolver;
+  private final ProcessedFilePvService processedFilePvService;
   private final ThreadLocal<RedeProcessingWarningCollector> warningCollector = new ThreadLocal<>();
 
   public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
@@ -180,6 +181,7 @@ public class ProcessRedeEeFiService {
           + ", avisos=" + warnings
           + ", avisosLayout=" + (collector == null ? 0 : collector.totalWarnings()));
 
+      processedFilePvService.collectFromCreditOrder(processedFile);
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
       creditOrderRepository.saveAll(creditOrders);

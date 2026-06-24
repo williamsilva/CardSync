@@ -46,6 +46,7 @@ public class ProcessRedeEeVdService {
   );
 
   private final BankingDomicileResolver bankingDomicileResolver;
+  private final ProcessedFilePvService processedFilePvService;
 
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
@@ -158,7 +159,7 @@ public class ProcessRedeEeVdService {
           + ", registros=" + countsByIdentifier);
 
       ensureSalesSummariesBankingDomicile(summaries);
-
+      processedFilePvService.collectFromSalesSummary(processedFile);
       processedFileRepository.save(processedFile);
       salesSummaryRepository.saveAll(summaries);
       transactionAcqRepository.saveAll(transactions);

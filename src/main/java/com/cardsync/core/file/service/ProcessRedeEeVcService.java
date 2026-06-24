@@ -55,6 +55,7 @@ public class ProcessRedeEeVcService {
   private final RedeIcPlusTransactionRepository redeIcPlusTransactionRepository;
 
   private final BankingDomicileResolver bankingDomicileResolver;
+  private final ProcessedFilePvService processedFilePvService;
   private final ThreadLocal<RedeProcessingWarningCollector> warningCollector = new ThreadLocal<>();
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
@@ -194,6 +195,7 @@ public class ProcessRedeEeVcService {
           + ", ids=" + countsByIdentifier
           + ", unidentified=" + unidentified);
 
+      processedFilePvService.collectFromSalesSummary(processedFile);
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
       salesSummaryRepository.saveAll(summaries);

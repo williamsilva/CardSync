@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -151,4 +152,32 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
     @Param("acquirerIds") Collection<UUID> acquirerIds,
     @Param("rvNumbers") Collection<Integer> rvNumbers
   );
+
+  /** Retorna os pvCentralizer distintos presentes em um arquivo processado (EEFI). */
+  @Query("""
+    select distinct co.pvCentralizer
+      from CreditOrderEntity co
+     where co.processedFile.id = :processedFileId
+       and co.pvCentralizer is not null
+  """)
+  Set<Integer> findDistinctPvCentralizerByProcessedFileId(@Param("processedFileId") UUID processedFileId);
+
+  /** Retorna pvCentralizer + acquirer distintos de um arquivo processado (EEFI) para auto-cadastro. */
+  @Query("""
+    select distinct co.pvCentralizer, co.acquirer
+      from CreditOrderEntity co
+     where co.processedFile.id = :processedFileId
+       and co.pvCentralizer is not null
+       and co.acquirer is not null
+  """)
+  List<Object[]> findDistinctPvCentralizerWithAcquirerByProcessedFileId(@Param("processedFileId") UUID processedFileId);
+
+  /** Carrega os pvCentralizer de múltiplos arquivos de uma vez para evitar N+1 no calendário. */
+  @Query("""
+    select co.processedFile.id, co.pvCentralizer
+      from CreditOrderEntity co
+     where co.processedFile.id in :fileIds
+       and co.pvCentralizer is not null
+  """)
+  List<Object[]> findPvCentralizerByProcessedFileIds(@Param("fileIds") Collection<UUID> fileIds);
 }

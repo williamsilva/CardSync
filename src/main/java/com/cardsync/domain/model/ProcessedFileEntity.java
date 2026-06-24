@@ -11,7 +11,9 @@ import lombok.Setter;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -91,6 +93,14 @@ public class ProcessedFileEntity extends AuditableEntityBase {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "banking_domicile_id")
   private BankingDomicileEntity bankingDomicile;
+
+  @ElementCollection(fetch = FetchType.LAZY)
+  @CollectionTable(
+    name = "cs_processed_file_pv",
+    joinColumns = @JoinColumn(name = "processed_file_id")
+  )
+  @Column(name = "pv_number")
+  private Set<Integer> pvNumbers = new LinkedHashSet<>();
 
   @OneToMany(mappedBy = "processedFile", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<ProcessedFileErrorEntity> errors = new ArrayList<>();

@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,5 +32,9 @@ public interface ProcessedFileRepository extends JpaRepository<ProcessedFileEnti
      order by pf.dateFile asc, pf.file asc
     """)
   List<ProcessedFileEntity> findCalendarFiles(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+  /** Carrega os pvNumbers armazenados de múltiplos arquivos em lote (evita N+1 no calendário). */
+  @Query("select pf.id, pvn from ProcessedFileEntity pf join pf.pvNumbers pvn where pf.id in :ids")
+  List<Object[]> findPvNumbersByFileIds(@Param("ids") Collection<UUID> ids);
 
 }

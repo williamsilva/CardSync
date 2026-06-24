@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -224,4 +225,32 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     @Param("ids") Collection<UUID> ids,
     @Param("manualGenerated") Boolean manualGenerated
   );
+
+  /** Retorna os pvNumbers distintos presentes em um arquivo processado (EEVC/EEVD). */
+  @Query("""
+    select distinct ss.pvNumber
+      from SalesSummaryEntity ss
+     where ss.processedFile.id = :processedFileId
+       and ss.pvNumber is not null
+  """)
+  Set<Integer> findDistinctPvNumbersByProcessedFileId(@Param("processedFileId") UUID processedFileId);
+
+  /** Retorna pvNumber + acquirer distintos de um arquivo processado (EEVC/EEVD) para auto-cadastro. */
+  @Query("""
+    select distinct ss.pvNumber, ss.acquirer
+      from SalesSummaryEntity ss
+     where ss.processedFile.id = :processedFileId
+       and ss.pvNumber is not null
+       and ss.acquirer is not null
+  """)
+  List<Object[]> findDistinctPvNumbersWithAcquirerByProcessedFileId(@Param("processedFileId") UUID processedFileId);
+
+  /** Carrega os pvNumbers de múltiplos arquivos de uma vez para evitar N+1 no calendário. */
+  @Query("""
+    select ss.processedFile.id, ss.pvNumber
+      from SalesSummaryEntity ss
+     where ss.processedFile.id in :fileIds
+       and ss.pvNumber is not null
+  """)
+  List<Object[]> findPvNumbersByProcessedFileIds(@Param("fileIds") Collection<UUID> fileIds);
 }

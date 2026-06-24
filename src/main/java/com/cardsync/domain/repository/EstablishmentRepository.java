@@ -12,8 +12,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -99,4 +101,43 @@ public interface EstablishmentRepository extends JpaRepository<EstablishmentEnti
   boolean existsByPvNumberAndCompany_IdAndAcquirer_Id(Integer pvNumber, UUID companyId, UUID acquirerId);
 
   boolean existsByPvNumberAndCompany_IdAndAcquirer_IdAndIdNot(Integer pvNumber, UUID companyId, UUID acquirerId, UUID id);
+
+  /** Carrega estabelecimentos ativos por adquirente e pvNumbers para enriquecer o calendário. */
+  @Query("""
+    select e from EstablishmentEntity e
+    left join fetch e.company
+    left join fetch e.acquirer
+    where e.acquirer.id in :acquirerIds
+      and e.pvNumber in :pvNumbers
+      and e.status = :activeStatus
+  """)
+  List<EstablishmentEntity> findActiveByAcquirerIdsAndPvNumbers(
+    @Param("acquirerIds") Collection<UUID> acquirerIds,
+    @Param("pvNumbers") Collection<Integer> pvNumbers,
+    @Param("activeStatus") Integer activeStatus
+  );
+
+  /** Carrega todos os estabelecimentos ativos de uma lista de adquirentes (sem filtro de pvNumber). */
+  @Query("""
+    select e from EstablishmentEntity e
+    left join fetch e.company
+    left join fetch e.acquirer
+    where e.acquirer.id in :acquirerIds
+      and e.status = :activeStatus
+  """)
+  List<EstablishmentEntity> findAllActiveByAcquirerIds(
+    @Param("acquirerIds") Collection<UUID> acquirerIds,
+    @Param("activeStatus") Integer activeStatus
+  );
+
+  /** Retorna os pvNumbers já cadastrados para um adquirente (para evitar duplicatas no auto-cadastro). */
+  @Query("""
+    select e.pvNumber from EstablishmentEntity e
+    where e.acquirer.id = :acquirerId
+      and e.pvNumber in :pvNumbers
+  """)
+  Set<Integer> findExistingPvNumbersByAcquirerId(
+    @Param("acquirerId") UUID acquirerId,
+    @Param("pvNumbers") Collection<Integer> pvNumbers
+  );
 }

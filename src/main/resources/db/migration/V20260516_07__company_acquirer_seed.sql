@@ -14,6 +14,8 @@ INSERT INTO cs_acquirer(id, status, cnpj, fantasy_name, social_reason, file_iden
     (UUID_TO_BIN(UUID()), 2, '22222222222222', 'SafraPay', 'SafraPay', 'SafraPay', NOW(), NOW(),
      (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
     (UUID_TO_BIN(UUID()), 2, '11111111111111', 'Outra', 'Outra Adquirente', 'Outra', NOW(), NOW(),
+     (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br')),
+    (UUID_TO_BIN(UUID()), 2, '33333333333333', 'Sicredi', 'Sicredi', 'Sicredi', NOW(), NOW(),
      (SELECT id FROM cs_users WHERE user_name = 'suporte@cardsync.com.br'));
 
 INSERT INTO cs_permissions (id, name, description) VALUES

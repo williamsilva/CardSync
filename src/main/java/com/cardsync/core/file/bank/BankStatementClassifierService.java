@@ -45,6 +45,8 @@ public class BankStatementClassifierService {
     resolveAcquirer(normalized).ifPresent(classification::setAcquirer);
     resolveFlag(normalized).ifPresent(classification::setFlag);
     classification.setModalityPaymentBank(resolveBankModality(historicalCode, normalized, layout));
+    resolveEstablishment(classification.getPvCandidates(), classification.getAcquirer())
+      .ifPresent(classification::setEstablishment);
 
     if (classification.getAcquirer() == null) classification.addNote("acquirer_not_detected_by_text");
     if (classification.getFlag() == null) classification.addNote("flag_not_detected_by_text");
@@ -106,13 +108,13 @@ public class BankStatementClassifierService {
     return false;
   }
 
-  private Optional<EstablishmentEntity> resolveEstablishment(List<Integer> pvCandidates) {
+  private Optional<EstablishmentEntity> resolveEstablishment(List<Integer> pvCandidates, AcquirerEntity acquirer) {
     if (pvCandidates == null || pvCandidates.isEmpty()) return Optional.empty();
 
     for (Integer pv : pvCandidates) {
-      Optional<EstablishmentEntity> found = establishmentRepository.findAll().stream()
-        .filter(e -> e.getPvNumber() != null && e.getPvNumber().equals(pv))
-        .findFirst();
+      Optional<EstablishmentEntity> found = acquirer != null
+        ? establishmentRepository.findFirstByPvNumberAndAcquirer_Id(pv, acquirer.getId())
+        : establishmentRepository.findFirstByPvNumber(pv);
       if (found.isPresent()) return found;
     }
 
