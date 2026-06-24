@@ -120,6 +120,7 @@ cardsync:
         - "senha123"
       tokens:
         # Base pública usada nos links enviados por e-mail (opcional)
+        # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
         public-base-url: ${CARDSYNC_PUBLIC_BASE_URL:http://localhost:9091}
         # convite / primeira senha (default 1 dia)
         invite-ttl: ${CARDSYNC_INVITE_TTL:PT24H}
@@ -147,6 +148,7 @@ cardsync:
       enabled: true
       extend-when-locked: false
       # Patamares progressivos (OBRIGATÓRIO)
+      # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
       rules:
         - attempts: 5
           duration: PT1M
@@ -159,6 +161,16 @@ cardsync:
 
     auth-server:
       dev-generate-key: false
+
+      token:
+        # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
+        # Tempo de inatividade até expirar a sessão HTTP
+        session-timeout: ${CARDSYNC_SESSION_TIMEOUT:PT2H}
+        # Validade do access token JWT
+        access-token-ttl: ${CARDSYNC_ACCESS_TOKEN_TTL:PT10M}
+        # Validade do refresh token
+        refresh-token-ttl: ${CARDSYNC_REFRESH_TOKEN_TTL:P30D}
+
       keystore:
         location: classpath:keystore/cardsync.jks
         password: changeit
@@ -189,14 +201,3 @@ cardsync:
     protected-usernames:
       - owner
       - system
-
-#logging:
-  #level:
-    #org.hibernate.SQL: DEBUG
-    #org.springframework.web: DEBUG
-    #org.springframework.data: DEBUG
-    #org.hibernate.orm.jdbc.bind: TRACE
-    #org.springframework.session: DEBUG
-    #org.springframework.security: DEBUG
-    #org.springframework.data.jpa.repository.query: DEBUG
-    #org.springframework.boot.autoconfigure.session: DEBUG

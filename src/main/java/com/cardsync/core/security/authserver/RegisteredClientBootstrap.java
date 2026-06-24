@@ -31,7 +31,15 @@ public class RegisteredClientBootstrap {
     return args -> {
       String clientId = props.getAuthserver().getClient().getClientId();
       RegisteredClient existing = repo.findByClientId(clientId);
-      if (existing!=null) {
+
+      TokenSettings tokenSettings = TokenSettings.builder()
+        .accessTokenTimeToLive(props.getAuthserver().getToken().getAccessTokenTtl())
+        .reuseRefreshTokens(false)
+        .refreshTokenTimeToLive(props.getAuthserver().getToken().getRefreshTokenTtl())
+        .build();
+
+      if (existing != null) {
+        repo.save(RegisteredClient.from(existing).tokenSettings(tokenSettings).build());
         return;
       }
 
@@ -39,13 +47,6 @@ public class RegisteredClientBootstrap {
 
       // Redirect URIs fixos e exatos (DEV/PROD)
       String redirect = props.getAuthserver().getClient().getRedirectUri();
-
-      TokenSettings tokenSettings = TokenSettings.builder()
-        .accessTokenTimeToLive(Duration.ofMinutes(10))
-        // Refresh token server-side (baseline). Rotation a cada uso:
-        .reuseRefreshTokens(false)
-        .refreshTokenTimeToLive(Duration.ofDays(30))
-        .build();
 
       ClientSettings clientSettings = ClientSettings.builder()
         .requireAuthorizationConsent(false)

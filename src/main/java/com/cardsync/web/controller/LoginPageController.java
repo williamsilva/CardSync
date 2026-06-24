@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,9 +25,18 @@ public class LoginPageController {
   @GetMapping("/login")
   public String login(HttpServletRequest request, Model model, Authentication auth) {
 
-    if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
-      // já está logado -> manda pra home (ou Angular)
-      return "redirect:/";
+    // Usa SecurityContextHolder como fonte primária; auth (parâmetro Spring MVC) como fallback
+    Authentication current = SecurityContextHolder.getContext().getAuthentication();
+    if (current == null) current = auth;
+
+    if (current != null && current.isAuthenticated() && !(current instanceof AnonymousAuthenticationToken)) {
+      // Limpa qualquer estado de erro stale que possa ter sido migrado junto com a sessão
+      var session = request.getSession(false);
+      if (session != null) session.removeAttribute(LoginUiState.SESSION_KEY);
+
+      // Redireciona direto para o SPA (evita o hop extra por "/")
+      String spaUrl = securityProps.getWeb().getSpaBaseUrl();
+      return "redirect:" + (spaUrl != null && !spaUrl.isBlank() ? spaUrl : "/");
     }
 
     var session = request.getSession(false);

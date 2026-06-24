@@ -170,6 +170,7 @@ cardsync:
       same-site: ${CARDSYNC_COOKIE_SAMESITE:Lax}
 
     lockout:
+      # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
       enabled: ${CARDSYNC_LOCKOUT_ENABLED:true}
       extend-when-locked: ${CARDSYNC_LOCKOUT_EXTEND_WHEN_LOCKED:false}
       rules:
@@ -184,6 +185,12 @@ cardsync:
 
     auth-server:
       dev-generate-key: false
+      # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
+      token:
+        session-timeout: ${CARDSYNC_SESSION_TIMEOUT:PT30M}
+        access-token-ttl: ${CARDSYNC_ACCESS_TOKEN_TTL:PT10M}
+        refresh-token-ttl: ${CARDSYNC_REFRESH_TOKEN_TTL:P30D}
+
       keystore:
         location: classpath:keystore/cardsync.jks
         password: ${CARDSYNC_AUTH_KEYSTORE_PASSWORD:}
@@ -191,8 +198,8 @@ cardsync:
         key-password: ${CARDSYNC_AUTH_KEYSTORE_KEY_PASSWORD:}
 
       client:
-        client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
         client-secret: ${CARDSYNC_BFF_CLIENT_SECRET}
+        client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
         redirect-uri: ${CARDSYNC_BFF_REDIRECT_URI:https://api.cardsync.com.br/login/oauth2/code/cardsync-bff}
         post-logout-redirect-uris:
           - ${CARDSYNC_POST_LOGOUT_REDIRECT_URI:https://cardsync.com.br/}
