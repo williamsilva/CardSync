@@ -151,7 +151,8 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   @Query("""
     select new com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderStats(
       ss.id,
-      count(co.id)
+      count(co.id),
+      max(ss.grossValue)
     )
       from SalesSummaryEntity ss
       left join CreditOrderEntity co on co.salesSummary.id = ss.id

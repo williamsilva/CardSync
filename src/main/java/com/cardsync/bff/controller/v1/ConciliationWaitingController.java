@@ -5,7 +5,11 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.Transact
 import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
 import com.cardsync.core.conciliation.analysis.ConciliationManualSwapReconciliationService;
 import com.cardsync.core.conciliation.analysis.ErpAcquirerResolutionService;
+import com.cardsync.core.reconciliation.BankReconciliationResult;
+import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
+import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationResult;
+import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
@@ -32,6 +36,8 @@ public class ConciliationWaitingController {
   private final ErpCancellationReprocessService erpCancellationReprocessService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
+  private final BankReconciliationService bankReconciliationService;
+  private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
 
   @PostMapping("/missing-acquirer")
   @CheckSecurity.FileProcessing.CanRead
@@ -194,5 +200,17 @@ public class ConciliationWaitingController {
     @Valid @RequestBody ErpCancellationReprocessRequest request
   ) {
     return erpCancellationReprocessService.reprocess(request.year(), request.month());
+  }
+
+  @PostMapping("/reconcile-bank")
+  @CheckSecurity.FileProcessing.CanProcess
+  public BankReconciliationResult reconcileBank() {
+    return bankReconciliationService.reconcilePending();
+  }
+
+  @PostMapping("/reconcile-sales-summary-credit-order")
+  @CheckSecurity.FileProcessing.CanProcess
+  public SalesSummaryCreditOrderReconciliationResult reconcileSalesSummaryCreditOrder() {
+    return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
   }
 }

@@ -3,18 +3,22 @@ package com.cardsync.core.conciliation.analysis;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconcileErpAcquirerResultModel;
 import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
+import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -44,11 +48,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConciliationManualSwapReconciliationService {
 
-  private final EntityManager entityManager;
+  private final PlatformTransactionManager transactionManager;
   private final CardsyncAppProperties appProperties;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
+  private final AcquirerRepository acquirerRepository;
   private final ConciliationAnalysisService conciliationAnalysisService;
 
   @Transactional
@@ -66,6 +71,14 @@ public class ConciliationManualSwapReconciliationService {
     OffsetDateTime lookbackDate = LocalDate.now()
       .minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths())
       .atStartOfDay().atOffset(ZoneOffset.UTC);
+
+    UUID redeAcquirerId = acquirerRepository.findByFileIdentifierIgnoreCase("REDE")
+      .map(AcquirerEntity::getId)
+      .orElse(null);
+    if (redeAcquirerId == null) {
+      log.warn("⚠️ Adquirente REDE não encontrada na base, conciliação manual swap ignorada.");
+      return new ReconcileErpAcquirerResultModel(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
 
     List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForManualSwapReconciliation(
       pendingStatuses,
@@ -100,122 +113,145 @@ public class ConciliationManualSwapReconciliationService {
       trigger, erpIds.size(), batchSize, totalBatches
     );
 
+    TransactionTemplate batchTx = new TransactionTemplate(transactionManager);
+    batchTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
     for (int start = 0; start < erpIds.size(); start += batchSize) {
       batchNumber++;
-      int end = Math.min(start + batchSize, erpIds.size());
-      List<UUID> batchIds = erpIds.subList(start, end);
+      final int end = Math.min(start + batchSize, erpIds.size());
+      final List<UUID> batchIds = erpIds.subList(start, end);
+      final int currentBatch = batchNumber;
 
-      List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForReconciliation(batchIds);
-      if (erpBatch.isEmpty()) {
-        continue;
-      }
+      // [0]=analyzed [1]=matched [2]=updated [3]=notMatched [4]=valDiv [5]=acqDiv
+      // [6]=ambiguous [7]=flagUpd [8]=ctxUpd [9]=batchMatched [10]=manualPendingSize
+      int[] r = batchTx.execute(status -> {
+        List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForReconciliation(batchIds);
+        if (erpBatch.isEmpty()) {
+          return null;
+        }
 
-      // Considera apenas vendas manuais ainda pendentes — as demais já foram tratadas pela etapa principal.
-      List<TransactionErpEntity> manualPending = erpBatch.stream()
-        .filter(this::isManualCapture)
-        .filter(erp -> !conciliationAnalysisService.isExcludedFromCardReconciliation(erp))
-        .filter(conciliationAnalysisService::isPendingForErpAcquirerReconciliation)
-        .toList();
+        // Considera apenas vendas manuais ainda pendentes — as demais já foram tratadas pela etapa principal.
+        List<TransactionErpEntity> manualPending = erpBatch.stream()
+          .filter(this::isManualCapture)
+          .filter(erp -> !conciliationAnalysisService.isExcludedFromCardReconciliation(erp))
+          .filter(conciliationAnalysisService::isPendingForErpAcquirerReconciliation)
+          .toList();
 
-      if (manualPending.isEmpty()) {
-        continue;
-      }
+        if (manualPending.isEmpty()) {
+          return null;
+        }
 
-      // Candidatas da adquirente cruzando os campos INVERTIDOS (NSU do ERP ↔ autorização
-      // da ADQ e vice-versa). É isso que permite achar a venda quando ERP veio trocado.
-      List<TransactionAcqEntity> acquirerCandidates = conciliationAnalysisService.findAcquirerCandidatesForBatchSwapped(
-        erpBatch,
-        false,
-        pendingStatuses,
-        lookbackDate
-      );
-      Map<ConciliationAnalysisService.ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity =
-        conciliationAnalysisService.indexAcquirerCandidates(acquirerCandidates);
-
-      List<TransactionErpEntity> changedErpSales = new ArrayList<>();
-      List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
-      Set<UUID> changedAcquirerIds = new HashSet<>();
-
-      int batchMatched = 0;
-
-      for (TransactionErpEntity erp : manualPending) {
-        analyzed++;
-
-        // Procura candidatas usando a chave com NSU e autorização TROCADOS.
-        List<TransactionAcqEntity> identityCandidates = acquirersByIdentity.getOrDefault(
-          ConciliationAnalysisService.ErpAcquirerIdentityKey.fromErpSwapped(erp),
-          List.of()
+        // Candidatas da adquirente cruzando os campos INVERTIDOS (NSU do ERP ↔ autorização
+        // da ADQ e vice-versa). É isso que permite achar a venda quando ERP veio trocado.
+        List<TransactionAcqEntity> acquirerCandidates = conciliationAnalysisService.findAcquirerCandidatesForBatchSwapped(
+          erpBatch,
+          false,
+          pendingStatuses,
+          lookbackDate,
+          redeAcquirerId
         );
+        Map<ConciliationAnalysisService.ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity =
+          conciliationAnalysisService.indexAcquirerCandidates(acquirerCandidates);
 
-        ConciliationAnalysisService.ErpAcquirerMatchResult matchResult =
-          conciliationAnalysisService.findBestAcquirerMatchForReconciliation(erp, identityCandidates, true);
+        List<TransactionErpEntity> changedErpSales = new ArrayList<>();
+        List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
+        Set<UUID> changedAcquirerIds = new HashSet<>();
 
-        switch (matchResult.status()) {
-          case NOT_MATCHED -> {
-            notMatched++;
-            markManualSwapAttempted(erp, changedErpSales);
-          }
-          case VALUE_DIVERGENCE -> {
-            valueDivergences++;
-            markManualSwapAttempted(erp, changedErpSales);
-          }
-          case ACQUIRER_DIVERGENCE -> {
-            acquirerDivergences++;
-            markManualSwapAttempted(erp, changedErpSales);
-          }
-          case AMBIGUOUS -> {
-            ambiguousMatches++;
-            markManualSwapAttempted(erp, changedErpSales);
-          }
-          case MATCHED -> {
-            TransactionAcqEntity acq = matchResult.acquirerSale();
-            matched++;
-            batchMatched++;
+        int[] counts = new int[11];
+        counts[10] = manualPending.size();
 
-            // Corrige os dados do ERP com os da adquirente (fonte da verdade).
-            // No caso manual, NSU e autorização estavam invertidos; aproveitamos para
-            // alinhar também TID, valor e data quando a adquirente os informa.
-            correctErpFromAcquirer(erp, acq);
+        for (TransactionErpEntity erp : manualPending) {
+          counts[0]++;  // analyzed
 
-            ConciliationAnalysisService.ErpAcquirerApplyResult applyResult =
-              conciliationAnalysisService.applyAcquirerBusinessContext(erp, acq);
+          // Procura candidatas usando a chave com NSU e autorização TROCADOS.
+          List<TransactionAcqEntity> identityCandidates = acquirersByIdentity.getOrDefault(
+            ConciliationAnalysisService.ErpAcquirerIdentityKey.fromErpSwapped(erp),
+            List.of()
+          );
 
-            if (applyResult.changed()) {
-              updated++;
+          ConciliationAnalysisService.ErpAcquirerMatchResult matchResult =
+            conciliationAnalysisService.findBestAcquirerMatchForReconciliation(erp, identityCandidates, true);
+
+          switch (matchResult.status()) {
+            case NOT_MATCHED -> {
+              counts[3]++;
+              markManualSwapAttempted(erp, changedErpSales);
             }
-            if (applyResult.flagUpdated()) {
-              flagUpdated++;
+            case VALUE_DIVERGENCE -> {
+              counts[4]++;
+              markManualSwapAttempted(erp, changedErpSales);
             }
-            if (applyResult.businessContextUpdated()) {
-              businessContextUpdated++;
+            case ACQUIRER_DIVERGENCE -> {
+              counts[5]++;
+              markManualSwapAttempted(erp, changedErpSales);
             }
+            case AMBIGUOUS -> {
+              counts[6]++;
+              markManualSwapAttempted(erp, changedErpSales);
+            }
+            case MATCHED -> {
+              TransactionAcqEntity acq = matchResult.acquirerSale();
+              counts[1]++;   // matched
+              counts[9]++;   // batchMatched
 
-            changedErpSales.add(erp);
-            if (acq.getId() != null && changedAcquirerIds.add(acq.getId())) {
-              changedAcquirerSales.add(acq);
-            }
+              // Corrige os dados do ERP com os da adquirente (fonte da verdade).
+              // No caso manual, NSU e autorização estavam invertidos; aproveitamos para
+              // alinhar também TID, valor e data quando a adquirente os informa.
+              correctErpFromAcquirer(erp, acq);
 
-            log.info(
-              "🔁 Venda manual conciliada com NSU/autorização invertidos. erpId={}, erpNsu={}, erpAuth={}, acqId={}",
-              erp.getId(), erp.getNsu(), erp.getAuthorization(), acq.getId()
-            );
+              ConciliationAnalysisService.ErpAcquirerApplyResult applyResult =
+                conciliationAnalysisService.applyAcquirerBusinessContext(erp, acq);
+
+              if (applyResult.changed()) {
+                counts[2]++;
+              }
+              if (applyResult.flagUpdated()) {
+                counts[7]++;
+              }
+              if (applyResult.businessContextUpdated()) {
+                counts[8]++;
+              }
+
+              changedErpSales.add(erp);
+              if (acq.getId() != null && changedAcquirerIds.add(acq.getId())) {
+                changedAcquirerSales.add(acq);
+              }
+
+              log.info(
+                "🔁 Venda manual conciliada com NSU/autorização invertidos. erpId={}, erpNsu={}, erpAuth={}, acqId={}",
+                erp.getId(), erp.getNsu(), erp.getAuthorization(), acq.getId()
+              );
+            }
           }
         }
+
+        if (!changedErpSales.isEmpty()) {
+          transactionErpRepository.saveAll(changedErpSales);
+        }
+        if (!changedAcquirerSales.isEmpty()) {
+          transactionAcqRepository.saveAll(changedAcquirerSales);
+        }
+
+        return counts;
+      });
+
+      if (r == null) {
+        continue;
       }
 
-      if (!changedErpSales.isEmpty()) {
-        transactionErpRepository.saveAll(changedErpSales);
-      }
-      if (!changedAcquirerSales.isEmpty()) {
-        transactionAcqRepository.saveAll(changedAcquirerSales);
-      }
-
-      entityManager.flush();
-      entityManager.clear();
+      analyzed += r[0];
+      matched += r[1];
+      updated += r[2];
+      notMatched += r[3];
+      valueDivergences += r[4];
+      acquirerDivergences += r[5];
+      ambiguousMatches += r[6];
+      flagUpdated += r[7];
+      businessContextUpdated += r[8];
 
       log.info(
         "🔄 Conciliação manual invertida: batch={}/{}, manuaisPendentes={}, conciliadas={}, totalConciliadas={}",
-        batchNumber, totalBatches, manualPending.size(), batchMatched, matched
+        currentBatch, totalBatches, r[10], r[9], matched
       );
     }
 

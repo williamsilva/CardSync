@@ -87,7 +87,7 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   @ManyToOne(fetch = FetchType.LAZY)
   private EstablishmentEntity establishment;
 
-  @BatchSize(size = 100)
+  @BatchSize(size = 1000)
   @OrderBy("installment ASC")
   @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<InstallmentAcqEntity> installments = new LinkedHashSet<>();

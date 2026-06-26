@@ -11,7 +11,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import jakarta.persistence.EntityManager;
 
@@ -43,11 +46,20 @@ public class ConciliationAnalysisService {
   private final ReleasesBankRepository releasesBankRepository;
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
+  private final AcquirerRepository acquirerRepository;
   private final FileProcessingProperties fileProcessingProperties;
   private final CardsyncAppProperties appProperties;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final ConciliationFeeAnalysisService feeAnalysisService;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
+  private final PlatformTransactionManager transactionManager;
+
+  private record ErpAcqBatchResult(
+    int analyzed, int matched, int updated, int skippedDivergent,
+    int flagUpdated, int businessContextUpdated, int notMatched,
+    int valueDivergences, int acquirerDivergences, int ambiguousMatches,
+    int candidatesCount
+  ) {}
 
   @Transactional(readOnly = true)
   public ConciliationDashboardModel dashboard() {
@@ -156,6 +168,7 @@ public class ConciliationAnalysisService {
       int end = Math.min(start + ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE, erpIds.size());
       List<UUID> batchIds = erpIds.subList(start, end);
 
+      long t0 = System.currentTimeMillis();
       List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForFeeReconciliation(
         batchIds,
         reprocess,
@@ -163,6 +176,7 @@ public class ConciliationAnalysisService {
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         pendingFeeStatuses
       );
+      long tErpFetch = System.currentTimeMillis() - t0;
       if (erpBatch.isEmpty()) {
         continue;
       }
@@ -173,6 +187,7 @@ public class ConciliationAnalysisService {
       int batchDivergentRates = 0;
       int batchMissingContracts = 0;
 
+      long tFeeStart = System.currentTimeMillis();
       for (TransactionErpEntity erp : erpBatch) {
         TransactionAcqEntity acq = erp.getTransactionAcq();
         if (acq == null) {
@@ -205,24 +220,20 @@ public class ConciliationAnalysisService {
           okRates++;
         }
       }
+      long tFee = System.currentTimeMillis() - tFeeStart;
 
+      long tFlushStart = System.currentTimeMillis();
       if (!changedErpSales.isEmpty()) {
         transactionErpRepository.saveAll(changedErpSales);
       }
-
       entityManager.flush();
       entityManager.clear();
+      long tFlush = System.currentTimeMillis() - tFlushStart;
 
       log.info(
-        "🔄 Conciliação de taxas ERP x Adquirente: batch={}/{}, analisadas={}, erpAtualizadas={}, divergenciasTaxa={}, " +
-          "semContratoValido={}, totalAnalisadas={}",
-        batchNumber,
-        totalBatches,
-        batchAnalyzed,
-        batchUpdated,
-        batchDivergentRates,
-        batchMissingContracts,
-        analyzed
+        "⏱️ taxa batch={}/{} erpFetch={}ms fee={}ms flush={}ms analisadas={} atualizadas={} divergencias={} semContrato={}",
+        batchNumber, totalBatches, tErpFetch, tFee, tFlush,
+        batchAnalyzed, batchUpdated, batchDivergentRates, batchMissingContracts
       );
     }
 
@@ -275,6 +286,14 @@ public class ConciliationAnalysisService {
     OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime lookbackDate = reconciliationLookbackDate();
 
+    UUID redeAcquirerId = acquirerRepository.findByFileIdentifierIgnoreCase("REDE")
+      .map(AcquirerEntity::getId)
+      .orElse(null);
+    if (redeAcquirerId == null) {
+      log.warn("⚠️ Adquirente REDE não encontrada na base, conciliação ERP x ADQ ignorada.");
+      return new ReconcileErpAcquirerResultModel(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
     List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForReconciliation(
       reconcileAlreadyReconciled,
       pendingStatuses,
@@ -306,186 +325,222 @@ public class ConciliationAnalysisService {
       reconcileAlreadyReconciled
     );
 
+    TransactionTemplate batchTx = new TransactionTemplate(transactionManager);
+    batchTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
     for (int start = 0; start < erpIds.size(); start += ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE) {
       batchNumber++;
-      int end = Math.min(start + ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE, erpIds.size());
-      List<UUID> batchIds = erpIds.subList(start, end);
+      final int end = Math.min(start + ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE, erpIds.size());
+      final List<UUID> batchIds = erpIds.subList(start, end);
+      final int currentBatch = batchNumber;
 
-      List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForReconciliation(batchIds);
-      if (erpBatch.isEmpty()) {
+      ErpAcqBatchResult result = batchTx.execute(status -> {
+        long t0 = System.currentTimeMillis();
+        List<TransactionErpEntity> erpBatch = transactionErpRepository.findRedeErpBatchForReconciliation(batchIds);
+        long tErpFetch = System.currentTimeMillis() - t0;
+        if (erpBatch.isEmpty()) {
+          return null;
+        }
+
+        t0 = System.currentTimeMillis();
+        List<TransactionAcqEntity> acquirerCandidates = findAcquirerCandidatesForBatch(
+          erpBatch,
+          reconcileAlreadyReconciled,
+          pendingStatuses,
+          lookbackDate,
+          redeAcquirerId
+        );
+        long tAcqFetch = System.currentTimeMillis() - t0;
+        Map<ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity = indexAcquirerCandidates(acquirerCandidates);
+        long tMatchStart = System.currentTimeMillis();
+
+        List<TransactionErpEntity> changedErpSales = new ArrayList<>();
+        List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
+        Set<UUID> changedAcquirerIds = new HashSet<>();
+
+        int batchAnalyzed = 0;
+        int batchMatched = 0;
+        int batchUpdated = 0;
+        int batchNotMatched = 0;
+        int batchValueDiv = 0;
+        int batchAcqDiv = 0;
+        int batchAmbiguous = 0;
+        int batchSkipped = 0;
+        int batchFlagUpd = 0;
+        int batchCtxUpd = 0;
+
+        for (TransactionErpEntity erp : erpBatch) {
+          if (isExcludedFromCardReconciliation(erp)) {
+            continue;
+          }
+
+          if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(erp)) {
+            continue;
+          }
+
+          batchAnalyzed++;
+
+          List<TransactionAcqEntity> identityCandidates = acquirersByIdentity.getOrDefault(
+            ErpAcquirerIdentityKey.fromErp(erp),
+            List.of()
+          );
+
+          ErpAcquirerMatchResult matchResult = findBestAcquirerMatchForReconciliation(erp, identityCandidates);
+
+          if (matchResult.status() == ErpAcquirerMatchStatus.NOT_MATCHED) {
+            batchNotMatched++;
+            if (applyErpReconciliationStatus(
+              erp,
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ
+            )) {
+              batchUpdated++;
+              changedErpSales.add(erp);
+            }
+            continue;
+          }
+
+          if (matchResult.status() == ErpAcquirerMatchStatus.VALUE_DIVERGENCE) {
+            batchSkipped++;
+            batchValueDiv++;
+            if (applyErpReconciliationStatus(
+              erp,
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.VALUE_MISMATCH
+            )) {
+              batchUpdated++;
+              changedErpSales.add(erp);
+            }
+
+            int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
+              matchResult.acquirerSales(),
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.VALUE_MISMATCH,
+              changedAcquirerIds,
+              changedAcquirerSales
+            );
+            batchUpdated += acquirerUpdated;
+            continue;
+          }
+
+          if (matchResult.status() == ErpAcquirerMatchStatus.ACQUIRER_DIVERGENCE) {
+            batchSkipped++;
+            batchAcqDiv++;
+            if (applyErpReconciliationStatus(
+              erp,
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.ACQUIRER_MISMATCH
+            )) {
+              batchUpdated++;
+              changedErpSales.add(erp);
+            }
+
+            int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
+              matchResult.acquirerSales(),
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.ACQUIRER_MISMATCH,
+              changedAcquirerIds,
+              changedAcquirerSales
+            );
+            batchUpdated += acquirerUpdated;
+            continue;
+          }
+
+          if (matchResult.status() == ErpAcquirerMatchStatus.AMBIGUOUS) {
+            batchSkipped++;
+            batchAmbiguous++;
+            if (applyErpReconciliationStatus(
+              erp,
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.AMBIGUOUS_MATCH
+            )) {
+              batchUpdated++;
+              changedErpSales.add(erp);
+            }
+
+            int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
+              matchResult.acquirerSales(),
+              StatusReconciliationEnum.PENDING,
+              StatusTransactionReasonEnum.AMBIGUOUS_MATCH,
+              changedAcquirerIds,
+              changedAcquirerSales
+            );
+            batchUpdated += acquirerUpdated;
+            continue;
+          }
+
+          TransactionAcqEntity acq = matchResult.acquirerSale();
+          batchMatched++;
+
+          ErpAcquirerApplyResult applyResult = applyAcquirerBusinessContext(erp, acq);
+          if (applyResult.changed()) {
+            batchUpdated++;
+            changedErpSales.add(erp);
+          }
+          if (applyResult.flagUpdated()) {
+            batchFlagUpd++;
+          }
+          if (applyResult.businessContextUpdated()) {
+            batchCtxUpd++;
+          }
+
+          // A conciliação ERP x Adquirente deve apenas parear a venda e atualizar o contexto comercial.
+          // A análise/atualização de taxas e o feeReconciliationStatus são exclusivos do fluxo
+          // reconcileErpAcquirerFees(...), para evitar reprocessamento indevido ou bloqueio prematuro.
+
+          if (acq.getId() != null && changedAcquirerIds.add(acq.getId())) {
+            changedAcquirerSales.add(acq);
+          }
+        }
+
+        long tMatch = System.currentTimeMillis() - tMatchStart;
+
+        long tFlushStart = System.currentTimeMillis();
+        if (!changedErpSales.isEmpty()) {
+          transactionErpRepository.saveAll(changedErpSales);
+        }
+        if (!changedAcquirerSales.isEmpty()) {
+          transactionAcqRepository.saveAll(changedAcquirerSales);
+        }
+        entityManager.flush();
+        entityManager.clear();
+        long tFlush = System.currentTimeMillis() - tFlushStart;
+
+        log.info(
+          "⏱️ batch={}/{} erpFetch={}ms acqFetch={}ms match={}ms flush={}ms erp={} acq={}",
+          currentBatch, totalBatches, tErpFetch, tAcqFetch, tMatch, tFlush,
+          changedErpSales.size(), changedAcquirerSales.size()
+        );
+
+        return new ErpAcqBatchResult(batchAnalyzed, batchMatched, batchUpdated, batchSkipped,
+          batchFlagUpd, batchCtxUpd, batchNotMatched, batchValueDiv, batchAcqDiv,
+          batchAmbiguous, acquirerCandidates.size());
+      });
+
+      if (result == null) {
         continue;
       }
 
-      List<TransactionAcqEntity> acquirerCandidates = findAcquirerCandidatesForBatch(
-        erpBatch,
-        reconcileAlreadyReconciled,
-        pendingStatuses,
-        lookbackDate
-      );
-      Map<ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity = indexAcquirerCandidates(acquirerCandidates);
-
-      List<TransactionErpEntity> changedErpSales = new ArrayList<>();
-      List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
-      Set<UUID> changedAcquirerIds = new HashSet<>();
-
-      int batchAnalyzed = 0;
-      int batchMatched = 0;
-      int batchUpdated = 0;
-
-      for (TransactionErpEntity erp : erpBatch) {
-        if (isExcludedFromCardReconciliation(erp)) {
-          continue;
-        }
-
-        if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(erp)) {
-          continue;
-        }
-
-        analyzed++;
-        batchAnalyzed++;
-
-        List<TransactionAcqEntity> identityCandidates = acquirersByIdentity.getOrDefault(
-          ErpAcquirerIdentityKey.fromErp(erp),
-          List.of()
-        );
-
-        ErpAcquirerMatchResult matchResult = findBestAcquirerMatchForReconciliation(erp, identityCandidates);
-
-        if (matchResult.status() == ErpAcquirerMatchStatus.NOT_MATCHED) {
-          notMatched++;
-          if (applyErpReconciliationStatus(
-            erp,
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.CV_NOT_FOUND_ADQ
-          )) {
-            updated++;
-            batchUpdated++;
-            changedErpSales.add(erp);
-          }
-          continue;
-        }
-
-        if (matchResult.status() == ErpAcquirerMatchStatus.VALUE_DIVERGENCE) {
-          skippedDivergent++;
-          valueDivergences++;
-          if (applyErpReconciliationStatus(
-            erp,
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.VALUE_MISMATCH
-          )) {
-            updated++;
-            batchUpdated++;
-            changedErpSales.add(erp);
-          }
-
-          int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
-            matchResult.acquirerSales(),
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.VALUE_MISMATCH,
-            changedAcquirerIds,
-            changedAcquirerSales
-          );
-          updated += acquirerUpdated;
-          batchUpdated += acquirerUpdated;
-          continue;
-        }
-
-        if (matchResult.status() == ErpAcquirerMatchStatus.ACQUIRER_DIVERGENCE) {
-          skippedDivergent++;
-          acquirerDivergences++;
-          if (applyErpReconciliationStatus(
-            erp,
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.ACQUIRER_MISMATCH
-          )) {
-            updated++;
-            batchUpdated++;
-            changedErpSales.add(erp);
-          }
-
-          int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
-            matchResult.acquirerSales(),
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.ACQUIRER_MISMATCH,
-            changedAcquirerIds,
-            changedAcquirerSales
-          );
-          updated += acquirerUpdated;
-          batchUpdated += acquirerUpdated;
-          continue;
-        }
-
-        if (matchResult.status() == ErpAcquirerMatchStatus.AMBIGUOUS) {
-          skippedDivergent++;
-          ambiguousMatches++;
-          if (applyErpReconciliationStatus(
-            erp,
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.AMBIGUOUS_MATCH
-          )) {
-            updated++;
-            batchUpdated++;
-            changedErpSales.add(erp);
-          }
-
-          int acquirerUpdated = applyAcquirerReconciliationStatusToCandidates(
-            matchResult.acquirerSales(),
-            StatusReconciliationEnum.PENDING,
-            StatusTransactionReasonEnum.AMBIGUOUS_MATCH,
-            changedAcquirerIds,
-            changedAcquirerSales
-          );
-          updated += acquirerUpdated;
-          batchUpdated += acquirerUpdated;
-          continue;
-        }
-
-        TransactionAcqEntity acq = matchResult.acquirerSale();
-        matched++;
-        batchMatched++;
-
-        ErpAcquirerApplyResult applyResult = applyAcquirerBusinessContext(erp, acq);
-        if (applyResult.changed()) {
-          updated++;
-          batchUpdated++;
-          changedErpSales.add(erp);
-        }
-        if (applyResult.flagUpdated()) {
-          flagUpdated++;
-        }
-        if (applyResult.businessContextUpdated()) {
-          businessContextUpdated++;
-        }
-
-        // A conciliação ERP x Adquirente deve apenas parear a venda e atualizar o contexto comercial.
-        // A análise/atualização de taxas e o feeReconciliationStatus são exclusivos do fluxo
-        // reconcileErpAcquirerFees(...), para evitar reprocessamento indevido ou bloqueio prematuro.
-
-        if (acq.getId() != null && changedAcquirerIds.add(acq.getId())) {
-          changedAcquirerSales.add(acq);
-        }
-      }
-
-      if (!changedErpSales.isEmpty()) {
-        transactionErpRepository.saveAll(changedErpSales);
-      }
-
-      if (!changedAcquirerSales.isEmpty()) {
-        transactionAcqRepository.saveAll(changedAcquirerSales);
-      }
-
-      entityManager.flush();
-      entityManager.clear();
+      analyzed += result.analyzed();
+      matched += result.matched();
+      updated += result.updated();
+      skippedDivergent += result.skippedDivergent();
+      flagUpdated += result.flagUpdated();
+      businessContextUpdated += result.businessContextUpdated();
+      notMatched += result.notMatched();
+      valueDivergences += result.valueDivergences();
+      acquirerDivergences += result.acquirerDivergences();
+      ambiguousMatches += result.ambiguousMatches();
 
       log.info(
         "🔄 Conciliação ERP x Adquirente: batch={}/{}, erpAnalisadas={}, acqCandidatas={}, conciliadas={}, " +
           "atualizadas={}, totalAnalisadas={}, totalConciliadas={}",
-        batchNumber,
+        currentBatch,
         totalBatches,
-        batchAnalyzed,
-        acquirerCandidates.size(),
-        batchMatched,
-        batchUpdated,
+        result.analyzed(),
+        result.candidatesCount(),
+        result.matched(),
+        result.updated(),
         analyzed,
         matched
       );
@@ -495,7 +550,9 @@ public class ConciliationAnalysisService {
       reconcileAlreadyReconciled,
       pendingStatuses,
       implantationDate,
-      lookbackDate
+      lookbackDate,
+      redeAcquirerId,
+      batchTx
     );
 
     if (acquirerMissingErpUpdated > 0) {
@@ -758,64 +815,69 @@ public class ConciliationAnalysisService {
     return status == StatusTransactionEnum.CANCELED || status == StatusTransactionEnum.DELETED;
   }
 
-  private int classifyRedeAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses, OffsetDateTime implantationDate, OffsetDateTime lookbackDate) {
+  private int classifyRedeAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses, OffsetDateTime implantationDate, OffsetDateTime lookbackDate, UUID redeAcquirerId, TransactionTemplate batchTx) {
     int totalUpdated = 0;
     int batchNumber = 0;
 
     while (true) {
-      List<UUID> acquirerIds = transactionAcqRepository.findRedeAcqIdsForMissingInErpClassification(
-        PageRequest.of(0, ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE),
-        reconcileAlreadyReconciled,
-        pendingStatuses,
-        StatusTransactionEnum.PENDING.getCode(),
-        StatusTransactionReasonEnum.NULL.getCode(),
-        EXCLUDED_CARD_RECONCILIATION_MODALITY,
-        implantationDate,
-        lookbackDate
-      );
+      int[] batchResult = batchTx.execute(status -> {
+        List<UUID> acquirerIds = transactionAcqRepository.findRedeAcqIdsForMissingInErpClassification(
+          PageRequest.of(0, ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE),
+          reconcileAlreadyReconciled,
+          pendingStatuses,
+          StatusTransactionEnum.PENDING.getCode(),
+          StatusTransactionReasonEnum.NULL.getCode(),
+          EXCLUDED_CARD_RECONCILIATION_MODALITY,
+          implantationDate,
+          lookbackDate,
+          redeAcquirerId
+        );
 
-      if (acquirerIds.isEmpty()) {
+        if (acquirerIds.isEmpty()) {
+          return null;
+        }
+
+        List<TransactionAcqEntity> acquirerBatch = transactionAcqRepository.findBatchForMissingInErpStatusClassification(acquirerIds);
+        List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
+
+        for (TransactionAcqEntity acq : acquirerBatch) {
+          if (isExcludedFromCardReconciliation(acq)) {
+            continue;
+          }
+
+          if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(acq)) {
+            continue;
+          }
+
+          if (applyAcquirerReconciliationStatus(
+            acq,
+            StatusReconciliationEnum.PENDING,
+            StatusTransactionReasonEnum.CV_NOT_FOUND_ERP
+          )) {
+            changedAcquirerSales.add(acq);
+          }
+        }
+
+        if (changedAcquirerSales.isEmpty()) {
+          return new int[]{-1, acquirerBatch.size()};
+        }
+
+        transactionAcqRepository.saveAll(changedAcquirerSales);
+        return new int[]{changedAcquirerSales.size(), acquirerBatch.size()};
+      });
+
+      if (batchResult == null || batchResult[0] < 0) {
         break;
       }
 
+      totalUpdated += batchResult[0];
       batchNumber++;
-
-      List<TransactionAcqEntity> acquirerBatch = transactionAcqRepository.findBatchForMissingInErpStatusClassification(acquirerIds);
-      List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
-
-      for (TransactionAcqEntity acq : acquirerBatch) {
-        if (isExcludedFromCardReconciliation(acq)) {
-          continue;
-        }
-
-        if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(acq)) {
-          continue;
-        }
-
-        if (applyAcquirerReconciliationStatus(
-          acq,
-          StatusReconciliationEnum.PENDING,
-          StatusTransactionReasonEnum.CV_NOT_FOUND_ERP
-        )) {
-          changedAcquirerSales.add(acq);
-        }
-      }
-
-      if (changedAcquirerSales.isEmpty()) {
-        break;
-      }
-
-      transactionAcqRepository.saveAll(changedAcquirerSales);
-      totalUpdated += changedAcquirerSales.size();
-
-      entityManager.flush();
-      entityManager.clear();
 
       log.info(
         "🔎 Classificação de vendas da adquirente sem ERP: batch={}, analisadas={}, atualizadas={}",
         batchNumber,
-        acquirerBatch.size(),
-        changedAcquirerSales.size()
+        batchResult[1],
+        batchResult[0]
       );
     }
 
@@ -894,7 +956,8 @@ public class ConciliationAnalysisService {
   private boolean applyAcquirerSourceContext(TransactionErpEntity erp, TransactionAcqEntity acq) {
     boolean changed = false;
 
-    CompanyEntity company = firstNonNull(acq.getCompany(), acq.getEstablishment() != null ? acq.getEstablishment().getCompany() : null);
+    CompanyEntity company = acq.getCompany() != null ? acq.getCompany()
+      : (acq.getEstablishment() != null ? acq.getEstablishment().getCompany() : null);
     EstablishmentEntity establishment = acq.getEstablishment();
 
     if (company != null) {
@@ -940,7 +1003,7 @@ public class ConciliationAnalysisService {
 
   List<TransactionAcqEntity> findAcquirerCandidatesForBatch(
     List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses,
-    OffsetDateTime lookbackDate) {
+    OffsetDateTime lookbackDate, UUID redeAcquirerId) {
     Set<Long> nsus = erpBatch.stream()
       .filter(erp -> !isExcludedFromCardReconciliation(erp))
       .map(TransactionErpEntity::getNsu)
@@ -965,7 +1028,8 @@ public class ConciliationAnalysisService {
         pendingStatuses,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDate,
-        lookbackDate
+        lookbackDate,
+        redeAcquirerId
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
@@ -976,7 +1040,8 @@ public class ConciliationAnalysisService {
         pendingStatuses,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDate,
-        lookbackDate
+        lookbackDate,
+        redeAcquirerId
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
@@ -995,7 +1060,7 @@ public class ConciliationAnalysisService {
    */
   List<TransactionAcqEntity> findAcquirerCandidatesForBatchSwapped(
     List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses,
-    OffsetDateTime lookbackDate) {
+    OffsetDateTime lookbackDate, UUID redeAcquirerId) {
 
     // NSUs candidatos = autorizações do ERP convertidas para número.
     Set<Long> swappedNsus = erpBatch.stream()
@@ -1024,7 +1089,8 @@ public class ConciliationAnalysisService {
         pendingStatuses,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDateSwapped,
-        lookbackDate
+        lookbackDate,
+        redeAcquirerId
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
@@ -1035,7 +1101,8 @@ public class ConciliationAnalysisService {
         pendingStatuses,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDateSwapped,
-        lookbackDate
+        lookbackDate,
+        redeAcquirerId
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 

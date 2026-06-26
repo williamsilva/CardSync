@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Getter
@@ -25,6 +26,8 @@ public class SalesSummaryCreditOrderReconciliationResult {
   private int summariesWithoutCreditOrders;
   private int generatedCreditOrders;
   private int creditOrdersAnalyzed;
+  private BigDecimal totalGrossValueReconciled;
+  private BigDecimal totalGrossValuePending;
   private OffsetDateTime startedAt;
   private OffsetDateTime finishedAt;
 }

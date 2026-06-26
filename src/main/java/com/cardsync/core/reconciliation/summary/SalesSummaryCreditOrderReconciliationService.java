@@ -111,11 +111,13 @@ public class SalesSummaryCreditOrderReconciliationService {
     Counter counter = new Counter(trigger, startedAt);
     counter.summariesAnalyzed = stats.size();
 
+    Map<UUID, BigDecimal> grossValueMap = new java.util.HashMap<>(stats.size());
     List<UUID> summariesWithOrders = new ArrayList<>();
     List<UUID> summariesWithoutOrders = new ArrayList<>();
     long existingCreditOrders = 0L;
 
     for (SalesSummaryCreditOrderStats row : stats) {
+      grossValueMap.put(row.getSalesSummaryId(), row.getGrossValue() != null ? row.getGrossValue() : BigDecimal.ZERO);
       if (row.hasCreditOrders()) {
         summariesWithOrders.add(row.getSalesSummaryId());
         existingCreditOrders += row.creditOrdersCountSafe();
@@ -148,6 +150,14 @@ public class SalesSummaryCreditOrderReconciliationService {
     List<UUID> reconciledSummaryIds = new ArrayList<>(summariesWithOrders.size() + generated.generatedSummaryIds().size());
     reconciledSummaryIds.addAll(summariesWithOrders);
     reconciledSummaryIds.addAll(generated.generatedSummaryIds());
+
+    counter.totalGrossValueReconciled = reconciledSummaryIds.stream()
+      .map(id -> grossValueMap.getOrDefault(id, BigDecimal.ZERO))
+      .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    counter.totalGrossValuePending = generated.notGeneratedSummaryIds().stream()
+      .map(id -> grossValueMap.getOrDefault(id, BigDecimal.ZERO))
+      .reduce(BigDecimal.ZERO, BigDecimal::add);
 
     bulkUpdateExistingCreditOrders(trigger, summariesWithOrders);
     bulkUpdateSalesSummaryStatuses(trigger, "conciliado", reconciledSummaryIds, ORDER_SUMMARY_RECONCILED);
@@ -601,6 +611,8 @@ public class SalesSummaryCreditOrderReconciliationService {
     private int summariesWithoutCreditOrders;
     private int generatedCreditOrders;
     private int creditOrdersAnalyzed;
+    private BigDecimal totalGrossValueReconciled = BigDecimal.ZERO;
+    private BigDecimal totalGrossValuePending = BigDecimal.ZERO;
 
     private Counter(FinancialReconciliationTriggerType trigger, OffsetDateTime startedAt) {
       this.trigger = trigger;
@@ -618,6 +630,8 @@ public class SalesSummaryCreditOrderReconciliationService {
         .summariesWithoutCreditOrders(summariesWithoutCreditOrders)
         .generatedCreditOrders(generatedCreditOrders)
         .creditOrdersAnalyzed(creditOrdersAnalyzed)
+        .totalGrossValueReconciled(totalGrossValueReconciled)
+        .totalGrossValuePending(totalGrossValuePending)
         .startedAt(startedAt)
         .finishedAt(finishedAt)
         .build();

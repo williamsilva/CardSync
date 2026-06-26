@@ -75,7 +75,7 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
             or a.statusTransactionReason = :nullReason)
        and a.saleDate >= :implantationDate
        and a.saleDate >= :lookbackDate
-       and upper(a.acquirer.fileIdentifier) = 'REDE'
+       and a.acquirer.id = :acquirerId
      order by a.saleDate asc, a.id asc
   """)
   List<UUID> findRedeAcqIdsForMissingInErpClassification(
@@ -86,7 +86,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("nullReason") Integer nullReason,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
-    @Param("lookbackDate") OffsetDateTime lookbackDate
+    @Param("lookbackDate") OffsetDateTime lookbackDate,
+    @Param("acquirerId") UUID acquirerId
   );
 
   @Query("""
@@ -110,7 +111,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch a.acquirer
       left join fetch a.flag
       left join fetch a.company
-      left join fetch a.establishment
+      left join fetch a.establishment est
+      left join fetch est.company
       left join fetch a.adjustment
       left join fetch a.salesSummary ss
       left join fetch ss.bankingDomicile
@@ -118,7 +120,7 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
        and (a.modality is not null and a.modality <> :excludedModality)
        and a.saleDate >= :implantationDate
        and a.saleDate >= :lookbackDate
-       and upper(a.acquirer.fileIdentifier) = 'REDE'
+       and a.acquirer.id = :acquirerId
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
@@ -129,7 +131,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
-    @Param("lookbackDate") OffsetDateTime lookbackDate
+    @Param("lookbackDate") OffsetDateTime lookbackDate,
+    @Param("acquirerId") UUID acquirerId
   );
 
   @Query("""
@@ -138,7 +141,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch a.acquirer
       left join fetch a.flag
       left join fetch a.company
-      left join fetch a.establishment
+      left join fetch a.establishment est
+      left join fetch est.company
       left join fetch a.adjustment
       left join fetch a.salesSummary ss
       left join fetch ss.bankingDomicile
@@ -146,7 +150,7 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
        and (a.modality is not null and a.modality <> :excludedModality)
        and a.saleDate >= :implantationDate
        and a.saleDate >= :lookbackDate
-       and upper(a.acquirer.fileIdentifier) = 'REDE'
+       and a.acquirer.id = :acquirerId
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
@@ -157,7 +161,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
-    @Param("lookbackDate") OffsetDateTime lookbackDate
+    @Param("lookbackDate") OffsetDateTime lookbackDate,
+    @Param("acquirerId") UUID acquirerId
   );
 
   @Query("""

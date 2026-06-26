@@ -71,6 +71,41 @@ public interface ContractRepository extends JpaRepository<ContractEntity, UUID>,
     @Param("saleDate") LocalDate saleDate
   );
 
+  @EntityGraph(attributePaths = {
+    "company", "acquirer", "establishment",
+    "contractFlags", "contractFlags.flag", "contractFlags.contractRates"
+  })
+  @Query("""
+    select c
+    from ContractEntity c
+    join c.contractFlags cf
+    join cf.contractRates cr
+    where c.status = :status
+      and c.acquirer.id = :acquirerId
+      and cf.flag.id = :flagId
+      and cr.modality = :modality
+      and (
+        (:companyId is null and c.company is null)
+        or (:companyId is not null and (c.company is null or c.company.id = :companyId))
+      )
+      and (
+        (:establishmentId is null and c.establishment is null)
+        or (:establishmentId is not null and (c.establishment is null or c.establishment.id = :establishmentId))
+      )
+    order by
+      case when c.establishment is not null then 0 else 1 end,
+      case when c.company is not null then 0 else 1 end,
+      c.startDate desc
+    """)
+  List<ContractEntity> findCandidatesForErpRateAllPeriods(
+    @Param("companyId") UUID companyId,
+    @Param("acquirerId") UUID acquirerId,
+    @Param("establishmentId") UUID establishmentId,
+    @Param("flagId") UUID flagId,
+    @Param("modality") Integer modality,
+    @Param("status") Integer status
+  );
+
   @Query("""
     select case when count(c) > 0 then true else false end
     from ContractEntity c

@@ -5,6 +5,8 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.Reconcil
 import com.cardsync.domain.model.ReconciliationSettingsEntity;
 import com.cardsync.domain.repository.ReconciliationSettingsRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +23,10 @@ public class ReconciliationSettingsService {
         s.getErpAcquirerPreviousDaysLookback(),
         s.getErpAcquirerFutureDaysLookback(),
         s.getReconciliationLookbackMonths()))
-      .orElse(new ReconciliationSettingsModel(0, 0, 6));
+      .orElse(new ReconciliationSettingsModel(0, 0, 0));
   }
 
+  @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
   @Transactional(readOnly = true)
   public int getErpAcquirerPreviousDaysLookback() {
     return repository.findFirstBy()
@@ -31,6 +34,7 @@ public class ReconciliationSettingsService {
       .orElse(0);
   }
 
+  @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
   @Transactional(readOnly = true)
   public int getErpAcquirerFutureDaysLookback() {
     return repository.findFirstBy()
@@ -38,13 +42,15 @@ public class ReconciliationSettingsService {
       .orElse(0);
   }
 
+  @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
   @Transactional(readOnly = true)
   public int getReconciliationLookbackMonths() {
     return repository.findFirstBy()
       .map(ReconciliationSettingsEntity::getReconciliationLookbackMonths)
-      .orElse(6);
+      .orElse(0);
   }
 
+  @CacheEvict(value = "reconciliation-settings", allEntries = true)
   @Transactional
   public ReconciliationSettingsModel update(ReconciliationSettingsRequest request) {
     ReconciliationSettingsEntity settings = repository.findFirstBy()

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -25,6 +26,33 @@ import java.util.UUID;
 public class ContractedAcquirerRateLookupService {
 
   private final ContractRepository contractRepository;
+
+  @Transactional(readOnly = true)
+  public List<ContractEntity> findContractCandidates(UUID companyId, UUID acquirerId, UUID establishmentId, UUID flagId, Integer modality) {
+    return contractRepository.findCandidatesForErpRateAllPeriods(
+      companyId, acquirerId, establishmentId, flagId, modality, ContractEnum.VALIDITY.getCode()
+    );
+  }
+
+  public Optional<ContractedAcquirerRate> findRateFromCandidates(List<ContractEntity> candidates, TransactionAcqEntity tx) {
+    if (candidates == null || candidates.isEmpty() || tx == null || tx.getSaleDate() == null) {
+      return Optional.empty();
+    }
+    LocalDate saleDate = tx.getSaleDate().toLocalDate();
+    Set<UUID> seenContracts = new HashSet<>();
+    return candidates.stream()
+      .filter(contract -> contract != null && contract.getId() != null && seenContracts.add(contract.getId()))
+      .filter(contract -> isValidOnDate(contract, saleDate))
+      .map(contract -> buildRate(contract, tx))
+      .filter(Optional::isPresent)
+      .map(Optional::get)
+      .findFirst();
+  }
+
+  private boolean isValidOnDate(ContractEntity contract, LocalDate date) {
+    if (contract.getStartDate() == null || date.isBefore(contract.getStartDate())) return false;
+    return contract.getEndDate() == null || !date.isAfter(contract.getEndDate());
+  }
 
   @Transactional(readOnly = true)
   public Optional<ContractedAcquirerRate> findRate(TransactionAcqEntity tx) {

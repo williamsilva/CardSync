@@ -19,7 +19,7 @@ public enum StatusTransactionReasonExclusionEnum {
   CV_NOT_FOUND_ERP(4),
   INVALID_DATA(5),
   CANCELED(6),
-  DELETED(7),
+  REVERSED(7),
   TRANSACTION_ALREADY_CONCILIATED(8),
   OTHER(9);
 

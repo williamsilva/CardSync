@@ -14,7 +14,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -41,7 +40,7 @@ public class ConciliationFeeAnalysisService {
   private final ContractAuditWriterService contractAuditWriterService;
   private final ContractedAcquirerRateLookupService contractedAcquirerRateLookupService;
 
-  private final ThreadLocal<Map<RateLookupKey, Optional<ContractedAcquirerRate>>> reconciliationRateCache =
+  private final ThreadLocal<Map<RateLookupKey, List<ContractEntity>>> reconciliationRateCache =
     ThreadLocal.withInitial(HashMap::new);
 
   private final ThreadLocal<PendingAuditBatch> pendingAuditBatch =
@@ -320,8 +319,12 @@ public class ConciliationFeeAnalysisService {
       return Optional.empty();
     }
 
-    return reconciliationRateCache.get()
-      .computeIfAbsent(key, ignored -> contractedAcquirerRateLookupService.findRate(acq));
+    List<ContractEntity> candidates = reconciliationRateCache.get()
+      .computeIfAbsent(key, ignored -> contractedAcquirerRateLookupService.findContractCandidates(
+        key.companyId(), key.acquirerId(), key.establishmentId(), key.flagId(), key.modality()
+      ));
+
+    return contractedAcquirerRateLookupService.findRateFromCandidates(candidates, acq);
   }
 
   private void removeAudit(UUID transactionAcqId) {
@@ -413,9 +416,12 @@ public class ConciliationFeeAnalysisService {
     BigDecimal discountValue = firstPositive(
       acq.getDiscountValue(),
       discountFromGrossAndLiquid(acq),
-      positive(acq.getMdrRate()) && gross != null ? calculateFee(gross, acq.getMdrRate()) : null,
-      installmentAppliedFeeValue(acq)
+      positive(acq.getMdrRate()) && gross != null ? calculateFee(gross, acq.getMdrRate()) : null
     );
+    if (!positive(discountValue)) {
+      BigDecimal fromInstallments = installmentAppliedFeeValue(acq);
+      if (positive(fromInstallments)) discountValue = fromInstallments;
+    }
 
     BigDecimal rateAcquirer = firstPositive(
       acq.getMdrRate(),
@@ -594,11 +600,9 @@ public class ConciliationFeeAnalysisService {
     return null;
   }
 
-  private record RateLookupKey(
-    UUID companyId, UUID acquirerId, UUID establishmentId, UUID flagId,
-    Integer modality, Integer installment, Integer capture, LocalDate saleDate) {
+  private record RateLookupKey(UUID companyId, UUID acquirerId, UUID establishmentId, UUID flagId, Integer modality) {
     static RateLookupKey from(TransactionAcqEntity tx) {
-      if (tx == null || tx.getAcquirer() == null || tx.getFlag() == null || tx.getModality() == null || tx.getSaleDate() == null) {
+      if (tx == null || tx.getAcquirer() == null || tx.getFlag() == null || tx.getModality() == null) {
         return null;
       }
 
@@ -607,10 +611,7 @@ public class ConciliationFeeAnalysisService {
         tx.getAcquirer().getId(),
         tx.getEstablishment() == null ? null : tx.getEstablishment().getId(),
         tx.getFlag().getId(),
-        tx.getModality(),
-        tx.getInstallment(),
-        tx.getCapture(),
-        tx.getSaleDate().toLocalDate()
+        tx.getModality()
       );
     }
   }

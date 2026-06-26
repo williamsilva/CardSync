@@ -75,7 +75,6 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
       left join fetch e.establishment
       left join fetch e.bankingDomicile
       left join fetch e.adjustment
-      left join fetch e.installments
       left join fetch e.transactionAcq ta
       left join fetch ta.adjustment
       left join fetch ta.salesSummary tas
@@ -137,18 +136,12 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
       left join fetch e.flag
       left join fetch e.company
       left join fetch e.establishment
-      left join fetch e.bankingDomicile
-      left join fetch e.adjustment
       left join fetch e.installments
       join fetch e.transactionAcq ta
       left join fetch ta.acquirer
       left join fetch ta.flag
       left join fetch ta.company
       left join fetch ta.establishment
-      left join fetch ta.adjustment
-      left join fetch ta.installments
-      left join fetch ta.salesSummary tas
-      left join fetch tas.bankingDomicile
      where e.id in :ids
        and e.statusTransaction in :reconciledStatuses
        and ta.statusTransaction in :reconciledStatuses

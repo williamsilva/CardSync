@@ -10,6 +10,10 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
+      data-source-properties:
+        rewriteBatchedStatements: "true"
+        useServerPrepStmts: "true"
+        cachePrepStmts: "true"
       # Pool de conexões — ajustar maximum-pool-size ao limite do banco no Railway.
       # Railway plano básico: ~25 conexões MySQL. Usar no máximo 70% = ~17.
       # Fórmula geral: (núcleos_cpu_banco * 2) + spindle_disks
