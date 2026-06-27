@@ -137,6 +137,23 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   List<CreditOrderEntity> findOrphanedByIds(@Param("ids") Collection<UUID> ids);
 
   /**
+   * Vinculação direta após criação manual: busca CreditOrders órfãs para um resumo
+   * específico identificado por acquirer + pvCentralizer + rvNumber.
+   */
+  @Query("""
+    select co from CreditOrderEntity co
+    where co.salesSummary is null
+      and co.acquirer.id = :acquirerId
+      and co.pvCentralizer = :pvNumber
+      and co.rvNumber = :rvNumber
+  """)
+  List<CreditOrderEntity> findOrphanedForSummary(
+    @Param("acquirerId") UUID acquirerId,
+    @Param("pvNumber") Integer pvNumber,
+    @Param("rvNumber") Integer rvNumber
+  );
+
+  /**
    * Diagnóstico de mismatch PV: busca CreditOrders órfãs (sem salesSummary) que
    * compartilham acquirer+rvNumber com algum SalesSummary pendente, independentemente
    * de pvCentralizer. Usado para detectar se a raiz do problema é divergência de PV.
@@ -151,6 +168,25 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   List<CreditOrderEntity> findOrphanedByAcquirerIdsAndRvNumbers(
     @Param("acquirerIds") Collection<UUID> acquirerIds,
     @Param("rvNumbers") Collection<Integer> rvNumbers
+  );
+
+  /**
+   * Reparo de consistência: atualiza salesSummaryStatus para RECONCILED em ordens de crédito
+   * cujo resumo de vendas já está conciliado mas a ordem ainda tem salesSummaryStatus inconsistente.
+   * Ocorre quando ordens são vinculadas ao resumo após ele já ter sido conciliado.
+   */
+  @Transactional
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("""
+    update CreditOrderEntity co
+       set co.salesSummaryStatus = :reconciledStatus
+     where co.salesSummary.creditOrderStatus = :reconciledStatus
+       and co.salesSummary.rvDate >= :lookbackDate
+       and (co.salesSummaryStatus is null or co.salesSummaryStatus <> :reconciledStatus)
+  """)
+  int syncSalesSummaryStatusForReconciledSummaries(
+    @Param("reconciledStatus") Integer reconciledStatus,
+    @Param("lookbackDate") LocalDate lookbackDate
   );
 
   /** Retorna os pvCentralizer distintos presentes em um arquivo processado (EEFI). */

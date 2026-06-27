@@ -4,6 +4,7 @@ import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import lombok.RequiredArgsConstructor;
@@ -101,6 +102,11 @@ public class CreditOrderOrphanLinkingService {
         SalesSummaryEntity match = summaryMap.get(key);
         if (match != null) {
           co.setSalesSummary(match);
+          // Se o resumo já está conciliado, propaga o status imediatamente para evitar
+          // inconsistência entre SalesSummary.creditOrderStatus e CreditOrder.salesSummaryStatus
+          if (match.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
+            co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
+          }
           toSave.add(co);
           batchLinked++;
         }
@@ -124,5 +130,45 @@ public class CreditOrderOrphanLinkingService {
     );
 
     return totalLinked;
+  }
+
+  /**
+   * Vincula imediatamente as CreditOrders órfãs que correspondem a um resumo de vendas
+   * recém-criado manualmente (acquirer + pvCentralizer + rvNumber).
+   *
+   * <p>Chamado logo após a persistência do resumo manual para que a conciliação
+   * Resumo x Ordem já encontre as ordens vinculadas sem precisar aguardar o pipeline.</p>
+   */
+  @Transactional
+  public int linkOrphanedCreditOrdersForSummary(SalesSummaryEntity summary) {
+    if (summary.getAcquirer() == null || summary.getPvNumber() == null || summary.getRvNumber() == null) {
+      log.warn("⚠️ Vinculação direta ignorada: summary id={} sem acquirer/pvNumber/rvNumber.", summary.getId());
+      return 0;
+    }
+
+    List<CreditOrderEntity> orphans = creditOrderRepository.findOrphanedForSummary(
+      summary.getAcquirer().getId(),
+      summary.getPvNumber(),
+      summary.getRvNumber()
+    );
+
+    if (orphans.isEmpty()) {
+      log.info("✅ Vinculação direta: nenhuma CreditOrder órfã para pv={}, rv={}", summary.getPvNumber(), summary.getRvNumber());
+      return 0;
+    }
+
+    for (CreditOrderEntity co : orphans) {
+      co.setSalesSummary(summary);
+      if (summary.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
+        co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
+      }
+    }
+
+    creditOrderRepository.saveAll(orphans);
+
+    log.info("🔗 Vinculação direta: {} CreditOrder(s) vinculada(s) ao summary id={}, pv={}, rv={}",
+      orphans.size(), summary.getId(), summary.getPvNumber(), summary.getRvNumber());
+
+    return orphans.size();
   }
 }

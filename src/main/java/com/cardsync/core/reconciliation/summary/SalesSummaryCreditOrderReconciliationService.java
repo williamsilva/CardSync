@@ -164,6 +164,18 @@ public class SalesSummaryCreditOrderReconciliationService {
     bulkUpdateSalesSummaryStatuses(trigger, "pendente/sem ordem", generated.notGeneratedSummaryIds(), ORDER_SUMMARY_PENDING);
     bulkUpdateManualGenerated(trigger, generated.generatedSummaryIds());
 
+    int fixedOrders = creditOrderRepository.syncSalesSummaryStatusForReconciledSummaries(
+      ORDER_SUMMARY_RECONCILED,
+      lookbackDate
+    );
+    if (fixedOrders > 0) {
+      log.warn(
+        "⚠️ Etapa 4 - Consistência: {} ordem(ns) de crédito com salesSummaryStatus inconsistente detectada(s) e corrigida(s). trigger={}",
+        fixedOrders,
+        trigger
+      );
+    }
+
     SalesSummaryCreditOrderReconciliationResult result = counter.toResult(OffsetDateTime.now());
 
     log.info(

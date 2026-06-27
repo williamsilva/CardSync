@@ -25,6 +25,10 @@ public class SaleSummaryAdvancedFields extends BaseSpecificationSupport<SalesSum
       return spec;
     }
 
+    spec = spec.and(contains(filter.rvNumber(), "rvNumber"));
+
+    spec = spec.and(localDatePeriod("rvDate", filter.periodRvDate(), filter.rvDate(), true));
+
     spec = spec.and(inCodes("pvNumber", filter.establishments(), x -> x));
     spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode));
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
