@@ -31,6 +31,9 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
 
   Optional<TransactionAcqEntity> findFirstByNsu(Long nsu);
 
+  @Query("select coalesce(max(t.installment), 1) from TransactionAcqEntity t where t.salesSummary.id = :summaryId")
+  int findMaxInstallmentBySalesSummaryId(@Param("summaryId") UUID summaryId);
+
   Optional<TransactionAcqEntity> findFirstBySalesSummary_IdAndNsuAndAuthorizationOrderBySaleDateDesc(
     UUID salesSummaryId,
     Long nsu,

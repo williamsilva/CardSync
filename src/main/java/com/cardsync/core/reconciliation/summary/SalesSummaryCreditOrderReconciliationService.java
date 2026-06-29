@@ -35,6 +35,7 @@ public class SalesSummaryCreditOrderReconciliationService {
 
   private static final int ORDER_SUMMARY_PENDING = StatusReconciliationEnum.PENDING.getCode();
   private static final int ORDER_SUMMARY_RECONCILED = StatusReconciliationEnum.RECONCILED.getCode();
+  private static final int ORDER_SUMMARY_PARTIALLY_RECONCILED = StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode();
 
   /**
    * Etapa 5 - Resumo x ordem de pagamento.
@@ -113,26 +114,32 @@ public class SalesSummaryCreditOrderReconciliationService {
 
     Map<UUID, BigDecimal> grossValueMap = new java.util.HashMap<>(stats.size());
     List<UUID> summariesWithOrders = new ArrayList<>();
+    List<UUID> summariesPartiallyReconciled = new ArrayList<>();
     List<UUID> summariesWithoutOrders = new ArrayList<>();
     long existingCreditOrders = 0L;
 
     for (SalesSummaryCreditOrderStats row : stats) {
       grossValueMap.put(row.getSalesSummaryId(), row.getGrossValue() != null ? row.getGrossValue() : BigDecimal.ZERO);
-      if (row.hasCreditOrders()) {
-        summariesWithOrders.add(row.getSalesSummaryId());
-        existingCreditOrders += row.creditOrdersCountSafe();
-      } else {
+      long ordersCount = row.creditOrdersCountSafe();
+      existingCreditOrders += ordersCount;
+
+      if (ordersCount == 0) {
         summariesWithoutOrders.add(row.getSalesSummaryId());
+      } else if (row.isFullyReconciled()) {
+        summariesWithOrders.add(row.getSalesSummaryId());
+      } else {
+        summariesPartiallyReconciled.add(row.getSalesSummaryId());
       }
     }
 
     counter.creditOrdersAnalyzed = safeInt(existingCreditOrders);
 
     log.info(
-      "🧮 Etapa 4 - Classificação inicial concluída. trigger={}, summaries={}, comOrdens={}, semOrdens={}, ordensExistentes={}",
+      "🧮 Etapa 4 - Classificação inicial concluída. trigger={}, summaries={}, totalmenteConciliados={}, parcialmenteConciliados={}, semOrdens={}, ordensExistentes={}",
       trigger,
       stats.size(),
       summariesWithOrders.size(),
+      summariesPartiallyReconciled.size(),
       summariesWithoutOrders.size(),
       existingCreditOrders
     );
@@ -144,7 +151,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     counter.summariesWithoutCreditOrders = generated.notGeneratedSummaryIds().size();
     counter.summariesPending = generated.notGeneratedSummaryIds().size();
     counter.summariesReconciled = summariesWithOrders.size() + generated.generatedSummaryIds().size();
-    counter.summariesPartiallyReconciled = 0;
+    counter.summariesPartiallyReconciled = summariesPartiallyReconciled.size();
     counter.summariesBlockedByPreviousStep = 0;
 
     List<UUID> reconciledSummaryIds = new ArrayList<>(summariesWithOrders.size() + generated.generatedSummaryIds().size());
@@ -159,8 +166,13 @@ public class SalesSummaryCreditOrderReconciliationService {
       .map(id -> grossValueMap.getOrDefault(id, BigDecimal.ZERO))
       .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-    bulkUpdateExistingCreditOrders(trigger, summariesWithOrders);
+    List<UUID> summariesWithAnyOrders = new ArrayList<>(summariesWithOrders.size() + summariesPartiallyReconciled.size());
+    summariesWithAnyOrders.addAll(summariesWithOrders);
+    summariesWithAnyOrders.addAll(summariesPartiallyReconciled);
+
+    bulkUpdateExistingCreditOrders(trigger, summariesWithAnyOrders);
     bulkUpdateSalesSummaryStatuses(trigger, "conciliado", reconciledSummaryIds, ORDER_SUMMARY_RECONCILED);
+    bulkUpdateSalesSummaryStatuses(trigger, "parcialmente conciliado", summariesPartiallyReconciled, ORDER_SUMMARY_PARTIALLY_RECONCILED);
     bulkUpdateSalesSummaryStatuses(trigger, "pendente/sem ordem", generated.notGeneratedSummaryIds(), ORDER_SUMMARY_PENDING);
     bulkUpdateManualGenerated(trigger, generated.generatedSummaryIds());
 

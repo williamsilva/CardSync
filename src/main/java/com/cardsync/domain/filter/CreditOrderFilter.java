@@ -1,5 +1,6 @@
 package com.cardsync.domain.filter;
 
+import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 
@@ -9,6 +10,8 @@ public record CreditOrderFilter(
   String rvNumber,
 
   List<Integer> establishments,
+
+  List<ModalityEnum> modality,
 
   List<StatusPaymentBankEnum> statusPaymentBank,
   List<StatusReconciliationEnum> salesSummaryStatus

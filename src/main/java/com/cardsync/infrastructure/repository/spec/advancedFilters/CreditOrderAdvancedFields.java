@@ -2,6 +2,7 @@ package com.cardsync.infrastructure.repository.spec.advancedFilters;
 
 import com.cardsync.domain.filter.CreditOrderFilter;
 import com.cardsync.domain.model.CreditOrderEntity;
+import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
@@ -27,6 +28,8 @@ public class CreditOrderAdvancedFields extends BaseSpecificationSupport<CreditOr
     spec = spec.and(inCodes("originalPvNumber", filter.establishments(), x -> x));
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("salesSummaryStatus", filter.salesSummaryStatus(), StatusReconciliationEnum::getCode));
+
+    spec = spec.and(inPath(filter.modality(), ModalityEnum::getCode, "salesSummary", "modality"));
 
     return spec;
   }

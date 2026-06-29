@@ -18,6 +18,8 @@ import java.util.UUID;
 @Repository
 public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, UUID>, JpaSpecificationExecutor<CreditOrderEntity> {
 
+  boolean existsBySalesSummary_IdAndInstallmentNumber(UUID salesSummaryId, Integer installmentNumber);
+
   @Query("""
     select co.id
     from CreditOrderEntity co
@@ -216,4 +218,12 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
        and co.pvCentralizer is not null
   """)
   List<Object[]> findPvCentralizerByProcessedFileIds(@Param("fileIds") Collection<UUID> fileIds);
+
+  /** Retorna o maior installmentNumber existente para um resumo, ou 0 se nenhum existe. */
+  @Query("select coalesce(max(co.installmentNumber), 0) from CreditOrderEntity co where co.salesSummary.id = :summaryId")
+  int findMaxInstallmentNumberBySalesSummaryId(@Param("summaryId") UUID summaryId);
+
+  /** Retorna todos os installmentNumbers existentes para um resumo. */
+  @Query("select co.installmentNumber from CreditOrderEntity co where co.salesSummary.id = :summaryId")
+  Set<Integer> findInstallmentNumbersBySalesSummaryId(@Param("summaryId") UUID summaryId);
 }

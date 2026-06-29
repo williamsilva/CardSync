@@ -6,5 +6,6 @@ import jakarta.validation.constraints.Min;
 public record ReconciliationSettingsRequest(
   @Min(0) @Max(365) int erpAcquirerPreviousDaysLookback,
   @Min(0) @Max(365) int erpAcquirerFutureDaysLookback,
-  @Min(1) @Max(36) int reconciliationLookbackMonths
+  @Min(1) @Max(120) int reconciliationLookbackMonths,
+  @Min(1) @Max(365) int creditOrderPendingDays
 ) {}

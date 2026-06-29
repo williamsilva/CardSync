@@ -22,8 +22,9 @@ public class ReconciliationSettingsService {
       .map(s -> new ReconciliationSettingsModel(
         s.getErpAcquirerPreviousDaysLookback(),
         s.getErpAcquirerFutureDaysLookback(),
-        s.getReconciliationLookbackMonths()))
-      .orElse(new ReconciliationSettingsModel(0, 0, 0));
+        s.getReconciliationLookbackMonths(),
+        s.getCreditOrderPendingDays()))
+      .orElse(new ReconciliationSettingsModel(0, 0, 1, 30));
   }
 
   @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
@@ -47,7 +48,15 @@ public class ReconciliationSettingsService {
   public int getReconciliationLookbackMonths() {
     return repository.findFirstBy()
       .map(ReconciliationSettingsEntity::getReconciliationLookbackMonths)
-      .orElse(0);
+      .orElse(1);
+  }
+
+  @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
+  @Transactional(readOnly = true)
+  public int getCreditOrderPendingDays() {
+    return repository.findFirstBy()
+      .map(ReconciliationSettingsEntity::getCreditOrderPendingDays)
+      .orElse(30);
   }
 
   @CacheEvict(value = "reconciliation-settings", allEntries = true)
@@ -58,10 +67,12 @@ public class ReconciliationSettingsService {
     settings.setErpAcquirerPreviousDaysLookback(request.erpAcquirerPreviousDaysLookback());
     settings.setErpAcquirerFutureDaysLookback(request.erpAcquirerFutureDaysLookback());
     settings.setReconciliationLookbackMonths(request.reconciliationLookbackMonths());
+    settings.setCreditOrderPendingDays(request.creditOrderPendingDays());
     settings = repository.save(settings);
     return new ReconciliationSettingsModel(
       settings.getErpAcquirerPreviousDaysLookback(),
       settings.getErpAcquirerFutureDaysLookback(),
-      settings.getReconciliationLookbackMonths());
+      settings.getReconciliationLookbackMonths(),
+      settings.getCreditOrderPendingDays());
   }
 }

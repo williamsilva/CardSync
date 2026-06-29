@@ -1,0 +1,178 @@
+package com.cardsync.core.reconciliation.summary;
+
+import com.cardsync.bff.controller.v1.mapper.model.SaleSummaryModelAssembler;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualInput;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualResult;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderSkipReason;
+import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSummaryModel;
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.domain.filter.SaleSummaryFilter;
+import com.cardsync.domain.filter.query.ListQueryDto;
+import com.cardsync.domain.model.CreditOrderEntity;
+import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.domain.repository.CreditOrderRepository;
+import com.cardsync.domain.repository.SalesSummaryRepository;
+import com.cardsync.domain.repository.TransactionAcqRepository;
+import com.cardsync.infrastructure.repository.spec.SaleSummarySpecs;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class CreditOrderManualService {
+
+  private static final int RECONCILIATION_STATUS_PENDING = 1;
+
+  private final SaleSummarySpecs saleSummarySpecs;
+  private final SalesSummaryRepository salesSummaryRepository;
+  private final CreditOrderRepository creditOrderRepository;
+  private final TransactionAcqRepository transactionAcqRepository;
+  private final ReconciliationSettingsService reconciliationSettingsService;
+  private final CardsyncAppProperties appProperties;
+  private final SaleSummaryModelAssembler saleSummaryModelAssembler;
+
+  @Transactional(readOnly = true)
+  public Page<SaleSummaryModel> searchPendingSummaries(Pageable pageable, ListQueryDto<SaleSummaryFilter> query) {
+    int days = reconciliationSettingsService.getCreditOrderPendingDays();
+    LocalDate cutoffDate = LocalDate.now().minusDays(days);
+
+    Specification<SalesSummaryEntity> filterSpec = saleSummarySpecs.fromQueryForPendingCreditOrdersTotals(query, cutoffDate);
+    Specification<SalesSummaryEntity> dataSpec   = saleSummarySpecs.fromQueryForPendingCreditOrders(query, cutoffDate);
+
+    long total = salesSummaryRepository.count(filterSpec);
+    List<SaleSummaryModel> content = total == 0
+      ? List.of()
+      : salesSummaryRepository.findAll(dataSpec, pageable).stream()
+          .map(saleSummaryModelAssembler::toModel)
+          .toList();
+
+    return new PageImpl<>(content, pageable, total);
+  }
+
+  @Transactional(readOnly = true)
+  public List<SalesSummaryEntity> getPendingSummaries() {
+    int days = reconciliationSettingsService.getCreditOrderPendingDays();
+    LocalDate cutoff = LocalDate.now().minusDays(days);
+    LocalDate implantationDate = appProperties.getImplantationDate();
+    List<SalesSummaryEntity> summaries = salesSummaryRepository.findSummariesMissingCreditOrders(
+      implantationDate, cutoff);
+    // Force-load lazy associations while the session is still open (OSIV disabled)
+    summaries.forEach(ss -> {
+      Hibernate.initialize(ss.getProcessedFile());
+      Hibernate.initialize(ss.getAdjustments());
+      Hibernate.initialize(ss.getCreditOrders());
+      ss.getCreditOrders().forEach(co -> Hibernate.initialize(co.getReleaseBank()));
+    });
+    return summaries;
+  }
+
+  @Transactional
+  public CreditOrderManualResult create(CreditOrderManualInput input) {
+    List<UUID> createdIds = new ArrayList<>();
+    List<CreditOrderSkipReason> skippedReasons = new ArrayList<>();
+
+    for (UUID summaryId : input.summaryIds()) {
+      SalesSummaryEntity summary = salesSummaryRepository.findById(summaryId).orElse(null);
+      if (summary == null) {
+        skippedReasons.add(new CreditOrderSkipReason(null, "SUMMARY_NOT_FOUND", 0));
+        log.warn("⚠️ Resumo não encontrado: {}", summaryId);
+        continue;
+      }
+
+      try {
+        int installmentTotal = transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId);
+        Set<Integer> existing = creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId);
+
+        int installmentNumber = -1;
+        for (int i = 1; i <= installmentTotal; i++) {
+          if (!existing.contains(i)) {
+            installmentNumber = i;
+            break;
+          }
+        }
+
+        if (installmentNumber == -1) {
+          skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "ALL_INSTALLMENTS_COVERED", installmentTotal));
+          continue;
+        }
+
+        CreditOrderEntity co = buildCreditOrder(summary, installmentNumber, installmentTotal);
+        co = creditOrderRepository.save(co);
+        createdIds.add(co.getId());
+
+        log.info("✅ Ordem de crédito manual criada: id={}, summaryId={}, parcela={}/{}, releaseDate={}, releaseValue={}",
+          co.getId(), summaryId, installmentNumber, installmentTotal, co.getReleaseDate(), co.getReleaseValue());
+
+      } catch (IllegalStateException e) {
+        skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "UNEXPECTED_ERROR", 0));
+        log.warn("⚠️ Falha ao criar ordem de crédito para summary {}: {}", summaryId, e.getMessage());
+      }
+    }
+
+    return new CreditOrderManualResult(createdIds.size(), skippedReasons.size(), createdIds, skippedReasons);
+  }
+
+  private CreditOrderEntity buildCreditOrder(SalesSummaryEntity summary, int installmentNumber, int installmentTotal) {
+    BigDecimal gross = orZero(summary.getGrossValue());
+    BigDecimal discount = orZero(summary.getDiscountValue());
+    BigDecimal liquid = orZero(summary.getLiquidValue());
+
+    BigDecimal grossPer = installmentTotal > 1
+      ? gross.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN) : gross;
+    BigDecimal discountPer = installmentTotal > 1
+      ? discount.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN) : discount;
+    BigDecimal releaseValue = installmentTotal > 1
+      ? liquid.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN) : liquid;
+
+    LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
+      ? summary.getFirstInstallmentCreditDate()
+      : summary.getRvDate();
+    LocalDate releaseDate = baseDate != null ? baseDate.plusMonths(installmentNumber - 1) : null;
+
+    CreditOrderEntity co = new CreditOrderEntity();
+    co.setPvCentralizer(summary.getPvNumber());
+    co.setOriginalPvNumber(summary.getPvNumber());
+    co.setRvNumber(summary.getRvNumber());
+    co.setRvDate(summary.getRvDate());
+    co.setSalesSummary(summary);
+    co.setAcquirer(summary.getAcquirer());
+    co.setCompany(summary.getCompany());
+    co.setFlag(summary.getFlag());
+    co.setInstallmentNumber(installmentNumber);
+    co.setInstallmentTotal(installmentTotal);
+    co.setGrossRvValue(grossPer);
+    co.setDiscountRateValue(discountPer);
+    co.setReleaseValue(releaseValue);
+    co.setReleaseDate(releaseDate);
+    co.setCreditOrderDate(baseDate);
+    co.setRecordType("MANUAL_GENERATED");
+    co.setLaunchType("MANUAL");
+    co.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    co.setSalesSummaryStatus(StatusReconciliationEnum.PENDING);
+    co.setReconciliationStatus(RECONCILIATION_STATUS_PENDING);
+    return co;
+  }
+
+  private static BigDecimal orZero(BigDecimal value) {
+    return value != null ? value : BigDecimal.ZERO;
+  }
+}

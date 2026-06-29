@@ -152,7 +152,8 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     select new com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderStats(
       ss.id,
       count(co.id),
-      max(ss.grossValue)
+      max(ss.grossValue),
+      cast(coalesce(max(co.installmentTotal), 1) as integer)
     )
       from SalesSummaryEntity ss
       left join CreditOrderEntity co on co.salesSummary.id = ss.id
@@ -254,4 +255,27 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
        and ss.pvNumber is not null
   """)
   List<Object[]> findPvNumbersByProcessedFileIds(@Param("fileIds") Collection<UUID> fileIds);
+
+  /**
+   * Retorna resumos de vendas sem ordens de crédito ou com ordens para menos parcelas
+   * do que o total registrado nas ordens existentes, dentro do intervalo de datas configurado.
+   * Cobre dois casos: nenhuma ordem (count=0 < coalesce=1) e ordens parciais (count < installmentTotal).
+   */
+  @Query("""
+    select distinct ss
+      from SalesSummaryEntity ss
+      left join fetch ss.acquirer
+      left join fetch ss.flag
+      left join fetch ss.company
+      left join fetch ss.bankingDomicile
+     where ss.rvDate >= :implantationDate
+       and ss.rvDate <= :cutoffDate
+       and (select count(co) from CreditOrderEntity co where co.salesSummary = ss)
+           < coalesce((select max(co2.installmentTotal) from CreditOrderEntity co2 where co2.salesSummary = ss), 1)
+     order by ss.rvDate asc, ss.id asc
+  """)
+  List<SalesSummaryEntity> findSummariesMissingCreditOrders(
+    @Param("implantationDate") LocalDate implantationDate,
+    @Param("cutoffDate") LocalDate cutoffDate
+  );
 }

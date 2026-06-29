@@ -4,6 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.SaleSummaryModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.SalesSummaryManualInput;
 import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSummaryModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
+import com.cardsync.core.reconciliation.summary.CreditOrderManualService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryManualService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.SaleSummaryFilter;
@@ -24,14 +25,25 @@ import org.springframework.web.bind.annotation.*;
 public class SaleSummaryController {
 
   private final SaleSummaryService saleSummaryService;
+  private final CreditOrderManualService creditOrderManualService;
   private final SalesSummaryManualService salesSummaryManualService;
   private final SaleSummaryModelAssembler saleSummaryModelAssembler;
 
-  @PostMapping("/manual")
-  @ResponseStatus(HttpStatus.CREATED)
+  @PostMapping("/pending-credit-orders")
   @CheckSecurity.FileProcessing.CanProcess
-  public SaleSummaryModel createManual(@Valid @RequestBody SalesSummaryManualInput body) {
-    return saleSummaryModelAssembler.toModel(salesSummaryManualService.create(body));
+  public PagedModel<SaleSummaryModel> getPendingCreditOrders(@RequestBody ListQueryDto<SaleSummaryFilter> body) {
+    var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
+
+    Page<SaleSummaryModel> page = creditOrderManualService.searchPendingSummaries(pageable, body);
+
+    return PagedModel.of(
+      page.getContent(),
+      new PagedModel.PageMetadata(
+        page.getSize(),
+        page.getNumber(),
+        page.getTotalElements(),
+        page.getTotalPages())
+    );
   }
 
   @PostMapping("/search")
@@ -47,9 +59,15 @@ public class SaleSummaryController {
         page.getSize(),
         page.getNumber(),
         page.getTotalElements(),
-        page.getTotalPages()
-      )
+        page.getTotalPages())
     );
+  }
+
+  @PostMapping("/manual")
+  @ResponseStatus(HttpStatus.CREATED)
+  @CheckSecurity.FileProcessing.CanProcess
+  public SaleSummaryModel createManual(@Valid @RequestBody SalesSummaryManualInput body) {
+    return saleSummaryModelAssembler.toModel(salesSummaryManualService.create(body));
   }
 
   @PostMapping("/totals")
