@@ -2,7 +2,6 @@ package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.config.CardsyncAppProperties;
-import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.*;
@@ -58,7 +57,6 @@ public class SalesSummaryCreditOrderReconciliationService {
   );
 
   private final CardsyncAppProperties appProperties;
-  private final FileProcessingProperties properties;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
   private final CreditOrderRepository creditOrderRepository;
@@ -67,7 +65,7 @@ public class SalesSummaryCreditOrderReconciliationService {
   public SalesSummaryCreditOrderReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
-    boolean reprocess = properties.getReconciliation().isReprocessSalesSummaryCreditOrder();
+    boolean reprocess = reconciliationSettingsService.isReprocessSalesSummaryCreditOrder();
 
     log.info(
       "📌 Etapa 4 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}, reprocess={}",

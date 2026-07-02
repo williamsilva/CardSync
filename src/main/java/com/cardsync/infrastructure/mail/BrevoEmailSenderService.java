@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.mail;
 
-import com.cardsync.core.config.EmailProperties;
+import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.UserEntity;
@@ -16,20 +16,20 @@ public class BrevoEmailSenderService implements EmailSenderService {
 
   private final RestClient restClient;
   private final UserRepository userRepository;
-  private final EmailProperties emailProperties;
+  private final EmailSettingsService emailSettingsService;
   private final EmailLogService emailLogService;
   private final EmailTemplateProcessor emailTemplateProcessor;
 
   public BrevoEmailSenderService(
     RestClient restClient,
     UserRepository userRepository,
-    EmailProperties emailProperties,
+    EmailSettingsService emailSettingsService,
     EmailLogService emailLogService,
     EmailTemplateProcessor emailTemplateProcessor
   ) {
     this.restClient = restClient;
     this.userRepository = userRepository;
-    this.emailProperties = emailProperties;
+    this.emailSettingsService = emailSettingsService;
     this.emailLogService = emailLogService;
     this.emailTemplateProcessor = emailTemplateProcessor;
   }
@@ -50,8 +50,8 @@ public class BrevoEmailSenderService implements EmailSenderService {
     try {
       BrevoSendEmailRequest payload = BrevoSendEmailRequest.builder()
         .sender(new BrevoSendEmailRequest.Sender(
-          emailProperties.getFromName(),
-          emailProperties.getFromEmail()))
+          emailSettingsService.getFromName(),
+          emailSettingsService.getFromEmail()))
         .to(message.getRecipients().stream()
           .map(email -> new BrevoSendEmailRequest.Recipient(email, null))
           .toList())
@@ -64,7 +64,7 @@ public class BrevoEmailSenderService implements EmailSenderService {
 
       restClient.post()
         .uri("/smtp/email")
-        .header("api-key", emailProperties.getBrevo().getApiKey())
+        .header("api-key", emailSettingsService.getBrevoApiKey())
         .contentType(MediaType.APPLICATION_JSON)
         .body(payload)
         .retrieve()

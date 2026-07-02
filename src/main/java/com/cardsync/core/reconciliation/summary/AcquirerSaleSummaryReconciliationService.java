@@ -2,7 +2,6 @@ package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.config.CardsyncAppProperties;
-import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
@@ -45,7 +44,6 @@ public class AcquirerSaleSummaryReconciliationService {
   );
 
   private final CardsyncAppProperties appProperties;
-  private final FileProcessingProperties properties;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
 
@@ -61,7 +59,7 @@ public class AcquirerSaleSummaryReconciliationService {
   public AcquirerSaleSummaryReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
-    boolean reprocess = properties.getReconciliation().isReprocessAcquirerSaleSummary();
+    boolean reprocess = reconciliationSettingsService.isReprocessAcquirerSaleSummary();
 
     log.info(
       "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, pendingSummaryStatuses={}, eligibleSaleStatuses={}, eligibleFeeStatuses={}, updateBatchSize={}, reprocess={}",

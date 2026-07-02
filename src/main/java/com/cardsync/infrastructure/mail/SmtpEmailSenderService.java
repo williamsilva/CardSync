@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.mail;
 
-import com.cardsync.core.config.EmailProperties;
+import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.UserEntity;
@@ -20,7 +20,7 @@ public class SmtpEmailSenderService implements EmailSenderService {
   private JavaMailSender mailSender;
 
   @Autowired
-  private EmailProperties emailProperties;
+  private EmailSettingsService emailSettingsService;
 
   @Autowired
   private EmailTemplateProcessor emailTemplateProcessor;
@@ -143,7 +143,7 @@ public class SmtpEmailSenderService implements EmailSenderService {
 
     helper.setText(body, true);
     helper.setSubject(message.getSubject());
-    helper.setFrom(emailProperties.getFromEmail());
+    helper.setFrom(emailSettingsService.getFromEmail());
     helper.setTo(message.getRecipients().toArray(new String[0]));
 
     if (message.getReplyTo() != null && !message.getReplyTo().isBlank()) {

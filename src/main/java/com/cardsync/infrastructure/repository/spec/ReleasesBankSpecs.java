@@ -1,10 +1,12 @@
 package com.cardsync.infrastructure.repository.spec;
 
+import com.cardsync.core.config.CardsyncAppProperties;
 import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
+import com.cardsync.domain.model.enums.ReleaseCategoryEnum;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.ReleasesBankAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
@@ -20,17 +22,20 @@ import java.util.Map;
 @Component
 public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final ReleasesBankTableFields releasesBankTableFields;
   private final ReleasesBankAdvancedFields releasesBankAdvancedFields;
 
   public ReleasesBankSpecs(
     DateFilterService dateFilterService,
+    CardsyncAppProperties appProperties,
     SpecificationFactory specificationFactory,
     ReleasesBankTableFields releasesBankTableFields,
     ReleasesBankAdvancedFields releasesBankAdvancedFields
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.releasesBankTableFields = releasesBankTableFields;
     this.releasesBankAdvancedFields = releasesBankAdvancedFields;
@@ -59,7 +64,9 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       );
 
       spec = spec.and(releasesBankAdvancedFields.advanced(query.advanced()));
+      spec = spec.and(inCodes("releaseCategory", getReleaseCategory(), ReleaseCategoryEnum::getCode));
       spec = spec.and(inCodes("modalityPaymentBank", getModalityPaymentBank(), ModalityPaymentBankEnum::getCode));
+      spec = spec.and(dateGreaterThanOrEqual("releaseDate", appProperties.getImplantationDate(), false));
     }
 
     return spec;
@@ -89,6 +96,12 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       ModalityPaymentBankEnum.CASH_CREDIT,
       ModalityPaymentBankEnum.ANTECIP_CRED
       //ModalityPaymentBankEnum.PIX_REC
+    );
+  }
+
+  private static List<ReleaseCategoryEnum> getReleaseCategory() {
+    return List.of(
+      ReleaseCategoryEnum.RECEIPT
     );
   }
 }

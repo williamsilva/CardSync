@@ -23,9 +23,9 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   @Query("""
     select co.id
     from CreditOrderEntity co
-    where co.releaseBank is null
+    where (:reprocess = true or co.releaseBank is null)
       and co.salesSummaryStatus = :summaryReconciledStatus
-      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
+      and (:reprocess = true or co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus))
       and co.releaseDate is not null
       and co.releaseValue is not null
       and co.company is not null
@@ -35,7 +35,8 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   List<UUID> findEligibleIdsForBankReconciliation(
     @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
     @Param("paymentPendingStatus") Integer paymentPendingStatus,
-    @Param("paymentPartialStatus") Integer paymentPartialStatus
+    @Param("paymentPartialStatus") Integer paymentPartialStatus,
+    @Param("reprocess") boolean reprocess
   );
 
   @Query("""
@@ -47,9 +48,9 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
     left join fetch co.company
     left join fetch co.bankingDomicile
     where co.id in :ids
-      and co.releaseBank is null
+      and (:reprocess = true or co.releaseBank is null)
       and co.salesSummaryStatus = :summaryReconciledStatus
-      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
+      and (:reprocess = true or co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus))
       and co.releaseDate is not null
       and co.releaseValue is not null
     order by co.releaseDate asc, co.id asc
@@ -58,7 +59,8 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
     @Param("ids") List<UUID> ids,
     @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
     @Param("paymentPendingStatus") Integer paymentPendingStatus,
-    @Param("paymentPartialStatus") Integer paymentPartialStatus
+    @Param("paymentPartialStatus") Integer paymentPartialStatus,
+    @Param("reprocess") boolean reprocess
   );
 
   @Transactional

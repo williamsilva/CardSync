@@ -2,7 +2,6 @@ package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.config.CardsyncAppProperties;
-import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
@@ -60,7 +59,6 @@ public class SalesSummaryTransactionReconciliationService {
   );
 
   private final CardsyncAppProperties appProperties;
-  private final FileProcessingProperties properties;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
 
@@ -68,7 +66,7 @@ public class SalesSummaryTransactionReconciliationService {
   public SalesSummaryTransactionReconciliationResult reconcile(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
-    boolean includeAll = properties.getReconciliation().isReprocessSalesSummaryTransactions();
+    boolean includeAll = reconciliationSettingsService.isReprocessSalesSummaryTransactions();
 
     log.info(
       "📌 Etapa 1b - Resumo x TransactionAcq iniciada. trigger={}, includeAll={}, excludedStatuses={}, reconciledStatuses={}",

@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.mail;
 
-import com.cardsync.core.config.EmailProperties;
+import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.repository.UserRepository;
 import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;
@@ -21,19 +21,19 @@ public class EmailSenderConfig {
   @ConditionalOnProperty(name = "cardsync.email.impl", havingValue = "brevo")
   EmailSenderService brevoEmailSenderService(
     RestClient.Builder restClientBuilder,
-    EmailProperties emailProperties,
+    EmailSettingsService emailSettingsService,
     EmailTemplateProcessor emailTemplateProcessor,
     EmailLogService emailLogService,
     UserRepository userRepository
   ) {
     RestClient restClient = restClientBuilder
-      .baseUrl(emailProperties.getBrevo().getBaseUrl())
+      .baseUrl(emailSettingsService.getBrevoBaseUrl())
       .build();
 
     return new BrevoEmailSenderService(
       restClient,
       userRepository,
-      emailProperties,
+      emailSettingsService,
       emailLogService,
       emailTemplateProcessor
     );

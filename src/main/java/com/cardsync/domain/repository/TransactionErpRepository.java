@@ -20,6 +20,14 @@ import java.util.UUID;
 public interface TransactionErpRepository extends JpaRepository<TransactionErpEntity, UUID>, JpaSpecificationExecutor<TransactionErpEntity> {
 
   Optional<TransactionErpEntity> findFirstByTransactionAcq_Id(UUID transactionAcqId);
+
+  @Query("""
+    select e from TransactionErpEntity e
+    join fetch e.transactionAcq ta
+    where ta.id in :transactionAcqIds
+  """)
+  List<TransactionErpEntity> findByTransactionAcqIdIn(@Param("transactionAcqIds") Collection<UUID> transactionAcqIds);
+
   Page<TransactionErpEntity> findByCommercialStatusIn(Collection<ErpCommercialStatusEnum> statuses, Pageable pageable);
   Optional<TransactionErpEntity> findByIdAndCommercialStatusIn(UUID id, Collection<ErpCommercialStatusEnum> statuses);
   List<TransactionErpEntity> findTop500ByCommercialStatusInOrderBySaleDateAsc(Collection<ErpCommercialStatusEnum> statuses);

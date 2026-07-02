@@ -1,11 +1,13 @@
 package com.cardsync.core.reconciliation;
 
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
+import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
@@ -13,6 +15,10 @@ import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
+import com.cardsync.domain.repository.TransactionErpRepository;
+
+import java.util.Map;
+import java.util.stream.Collectors;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,9 +56,11 @@ public class BankReconciliationService {
   private final EntityManager entityManager;
   private final BankReconciliationMatcher matcher;
   private final FileProcessingProperties properties;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final CreditOrderRepository creditOrderRepository;
   private final ReleasesBankRepository releasesBankRepository;
   private final InstallmentAcqRepository installmentAcqRepository;
+  private final TransactionErpRepository transactionErpRepository;
 
   @Transactional
   public BankReconciliationResult reconcilePending() {
@@ -68,7 +76,8 @@ public class BankReconciliationService {
     List<UUID> eligibleOrderIds = creditOrderRepository.findEligibleIdsForBankReconciliation(
       SUMMARY_RECONCILED_STATUS,
       PAYMENT_PENDING,
-      PAYMENT_PARTIAL
+      PAYMENT_PARTIAL,
+      reconciliationSettingsService.isReprocessBankAcquirer()
     );
 
     int batchSize = Math.max(config.getBankBatchSize(), 1);
@@ -81,8 +90,8 @@ public class BankReconciliationService {
       eligibleOrderIds.size(),
       batchSize,
       totalBatches,
-      config.getDateToleranceDays(),
-      config.valueToleranceAsBigDecimal()
+      reconciliationSettingsService.getDateToleranceDays(),
+      reconciliationSettingsService.getValueTolerance()
     );
 
     Set<UUID> reconciledOrderIds = new HashSet<>();
@@ -96,7 +105,8 @@ public class BankReconciliationService {
         batchIds,
         SUMMARY_RECONCILED_STATUS,
         PAYMENT_PENDING,
-        PAYMENT_PARTIAL
+        PAYMENT_PARTIAL,
+        reconciliationSettingsService.isReprocessBankAcquirer()
       );
 
       java.util.Map<UUID, List<CreditOrderEntity>> ordersByCompany = new java.util.LinkedHashMap<>();
@@ -134,10 +144,10 @@ public class BankReconciliationService {
 
         List<ReleasesBankEntity> companyReleases = releasesBankRepository.findAvailableForCreditOrderBatch(
           STATUS_PENDING,
-          config.isReconcileAlreadyReconciledBankAcquirer(),
+          reconciliationSettingsService.isReprocessBankAcquirer(),
           companyId,
           minOrderDate,
-          maxOrderDate.plusDays(config.getDateToleranceDays())
+          maxOrderDate.plusDays(reconciliationSettingsService.getDateToleranceDays())
         );
 
         reconcileEligibleCreditOrders(
@@ -200,124 +210,67 @@ public class BankReconciliationService {
     FileProcessingProperties.Reconciliation config,
     BankReconciliationResult.Counter result
   ) {
-    // Lançamentos já conciliados nesta execução não podem ser reusados.
+    boolean reprocess = reconciliationSettingsService.isReprocessBankAcquirer();
+    BigDecimal tolerance = reconciliationSettingsService.getValueTolerance();
+    int toleranceDays = reconciliationSettingsService.getDateToleranceDays();
     Set<UUID> reconciledReleaseIds = new HashSet<>();
 
-    // Os lançamentos recebidos já são do contexto da empresa do lote; descarta os
-    // sem contexto obrigatório (seriam ignorados de qualquer forma).
+    List<CreditOrderEntity> validOrders = eligibleOrders.stream()
+      .filter(order -> {
+        if (hasRequiredContext(order)) return true;
+        log.warn(
+          "⚠ Ordem ignorada por falta de contexto. creditOrder={}, company={}, bankingDomicile={}",
+          order.getId(), idOrNull(order.getCompany()), idOrNull(order.getBankingDomicile())
+        );
+        return false;
+      })
+      .toList();
+
     List<ReleasesBankEntity> validReleases = candidateReleases.stream()
       .filter(this::hasRequiredContext)
       .toList();
 
-    for (CreditOrderEntity seedOrder : eligibleOrders) {
-      if (!isOrderStillEligible(seedOrder, reconciledOrderIds)) continue;
+    for (ReleasesBankEntity release : validReleases) {
+      if (release.getId() != null && reconciledReleaseIds.contains(release.getId())) continue;
 
-      if (!hasRequiredContext(seedOrder)) {
-        log.warn(
-          "⚠ Ordem de pagamento ignorada por falta de contexto. creditOrder={}, company={}, bankingDomicile={}, releaseDate={}, releaseValue={}",
-          seedOrder.getId(),
-          idOrNull(seedOrder.getCompany()),
-          idOrNull(seedOrder.getBankingDomicile()),
-          seedOrder.getReleaseDate(),
-          seedOrder.getReleaseValue()
-        );
-        continue;
+      if (release.getId() != null && analyzedReleaseIds.add(release.getId())) {
+        result.releaseAnalyzed();
       }
 
-      List<ReleasesBankEntity> releases = validReleases.stream()
-        .filter(release -> release.getId() == null || !reconciledReleaseIds.contains(release.getId()))
-        .filter(release -> isCreditOrderCandidateCompatible(release, seedOrder, config.getDateToleranceDays()))
-        .sorted(candidateReleaseComparator(seedOrder))
+      List<CreditOrderEntity> compatible = validOrders.stream()
+        .filter(order -> isOrderStillEligible(order, reconciledOrderIds, reprocess))
+        .filter(order -> isCreditOrderCandidateCompatible(release, order, toleranceDays))
         .toList();
 
-      boolean reconciled = false;
-      for (ReleasesBankEntity release : releases) {
-        if (release.getId() != null && analyzedReleaseIds.add(release.getId())) {
-          result.releaseAnalyzed();
-        }
+      if (compatible.isEmpty()) continue;
 
-        BankReconciliationMatcher.MatchResult selected = selectOrdersIncludingSeed(
-          seedOrder,
-          release,
-          eligibleOrders,
-          reconciledOrderIds,
-          config
-        );
+      BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
+        compatible,
+        CreditOrderEntity::getReleaseValue,
+        release.getReleaseValue(),
+        tolerance,
+        config.getSafeCapCents(),
+        config.getSubsetDpMaxCents()
+      );
 
-        if (selected.skippedBySafetyCap()) {
-          result.candidateGroupSkippedBySafetyCap();
-        }
-        if (!selected.matched()) continue;
-
-        List<CreditOrderEntity> orders = selected.typedItems();
-        applyCreditOrderMatch(release, orders, selected, result);
-        orders.stream()
-          .map(CreditOrderEntity::getId)
-          .filter(Objects::nonNull)
-          .forEach(reconciledOrderIds::add);
-        if (release.getId() != null) {
-          reconciledReleaseIds.add(release.getId());
-        }
-        reconciled = true;
-        break;
+      if (selected.skippedBySafetyCap()) {
+        result.candidateGroupSkippedBySafetyCap();
       }
+      if (!selected.matched()) continue;
 
-      if (!reconciled) {
-        log.debug(
-          "⏳ Nenhum lançamento bancário compatível encontrado para a ordem. creditOrder={}, data={}, valor={}",
-          seedOrder.getId(), seedOrder.getReleaseDate(), seedOrder.getReleaseValue()
-        );
-      }
+      List<CreditOrderEntity> orders = selected.typedItems();
+      applyCreditOrderMatch(release, orders, selected, result, reprocess);
+      orders.stream().map(CreditOrderEntity::getId).filter(Objects::nonNull).forEach(reconciledOrderIds::add);
+      if (release.getId() != null) reconciledReleaseIds.add(release.getId());
     }
-  }
-
-  private BankReconciliationMatcher.MatchResult selectOrdersIncludingSeed(
-    CreditOrderEntity seedOrder,
-    ReleasesBankEntity release,
-    List<CreditOrderEntity> eligibleOrders,
-    Set<UUID> reconciledOrderIds,
-    FileProcessingProperties.Reconciliation config
-  ) {
-    BigDecimal tolerance = config.valueToleranceAsBigDecimal();
-    BigDecimal seedValue = nvl(seedOrder.getReleaseValue());
-    BigDecimal remainingTarget = nvl(release.getReleaseValue()).subtract(seedValue);
-
-    if (remainingTarget.abs().compareTo(tolerance) <= 0) {
-      return BankReconciliationMatcher.MatchResult.matched(List.of(seedOrder), seedValue, false);
-    }
-    if (remainingTarget.signum() < 0) {
-      return matcher.notMatched();
-    }
-
-    List<CreditOrderEntity> complementaryOrders = eligibleOrders.stream()
-      .filter(order -> order != seedOrder)
-      .filter(order -> isOrderStillEligible(order, reconciledOrderIds))
-      .filter(order -> isCreditOrderCandidateCompatible(release, order, config.getDateToleranceDays()))
-      .toList();
-
-    BankReconciliationMatcher.MatchResult remainder = matcher.selectByValue(
-      complementaryOrders,
-      CreditOrderEntity::getReleaseValue,
-      remainingTarget,
-      tolerance,
-      config.getSafeCapCents(),
-      config.getSubsetDpMaxCents()
-    );
-
-    if (!remainder.matched()) return remainder;
-
-    List<CreditOrderEntity> selected = new java.util.ArrayList<>();
-    selected.add(seedOrder);
-    selected.addAll(remainder.typedItems());
-    BigDecimal matchedValue = seedValue.add(remainder.matchedValue());
-    return BankReconciliationMatcher.MatchResult.matched(selected, matchedValue, remainder.skippedBySafetyCap());
   }
 
   private void applyCreditOrderMatch(
     ReleasesBankEntity release,
     List<CreditOrderEntity> orders,
     BankReconciliationMatcher.MatchResult selected,
-    BankReconciliationResult.Counter result
+    BankReconciliationResult.Counter result,
+    boolean reprocess
   ) {
     BankReconciliationMatchType matchType = BankReconciliationMatchType.creditOrderByCount(orders.size());
 
@@ -327,8 +280,8 @@ public class BankReconciliationService {
       order.setReconciliationStatus(STATUS_LIQUIDATED);
       order.setCreditStatus(STATUS_LIQUIDATED);
       updateSalesSummaryFromCreditOrder(order);
-      propagateCreditOrderToInstallments(order, release);
     }
+    propagateCreditOrdersToInstallments(orders, release, reprocess);
 
     release.setNumberCreditOrders(orders.size());
     release.setNumberReconciliations(safeInt(release.getNumberReconciliations()) + orders.size());
@@ -354,7 +307,7 @@ public class BankReconciliationService {
   ) {
     List<ReleasesBankEntity> releases = releasesBankRepository.findForBankReconciliation(
       STATUS_PENDING,
-      config.isReconcileAlreadyReconciledBankAcquirer()
+      reconciliationSettingsService.isReprocessBankAcquirer()
     );
 
     for (ReleasesBankEntity release : releases) {
@@ -377,10 +330,12 @@ public class BankReconciliationService {
     }
   }
 
-  private boolean isOrderStillEligible(CreditOrderEntity order, Set<UUID> reconciledOrderIds) {
-    if (order == null || order.getReleaseBank() != null) return false;
+  private boolean isOrderStillEligible(CreditOrderEntity order, Set<UUID> reconciledOrderIds, boolean reprocess) {
+    if (order == null) return false;
+    if (!reprocess && order.getReleaseBank() != null) return false;
     if (order.getId() != null && reconciledOrderIds.contains(order.getId())) return false;
-    return order.getReleaseDate() != null && order.getReleaseValue() != null;
+    if (order.getReleaseDate() == null || order.getReleaseValue() == null) return false;
+    return order.getReleaseValue().compareTo(BigDecimal.ZERO) > 0;
   }
 
   private boolean hasRequiredContext(CreditOrderEntity order) {
@@ -388,9 +343,7 @@ public class BankReconciliationService {
       && order.getReleaseDate() != null
       && order.getReleaseValue() != null
       && order.getCompany() != null
-      && order.getCompany().getId() != null
-      && order.getBankingDomicile() != null
-      && order.getBankingDomicile().getId() != null;
+      && order.getCompany().getId() != null;
   }
 
   private Comparator<ReleasesBankEntity> candidateReleaseComparator(CreditOrderEntity order) {
@@ -417,8 +370,8 @@ public class BankReconciliationService {
   }
 
   private BankReconciliationMatcher.MatchResult reconcileByInstallments(ReleasesBankEntity release, FileProcessingProperties.Reconciliation config) {
-    int toleranceDays = config.getDateToleranceDays();
-    BigDecimal valueTolerance = config.valueToleranceAsBigDecimal();
+    int toleranceDays = reconciliationSettingsService.getDateToleranceDays();
+    BigDecimal valueTolerance = reconciliationSettingsService.getValueTolerance();
     LocalDate dateFrom = release.getReleaseDate().minusDays(toleranceDays);
     LocalDate dateTo = release.getReleaseDate().plusDays(toleranceDays);
 
@@ -467,11 +420,41 @@ public class BankReconciliationService {
     return selected;
   }
 
-  private void propagateCreditOrderToInstallments(CreditOrderEntity order, ReleasesBankEntity release) {
-    if (order.getId() == null) return;
-    List<InstallmentAcqEntity> installments = installmentAcqRepository.findByCreditOrder_Id(order.getId());
-    applyReleaseToInstallments(installments, release);
-    installmentAcqRepository.saveAll(installments);
+  private void propagateCreditOrdersToInstallments(List<CreditOrderEntity> orders, ReleasesBankEntity release, boolean reprocess) {
+    // Agrupa por acquirerId → { rvNumber → installmentNumber } para busca em lote
+    Map<UUID, Map<Integer, Integer>> acquirerRvToInstNum = new java.util.LinkedHashMap<>();
+    for (CreditOrderEntity order : orders) {
+      if (order.getAcquirer() == null || order.getRvNumber() == null || order.getInstallmentNumber() == null) continue;
+      acquirerRvToInstNum
+        .computeIfAbsent(order.getAcquirer().getId(), k -> new java.util.LinkedHashMap<>())
+        .put(order.getRvNumber(), order.getInstallmentNumber());
+    }
+    if (acquirerRvToInstNum.isEmpty()) return;
+
+    List<InstallmentAcqEntity> allInstallments = new java.util.ArrayList<>();
+    for (var entry : acquirerRvToInstNum.entrySet()) {
+      UUID acquirerId = entry.getKey();
+      Map<Integer, Integer> rvToInstNum = entry.getValue();
+      List<InstallmentAcqEntity> batch = installmentAcqRepository
+        .findByAcquirerIdAndRvNumbers(acquirerId, rvToInstNum.keySet(), reprocess);
+      for (InstallmentAcqEntity ia : batch) {
+        if (ia.getTransaction() == null) continue;
+        Integer rv = ia.getTransaction().getRvNumber();
+        Integer expectedInst = rv != null ? rvToInstNum.get(rv) : null;
+        if (expectedInst != null && expectedInst.equals(ia.getInstallment())) {
+          allInstallments.add(ia);
+        }
+      }
+    }
+
+    if (allInstallments.isEmpty()) {
+      log.debug("⏳ Nenhuma parcela ADQ encontrada para propagar. release={}, ordens={}", release.getId(), orders.size());
+      return;
+    }
+
+    applyReleaseToInstallments(allInstallments, release);
+    installmentAcqRepository.saveAll(allInstallments);
+    log.debug("✅ {} parcela(s) ADQ propagada(s) para {} ordem(ns). release={}", allInstallments.size(), orders.size(), release.getId());
   }
 
   private void applyReleaseToInstallments(List<InstallmentAcqEntity> installments, ReleasesBankEntity release) {
@@ -496,21 +479,42 @@ public class BankReconciliationService {
   private int propagateReleaseStatusTransactions(ReleasesBankEntity release) {
     if (release.getId() == null) return 0;
     List<InstallmentAcqEntity> linkedInstallments = installmentAcqRepository.findByReleaseBank_Id(release.getId());
-    Set<UUID> updatedTransactions = new HashSet<>();
+    if (linkedInstallments.isEmpty()) return 0;
 
+    Set<UUID> transactionIds = linkedInstallments.stream()
+      .map(InstallmentAcqEntity::getTransaction)
+      .filter(Objects::nonNull)
+      .map(TransactionAcqEntity::getId)
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+
+    Map<UUID, List<InstallmentAcqEntity>> installmentsByTx = installmentAcqRepository
+      .findByTransactionIdIn(transactionIds).stream()
+      .filter(i -> i.getTransaction() != null && i.getTransaction().getId() != null)
+      .collect(Collectors.groupingBy(i -> i.getTransaction().getId()));
+
+    Map<UUID, TransactionErpEntity> erpByTxId = transactionErpRepository
+      .findByTransactionAcqIdIn(transactionIds).stream()
+      .filter(e -> e.getTransactionAcq() != null && e.getTransactionAcq().getId() != null)
+      .collect(Collectors.toMap(e -> e.getTransactionAcq().getId(), e -> e, (a, b) -> a));
+
+    Set<UUID> updatedTransactions = new HashSet<>();
     for (InstallmentAcqEntity linked : linkedInstallments) {
       TransactionAcqEntity transaction = linked.getTransaction();
       if (transaction == null || transaction.getId() == null || updatedTransactions.contains(transaction.getId())) continue;
-      updateStatusTransaction(transaction);
+      List<InstallmentAcqEntity> txInstallments = installmentsByTx.getOrDefault(transaction.getId(), List.of());
+      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()));
       updatedTransactions.add(transaction.getId());
     }
     return updatedTransactions.size();
   }
 
-  private void updateStatusTransaction(TransactionAcqEntity transaction) {
-    if (transaction == null || transaction.getId() == null) return;
-    List<InstallmentAcqEntity> installments = installmentAcqRepository.findByTransaction_Id(transaction.getId());
-    if (installments.isEmpty()) return;
+  private void updateStatusTransactionBatched(
+    TransactionAcqEntity transaction,
+    List<InstallmentAcqEntity> installments,
+    TransactionErpEntity erpTx
+  ) {
+    if (transaction == null || installments.isEmpty()) return;
 
     boolean allLiquidated = installments.stream().allMatch(i -> Objects.equals(i.getStatusPaymentBank(), STATUS_LIQUIDATED));
     boolean anyLiquidated = installments.stream().anyMatch(i -> Objects.equals(i.getStatusPaymentBank(), STATUS_LIQUIDATED));
@@ -526,6 +530,14 @@ public class BankReconciliationService {
     }
 
     updateSalesSummaryFromTransaction(transaction);
+
+    if (erpTx != null) {
+      if (allLiquidated) {
+        erpTx.setStatusTransaction(StatusTransactionEnum.AUTOMATICALLY_RECONCILED);
+      } else if (!anyLiquidated) {
+        erpTx.setStatusTransaction(StatusTransactionEnum.PENDING);
+      }
+    }
   }
 
   private void updateSalesSummaryFromTransaction(TransactionAcqEntity transaction) {
@@ -545,7 +557,12 @@ public class BankReconciliationService {
     if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null) return false;
     if (order.getReleaseDate().isAfter(release.getReleaseDate())) return false;
     if (ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate()) > toleranceDays) return false;
-    return contextOf(release).compatible(contextOf(order));
+    if (!contextOf(release).compatible(contextOf(order))) return false;
+    // Verifica domicílio bancário apenas quando ambos estão preenchidos
+    UUID orderDomicile = idOrNull(order.getBankingDomicile());
+    UUID releaseDomicile = idOrNull(release.getBankingDomicile());
+    if (orderDomicile != null && releaseDomicile != null && !orderDomicile.equals(releaseDomicile)) return false;
+    return true;
   }
 
   private boolean isInstallmentCandidateCompatible(ReleasesBankEntity release, InstallmentAcqEntity installment, int toleranceDays) {
@@ -665,7 +682,7 @@ public class BankReconciliationService {
   }
 
   private boolean shouldMarkNotReconciled(ReleasesBankEntity release, FileProcessingProperties.Reconciliation config) {
-    int days = Math.max(config.getBankMarkNotReconciledAfterDays(), 0);
+    int days = Math.max(reconciliationSettingsService.getBankMarkNotReconciledAfterDays(), 0);
     if (release.getReleaseDate() == null) return true;
     LocalDate limitDate = LocalDate.now().minusDays(days);
     return !release.getReleaseDate().isAfter(limitDate);

@@ -1,6 +1,5 @@
 package com.cardsync.core.file.scheduler;
 
-import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.service.FileStorageTask;
 import com.cardsync.core.reconciliation.pipeline.FinancialReconciliationPipelineResult;
 import com.cardsync.core.reconciliation.pipeline.FinancialReconciliationPipelineService;
@@ -26,27 +25,22 @@ public class JobSequencialService {
   private final AtomicBoolean running = new AtomicBoolean(false);
 
   private final FileStorageTask fileStorageTask;
-  private final FileProcessingProperties properties;
+  private final SchedulerSettingsService schedulerSettingsService;
   private final FinancialReconciliationPipelineService financialReconciliationPipelineService;
 
   @PostConstruct
   public void logSchedulerConfiguration() {
-    if (properties.getScheduler() == null) {
-      log.warn("⚠️ Esteira completa CardSync criada, mas file-processing.scheduler não foi carregado.");
-      return;
-    }
-
     log.info(
       "🕒 Esteira completa CardSync configurada: schedulerEnabled={}, completePipelineEnabled={}, cron={}, stopOnStepError={}",
-      properties.getScheduler().isEnabled(),
-      properties.getScheduler().isCompletePipelineEnabled(),
-      properties.getScheduler().getCompletePipelineCron(),
-      properties.getScheduler().isCompletePipelineStopOnStepError()
+      schedulerSettingsService.isEnabled(),
+      schedulerSettingsService.isCompletePipelineEnabled(),
+      schedulerSettingsService.getCompletePipelineCron(),
+      schedulerSettingsService.isCompletePipelineStopOnStepError()
     );
   }
 
   @Scheduled(
-    cron = "${file-processing.scheduler.complete-pipeline-cron:0 0/5 * * * *}",
+    cron = "#{@schedulerSettingsService.completePipelineCron}",
     zone = "${cardsync.app.business-zone:America/Sao_Paulo}"
   )
   @SchedulerLock(
@@ -55,7 +49,7 @@ public class JobSequencialService {
     lockAtLeastFor = "${file-processing.scheduler.lock-at-least-for:PT10S}"
   )
   public void startSequence() {
-    if (!isSchedulerEnabled() || !properties.getScheduler().isCompletePipelineEnabled()) {
+    if (!schedulerSettingsService.isEnabled() || !schedulerSettingsService.isCompletePipelineEnabled()) {
       logIdle();
       return;
     }
@@ -164,7 +158,7 @@ public class JobSequencialService {
         ex
       );
 
-      if (properties.getScheduler().isCompletePipelineStopOnStepError()) {
+      if (schedulerSettingsService.isCompletePipelineStopOnStepError()) {
         throw ex;
       }
 
@@ -172,12 +166,8 @@ public class JobSequencialService {
     }
   }
 
-  private boolean isSchedulerEnabled() {
-    return properties.getScheduler() != null && properties.getScheduler().isEnabled();
-  }
-
   private void logIdle() {
-    if (properties.getScheduler() != null && properties.getScheduler().isLogIdleCycles()) {
+    if (schedulerSettingsService.isLogIdleCycles()) {
       log.debug("Esteira completa CardSync desabilitada para este ciclo.");
     }
   }

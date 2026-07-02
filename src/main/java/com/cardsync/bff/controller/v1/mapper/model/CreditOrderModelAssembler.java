@@ -4,6 +4,8 @@ import com.cardsync.bff.controller.v1.CreditOrderController;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.CreditOrderModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.SalesSummaryMinimalModel;
@@ -45,6 +47,7 @@ public class CreditOrderModelAssembler extends RepresentationModelAssemblerSuppo
     model.setAcquirer(toAcquirer(entity.getAcquirer()));
     model.setSalesSummary(toSalesSummary(entity.getSalesSummary()));
     model.setProcessedFile(toProcessedFile(entity.getProcessedFile()));
+    model.setBankingDomicile(toBankingDomicile(entity.getBankingDomicile()));
     return model;
   }
 
@@ -87,11 +90,48 @@ public class CreditOrderModelAssembler extends RepresentationModelAssemblerSuppo
   }
 
   private SalesSummaryMinimalModel toSalesSummary(SalesSummaryEntity entity) {
+    if (entity == null || entity.getId() == null) {
+      return null;
+    }
+    var spb = entity.getStatusPaymentBank();
+    var ts = entity.getTransactionsStatus();
+    return SalesSummaryMinimalModel.builder()
+      .id(entity.getId())
+      .agency(entity.getAgency())
+      .pvNumber(entity.getPvNumber())
+      .modality(entity.getModality())
+      .lineNumber(entity.getLineNumber())
+      .numberCvNsu(entity.getNumberCvNsu())
+      .currentAccount(entity.getCurrentAccount())
+      .statusPaymentBank(spb == null ? null : spb.name())
+      .transactionsStatus(ts == null ? null : ts.name())
+      .bankingDomicile(toBankingDomicile(entity.getBankingDomicile()))
+      .build();
+  }
+
+  private BankingDomicileMinimalModel toBankingDomicile(BankingDomicileEntity entity) {
     if (entity == null) {
       return null;
     }
-    return SalesSummaryMinimalModel.builder()
-      .modality(entity.getModality())
+
+    return BankingDomicileMinimalModel.builder()
+      .id(entity.getId())
+      .agency(entity.getAgency())
+      .currentAccount(entity.getCurrentAccount())
+      .bank(toBank(entity.getBank()))
+      .build();
+  }
+
+  private BankMinimalModel toBank(BankEntity entity) {
+    if (entity == null) {
+      return null;
+    }
+
+    return BankMinimalModel.builder()
+      .id(entity.getId())
+      .code(entity.getCode())
+      .name(entity.getName())
+      .status(entity.getStatus())
       .build();
   }
 

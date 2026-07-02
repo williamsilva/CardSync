@@ -306,7 +306,7 @@ public class ProcessRedeEeVcService {
     summary.setDiscountValue(safeMoney(line, "98-113", lineNumber, "discount_value", "sales_summary"));
     summary.setLiquidValue(safeMoney(line, "113-128", lineNumber, "liquid_value", "sales_summary"));
     summary.setFirstInstallmentCreditDate(FileParserUtils.extractDateLine(line, "128-136", lineNumber));
-    summary.setModality(layout.summaryModality);
+    if (layout.summaryModality != null) summary.setModality(layout.summaryModality);
     applyBankingDomicile(summary, safeBankingDomicile(summary.getBank(), establishment, agency, currentAccount));
     summary.setProcessedFile(processedFile);
     return summary;
@@ -1034,8 +1034,8 @@ public class ProcessRedeEeVcService {
 
   private enum TransactionLayout {
     ROTATIVO("ROTATIVO", ModalityEnum.CASH_CREDIT.getCode()),
-    PARCELADO("PARCELADO", ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode()),
-    IATA("IATA", ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode()),
+    PARCELADO("PARCELADO", null),  // determinado pelo installment real da transação
+    IATA("IATA", null),            // determinado pelo installment real da transação
     DOLLAR("DOLLAR", ModalityEnum.CASH_CREDIT.getCode());
 
     private final String summaryType;

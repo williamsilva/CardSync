@@ -1,6 +1,6 @@
 package com.cardsync.core.reconciliation.cancellation;
 
-import com.cardsync.core.file.config.FileProcessingProperties;
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.InstallmentErpEntity;
@@ -38,7 +38,7 @@ public class AcquirerSaleCancellationService {
   private static final int BATCH_SIZE = 1_000;
 
   private final EntityManager entityManager;
-  private final FileProcessingProperties properties;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final AdjustmentRepository adjustmentRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
@@ -56,8 +56,8 @@ public class AcquirerSaleCancellationService {
   @Transactional
   public AcquirerSaleCancellationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
-    boolean reprocess = properties.getReconciliation().isReprocessAcquirerSaleCancellations();
-    BigDecimal tolerance = properties.getReconciliation().valueToleranceAsBigDecimal();
+    boolean reprocess = reconciliationSettingsService.isReprocessAcquirerSaleCancellations();
+    BigDecimal tolerance = reconciliationSettingsService.getValueTolerance();
 
     List<UUID> adjustmentIds = adjustmentRepository.findIdsForAcquirerSaleCancellationReconciliation(
       reprocess,

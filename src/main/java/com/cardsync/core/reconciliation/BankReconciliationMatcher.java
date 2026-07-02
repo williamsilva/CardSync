@@ -49,13 +49,20 @@ class BankReconciliationMatcher {
       return MatchResult.matched(sorted, total, false);
     }
 
+    // 3) Para grupos pequenos usa força bruta 2^N — não aloca arrays grandes,
+    //    funciona para qualquer valor monetário e cobre os lançamentos bancários
+    //    de alto valor (R$ 100k–600k) compostos por poucas ordens (3–15 itens).
+    if (sorted.size() <= 20) {
+      return bruteForceSubsetSum(sorted, extractor, targetValue, safeTolerance);
+    }
+
     long targetCents = toCents(targetValue.add(safeTolerance));
     if (targetCents > safeCapCents) {
       log.debug("Subset reconciliation ignored because target cents exceeded safe cap. target={}, safeCapCents={}", targetValue, safeCapCents);
       return MatchResult.skipped();
     }
 
-    // 3) Subconjunto exato via programação dinâmica em centavos.
+    // 4) Subconjunto exato via programação dinâmica em centavos.
     //    Substitui a antiga heurística gulosa (que perdia combinações válidas) e a
     //    recursão exponencial (limitada a 30 itens). A DP é exata e polinomial
     //    (O(n × alvoCents)), encontrando um subconjunto cuja soma esteja dentro da
@@ -145,6 +152,57 @@ class BankReconciliationMatcher {
 
     BigDecimal matchedValue = BigDecimal.valueOf(bestSum).movePointLeft(2);
     return MatchResult.matched(selected, matchedValue, false);
+  }
+
+  /**
+   * Força bruta 2^N para grupos pequenos (N ≤ 20). Não aloca arrays proporcionais
+   * ao valor-alvo, portanto funciona para qualquer montante — inclusive lançamentos
+   * bancários de alto valor compostos por poucas ordens de crédito.
+   */
+  private <T> MatchResult bruteForceSubsetSum(
+    List<T> candidates,
+    ValueExtractor<T> extractor,
+    BigDecimal targetValue,
+    BigDecimal tolerance
+  ) {
+    int n = candidates.size();
+    long targetCents = toCents(targetValue);
+    long toleranceCents = toCents(tolerance);
+    long minCents = Math.max(0, targetCents - toleranceCents);
+    long maxCents = targetCents + toleranceCents;
+
+    long[] valueCents = new long[n];
+    for (int i = 0; i < n; i++) {
+      valueCents[i] = toCents(extractor.value(candidates.get(i)));
+    }
+
+    long bestDiff = Long.MAX_VALUE;
+    int bestMask = -1;
+    long bestSum = 0;
+
+    for (int mask = 1; mask < (1 << n); mask++) {
+      long s = 0;
+      for (int i = 0; i < n; i++) {
+        if ((mask & (1 << i)) != 0) s += valueCents[i];
+      }
+      if (s >= minCents && s <= maxCents) {
+        long diff = Math.abs(s - targetCents);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestMask = mask;
+          bestSum = s;
+          if (diff == 0) break;
+        }
+      }
+    }
+
+    if (bestMask < 0) return MatchResult.notMatched();
+
+    List<T> selected = new ArrayList<>();
+    for (int i = 0; i < n; i++) {
+      if ((bestMask & (1 << i)) != 0) selected.add(candidates.get(i));
+    }
+    return MatchResult.matched(selected, BigDecimal.valueOf(bestSum).movePointLeft(2), false);
   }
 
   private <T> BigDecimal sum(List<T> candidates, ValueExtractor<T> extractor) {

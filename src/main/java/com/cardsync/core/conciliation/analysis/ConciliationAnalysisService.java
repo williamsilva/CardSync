@@ -127,7 +127,7 @@ public class ConciliationAnalysisService {
 
   @Transactional
   public ReconcileErpAcquirerFeesResultModel reconcileRedeErpAcquirerFees(String trigger) {
-    boolean reprocess = fileProcessingProperties.getReconciliation().isReprocessErpAcquirerFees();
+    boolean reprocess = reconciliationSettingsService.isReprocessErpAcquirerFees();
     List<Integer> reconciledStatuses = erpAcquirerReconciledStatusCodes();
     List<Integer> pendingFeeStatuses = pendingFeeReconciliationStatusCodes();
     OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
@@ -897,9 +897,7 @@ public class ConciliationAnalysisService {
   }
 
   boolean shouldReconcileAlreadyReconciledErpAcquirerSales() {
-    return fileProcessingProperties != null
-      && fileProcessingProperties.getReconciliation() != null
-      && fileProcessingProperties.getReconciliation().isReconcileAlreadyReconciledErpAcquirerSales();
+    return reconciliationSettingsService.isReprocessErpAcquirerSales();
   }
 
   boolean isPendingForErpAcquirerReconciliation(TransactionErpEntity erp) {
@@ -1242,8 +1240,7 @@ public class ConciliationAnalysisService {
   }
 
   private BigDecimal reconciliationValueTolerance() {
-    FileProcessingProperties.Reconciliation reconciliation = fileProcessingProperties.getReconciliation();
-    return reconciliation != null ? reconciliation.valueToleranceAsBigDecimal() : VALUE_TOLERANCE;
+    return reconciliationSettingsService.getValueTolerance();
   }
 
   private int manualSwapSaleDateToleranceDays() {

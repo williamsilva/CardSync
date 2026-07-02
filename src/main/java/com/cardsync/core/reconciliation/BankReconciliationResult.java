@@ -48,7 +48,7 @@ public class BankReconciliationResult {
 
   /**
    * Compatibilidade com chamadas antigas no estilo Java record.
-   *
+
    * O resultado foi convertido para classe Lombok para permitir @Builder, @NoArgsConstructor
    * e serialização mais flexível. Porém alguns schedulers/controllers ainda podem chamar
    * result.releasesAnalyzed() em vez de result.getReleasesAnalyzed().

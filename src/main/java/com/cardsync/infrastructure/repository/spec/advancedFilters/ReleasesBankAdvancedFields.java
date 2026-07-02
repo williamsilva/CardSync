@@ -4,6 +4,7 @@ import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
 import com.cardsync.domain.model.enums.ReleaseCategoryEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
@@ -24,12 +25,15 @@ public class ReleasesBankAdvancedFields extends BaseSpecificationSupport<Release
     Specification<ReleasesBankEntity> spec = Specs.all();
 
     spec = spec.and(inCodes("releaseCategory", filter.releaseCategory(), ReleaseCategoryEnum::getCode));
+    spec = spec.and(inCodes("reconciliationStatus", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("modalityPaymentBank", filter.modalityPaymentBank(), ModalityPaymentBankEnum::getCode));
 
     spec = spec.and(inPath(filter.banks(), ReleasesBankAdvancedFields::parseUuidOrNull,"bank", "id"));
     spec = spec.and(inPath(filter.flags(), ReleasesBankAdvancedFields::parseUuidOrNull,"flag", "id"));
     spec = spec.and(inPath(filter.companies(), ReleasesBankAdvancedFields::parseUuidOrNull,"company", "id"));
     spec = spec.and(inPath(filter.acquirers(), ReleasesBankAdvancedFields::parseUuidOrNull,"acquirer", "id"));
+
+    spec = spec.and(localDatePeriod("releaseDate", filter.periodReleaseDate(), filter.releaseDate(), true));
 
     return spec;
   }

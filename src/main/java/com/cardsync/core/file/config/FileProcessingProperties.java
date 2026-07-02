@@ -8,7 +8,6 @@ import lombok.ToString;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -233,34 +232,6 @@ public class FileProcessingProperties {
   public static class Scheduler {
 
     /**
-     * Liga/desliga geral dos agendamentos automáticos.
-     * Os endpoints manuais continuam funcionando mesmo quando o scheduler estiver desabilitado.
-     */
-    private boolean enabled = true;
-
-    /**
-     * Único agendamento automático recomendado.
-     * Executa a esteira completa: ERP -> Rede/adquirente -> Banco/CNAB -> conciliações financeiras.
-     */
-    private boolean completePipelineEnabled = true;
-
-    /**
-     * Cron de 6 campos do Spring para a esteira completa.
-     * Default: a cada 5 minutos.
-     */
-    private String completePipelineCron = "0 0/5 * * * *";
-
-    /**
-     * Quando true, se uma etapa falhar, as próximas etapas da esteira completa não executam.
-     */
-    private boolean completePipelineStopOnStepError = true;
-
-    /**
-     * Apenas para logs/status, indicando se o scheduler deve registrar ciclos sem execução.
-     */
-    private boolean logIdleCycles = false;
-
-    /**
      * Trava distribuída (ShedLock): tempo máximo que o lock da esteira é mantido caso a
      * instância que o adquiriu caia sem liberá-lo. Deve ser maior que a duração máxima
      * esperada de uma execução completa. Formato ISO-8601 de duração (ex.: PT30M).
@@ -281,22 +252,12 @@ public class FileProcessingProperties {
   public static class Reconciliation {
 
     /**
-     * Tolerância máxima, em dias, entre a data prevista/origem e a data do lançamento bancário.
-     */
-    private int dateToleranceDays = 7;
-
-    /**
      * Janela máxima, em dias, entre a data de venda do ERP e a da adquirente na
      * conciliação de transações MANUAIS com NSU/autorização invertidos. Como essas
      * vendas são digitadas manualmente, a data pode divergir bastante; por isso a
      * janela é maior que a da conciliação principal. Default 60 dias.
      */
     private int manualSwapSaleDateToleranceDays = 60;
-
-    /**
-     * Tolerância monetária absoluta. String para evitar perda de precisão no binder.
-     */
-    private String valueTolerance = "0.05";
 
     /**
      * Limite para busca recursiva de combinação de parcelas/ordens.
@@ -317,49 +278,6 @@ public class FileProcessingProperties {
     private long subsetDpMaxCents = 5_000_000L;
 
     /**
-     * Por padrão, a conciliação ERP x adquirente ignora vendas já conciliadas.
-     * Ative apenas quando precisar reprocessar/corrigir conciliações antigas.
-     */
-    private boolean reconcileAlreadyReconciledErpAcquirerSales = false;
-
-    /**
-     * Por padrão, a conciliação Banco x adquirente ignora lançamentos já conciliados.
-     * Ative apenas para auditoria/reprocessamento controlado.
-     */
-    private boolean reconcileAlreadyReconciledBankAcquirer = false;
-
-    /**
-     * Por padrão, a etapa de cancelamentos informados pela adquirente ignora vendas já canceladas.
-     * Ative apenas quando precisar reprocessar/corrigir cancelamentos antigos.
-     */
-    private boolean reprocessAcquirerSaleCancellations = false;
-
-    /**
-     * Por padrão, a conciliação de taxas ERP x adquirente ignora transações já processadas.
-     * Ative apenas quando precisar reprocessar/corrigir taxas de conciliações antigas.
-     */
-    private boolean reprocessErpAcquirerFees = false;
-
-    /**
-     * Por padrão, a conciliação de transações ADQ x resumo de vendas processa apenas
-     * resumos com transactionsStatus nulo ou pendente.
-     * Ative para reprocessar resumos já conciliados (auditoria / correção).
-     */
-    private boolean reprocessSalesSummaryTransactions = false;
-
-    /**
-     * Por padrão, a conciliação Venda ADQ x resumo ignora resumos já conciliados.
-     * Ative apenas quando precisar reprocessar/corrigir resumos de vendas.
-     */
-    private boolean reprocessAcquirerSaleSummary = false;
-
-    /**
-     * Por padrão, a conciliação Resumo x ordem de crédito ignora resumos já conciliados.
-     * Ative apenas quando precisar reprocessar/corrigir ordens de crédito vinculadas.
-     */
-    private boolean reprocessSalesSummaryCreditOrder = false;
-
-    /**
      * Modo legado da conciliação Banco x adquirente.
      * A execução automática atual é dirigida exclusivamente pelas ordens de crédito elegíveis.
      */
@@ -370,32 +288,6 @@ public class FileProcessingProperties {
      */
     private int bankBatchSize = 500;
 
-    /**
-     * Mantém lançamentos recentes como pendentes para aguardar chegada do arquivo da adquirente.
-     * Após este número de dias, o lançamento sem match passa a NOT_RECONCILED.
-     */
-    private int bankMarkNotReconciledAfterDays = 3;
-
-    /**
-     * Fallback estático para o lookback retroativo de data na conciliação ERP x adquirente.
-     * O valor efetivo em runtime vem de {@code ReconciliationSettingsService} (banco de dados).
-     * Este campo serve apenas de default quando nenhuma configuração foi salva.
-     */
-    private int erpAcquirerPreviousDaysLookback = 0;
-
-    /**
-     * Fallback estático para o lookback futuro de data na conciliação ERP x adquirente.
-     * Usado quando o ERP registra a venda antes da adquirente (data ADQ posterior ao ERP).
-     * O valor efetivo em runtime vem de {@code ReconciliationSettingsService} (banco de dados).
-     */
-    private int erpAcquirerFutureDaysLookback = 0;
-
-    public BigDecimal valueToleranceAsBigDecimal() {
-      if (valueTolerance == null || valueTolerance.isBlank()) {
-        return new BigDecimal("0.05");
-      }
-      return new BigDecimal(valueTolerance.trim());
-    }
   }
 
   /**

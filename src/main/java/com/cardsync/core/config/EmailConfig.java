@@ -18,7 +18,7 @@ import org.springframework.web.client.RestClient;
 public class EmailConfig {
 
   private final UserRepository userRepository;
-  private final EmailProperties emailProperties;
+  private final EmailSettingsService emailSettingsService;
   private final EmailLogService emailLogService;
   private final RestClient.Builder restClientBuilder;
   private final EmailTemplateProcessor emailTemplateProcessor;
@@ -26,19 +26,18 @@ public class EmailConfig {
   @Bean
   @Primary
   public EmailSenderService sendEmailService() {
-    return switch (emailProperties.getImpl()) {
+    return switch (emailSettingsService.getImpl()) {
       case FAKE -> new FakeEmailSenderService();
       case SMTP -> new SmtpEmailSenderService();
       case BREVO -> new BrevoEmailSenderService(
         restClientBuilder
-          .baseUrl(emailProperties.getBrevo().getBaseUrl())
+          .baseUrl(emailSettingsService.getBrevoBaseUrl())
           .build(),
         userRepository,
-        emailProperties,
+        emailSettingsService,
         emailLogService,
         emailTemplateProcessor
       );
-      default -> null;
     };
   }
 

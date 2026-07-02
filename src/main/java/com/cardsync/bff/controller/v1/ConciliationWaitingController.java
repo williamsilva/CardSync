@@ -8,8 +8,11 @@ import com.cardsync.core.conciliation.analysis.ErpAcquirerResolutionService;
 import com.cardsync.core.reconciliation.BankReconciliationResult;
 import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
+import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationResult;
+import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationResult;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationService;
+import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationResult;
 import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
@@ -36,6 +39,7 @@ public class ConciliationWaitingController {
   private final ErpCancellationReprocessService erpCancellationReprocessService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
+  private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
   private final BankReconciliationService bankReconciliationService;
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
 
@@ -212,5 +216,19 @@ public class ConciliationWaitingController {
   @CheckSecurity.FileProcessing.CanProcess
   public SalesSummaryCreditOrderReconciliationResult reconcileSalesSummaryCreditOrder() {
     return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
+  }
+
+  // Etapa 2 — Resumo de Vendas x TransactionAcq (endpoint independente)
+  @PostMapping("/reconcile-sales-summary-transactions")
+  @CheckSecurity.FileProcessing.CanProcess
+  public SalesSummaryTransactionReconciliationResult reconcileSalesSummaryTransactions() {
+    return salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
+  }
+
+  // Etapa 5 — Venda ADQ x Resumo de Vendas
+  @PostMapping("/reconcile-acquirer-sale-summary")
+  @CheckSecurity.FileProcessing.CanProcess
+  public AcquirerSaleSummaryReconciliationResult reconcileAcquirerSaleSummary() {
+    return acquirerSaleSummaryReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
   }
 }

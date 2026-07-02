@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,7 +19,42 @@ public interface InstallmentAcqRepository extends JpaRepository<InstallmentAcqEn
 
   List<InstallmentAcqEntity> findByTransaction_Id(UUID transactionId);
 
+  @Query("""
+    select ia from InstallmentAcqEntity ia
+    join ia.transaction tx
+    where tx.rvNumber = :rvNumber
+      and tx.acquirer.id = :acquirerId
+      and ia.installment = :installmentNumber
+      and (:reprocess = true or ia.releaseBank is null)
+  """)
+  List<InstallmentAcqEntity> findPendingByRvNumberAcquirerAndInstallmentNumber(
+    @Param("rvNumber") Integer rvNumber,
+    @Param("acquirerId") UUID acquirerId,
+    @Param("installmentNumber") Integer installmentNumber,
+    @Param("reprocess") boolean reprocess
+  );
+
   List<InstallmentAcqEntity> findByReleaseBank_Id(UUID releaseBankId);
+
+  @Query("""
+    select ia from InstallmentAcqEntity ia
+    join fetch ia.transaction tx
+    where tx.acquirer.id = :acquirerId
+      and tx.rvNumber in :rvNumbers
+      and (:reprocess = true or ia.releaseBank is null)
+  """)
+  List<InstallmentAcqEntity> findByAcquirerIdAndRvNumbers(
+    @Param("acquirerId") UUID acquirerId,
+    @Param("rvNumbers") Collection<Integer> rvNumbers,
+    @Param("reprocess") boolean reprocess
+  );
+
+  @Query("""
+    select ia from InstallmentAcqEntity ia
+    join fetch ia.transaction tx
+    where tx.id in :transactionIds
+  """)
+  List<InstallmentAcqEntity> findByTransactionIdIn(@Param("transactionIds") Collection<UUID> transactionIds);
 
   @Query("""
     select ia

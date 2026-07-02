@@ -3,6 +3,7 @@ package com.cardsync.bff.controller.v1.representation.model.transactions;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
 import lombok.*;
 import org.springframework.hateoas.RepresentationModel;
@@ -42,4 +43,5 @@ public class CreditOrderModel extends RepresentationModel<@NonNull CreditOrderMo
   private AcquirerMinimalModel acquirer;
   private SalesSummaryMinimalModel salesSummary;
   private ProcessedFileMinimalModel processedFile;
+  private BankingDomicileMinimalModel bankingDomicile;
 }
