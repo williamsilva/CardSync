@@ -8,5 +8,15 @@ public record EmailSettingsRequest(
   @NotBlank @Size(max = 255) String fromName,
   @NotBlank @Size(max = 255) String fromEmail,
   @Size(max = 500) String brevoApiKey,
-  @Size(max = 255) String brevoBaseUrl
+  @Size(max = 255) String brevoBaseUrl,
+  Integer brevoPort,
+  @Size(max = 255) String brevoUsername,
+  String chargebackRecipients,
+  @Size(max = 255) String smtpHost,
+  Integer smtpPort,
+  @Size(max = 255) String smtpUsername,
+  @Size(max = 500) String smtpPassword,
+  Boolean smtpAuth,
+  Boolean smtpStarttls,
+  Boolean smtpSsl
 ) {}

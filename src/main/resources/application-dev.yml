@@ -86,6 +86,16 @@ cardsync:
     brevo:
       base-url: ${BREVO_BASE_URL:https://api.brevo.com/v3}
       api-key: ${BREVO_API_KEY:}
+      port: ${BREVO_PORT:587}
+      username: ${BREVO_USERNAME:}
+    smtp:
+      host: ${MAIL_HOST:}
+      port: ${MAIL_PORT:587}
+      username: ${MAIL_USERNAME:}
+      password: ${MAIL_PASSWORD:}
+      auth: ${MAIL_SMTP_AUTH:true}
+      starttls: ${MAIL_SMTP_STARTTLS:false}
+      ssl: ${MAIL_SMTP_SSL:false}
 
   security:
     issuer: ${CARDSYNC_ISSUER:http://localhost:9091}

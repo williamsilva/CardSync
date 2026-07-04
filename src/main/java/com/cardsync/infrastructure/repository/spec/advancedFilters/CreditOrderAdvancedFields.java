@@ -31,8 +31,9 @@ public class CreditOrderAdvancedFields extends BaseSpecificationSupport<CreditOr
 
     spec = spec.and(inPath(filter.modality(), ModalityEnum::getCode, "salesSummary", "modality"));
 
-    spec = spec.and(inPath(filter.flags(), CreditOrderAdvancedFields::parseUuidOrNull,"flag", "id"));
-    spec = spec.and(inPath(filter.companies(), ReleasesBankAdvancedFields::parseUuidOrNull,"company", "id"));
+    spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,"flag", "id"));
+    spec = spec.and(inPath(filter.companies(), BaseSpecificationSupport::parseUuidOrNull,"company", "id"));
+    spec = spec.and(inPath(filter.banks(), BaseSpecificationSupport::parseUuidOrNull,"bankingDomicile","bank", "id"));
 
     spec = spec.and(localDatePeriod("releaseDate", filter.periodReleaseDate(), filter.releaseDate(), true));
     spec = spec.and(localDatePeriod("creditOrderDate", filter.periodCreditOrderDate(), filter.creditOrderDate(), true));

@@ -260,6 +260,10 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
    * Retorna resumos de vendas sem ordens de crédito ou com ordens para menos parcelas
    * do que o total registrado nas ordens existentes, dentro do intervalo de datas configurado.
    * Cobre dois casos: nenhuma ordem (count=0 < coalesce=1) e ordens parciais (count < installmentTotal).
+   *
+   * Filtro de data da próxima parcela (não gerar ordens futuras):
+   *   - Sem ordens: coalesce(firstInstallmentCreditDate, rvDate) <= :yesterday (parcela 1 deve ser passada)
+   *   - Com ordens: max(releaseDate) <= :monthAgo, equivalente a max(releaseDate) + 1 mês <= :yesterday
    */
   @Query("""
     select distinct ss
@@ -272,10 +276,21 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
        and ss.rvDate <= :cutoffDate
        and (select count(co) from CreditOrderEntity co where co.salesSummary = ss)
            < coalesce((select max(co2.installmentTotal) from CreditOrderEntity co2 where co2.salesSummary = ss), 1)
+       and (
+         (
+           not exists (select co3 from CreditOrderEntity co3 where co3.salesSummary = ss)
+           and coalesce(ss.firstInstallmentCreditDate, ss.rvDate) <= :yesterday
+         ) or (
+           exists (select co4 from CreditOrderEntity co4 where co4.salesSummary = ss)
+           and (select max(co5.releaseDate) from CreditOrderEntity co5 where co5.salesSummary = ss) <= :monthAgo
+         )
+       )
      order by ss.rvDate asc, ss.id asc
   """)
   List<SalesSummaryEntity> findSummariesMissingCreditOrders(
     @Param("implantationDate") LocalDate implantationDate,
-    @Param("cutoffDate") LocalDate cutoffDate
+    @Param("cutoffDate") LocalDate cutoffDate,
+    @Param("yesterday") LocalDate yesterday,
+    @Param("monthAgo") LocalDate monthAgo
   );
 }

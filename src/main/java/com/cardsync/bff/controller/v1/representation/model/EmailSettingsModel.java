@@ -5,5 +5,15 @@ public record EmailSettingsModel(
   String fromName,
   String fromEmail,
   String brevoApiKey,
-  String brevoBaseUrl
+  String brevoBaseUrl,
+  Integer brevoPort,
+  String brevoUsername,
+  String chargebackRecipients,
+  String smtpHost,
+  Integer smtpPort,
+  String smtpUsername,
+  String smtpPassword,
+  Boolean smtpAuth,
+  Boolean smtpStarttls,
+  Boolean smtpSsl
 ) {}

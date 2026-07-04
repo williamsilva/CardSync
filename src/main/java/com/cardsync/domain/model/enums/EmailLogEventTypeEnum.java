@@ -13,7 +13,8 @@ public enum EmailLogEventTypeEnum {
 
   NULL(0),
   PASSWORD_RESET(1),
-  FIRST_PASSWORD(2);
+  FIRST_PASSWORD(2),
+  CHARGEBACK_DETECTED(3);
 
   private final int code;
 

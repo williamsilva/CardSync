@@ -54,9 +54,11 @@ public class CreditOrderManualService {
   public Page<SaleSummaryModel> searchPendingSummaries(Pageable pageable, ListQueryDto<SaleSummaryFilter> query) {
     int days = reconciliationSettingsService.getCreditOrderPendingDays();
     LocalDate cutoffDate = LocalDate.now().minusDays(days);
+    LocalDate yesterday  = LocalDate.now().minusDays(1);
+    LocalDate monthAgo   = yesterday.minusMonths(1);
 
-    Specification<SalesSummaryEntity> filterSpec = saleSummarySpecs.fromQueryForPendingCreditOrdersTotals(query, cutoffDate);
-    Specification<SalesSummaryEntity> dataSpec   = saleSummarySpecs.fromQueryForPendingCreditOrders(query, cutoffDate);
+    Specification<SalesSummaryEntity> filterSpec = saleSummarySpecs.fromQueryForPendingCreditOrdersTotals(query, cutoffDate, yesterday, monthAgo);
+    Specification<SalesSummaryEntity> dataSpec   = saleSummarySpecs.fromQueryForPendingCreditOrders(query, cutoffDate, yesterday, monthAgo);
 
     long total = salesSummaryRepository.count(filterSpec);
     List<SaleSummaryModel> content = total == 0
@@ -71,10 +73,12 @@ public class CreditOrderManualService {
   @Transactional(readOnly = true)
   public List<SalesSummaryEntity> getPendingSummaries() {
     int days = reconciliationSettingsService.getCreditOrderPendingDays();
-    LocalDate cutoff = LocalDate.now().minusDays(days);
+    LocalDate cutoff    = LocalDate.now().minusDays(days);
+    LocalDate yesterday = LocalDate.now().minusDays(1);
+    LocalDate monthAgo  = yesterday.minusMonths(1);
     LocalDate implantationDate = appProperties.getImplantationDate();
     List<SalesSummaryEntity> summaries = salesSummaryRepository.findSummariesMissingCreditOrders(
-      implantationDate, cutoff);
+      implantationDate, cutoff, yesterday, monthAgo);
     // Force-load lazy associations while the session is still open (OSIV disabled)
     summaries.forEach(ss -> {
       Hibernate.initialize(ss.getProcessedFile());
@@ -115,12 +119,24 @@ public class CreditOrderManualService {
           continue;
         }
 
+        LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
+          ? summary.getFirstInstallmentCreditDate()
+          : summary.getRvDate();
+        LocalDate nextReleaseDate = baseDate != null ? baseDate.plusMonths(installmentNumber - 1) : null;
+        if (nextReleaseDate != null && nextReleaseDate.isAfter(LocalDate.now().minusDays(1))) {
+          skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "FUTURE_RELEASE_DATE", installmentNumber));
+          log.info("⏭️ Parcela {}/{} ignorada — vencimento futuro: {}", installmentNumber, installmentTotal, nextReleaseDate);
+          continue;
+        }
+
         CreditOrderEntity co = buildCreditOrder(summary, installmentNumber, installmentTotal);
         co = creditOrderRepository.save(co);
         createdIds.add(co.getId());
 
         log.info("✅ Ordem de crédito manual criada: id={}, summaryId={}, parcela={}/{}, releaseDate={}, releaseValue={}",
           co.getId(), summaryId, installmentNumber, installmentTotal, co.getReleaseDate(), co.getReleaseValue());
+
+        updateSummaryCreditOrderStatus(summary, existing.size() + 1, installmentTotal);
 
       } catch (IllegalStateException e) {
         skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "UNEXPECTED_ERROR", 0));
@@ -157,6 +173,7 @@ public class CreditOrderManualService {
     co.setAcquirer(summary.getAcquirer());
     co.setCompany(summary.getCompany());
     co.setFlag(summary.getFlag());
+    co.setBankingDomicile(summary.getBankingDomicile());
     co.setInstallmentNumber(installmentNumber);
     co.setInstallmentTotal(installmentTotal);
     co.setGrossRvValue(grossPer);
@@ -170,6 +187,17 @@ public class CreditOrderManualService {
     co.setSalesSummaryStatus(StatusReconciliationEnum.PENDING);
     co.setReconciliationStatus(RECONCILIATION_STATUS_PENDING);
     return co;
+  }
+
+  private void updateSummaryCreditOrderStatus(SalesSummaryEntity summary, int newCount, int installmentTotal) {
+    StatusReconciliationEnum newStatus = newCount >= installmentTotal
+      ? StatusReconciliationEnum.RECONCILED
+      : StatusReconciliationEnum.PARTIALLY_RECONCILED;
+
+    if (summary.getCreditOrderStatus() != newStatus) {
+      summary.setCreditOrderStatus(newStatus);
+      log.info("📊 creditOrderStatus {} → {}", summary.getId(), newStatus);
+    }
   }
 
   private static BigDecimal orZero(BigDecimal value) {

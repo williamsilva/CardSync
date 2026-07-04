@@ -18,16 +18,30 @@ public class EmailProperties {
 
   private Impl impl = Impl.FAKE;
   private final Brevo brevo = new Brevo();
+  private final Smtp smtp = new Smtp();
 
   @Getter
   @Setter
   public static class Brevo {
     private String apiKey;
     private String baseUrl;
+    private Integer port = 587;
+    private String username;
+  }
+
+  @Getter
+  @Setter
+  public static class Smtp {
+    private String host;
+    private Integer port = 587;
+    private String username;
+    private String password;
+    private Boolean auth = true;
+    private Boolean starttls = false;
+    private Boolean ssl = false;
   }
 
   public enum Impl {
     SMTP, FAKE, BREVO
   }
-
 }

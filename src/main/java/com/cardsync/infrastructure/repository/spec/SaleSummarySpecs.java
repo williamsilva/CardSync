@@ -14,6 +14,7 @@ import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.SaleSummaryTableFields;
 import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
@@ -57,21 +58,23 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
   }
 
   public Specification<SalesSummaryEntity> fromQueryForPendingCreditOrders(
-      ListQueryDto<SaleSummaryFilter> query, LocalDate cutoffDate) {
+      ListQueryDto<SaleSummaryFilter> query, LocalDate cutoffDate, LocalDate yesterday, LocalDate monthAgo) {
     Specification<SalesSummaryEntity> spec = baseFilters(query)
       .and(rvDateBefore(cutoffDate))
       .and(installmentModalitySpec())
       .and(missingCreditOrdersSpec())
+      .and(nextReleaseDateNotFutureSpec(yesterday, monthAgo))
       .and(fetchListAssociations());
     return spec.and(orderByTableSort(query == null ? null : query.sort()));
   }
 
   public Specification<SalesSummaryEntity> fromQueryForPendingCreditOrdersTotals(
-      ListQueryDto<SaleSummaryFilter> query, LocalDate cutoffDate) {
+      ListQueryDto<SaleSummaryFilter> query, LocalDate cutoffDate, LocalDate yesterday, LocalDate monthAgo) {
     return baseFilters(query)
       .and(rvDateBefore(cutoffDate))
       .and(installmentModalitySpec())
-      .and(missingCreditOrdersSpec());
+      .and(missingCreditOrdersSpec())
+      .and(nextReleaseDateNotFutureSpec(yesterday, monthAgo));
   }
 
   private static Specification<SalesSummaryEntity> rvDateBefore(LocalDate date) {
@@ -80,6 +83,7 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
 
   private static Specification<SalesSummaryEntity> installmentModalitySpec() {
     return (root, query, cb) -> root.get("modality").in(
+      ModalityEnum.CASH_CREDIT.getCode(),
       ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode(),
       ModalityEnum.INSTALLMENT_CREDIT_7_12.getCode(),
       ModalityEnum.INSTALLMENT_CREDIT_13_21.getCode()
@@ -103,6 +107,48 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
       coalesce.value(1L);
 
       return cb.lt(countSq, coalesce);
+    };
+  }
+
+  /**
+   * Garante que a próxima parcela a ser gerada tenha vencimento <= ontem.
+   *
+   * Sem ordens existentes: baseDate (parcela 1) <= yesterday.
+   * Com ordens existentes: max(releaseDate) <= monthAgo, equivalente a max + 1 mês <= yesterday.
+   * Isso impede gerar ordens com vencimento futuro que ainda podem vir no arquivo da adquirente.
+   */
+  private static Specification<SalesSummaryEntity> nextReleaseDateNotFutureSpec(
+      LocalDate yesterday, LocalDate monthAgo) {
+    return (root, query, cb) -> {
+      // Subquery: contagem de ordens existentes
+      Subquery<Long> existsCountSq = query.subquery(Long.class);
+      Root<CreditOrderEntity> coEx = existsCountSq.from(CreditOrderEntity.class);
+      existsCountSq.select(cb.count(coEx.get("id")))
+                   .where(cb.equal(coEx.get("salesSummary"), root));
+
+      // Subquery: maior releaseDate das ordens existentes
+      Subquery<LocalDate> maxReleaseSq = query.subquery(LocalDate.class);
+      Root<CreditOrderEntity> coMax = maxReleaseSq.from(CreditOrderEntity.class);
+      maxReleaseSq.select(cb.greatest(coMax.<LocalDate>get("releaseDate")))
+                  .where(cb.equal(coMax.get("salesSummary"), root));
+
+      // baseDate = coalesce(firstInstallmentCreditDate, rvDate)
+      CriteriaBuilder.Coalesce<LocalDate> baseDate = cb.coalesce();
+      baseDate.value(root.get("firstInstallmentCreditDate"));
+      baseDate.value(root.get("rvDate"));
+
+      // Condição A: sem ordens — parcela 1 (baseDate) <= yesterday
+      Predicate noOrders  = cb.equal(existsCountSq, 0L);
+      Predicate baseDateOk = cb.lessThanOrEqualTo(baseDate, yesterday);
+
+      // Condição B: com ordens — max(releaseDate) <= monthAgo ≡ próxima parcela <= yesterday
+      Predicate hasOrders  = cb.greaterThan(existsCountSq, 0L);
+      Predicate maxDateOk  = cb.lessThanOrEqualTo(maxReleaseSq, monthAgo);
+
+      return cb.or(
+        cb.and(noOrders,  baseDateOk),
+        cb.and(hasOrders, maxDateOk)
+      );
     };
   }
 

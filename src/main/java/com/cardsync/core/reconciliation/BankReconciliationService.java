@@ -142,12 +142,13 @@ public class BankReconciliationService {
 
         if (minOrderDate == null || maxOrderDate == null) continue;
 
+        int toleranceDays = reconciliationSettingsService.getDateToleranceDays();
         List<ReleasesBankEntity> companyReleases = releasesBankRepository.findAvailableForCreditOrderBatch(
           STATUS_PENDING,
           reconciliationSettingsService.isReprocessBankAcquirer(),
           companyId,
-          minOrderDate,
-          maxOrderDate.plusDays(reconciliationSettingsService.getDateToleranceDays())
+          minOrderDate.minusDays(toleranceDays),
+          maxOrderDate.plusDays(toleranceDays)
         );
 
         reconcileEligibleCreditOrders(
@@ -555,8 +556,7 @@ public class BankReconciliationService {
 
   private boolean isCreditOrderCandidateCompatible(ReleasesBankEntity release, CreditOrderEntity order, int toleranceDays) {
     if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null) return false;
-    if (order.getReleaseDate().isAfter(release.getReleaseDate())) return false;
-    if (ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate()) > toleranceDays) return false;
+    if (Math.abs(ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate())) > toleranceDays) return false;
     if (!contextOf(release).compatible(contextOf(order))) return false;
     // Verifica domicílio bancário apenas quando ambos estão preenchidos
     UUID orderDomicile = idOrNull(order.getBankingDomicile());

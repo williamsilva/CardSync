@@ -12,6 +12,7 @@ public record CreditOrderFilter(
   String rvNumber,
 
   List<String> flags,
+  List<String> banks,
   List<String> companies,
   List<Integer> establishments,
 

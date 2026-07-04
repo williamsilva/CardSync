@@ -1,6 +1,7 @@
 package com.cardsync.core.file.service;
 
 import com.cardsync.core.file.bank.BankingDomicileResolver;
+import com.cardsync.core.mail.ChargebackEmailService;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
@@ -57,6 +58,7 @@ public class ProcessRedeEeFiService {
 
   private final BankingDomicileResolver bankingDomicileResolver;
   private final ProcessedFilePvService processedFilePvService;
+  private final ChargebackEmailService chargebackEmailService;
   private final ThreadLocal<RedeProcessingWarningCollector> warningCollector = new ThreadLocal<>();
 
   public void processFile(Path file, FileProcessingProperties.FilePaths paths) {
@@ -205,6 +207,13 @@ public class ProcessRedeEeFiService {
       pixCancellationRepository.saveAll(pixCancellations);
       suspendedPaymentRepository.saveAll(suspendedPayments);
       technicalReserveRepository.saveAll(technicalReserves);
+      chargebackEmailService.notifyChargebacksFound(
+        file.getFileName().toString(),
+        pendingDebts,
+        savedFinancialAdjustments,
+        settledDebts,
+        unschedulings
+      );
       moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
 
       if (!unidentified.isEmpty()) {
