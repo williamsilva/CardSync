@@ -69,6 +69,39 @@ public class ConciliationFeeAnalysisService {
   }
 
   /**
+   * Variante em lote para o dashboard: usa o cache de contratos (ThreadLocal) para evitar
+   * N+1 no lookup de contratos — uma busca por chave única (company+acquirer+establishment+flag+modality)
+   * em vez de uma por venda. O cache é descartado no finally, independentemente de exceção.
+   */
+  @Transactional(readOnly = true)
+  public List<FeeAnalysisResult> analyzeBulk(List<TransactionAcqEntity> entities) {
+    if (entities == null || entities.isEmpty()) return List.of();
+    try {
+      return entities.stream().map(this::analyzeWithCache).toList();
+    } finally {
+      reconciliationRateCache.remove();
+    }
+  }
+
+  private FeeAnalysisResult analyzeWithCache(TransactionAcqEntity entity) {
+    BigDecimal gross = nz(entity.getGrossValue());
+    BigDecimal appliedFee = appliedFeeValue(entity);
+    BigDecimal appliedRate = appliedRate(entity, gross, appliedFee);
+
+    Optional<ContractedAcquirerRate> contractedRate = findRateForReconciliationCached(entity);
+    BigDecimal expectedRate = contractedRate.map(ContractedAcquirerRate::rate).orElse(null);
+    BigDecimal expectedFee = expectedRate != null ? calculateFee(gross, expectedRate) : null;
+    BigDecimal feeDifference = expectedFee != null ? appliedFee.subtract(expectedFee) : null;
+    String status = feeStatus(expectedRate, appliedRate, feeDifference);
+
+    return new FeeAnalysisResult(
+      entity.getId(), entity.getSaleDate(), companyName(entity.getCompany()), establishmentName(entity.getEstablishment()),
+      acquirerName(entity.getAcquirer()), flagName(entity.getFlag()), modalityName(entity.getModality()), entity.getNsu(),
+      entity.getAuthorization(), entity.getGrossValue(), expectedRate, appliedRate, expectedFee, appliedFee, feeDifference, status
+    );
+  }
+
+  /**
    * Executa a auditoria de taxa para o par ERP x adquirente já encontrado.
 
    * Regras:

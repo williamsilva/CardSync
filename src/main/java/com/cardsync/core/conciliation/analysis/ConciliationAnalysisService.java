@@ -63,13 +63,16 @@ public class ConciliationAnalysisService {
 
   @Transactional(readOnly = true)
   public ConciliationDashboardModel dashboard() {
-    List<TransactionErpEntity> erpSales = transactionErpRepository.findAll();
-    List<TransactionAcqEntity> acquirerSales = transactionAcqRepository.findAll();
-    List<CreditOrderEntity> creditOrders = creditOrderRepository.findAll();
-    List<ReleasesBankEntity> bankReleases = releasesBankRepository.findAll();
-    List<PendingDebtEntity> pendingDebts = pendingDebtRepository.findAll();
-    List<AdjustmentEntity> adjustments = adjustmentRepository.findAll();
-    List<FeeAnalysisResult> feeAnalyses = acquirerSales.stream().map(feeAnalysisService::analyze).toList();
+    OffsetDateTime lookbackDate = reconciliationLookbackDate();
+    LocalDate lookbackLocalDate = lookbackDate.toLocalDate();
+
+    List<TransactionErpEntity> erpSales = transactionErpRepository.findAllForDashboard(lookbackDate);
+    List<TransactionAcqEntity> acquirerSales = transactionAcqRepository.findAllForDashboard(lookbackDate);
+    List<CreditOrderEntity> creditOrders = creditOrderRepository.findAllForDashboard(lookbackLocalDate);
+    List<ReleasesBankEntity> bankReleases = releasesBankRepository.findAllForDashboard(lookbackLocalDate);
+    List<PendingDebtEntity> pendingDebts = pendingDebtRepository.findAllForDashboard(lookbackLocalDate);
+    List<AdjustmentEntity> adjustments = adjustmentRepository.findAllForDashboard(lookbackLocalDate);
+    List<FeeAnalysisResult> feeAnalyses = feeAnalysisService.analyzeBulk(acquirerSales);
 
     BigDecimal erpGross = sum(erpSales.stream().map(TransactionErpEntity::getGrossValue));
     BigDecimal acquirerGross = sum(acquirerSales.stream().map(TransactionAcqEntity::getGrossValue));
@@ -116,7 +119,7 @@ public class ConciliationAnalysisService {
       new ConciliationComparisonModel(erpGross, acquirerGross, erpGross.subtract(acquirerGross), matchedAmount, pendingAmount),
       feesByAcquirer(feeAnalyses),
       divergencesByType(erpGross, acquirerGross, pendingDebts, adjustments, creditOrders, bankReleases, feeAnalyses),
-      aging()
+      aging(erpSales, pendingDebts, adjustments, creditOrders)
     );
   }
 
@@ -590,22 +593,37 @@ public class ConciliationAnalysisService {
 
   @Transactional(readOnly = true)
   public List<ConciliationAgingModel> aging() {
+    OffsetDateTime lookbackDate = reconciliationLookbackDate();
+    LocalDate lookbackLocalDate = lookbackDate.toLocalDate();
+    return aging(
+      transactionErpRepository.findAllForDashboard(lookbackDate),
+      pendingDebtRepository.findAllForDashboard(lookbackLocalDate),
+      adjustmentRepository.findAllForDashboard(lookbackLocalDate),
+      creditOrderRepository.findAllForDashboard(lookbackLocalDate)
+    );
+  }
+
+  private List<ConciliationAgingModel> aging(
+    List<TransactionErpEntity> erpSales,
+    List<PendingDebtEntity> pendingDebts,
+    List<AdjustmentEntity> adjustments,
+    List<CreditOrderEntity> creditOrders) {
     List<ConciliationAgingModel> items = new ArrayList<>();
-    addAging(items, "ERP_PENDENTE_COMERCIAL", transactionErpRepository.findAll().stream()
+    addAging(items, "ERP_PENDENTE_COMERCIAL", erpSales.stream()
       .filter(t -> t.getCommercialStatus() != null && t.getCommercialStatus() != ErpCommercialStatusEnum.OK)
       .map(AgingItem::fromErp));
-    addAging(items, "DEBITO_PENDENTE", pendingDebtRepository.findAll().stream()
+    addAging(items, "DEBITO_PENDENTE", pendingDebts.stream()
       .filter(debt -> !debitChargebackClassifier.isChargeback(debt))
       .map(AgingItem::fromPendingDebt));
     addAging(items, "CHARGEBACK_ABERTO", Stream.concat(
-      pendingDebtRepository.findAll().stream()
+      pendingDebts.stream()
         .filter(debitChargebackClassifier::isChargeback)
         .map(AgingItem::fromPendingDebt),
-      adjustmentRepository.findAll().stream()
+      adjustments.stream()
         .filter(debitChargebackClassifier::isChargeback)
         .map(adjustment -> AgingItem.fromAdjustment(adjustment, debitChargebackClassifier.debitValue(adjustment)))
     ));
-    addAging(items, "ORDEM_CREDITO_SEM_BANCO", creditOrderRepository.findAll().stream()
+    addAging(items, "ORDEM_CREDITO_SEM_BANCO", creditOrders.stream()
       .filter(co -> co.getReleaseBank() == null)
       .map(AgingItem::fromCreditOrder));
     return items;

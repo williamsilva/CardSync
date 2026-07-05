@@ -20,6 +20,9 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
 
   boolean existsBySalesSummary_IdAndInstallmentNumber(UUID salesSummaryId, Integer installmentNumber);
 
+  @Query("select co from CreditOrderEntity co where co.releaseDate >= :lookback order by co.releaseDate asc")
+  List<CreditOrderEntity> findAllForDashboard(@Param("lookback") LocalDate lookback);
+
   @Query("""
     select co.id
     from CreditOrderEntity co

@@ -74,6 +74,9 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
     @Param("lookbackDate") OffsetDateTime lookbackDate
   );
 
+  @Query("select t from TransactionErpEntity t where t.saleDate >= :lookback order by t.saleDate asc")
+  List<TransactionErpEntity> findAllForDashboard(@Param("lookback") OffsetDateTime lookback);
+
   @Query("""
     select distinct e
       from TransactionErpEntity e

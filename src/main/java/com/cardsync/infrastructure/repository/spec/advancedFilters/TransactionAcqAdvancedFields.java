@@ -38,13 +38,15 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     spec = spec.and(flag(filter));
     spec = spec.and(company(filter));
     spec = spec.and(capture(filter));
-    spec = spec.and(saleDate(filter));
     spec = spec.and(modality(filter));
     spec = spec.and(acquirer(filter));
     spec = spec.and(establishment(filter));
     spec = spec.and(statusTransaction(filter));
     spec = spec.and(expectedPaymentDate(filter));
     spec = spec.and(adjustmentValue(filter.adjustmentValueStart(), filter.adjustmentValueEnd()));
+
+    spec = spec.and(offsetDateTimePeriod("saleDate", filter.periodSaleDate(), filter.saleDate(),true));
+
     spec = spec.and(currencyRangeValue("grossValue", filter.grossValueStart(), filter.grossValueEnd()));
     spec = spec.and(currencyRangeValue("liquidValue", filter.liquidValueStart(), filter.liquidValueEnd()));
     spec = spec.and(currencyRangeValue("discountValue", filter.discountValueStart(), filter.discountValueEnd()));
@@ -100,14 +102,6 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     };
   }
 
-  private Specification<TransactionAcqEntity> saleDate(TransactionAcqSalesFilter filter) {
-    return offsetDateTimePeriod(
-      "saleDate",
-      filter.periodSaleDate(),
-      filter.saleDate(),
-      true
-    );
-  }
 
   private Specification<TransactionAcqEntity> expectedPaymentDate(TransactionAcqSalesFilter filter) {
     return localDatePeriodJoin(

@@ -35,6 +35,7 @@ public class FinancialReconciliationPipelineService {
 
   private final AtomicBoolean manualRunning = new AtomicBoolean(false);
 
+  private final ReconciliationExecutionLogService reconciliationExecutionLogService;
   private final BankReconciliationService bankReconciliationService;
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final AcquirerSaleCancellationService acquirerSaleCancellationService;
@@ -90,6 +91,7 @@ public class FinancialReconciliationPipelineService {
         Duration.between(startedAt, finishedAt).toSeconds()
       );
 
+      reconciliationExecutionLogService.save(result);
       return result;
     } finally {
       if (isManual) {
@@ -156,7 +158,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ERP_ACQUIRER)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 1 concluída (inclui reprocesso de manuais com NSU/autorização invertidos). Somente vendas conciliadas aqui ficam elegíveis para ajustes/taxas.")
+      .message("conciliation.dashboard.history.stepMessage.ERP_ACQUIRER")
       .analyzed(erpAcq.analyzed() + manualSwap.analyzed())
       .reconciled(erpAcq.matched() + manualSwap.matched())
       .updated(erpAcq.updated() + manualSwap.updated())
@@ -179,7 +181,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.SALES_SUMMARY_TRANSACTION)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 2 concluída. Resumos marcados conforme estado das transações ADQ (sem gate de taxa). Resumos sem transações marcados como conciliados.")
+      .message("conciliation.dashboard.history.stepMessage.SALES_SUMMARY_TRANSACTION")
       .analyzed(r.getSummariesAnalyzed())
       .reconciled(r.getSummariesReconciled())
       .partiallyReconciled(r.getSummariesPartiallyReconciled())
@@ -197,7 +199,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ACQUIRER_SALE_CANCELLATION)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 2 concluída. Cancelamentos totais informados pela adquirente foram propagados para ADQ/ERP antes das taxas e resumos.")
+      .message("conciliation.dashboard.history.stepMessage.ACQUIRER_SALE_CANCELLATION")
       .analyzed(cancellations.getAdjustmentsAnalyzed())
       .reconciled(cancellations.getFullCancellationsIdentified())
       .updated(cancellations.getAcquirerSalesCanceled() + cancellations.getErpSalesCanceled())
@@ -217,7 +219,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ACQUIRER_SALE_ADJUSTMENTS)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 3 concluída. Taxas OK ou contrato ausente normalizado avançam; divergência de taxa bloqueia próximas etapas.")
+      .message("conciliation.dashboard.history.stepMessage.ACQUIRER_SALE_ADJUSTMENTS")
       .analyzed(fees.analyzed())
       .reconciled(fees.okRates() + fees.missingValidContracts())
       .updated(fees.updatedErpSales())
@@ -237,7 +239,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ACQUIRER_SALE_SUMMARY)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 4 concluída. Resumo só concilia quando as vendas ADQ vinculadas estão elegíveis das etapas 1 e 2.")
+      .message("conciliation.dashboard.history.stepMessage.ACQUIRER_SALE_SUMMARY")
       .analyzed(r.getSummariesAnalyzed())
       .reconciled(r.getSummariesReconciled())
       .partiallyReconciled(r.getSummariesPartiallyReconciled())
@@ -262,7 +264,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.SALES_SUMMARY_CREDIT_ORDER)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 5 concluída. Débito/antecipação sem ordem pode gerar ordem sintética para análise.")
+      .message("conciliation.dashboard.history.stepMessage.SALES_SUMMARY_CREDIT_ORDER")
       .analyzed(r.getSummariesAnalyzed())
       .reconciled(r.getSummariesReconciled())
       .partiallyReconciled(r.getSummariesPartiallyReconciled())
@@ -286,7 +288,7 @@ public class FinancialReconciliationPipelineService {
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.CREDIT_ORDER_BANK_RELEASE)
       .status(ReconciliationPipelineStepStatusEnum.COMPLETED)
-      .message("Etapa 6 concluída. Ordem só fica elegível quando o resumo já está conciliado com a ordem.")
+      .message("conciliation.dashboard.history.stepMessage.CREDIT_ORDER_BANK_RELEASE")
       .analyzed(r.releasesAnalyzed())
       .reconciled(r.releasesReconciled())
       .withoutMatch(r.releasesWithoutMatch())

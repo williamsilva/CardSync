@@ -7,11 +7,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity, UUID>, JpaSpecificationExecutor<ReleasesBankEntity> {
+
+  @Query("select rb from ReleasesBankEntity rb where rb.releaseDate >= :lookback order by rb.releaseDate asc")
+  List<ReleasesBankEntity> findAllForDashboard(@Param("lookback") LocalDate lookback);
 
   /**
    * Retorna os pares arquivo processado x domicílio bancário identificados durante
