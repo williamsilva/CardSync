@@ -19,7 +19,7 @@ record ReconciliationMatchContext(
   boolean compatible(ReconciliationMatchContext other) {
     if (other == null) return false;
     if (!sameRequired(companyId, other.companyId)) return false;
-    if (!sameOptional(acquirerId, other.acquirerId)) return false;
+    if (!sameRequired(acquirerId, other.acquirerId)) return false;
     if (!sameOptional(establishmentId, other.establishmentId)) return false;
     if (!sameOptional(flagId, other.flagId)) return false;
     return paymentKind == PaymentKind.UNKNOWN

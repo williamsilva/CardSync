@@ -26,23 +26,23 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
 
+  private final CardsyncAppProperties appProperties;
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingAcqTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields;
-  private final CardsyncAppProperties appProperties;
 
   public ConciliationWaitingAcqSpecs(
+    CardsyncAppProperties appProperties,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     ConciliationWaitingAcqTableFields conciliationWaitingTableFields,
-    ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields,
-    CardsyncAppProperties appProperties
+    ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
+    this.appProperties = appProperties;
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
-    this.appProperties = appProperties;
   }
 
   public Specification<TransactionAcqEntity> fromQuery(ListQueryDto<ConciliationWaitingModelFilter> query) {

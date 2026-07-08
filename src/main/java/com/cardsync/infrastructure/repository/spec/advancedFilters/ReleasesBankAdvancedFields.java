@@ -28,6 +28,8 @@ public class ReleasesBankAdvancedFields extends BaseSpecificationSupport<Release
     spec = spec.and(inCodes("reconciliationStatus", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("modalityPaymentBank", filter.modalityPaymentBank(), ModalityPaymentBankEnum::getCode));
 
+    spec = spec.and(currencyRangeValue("releaseValue", filter.releaseValueStart(), filter.releaseValueEnd()));
+
     spec = spec.and(inPath(filter.banks(), ReleasesBankAdvancedFields::parseUuidOrNull,"bank", "id"));
     spec = spec.and(inPath(filter.flags(), ReleasesBankAdvancedFields::parseUuidOrNull,"flag", "id"));
     spec = spec.and(inPath(filter.companies(), ReleasesBankAdvancedFields::parseUuidOrNull,"company", "id"));

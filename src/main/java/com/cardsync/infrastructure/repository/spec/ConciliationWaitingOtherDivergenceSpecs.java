@@ -6,6 +6,7 @@ import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.ConciliationWaitingErpAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
@@ -68,6 +69,7 @@ public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSu
     }
 
     spec = spec.and(Specification.not(inCodes("modality", excludedModalities(), ModalityEnum::getCode)));
+    spec = spec.and(Specification.not(inCodes("statusTransaction", otherDivergenceStatus(), StatusTransactionEnum::getCode)));
     spec = spec.and(inCodes("statusTransactionReason", otherDivergenceReasons(), StatusTransactionReasonEnum::getCode));
     spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
 
@@ -76,6 +78,13 @@ public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSu
 
   private static List<ModalityEnum> excludedModalities() {
     return List.of(ModalityEnum.DIGITAL_WALLET);
+  }
+
+  private static List<StatusTransactionEnum> otherDivergenceStatus() {
+    return List.of(
+      StatusTransactionEnum.DELETED,
+      StatusTransactionEnum.CANCELED
+    );
   }
 
   private static List<StatusTransactionReasonEnum> otherDivergenceReasons() {

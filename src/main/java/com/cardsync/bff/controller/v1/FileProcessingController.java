@@ -8,16 +8,11 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Proces
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileSummaryModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ReprocessPendingErpResultModel;
-import com.cardsync.bff.controller.v1.representation.model.fileprocessing.dashboard.FileProcessingDashboardModel;
-import com.cardsync.bff.controller.v1.representation.model.fileprocessing.dashboard.FileProcessingDivergenceContextModel;
 import com.cardsync.bff.controller.v1.representation.model.rede.RedeTotalizerModel;
 import com.cardsync.core.file.erp.service.ErpPendingSaleService;
 import com.cardsync.core.file.rede.service.RedeFinancialQueryService;
 import com.cardsync.core.file.service.FileStorageTask;
-import com.cardsync.core.file.service.dashboard.FileProcessingDashboardService;
 import com.cardsync.core.file.service.report.FileProcessingReportService;
-import com.cardsync.core.reconciliation.BankReconciliationResult;
-import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ProcessedFileFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
@@ -48,21 +43,7 @@ public class FileProcessingController {
   private final FileStorageTask fileStorageTask;
   private final FileProcessingReportService reportService;
   private final ErpPendingSaleService erpPendingSaleService;
-  private final FileProcessingDashboardService dashboardService;
   private final RedeFinancialQueryService redeFinancialQueryService;
-  private final BankReconciliationService bankReconciliationService;
-
-  @GetMapping("/dashboard")
-  @CheckSecurity.FileProcessing.CanRead
-  public FileProcessingDashboardModel dashboard() {
-    return dashboardService.dashboard();
-  }
-
-  @GetMapping("/dashboard/divergences")
-  @CheckSecurity.FileProcessing.CanRead
-  public List<FileProcessingDivergenceContextModel> dashboardDivergences() {
-    return dashboardService.divergenceContexts();
-  }
 
   @PostMapping("/files/search")
   @CheckSecurity.FileProcessing.CanRead
@@ -118,12 +99,6 @@ public class FileProcessingController {
     return erpPendingSaleService.listPending(pageable);
   }
 
-  @GetMapping("/erp/pending-sales/{id}")
-  @CheckSecurity.FileProcessing.CanRead
-  public ErpPendingSaleModel findPendingErpSale(@PathVariable UUID id) {
-    return erpPendingSaleService.findPending(id);
-  }
-
   @GetMapping("/rede/totalizers")
   @CheckSecurity.FileProcessing.CanRead
   public Page<RedeTotalizerModel> listRedeTotalizers(Pageable pageable) {
@@ -167,9 +142,4 @@ public class FileProcessingController {
     return ResponseEntity.accepted().body(FileProcessingScheduleStatusModel.from(fileStorageTask.bankStatus()));
   }
 
-  @PostMapping("/bank/reconcile")
-  @CheckSecurity.FileProcessing.CanProcess
-  public BankReconciliationResult reconcileBank() {
-    return bankReconciliationService.reconcilePending();
-  }
 }

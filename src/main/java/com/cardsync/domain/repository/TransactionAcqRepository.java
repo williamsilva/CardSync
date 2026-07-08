@@ -198,6 +198,24 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     select a.id
       from TransactionAcqEntity a
      where a.statusTransaction = :canceledStatus
+       and (
+         not exists (select 1 from TransactionErpEntity erp where erp.transactionAcq = a)
+         or exists (
+           select 1 from TransactionErpEntity erp
+            where erp.transactionAcq = a
+              and (erp.statusTransaction is null or erp.statusTransaction <> :canceledStatus)
+         )
+       )
+     order by a.saleDate asc, a.id asc
+  """)
+  List<UUID> findCancelledAcqIdsForPipelineReprocess(
+    @Param("canceledStatus") Integer canceledStatus
+  );
+
+  @Query("""
+    select a.id
+      from TransactionAcqEntity a
+     where a.statusTransaction = :canceledStatus
        and function('YEAR', a.saleDate) = :year
        and function('MONTH', a.saleDate) = :month
      order by a.saleDate asc, a.id asc

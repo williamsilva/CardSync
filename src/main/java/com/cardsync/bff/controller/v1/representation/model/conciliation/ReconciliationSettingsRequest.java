@@ -13,6 +13,14 @@ public record ReconciliationSettingsRequest(
   @Min(0) @Max(365) int erpAcquirerFutureDaysLookback,
   @Min(1) @Max(120) int reconciliationLookbackMonths,
   @Min(1) @Max(365) int creditOrderPendingDays,
+  // Flags de habilitação de etapas — ordem = esteira de conciliação
+  boolean enabledErpAcquirer,
+  boolean enabledSalesSummaryTransactions,
+  boolean enabledAcquirerSaleCancellations,
+  boolean enabledErpAcquirerFees,
+  boolean enabledAcquirerSaleSummary,
+  boolean enabledSalesSummaryCreditOrder,
+  boolean enabledBankAcquirer,
   // Flags de reprocessamento — ordem = esteira de conciliação
   boolean reprocessErpAcquirerSales,
   boolean reprocessSalesSummaryTransactions,
@@ -22,7 +30,8 @@ public record ReconciliationSettingsRequest(
   boolean reprocessSalesSummaryCreditOrder,
   boolean reprocessBankAcquirer,
   // Parâmetros de tolerância
-  @Min(0) @Max(60) int dateToleranceDays,
+  @Min(0) @Max(60) int dateToleranceDaysBefore,
+  @Min(0) @Max(60) int dateToleranceDaysAfter,
   @NotNull @DecimalMin("0.00") @DecimalMax("10.00") BigDecimal valueTolerance,
   @Min(0) @Max(60) int bankMarkNotReconciledAfterDays
 ) {}

@@ -4,6 +4,7 @@ import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
@@ -36,6 +37,7 @@ public class ConciliationWaitingAcqAdvancedFields extends BaseSpecificationSuppo
 
     spec = spec.and(inCodes("capture", filter.capture(), CaptureEnum::getCode));
     spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode ));
+    spec = spec.and(inCodes("statusTransactionReason", filter.statusTransactionReason(), StatusTransactionReasonEnum::getCode ));
 
     spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,  "flag", "id"));
     spec = spec.and(inPath(filter.companies(), BaseSpecificationSupport::parseUuidOrNull, "company", "id"));

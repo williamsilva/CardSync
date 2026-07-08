@@ -102,7 +102,6 @@ public class TransactionAcqAdvancedFields extends BaseSpecificationSupport<Trans
     };
   }
 
-
   private Specification<TransactionAcqEntity> expectedPaymentDate(TransactionAcqSalesFilter filter) {
     return localDatePeriodJoin(
       "installments",

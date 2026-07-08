@@ -53,10 +53,8 @@ public class AnticipationService {
       AnticipationEntity.class,
       spec,
       "grossValue",
-      "discountValue",
-      "liquidValue",
-      "adjustment",
-      "adjustmentValue"
+      "discountRateValue",
+      "releaseValue"
     );
   }
 }

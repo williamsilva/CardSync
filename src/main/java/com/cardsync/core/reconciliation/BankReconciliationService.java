@@ -56,11 +56,11 @@ public class BankReconciliationService {
   private final EntityManager entityManager;
   private final BankReconciliationMatcher matcher;
   private final FileProcessingProperties properties;
-  private final ReconciliationSettingsService reconciliationSettingsService;
   private final CreditOrderRepository creditOrderRepository;
   private final ReleasesBankRepository releasesBankRepository;
   private final InstallmentAcqRepository installmentAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
+  private final ReconciliationSettingsService reconciliationSettingsService;
 
   @Transactional
   public BankReconciliationResult reconcilePending() {
@@ -85,12 +85,13 @@ public class BankReconciliationService {
 
     log.info(
       "📌 Iniciando conciliação Banco x Adquirente dirigida por ordens: trigger={}, ordensElegiveis={}, tamanhoLote={}, " +
-        "totalLotes={}, toleranciaDias={}, toleranciaValor={}",
+        "totalLotes={}, toleranciaAntes={}, toleranciaDepois={}, toleranciaValor={}",
       trigger.getCode(),
       eligibleOrderIds.size(),
       batchSize,
       totalBatches,
-      reconciliationSettingsService.getDateToleranceDays(),
+      reconciliationSettingsService.getDateToleranceDaysBefore(),
+      reconciliationSettingsService.getDateToleranceDaysAfter(),
       reconciliationSettingsService.getValueTolerance()
     );
 
@@ -142,13 +143,14 @@ public class BankReconciliationService {
 
         if (minOrderDate == null || maxOrderDate == null) continue;
 
-        int toleranceDays = reconciliationSettingsService.getDateToleranceDays();
+        int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
+        int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
         List<ReleasesBankEntity> companyReleases = releasesBankRepository.findAvailableForCreditOrderBatch(
           STATUS_PENDING,
           reconciliationSettingsService.isReprocessBankAcquirer(),
           companyId,
-          minOrderDate.minusDays(toleranceDays),
-          maxOrderDate.plusDays(toleranceDays)
+          minOrderDate.minusDays(toleranceDaysBefore),
+          maxOrderDate.plusDays(toleranceDaysAfter)
         );
 
         reconcileEligibleCreditOrders(
@@ -213,7 +215,8 @@ public class BankReconciliationService {
   ) {
     boolean reprocess = reconciliationSettingsService.isReprocessBankAcquirer();
     BigDecimal tolerance = reconciliationSettingsService.getValueTolerance();
-    int toleranceDays = reconciliationSettingsService.getDateToleranceDays();
+    int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
+    int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
     Set<UUID> reconciledReleaseIds = new HashSet<>();
 
     List<CreditOrderEntity> validOrders = eligibleOrders.stream()
@@ -240,7 +243,7 @@ public class BankReconciliationService {
 
       List<CreditOrderEntity> compatible = validOrders.stream()
         .filter(order -> isOrderStillEligible(order, reconciledOrderIds, reprocess))
-        .filter(order -> isCreditOrderCandidateCompatible(release, order, toleranceDays))
+        .filter(order -> isCreditOrderCandidateCompatible(release, order, toleranceDaysBefore, toleranceDaysAfter))
         .toList();
 
       if (compatible.isEmpty()) continue;
@@ -344,7 +347,9 @@ public class BankReconciliationService {
       && order.getReleaseDate() != null
       && order.getReleaseValue() != null
       && order.getCompany() != null
-      && order.getCompany().getId() != null;
+      && order.getCompany().getId() != null
+      && order.getAcquirer() != null
+      && order.getAcquirer().getId() != null;
   }
 
   private Comparator<ReleasesBankEntity> candidateReleaseComparator(CreditOrderEntity order) {
@@ -371,10 +376,13 @@ public class BankReconciliationService {
   }
 
   private BankReconciliationMatcher.MatchResult reconcileByInstallments(ReleasesBankEntity release, FileProcessingProperties.Reconciliation config) {
-    int toleranceDays = reconciliationSettingsService.getDateToleranceDays();
+    int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
+    int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
     BigDecimal valueTolerance = reconciliationSettingsService.getValueTolerance();
-    LocalDate dateFrom = release.getReleaseDate().minusDays(toleranceDays);
-    LocalDate dateTo = release.getReleaseDate().plusDays(toleranceDays);
+    // dateFrom: installments expected up to toleranceDaysAfter before the release (release came after)
+    // dateTo:   installments expected up to toleranceDaysBefore after the release (release came before)
+    LocalDate dateFrom = release.getReleaseDate().minusDays(toleranceDaysAfter);
+    LocalDate dateTo = release.getReleaseDate().plusDays(toleranceDaysBefore);
 
     ReconciliationMatchContext releaseContext = contextOf(release);
     List<InstallmentAcqEntity> candidates = installmentAcqRepository.findPendingForBankRelease(
@@ -382,12 +390,12 @@ public class BankReconciliationService {
         release.getCompany().getId(),
         idOrNull(release.getAcquirer()),
         idOrNull(release.getEstablishment()),
-        release.getBankingDomicile().getId(),
+        idOrNull(release.getBankingDomicile()),
         idOrNull(release.getFlag()),
         dateFrom,
         dateTo
       ).stream()
-      .filter(installment -> isInstallmentCandidateCompatible(release, installment, toleranceDays))
+      .filter(installment -> isInstallmentCandidateCompatible(release, installment, toleranceDaysBefore, toleranceDaysAfter))
       .sorted(Comparator.comparingInt(
         (InstallmentAcqEntity installment) -> releaseContext.strength(contextOf(installment))).reversed())
       .toList();
@@ -554,25 +562,30 @@ public class BankReconciliationService {
     summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
   }
 
-  private boolean isCreditOrderCandidateCompatible(ReleasesBankEntity release, CreditOrderEntity order, int toleranceDays) {
+  private boolean isCreditOrderCandidateCompatible(ReleasesBankEntity release, CreditOrderEntity order, int toleranceDaysBefore, int toleranceDaysAfter) {
     if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null) return false;
-    if (Math.abs(ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate())) > toleranceDays) return false;
+    // daysDiff > 0: lançamento DEPOIS da ordem (normal); < 0: lançamento ANTES da ordem (suspeito)
+    long daysDiff = ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate());
+    if (daysDiff > toleranceDaysAfter) return false;
+    if (daysDiff < -toleranceDaysBefore) return false;
     if (!contextOf(release).compatible(contextOf(order))) return false;
-    // Verifica domicílio bancário apenas quando ambos estão preenchidos
-    UUID orderDomicile = idOrNull(order.getBankingDomicile());
-    UUID releaseDomicile = idOrNull(release.getBankingDomicile());
-    if (orderDomicile != null && releaseDomicile != null && !orderDomicile.equals(releaseDomicile)) return false;
+    // Banco obrigatório: release.bank vs order.bankingDomicile.bank
+    UUID releaseBank = idOrNull(release.getBank());
+    UUID orderBank = order.getBankingDomicile() != null ? idOrNull(order.getBankingDomicile().getBank()) : null;
+    if (releaseBank == null || orderBank == null || !releaseBank.equals(orderBank)) return false;
     return true;
   }
 
-  private boolean isInstallmentCandidateCompatible(ReleasesBankEntity release, InstallmentAcqEntity installment, int toleranceDays) {
+  private boolean isInstallmentCandidateCompatible(ReleasesBankEntity release, InstallmentAcqEntity installment, int toleranceDaysBefore, int toleranceDaysAfter) {
     if (installment == null || installment.getExpectedPaymentDate() == null) return false;
     if (installment.getTransaction() != null && installment.getTransaction().getSaleDate() != null) {
       LocalDate saleDate = installment.getTransaction().getSaleDate().toLocalDate();
       if (release.getReleaseDate().isBefore(saleDate)) return false;
     }
-    long diff = Math.abs(ChronoUnit.DAYS.between(installment.getExpectedPaymentDate(), release.getReleaseDate()));
-    if (diff > toleranceDays) return false;
+    // daysDiff > 0: lançamento DEPOIS do pagamento esperado (normal); < 0: lançamento ANTES
+    long daysDiff = ChronoUnit.DAYS.between(installment.getExpectedPaymentDate(), release.getReleaseDate());
+    if (daysDiff > toleranceDaysAfter) return false;
+    if (daysDiff < -toleranceDaysBefore) return false;
     return contextOf(release).compatible(contextOf(installment));
   }
 
@@ -651,8 +664,8 @@ public class BankReconciliationService {
       && release.getReleaseValue() != null
       && release.getCompany() != null
       && release.getCompany().getId() != null
-      && release.getBankingDomicile() != null
-      && release.getBankingDomicile().getId() != null;
+      && release.getBank() != null
+      && release.getBank().getId() != null;
   }
 
   private void markReleaseNotReconciledWhenExpired(

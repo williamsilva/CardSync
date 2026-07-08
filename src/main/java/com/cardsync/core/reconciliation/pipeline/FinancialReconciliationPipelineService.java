@@ -7,8 +7,10 @@ import com.cardsync.core.conciliation.analysis.ConciliationManualSwapReconciliat
 import com.cardsync.core.reconciliation.BankReconciliationResult;
 import com.cardsync.core.reconciliation.BankReconciliationTriggerType;
 import com.cardsync.core.reconciliation.BankReconciliationService;
+import com.cardsync.bff.controller.v1.representation.model.conciliation.ErpCancellationReprocessResult;
 import com.cardsync.core.reconciliation.cancellation.AcquirerSaleCancellationResult;
 import com.cardsync.core.reconciliation.cancellation.AcquirerSaleCancellationService;
+import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
 import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationResult;
 import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationService;
 import com.cardsync.core.reconciliation.summary.CreditOrderOrphanLinkingService;
@@ -19,6 +21,7 @@ import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconcili
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.model.enums.ReconciliationPipelineStepEnum;
 import com.cardsync.domain.model.enums.ReconciliationPipelineStepStatusEnum;
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,9 +39,11 @@ public class FinancialReconciliationPipelineService {
   private final AtomicBoolean manualRunning = new AtomicBoolean(false);
 
   private final ReconciliationExecutionLogService reconciliationExecutionLogService;
+  private final ReconciliationSettingsService reconciliationSettingsService;
   private final BankReconciliationService bankReconciliationService;
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final AcquirerSaleCancellationService acquirerSaleCancellationService;
+  private final ErpCancellationReprocessService erpCancellationReprocessService;
   private final CreditOrderOrphanLinkingService creditOrderOrphanLinkingService;
   private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
@@ -73,13 +78,27 @@ public class FinancialReconciliationPipelineService {
         .startedAt(startedAt)
         .build();
 
-      result.addStep(executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger)));
-      result.addStep(executePipelineStep("2. Resumo de vendas x TransactionAcq", () -> runSalesSummaryTransactions(trigger)));
-      result.addStep(executePipelineStep("3. Cancelamentos informados pela adquirente", () -> runAcquirerSaleCancellations(trigger)));
-      result.addStep(executePipelineStep("4. Ajustes/taxas ERP x Adquirente", () -> runSaleAdjustments(trigger)));
-      result.addStep(executePipelineStep("5. Venda ADQ x resumo de vendas", () -> runAcquirerSaleSummary(trigger)));
-      result.addStep(executePipelineStep("6. Resumo de vendas x ordem de pagamento", () -> runSalesSummaryCreditOrder(trigger)));
-      result.addStep(executePipelineStep("7. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger)));
+      result.addStep(reconciliationSettingsService.isEnabledErpAcquirer()
+        ? executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.ERP_ACQUIRER, "1. ADQ x ERP"));
+      result.addStep(reconciliationSettingsService.isEnabledSalesSummaryTransactions()
+        ? executePipelineStep("2. Resumo de vendas x TransactionAcq", () -> runSalesSummaryTransactions(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.SALES_SUMMARY_TRANSACTION, "2. Resumo de vendas x TransactionAcq"));
+      result.addStep(reconciliationSettingsService.isEnabledAcquirerSaleCancellations()
+        ? executePipelineStep("3. Cancelamentos informados pela adquirente", () -> runAcquirerSaleCancellations(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_CANCELLATION, "3. Cancelamentos informados pela adquirente"));
+      result.addStep(reconciliationSettingsService.isEnabledErpAcquirerFees()
+        ? executePipelineStep("4. Ajustes/taxas ERP x Adquirente", () -> runSaleAdjustments(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_ADJUSTMENTS, "4. Ajustes/taxas ERP x Adquirente"));
+      result.addStep(reconciliationSettingsService.isEnabledAcquirerSaleSummary()
+        ? executePipelineStep("5. Venda ADQ x resumo de vendas", () -> runAcquirerSaleSummary(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_SUMMARY, "5. Venda ADQ x resumo de vendas"));
+      result.addStep(reconciliationSettingsService.isEnabledSalesSummaryCreditOrder()
+        ? executePipelineStep("6. Resumo de vendas x ordem de pagamento", () -> runSalesSummaryCreditOrder(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.SALES_SUMMARY_CREDIT_ORDER, "6. Resumo de vendas x ordem de pagamento"));
+      result.addStep(reconciliationSettingsService.isEnabledBankAcquirer()
+        ? executePipelineStep("7. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger))
+        : skippedStep(ReconciliationPipelineStepEnum.CREDIT_ORDER_BANK_RELEASE, "7. Ordem de pagamento x lançamento bancário"));
 
       OffsetDateTime finishedAt = OffsetDateTime.now();
       result.setFinishedAt(finishedAt);
@@ -145,6 +164,18 @@ public class FinancialReconciliationPipelineService {
     }
   }
 
+  private FinancialReconciliationStepResult skippedStep(ReconciliationPipelineStepEnum step, String name) {
+    OffsetDateTime now = OffsetDateTime.now();
+    log.info("⏭ Etapa da esteira ignorada (desabilitada nas configurações): {}", name);
+    return FinancialReconciliationStepResult.builder()
+      .step(step)
+      .status(ReconciliationPipelineStepStatusEnum.SKIPPED)
+      .message("conciliation.dashboard.history.stepMessage.SKIPPED")
+      .startedAt(now)
+      .finishedAt(now)
+      .build();
+  }
+
   private FinancialReconciliationStepResult runErpAcquirer(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
     ReconcileErpAcquirerResultModel erpAcq = conciliationAnalysisService
@@ -195,6 +226,7 @@ public class FinancialReconciliationPipelineService {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     AcquirerSaleCancellationResult cancellations = acquirerSaleCancellationService.reconcilePending(trigger);
+    ErpCancellationReprocessResult erpReprocess = erpCancellationReprocessService.reprocessPendingAll();
 
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ACQUIRER_SALE_CANCELLATION)
@@ -202,7 +234,8 @@ public class FinancialReconciliationPipelineService {
       .message("conciliation.dashboard.history.stepMessage.ACQUIRER_SALE_CANCELLATION")
       .analyzed(cancellations.getAdjustmentsAnalyzed())
       .reconciled(cancellations.getFullCancellationsIdentified())
-      .updated(cancellations.getAcquirerSalesCanceled() + cancellations.getErpSalesCanceled())
+      .updated(cancellations.getAcquirerSalesCanceled() + cancellations.getErpSalesCanceled()
+        + erpReprocess.erpSalesCancelled() + erpReprocess.erpInstallmentsCancelled())
       .blocked(cancellations.getSkippedWithoutTransaction())
       .pending(cancellations.getSkippedPartialCancellations())
       .startedAt(startedAt)

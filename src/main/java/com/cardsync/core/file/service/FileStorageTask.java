@@ -2,7 +2,10 @@ package com.cardsync.core.file.service;
 
 import com.cardsync.core.file.runtime.FileProcessingExecutionStatus;
 import com.cardsync.core.file.runtime.FileProcessingSystemType;
+import com.cardsync.domain.model.FileProcessingExecutionStateEntity;
 import com.cardsync.domain.model.enums.FileProcessingTriggerType;
+import com.cardsync.infrastructure.repository.FileProcessingExecutionStateRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -27,6 +31,7 @@ public class FileStorageTask {
   private final ProcessFileErpService processFileErpService;
   private final ProcessFileRedeService processFileRedeService;
   private final ProcessFileBankService processFileBankService;
+  private final FileProcessingExecutionStateRepository executionStateRepository;
 
   private final AtomicBoolean erpRunning = new AtomicBoolean(false);
   private final AtomicBoolean redeRunning = new AtomicBoolean(false);
@@ -35,6 +40,28 @@ public class FileStorageTask {
   private final AtomicReference<ExecutionState> erpState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.ERP));
   private final AtomicReference<ExecutionState> redeState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.REDE));
   private final AtomicReference<ExecutionState> bankState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.BANK));
+
+  @PostConstruct
+  private void restoreStateFromDb() {
+    Arrays.stream(FileProcessingSystemType.values()).forEach(system -> {
+      executionStateRepository.findBySystem(system.getCode()).ifPresent(entity -> {
+        AtomicReference<ExecutionState> stateRef = stateRefFor(system);
+        FileProcessingTriggerType trigger = entity.getLastTrigger() != null
+          ? Arrays.stream(FileProcessingTriggerType.values())
+              .filter(t -> t.getCode().equals(entity.getLastTrigger()))
+              .findFirst().orElse(null)
+          : null;
+        stateRef.set(ExecutionState.builder()
+          .system(system)
+          .lastStartedAt(entity.getLastStartedAt())
+          .lastFinishedAt(entity.getLastFinishedAt())
+          .lastSuccess(entity.getLastSuccess())
+          .lastTrigger(trigger)
+          .lastMessage(entity.getLastMessage())
+          .build());
+      });
+    });
+  }
 
   public void processFileErp() {
     if (!tryProcessFileErp(FileProcessingTriggerType.MANUAL)) {
@@ -88,6 +115,32 @@ public class FileStorageTask {
     return running.get() && stateRef.get().getLastTrigger() == FileProcessingTriggerType.MANUAL;
   }
 
+  private AtomicReference<ExecutionState> stateRefFor(FileProcessingSystemType system) {
+    return switch (system) {
+      case ERP  -> erpState;
+      case REDE -> redeState;
+      case BANK -> bankState;
+    };
+  }
+
+  private void persistState(FileProcessingSystemType system, ExecutionState state) {
+    try {
+      FileProcessingExecutionStateEntity entity = executionStateRepository
+        .findBySystem(system.getCode())
+        .orElseGet(FileProcessingExecutionStateEntity::new);
+      entity.setSystem(system.getCode());
+      entity.setLastStartedAt(state.getLastStartedAt());
+      entity.setLastFinishedAt(state.getLastFinishedAt());
+      entity.setLastSuccess(state.getLastSuccess());
+      entity.setLastTrigger(state.getLastTrigger() != null ? state.getLastTrigger().getCode() : null);
+      entity.setLastMessage(state.getLastMessage());
+      entity.setUpdatedAt(OffsetDateTime.now());
+      executionStateRepository.save(entity);
+    } catch (Exception ex) {
+      log.warn("⚠ Falha ao persistir estado de execução para {}. erro={}", system.getCode(), ex.getMessage());
+    }
+  }
+
   private boolean execute(
     FileProcessingSystemType system,
     FileProcessingTriggerType trigger,
@@ -108,14 +161,18 @@ public class FileStorageTask {
       processor.run();
       OffsetDateTime finishedAt = OffsetDateTime.now();
       String message = "Processamento concluído em " + Duration.between(startedAt, finishedAt).toSeconds() + "s";
-      stateRef.set(stateRef.get().finished(finishedAt, true, message));
+      ExecutionState successState = stateRef.get().finished(finishedAt, true, message);
+      stateRef.set(successState);
+      persistState(system, successState);
       log.info("✅ Processamento de arquivos {} concluído. trigger={}, duração={}s",
         system.getCode(), trigger.getCode(), Duration.between(startedAt, finishedAt).toSeconds());
       return true;
     } catch (Exception ex) {
       OffsetDateTime finishedAt = OffsetDateTime.now();
       String message = safeMessage(ex);
-      stateRef.set(stateRef.get().finished(finishedAt, false, message));
+      ExecutionState failedState = stateRef.get().finished(finishedAt, false, message);
+      stateRef.set(failedState);
+      persistState(system, failedState);
       log.error("❌ Processamento de arquivos {} falhou. trigger={}, duração={}s, erro={}",
         system.getCode(), trigger.getCode(), Duration.between(startedAt, finishedAt).toSeconds(), message, ex);
       throw ex;

@@ -48,18 +48,27 @@ public class ErpCancellationReprocessService {
   @Transactional
   public ErpCancellationReprocessResult reprocess(int year, int month) {
     List<UUID> acqIds = transactionAcqRepository.findCancelledAcqIdsForMonthReprocess(
-      StatusTransactionEnum.CANCELED.getCode(),
-      year,
-      month
-    );
+      StatusTransactionEnum.CANCELED.getCode(), year, month);
+    log.info("🔁 Reprocessamento de cancelamentos ERP iniciado. year={}, month={}, candidatos={}", year, month, acqIds.size());
+    int[] counts = processAcqIds(acqIds);
+    log.info("✅ Reprocessamento de cancelamentos ERP finalizado. year={}, month={}, acqAnalisadas={}, erpCanceladas={}, vinculadas={}, parcelas={}, jaCanceladas={}, semErp={}",
+      year, month, counts[0], counts[1], counts[3], counts[2], counts[4], counts[5]);
+    return new ErpCancellationReprocessResult(year, month, counts[0], counts[1], counts[2], counts[3], counts[4], counts[5]);
+  }
 
+  @Transactional
+  public ErpCancellationReprocessResult reprocessPendingAll() {
+    List<UUID> acqIds = transactionAcqRepository.findCancelledAcqIdsForPipelineReprocess(
+      StatusTransactionEnum.CANCELED.getCode());
+    log.info("🔁 Reprocessamento de cancelamentos ERP (esteira) iniciado. candidatos={}", acqIds.size());
+    int[] counts = processAcqIds(acqIds);
+    log.info("✅ Reprocessamento de cancelamentos ERP (esteira) finalizado. acqAnalisadas={}, erpCanceladas={}, vinculadas={}, parcelas={}, jaCanceladas={}, semErp={}",
+      counts[0], counts[1], counts[3], counts[2], counts[4], counts[5]);
+    return new ErpCancellationReprocessResult(0, 0, counts[0], counts[1], counts[2], counts[3], counts[4], counts[5]);
+  }
+
+  private int[] processAcqIds(List<UUID> acqIds) {
     int totalBatches = (int) Math.ceil(acqIds.size() / (double) BATCH_SIZE);
-
-    log.info(
-      "🔁 Reprocessamento de cancelamentos ERP iniciado. year={}, month={}, candidatos={}, batches={}",
-      year, month, acqIds.size(), totalBatches
-    );
-
     int acqSalesCancelled = 0;
     int erpSalesCancelled = 0;
     int erpInstallmentsCancelled = 0;
@@ -77,24 +86,20 @@ public class ErpCancellationReprocessService {
       int batchLinked = 0;
       int batchSkippedAlready = 0;
       int batchSkippedNoErp = 0;
-
       Map<UUID, TransactionErpEntity> erpToSave = new LinkedHashMap<>();
 
       for (TransactionAcqEntity acq : acqBatch) {
         acqSalesCancelled++;
-
         TransactionErpEntity erp = erpByAcqId.get(acq.getId());
 
         if (erp == null) {
           erp = findUnlinkedErpByNsuAuth(acq);
           if (erp != null) {
-          erp.setTransactionAcq(acq);
-          applyAcqBusinessContext(erp, acq);
-          batchLinked++;
-          log.debug(
-              "🔗 ERP sem vínculo encontrado por NSU/auth/adquirente e vinculado ao ACQ. erpId={}, acqId={}, nsu={}, auth={}",
-              erp.getId(), acq.getId(), acq.getNsu(), acq.getAuthorization()
-            );
+            erp.setTransactionAcq(acq);
+            applyAcqBusinessContext(erp, acq);
+            batchLinked++;
+            log.debug("🔗 ERP sem vínculo encontrado por NSU/auth/adquirente e vinculado ao ACQ. erpId={}, acqId={}, nsu={}, auth={}",
+              erp.getId(), acq.getId(), acq.getNsu(), acq.getAuthorization());
           }
         }
 
@@ -121,7 +126,6 @@ public class ErpCancellationReprocessService {
       if (!erpToSave.isEmpty()) {
         transactionErpRepository.saveAll(erpToSave.values());
       }
-
       entityManager.flush();
       entityManager.clear();
 
@@ -131,25 +135,12 @@ public class ErpCancellationReprocessService {
       skippedAlreadyCancelled += batchSkippedAlready;
       skippedNoErpLinked += batchSkippedNoErp;
 
-      log.info(
-        "🔄 Reprocessamento batch={}/{}: erpCanceladas={}, vinculadas={}, parcelasCanceladas={}, jaCanceladas={}, semErp={}",
+      log.info("🔄 Reprocessamento batch={}/{}: erpCanceladas={}, vinculadas={}, parcelasCanceladas={}, jaCanceladas={}, semErp={}",
         batch, totalBatches, batchErpCancelled, batchLinked, batchInstallmentsCancelled,
-        batchSkippedAlready, batchSkippedNoErp
-      );
+        batchSkippedAlready, batchSkippedNoErp);
     }
 
-    log.info(
-      "✅ Reprocessamento de cancelamentos ERP finalizado. year={}, month={}, " +
-        "acqAnalisadas={}, erpCanceladas={}, vinculadasAntesCancelar={}, parcelasCanceladas={}, jaCanceladas={}, semErp={}",
-      year, month, acqSalesCancelled, erpSalesCancelled, erpLinkedBeforeCancel,
-      erpInstallmentsCancelled, skippedAlreadyCancelled, skippedNoErpLinked
-    );
-
-    return new ErpCancellationReprocessResult(
-      year, month,
-      acqSalesCancelled, erpSalesCancelled, erpInstallmentsCancelled, erpLinkedBeforeCancel,
-      skippedAlreadyCancelled, skippedNoErpLinked
-    );
+    return new int[]{acqSalesCancelled, erpSalesCancelled, erpInstallmentsCancelled, erpLinkedBeforeCancel, skippedAlreadyCancelled, skippedNoErpLinked};
   }
 
   private Map<UUID, TransactionErpEntity> findErpByAcqId(Collection<UUID> acqIds) {

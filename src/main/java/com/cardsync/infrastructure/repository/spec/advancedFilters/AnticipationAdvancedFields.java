@@ -31,6 +31,12 @@ public class AnticipationAdvancedFields extends BaseSpecificationSupport<Anticip
     spec = spec.and(inPath(filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull,"acquirer", "id"));
     spec = spec.and(inPath(filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,"establishment", "id"));
 
+    spec = spec.and(currencyRangeValue("grossValue", filter.grossValueStart(), filter.grossValueEnd()));
+    spec = spec.and(currencyRangeValue("releaseValue", filter.releaseValueStart(), filter.releaseValueEnd()));
+    spec = spec.and(currencyRangeValue("discountRateValue", filter.discountRateValueStart(), filter.discountRateValueEnd()));
+    spec = spec.and(currencyRangeValue("originalCreditValue", filter.originalCreditValueStart(), filter.originalCreditValueEnd()));
+    spec = spec.and(currencyRangeValue("advanceDiscountValue", filter.advanceDiscountValueStart(), filter.advanceDiscountValueEnd()));
+
     return spec;
   }
 }

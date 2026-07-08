@@ -28,6 +28,36 @@ public class ReconciliationSettingsEntity extends AuditableEntityBase {
   @Column(name = "credit_order_pending_days", nullable = false)
   private int creditOrderPendingDays = 30;
 
+  // ── Flags de habilitação de etapas (ordem = esteira de conciliação) ──────
+
+  /** Etapa 1 — ERP x Adquirente: se false, a etapa é pulada na esteira. */
+  @Column(name = "enabled_erp_acquirer", nullable = false)
+  private boolean enabledErpAcquirer = true;
+
+  /** Etapa 2 — Resumo de vendas x TransactionAcq: se false, a etapa é pulada. */
+  @Column(name = "enabled_sales_summary_transactions", nullable = false)
+  private boolean enabledSalesSummaryTransactions = true;
+
+  /** Etapa 3 — Cancelamentos da adquirente: se false, a etapa é pulada. */
+  @Column(name = "enabled_acquirer_sale_cancellations", nullable = false)
+  private boolean enabledAcquirerSaleCancellations = true;
+
+  /** Etapa 4 — Taxas ERP x Adquirente: se false, a etapa é pulada. */
+  @Column(name = "enabled_erp_acquirer_fees", nullable = false)
+  private boolean enabledErpAcquirerFees = true;
+
+  /** Etapa 5 — Venda ADQ x Resumo: se false, a etapa é pulada. */
+  @Column(name = "enabled_acquirer_sale_summary", nullable = false)
+  private boolean enabledAcquirerSaleSummary = true;
+
+  /** Etapa 6 — Resumo x Ordem de Pagamento: se false, a etapa é pulada. */
+  @Column(name = "enabled_sales_summary_credit_order", nullable = false)
+  private boolean enabledSalesSummaryCreditOrder = true;
+
+  /** Etapa 7 — Ordem de Pagamento x Banco: se false, a etapa é pulada. */
+  @Column(name = "enabled_bank_acquirer", nullable = false)
+  private boolean enabledBankAcquirer = true;
+
   // ── Flags de reprocessamento (ordem = esteira de conciliação) ─────────────
 
   /** Etapa 1 — ERP x Adquirente (vendas): reprocessa vendas já conciliadas. */
@@ -60,8 +90,13 @@ public class ReconciliationSettingsEntity extends AuditableEntityBase {
 
   // ── Parâmetros de tolerância ───────────────────────────────────────────────
 
-  @Column(name = "date_tolerance_days", nullable = false)
-  private int dateToleranceDays = 10;
+  /** Dias que o lançamento bancário pode ser ANTERIOR à ordem de crédito. */
+  @Column(name = "date_tolerance_days_before", nullable = false)
+  private int dateToleranceDaysBefore = 5;
+
+  /** Dias que o lançamento bancário pode ser POSTERIOR à ordem de crédito. */
+  @Column(name = "date_tolerance_days_after", nullable = false)
+  private int dateToleranceDaysAfter = 10;
 
   @Column(name = "value_tolerance", nullable = false, precision = 10, scale = 4)
   private BigDecimal valueTolerance = new BigDecimal("0.05");

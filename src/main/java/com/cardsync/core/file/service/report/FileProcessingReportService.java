@@ -240,8 +240,8 @@ public class FileProcessingReportService {
     int adqFiles = countGroup(files, FileGroupEnum.ADQ);
     int bankFiles = countGroup(files, FileGroupEnum.BANK);
 
-    ImportedFileGroupStatusModel erpStatus = buildErpStatus(date, processedFiles, erpFiles, noFileDayEntries, holidays);
-    ImportedFileGroupStatusModel adqStatus = buildAcquirerStatus(date, processedFiles, acquirers, noFileDayEntries, establishmentsByFileId, allEstsByAcquirerId, holidays);
+    ImportedFileGroupStatusModel erpStatus = buildErpStatus(date, processedFiles, erpFiles, noFileDayEntries);
+    ImportedFileGroupStatusModel adqStatus = buildAcquirerStatus(date, processedFiles, acquirers, noFileDayEntries, establishmentsByFileId, allEstsByAcquirerId);
     ImportedFileGroupStatusModel bankStatus = buildBankStatus(
       date, processedFiles, banks, bankingDomiciles, domicileIdsByProcessedFile, holidays, noFileDayEntries
     );
@@ -263,12 +263,10 @@ public class FileProcessingReportService {
     LocalDate date,
     List<ProcessedFileEntity> files,
     int erpFiles,
-    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries,
-    Set<LocalDate> holidays
+    List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
     boolean exempt = date.isBefore(cardsyncAppProperties.getImplantationDate())
-      || isErpExemptOnDate(date, noFileDayEntries)
-      || isNonBusinessDay(date, holidays);
+      || isErpExemptOnDate(date, noFileDayEntries);
     int expected = (!exempt && fileProcessingProperties.getCalendar().isErpEnabled()) ? 1 : 0;
     int received = erpFiles > 0 ? 1 : 0;
 
@@ -308,8 +306,7 @@ public class FileProcessingReportService {
     List<AcquirerEntity> acquirers,
     List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries,
     Map<UUID, List<ProcessedFileEstablishmentModel>> establishmentsByFileId,
-    Map<UUID, List<EstablishmentEntity>> allEstsByAcquirerId,
-    Set<LocalDate> holidays
+    Map<UUID, List<EstablishmentEntity>> allEstsByAcquirerId
   ) {
     List<ProcessedFileEntity> adqFiles = files.stream()
       .filter(file -> file.getGroup() == FileGroupEnum.ADQ)
@@ -317,7 +314,7 @@ public class FileProcessingReportService {
 
     List<ImportedFileEntityStatusModel> entities = acquirers.stream()
       .map(acquirer -> {
-        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries, holidays);
+        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries);
         int expectedFiles = expectedTypes.size();
         int filesReceived = countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes);
         List<String> missingFiles;
@@ -399,12 +396,12 @@ public class FileProcessingReportService {
       .toList();
 
     int expected = acquirers.stream()
-      .mapToInt(acquirer -> resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries, holidays).size())
+      .mapToInt(acquirer -> resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries).size())
       .sum();
 
     int received = acquirers.stream()
       .mapToInt(acquirer -> {
-        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries, holidays);
+        Set<String> expectedTypes = resolveExpectedAcquirerFileTypes(date, acquirer, noFileDayEntries);
         return countReceivedAcquirerFiles(adqFiles, acquirer, expectedTypes);
       })
       .sum();
@@ -670,10 +667,8 @@ public class FileProcessingReportService {
   private Set<String> resolveExpectedAcquirerFileTypes(
     LocalDate date,
     AcquirerEntity acquirer,
-    List<NoFileDayEntity> entries,
-    Set<LocalDate> holidays
+    List<NoFileDayEntity> entries
   ) {
-    if (isNonBusinessDay(date, holidays)) return Set.of();
     if (!isAcquirerExpectedOnDate(acquirer, date)) return Set.of();
 
     Set<String> expectedTypes = new HashSet<>(isRedeAcquirer(acquirer)

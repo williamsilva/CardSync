@@ -7,6 +7,14 @@ public record ReconciliationSettingsModel(
   int erpAcquirerFutureDaysLookback,
   int reconciliationLookbackMonths,
   int creditOrderPendingDays,
+  // Flags de habilitação de etapas — ordem = esteira de conciliação
+  boolean enabledErpAcquirer,
+  boolean enabledSalesSummaryTransactions,
+  boolean enabledAcquirerSaleCancellations,
+  boolean enabledErpAcquirerFees,
+  boolean enabledAcquirerSaleSummary,
+  boolean enabledSalesSummaryCreditOrder,
+  boolean enabledBankAcquirer,
   // Flags de reprocessamento — ordem = esteira de conciliação
   boolean reprocessErpAcquirerSales,
   boolean reprocessSalesSummaryTransactions,
@@ -16,7 +24,8 @@ public record ReconciliationSettingsModel(
   boolean reprocessSalesSummaryCreditOrder,
   boolean reprocessBankAcquirer,
   // Parâmetros de tolerância
-  int dateToleranceDays,
+  int dateToleranceDaysBefore,
+  int dateToleranceDaysAfter,
   BigDecimal valueTolerance,
   int bankMarkNotReconciledAfterDays
 ) {}

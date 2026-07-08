@@ -19,6 +19,7 @@ public record ConciliationWaitingModelFilter(
 
   List<CaptureEnum> capture,
   List<ModalityEnum> modality,
+  List<StatusTransactionReasonEnum> statusTransactionReason,
 
   List<String> flags,
   List<String> companies,

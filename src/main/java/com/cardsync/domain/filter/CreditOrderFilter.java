@@ -6,6 +6,7 @@ import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public record CreditOrderFilter(
@@ -14,14 +15,22 @@ public record CreditOrderFilter(
   List<String> flags,
   List<String> banks,
   List<String> companies,
+  List<String> acquirers,
   List<Integer> establishments,
 
   List<ModalityEnum> modality,
   List<StatusPaymentBankEnum> statusPaymentBank,
   List<StatusReconciliationEnum> salesSummaryStatus,
 
+  BigDecimal releaseValueEnd,
+  BigDecimal releaseValueStart,
+
+  PeriodEnum periodRvDate,
   PeriodEnum periodReleaseDate,
   PeriodEnum periodCreditOrderDate,
+
+  @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
+  List<String> rvDate,
 
   @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)
   List<String> releaseDate,
