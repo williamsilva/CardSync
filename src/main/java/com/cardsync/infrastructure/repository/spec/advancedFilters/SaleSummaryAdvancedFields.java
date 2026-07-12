@@ -35,9 +35,10 @@ public class SaleSummaryAdvancedFields extends BaseSpecificationSupport<SalesSum
     spec = spec.and(inCodes("transactionsStatus", filter.transactionsStatus(), StatusTransactionEnum::getCode));
     spec = spec.and(inCodes("creditOrderStatus", filter.creditOrderStatus(), StatusReconciliationEnum::getCode));
 
-    spec = spec.and(inPath(filter.flags(), SaleSummaryAdvancedFields::parseUuidOrNull,"flag", "id"));
-    spec = spec.and(inPath(filter.companies(), SaleSummaryAdvancedFields::parseUuidOrNull,"company", "id"));
-    spec = spec.and(inPath(filter.acquirers(), SaleSummaryAdvancedFields::parseUuidOrNull,"acquirer", "id"));
+    spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,"flag", "id"));
+    spec = spec.and(inPath(filter.companies(), BaseSpecificationSupport::parseUuidOrNull,"company", "id"));
+    spec = spec.and(inPath(filter.acquirers(), BaseSpecificationSupport::parseUuidOrNull,"acquirer", "id"));
+    spec = spec.and(inPath(filter.banks(), BaseSpecificationSupport::parseUuidOrNull,"bankingDomicile","bank", "id"));
 
     return spec;
   }

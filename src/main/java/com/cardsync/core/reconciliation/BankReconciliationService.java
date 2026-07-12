@@ -95,6 +95,11 @@ public class BankReconciliationService {
       reconciliationSettingsService.getValueTolerance()
     );
 
+    int zeroValueCount = reconcileZeroValueOrders();
+    if (zeroValueCount > 0) {
+      log.info("✅ Conciliação automática: {} ordem(ns) com releaseValue zero conciliada(s).", zeroValueCount);
+    }
+
     Set<UUID> reconciledOrderIds = new HashSet<>();
     Set<UUID> analyzedReleaseIds = new HashSet<>();
 
@@ -332,6 +337,20 @@ public class BankReconciliationService {
         markReleaseNotReconciledWhenExpired(release, config, "nenhuma parcela compatível encontrada", result);
       }
     }
+  }
+
+  private int reconcileZeroValueOrders() {
+    List<CreditOrderEntity> orders = creditOrderRepository
+      .findPendingZeroValueOrders(PAYMENT_PENDING, BigDecimal.ZERO);
+    if (orders.isEmpty()) return 0;
+    for (CreditOrderEntity order : orders) {
+      order.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+      order.setReconciliationStatus(STATUS_LIQUIDATED);
+      order.setCreditStatus(STATUS_LIQUIDATED);
+      updateSalesSummaryFromCreditOrder(order);
+    }
+    creditOrderRepository.saveAll(orders);
+    return orders.size();
   }
 
   private boolean isOrderStillEligible(CreditOrderEntity order, Set<UUID> reconciledOrderIds, boolean reprocess) {

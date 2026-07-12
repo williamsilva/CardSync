@@ -11,6 +11,7 @@ public record SaleSummaryFilter(
 
   String rvNumber,
 
+  List<String> banks,
   List<String> flags,
   List<String> companies,
   List<String> acquirers,

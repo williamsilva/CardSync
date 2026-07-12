@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -19,6 +20,17 @@ import java.util.UUID;
 public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, UUID>, JpaSpecificationExecutor<CreditOrderEntity> {
 
   boolean existsBySalesSummary_IdAndInstallmentNumber(UUID salesSummaryId, Integer installmentNumber);
+
+  @Query("""
+    SELECT co FROM CreditOrderEntity co
+    LEFT JOIN FETCH co.salesSummary
+    WHERE co.releaseBank IS NULL
+      AND co.statusPaymentBank = :pendingStatus
+      AND (co.releaseValue IS NULL OR co.releaseValue = :zeroValue)
+    """)
+  List<CreditOrderEntity> findPendingZeroValueOrders(
+      @Param("pendingStatus") Integer pendingStatus,
+      @Param("zeroValue") BigDecimal zeroValue);
 
   @Query("select co from CreditOrderEntity co where co.releaseDate >= :lookback order by co.releaseDate asc")
   List<CreditOrderEntity> findAllForDashboard(@Param("lookback") LocalDate lookback);

@@ -141,19 +141,11 @@ public class ConciliationWaitingService {
     TransactionErpEntity saved = transactionErpRepository.save(erp);
     transactionAcqRepository.save(acq);
 
-    log.info(
-      "✅ Venda ERP criada a partir da adquirente. erpId={}, acqId={}, nsu={}, authorization={}",
-      saved.getId(),
-      acq.getId(),
-      acq.getNsu(),
-      acq.getAuthorization()
-    );
+    log.info("✅ Venda ERP criada a partir da adquirente. erpId={}, acqId={}, nsu={}, authorization={}",
+      saved.getId(), acq.getId(), acq.getNsu(), acq.getAuthorization());
 
     return new ErpAcquirerResolutionResultModel(
-      saved.getId(),
-      acq.getId(),
-      "CREATE_ERP_FROM_ACQUIRER",
-      "OK",
+      saved.getId(), acq.getId(), "CREATE_ERP_FROM_ACQUIRER", "OK",
       "Venda ERP criada a partir da venda da adquirente e conciliada automaticamente."
     );
   }

@@ -4,6 +4,8 @@ import com.cardsync.bff.controller.v1.SaleSummaryController;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.FlagMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bank.BankMinimalModel;
+import com.cardsync.bff.controller.v1.representation.model.bankingdomicile.BankingDomicileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.*;
 import com.cardsync.domain.model.*;
@@ -50,6 +52,7 @@ public class SaleSummaryModelAssembler extends RepresentationModelAssemblerSuppo
     model.setCompany(toCompany(entity.getCompany()));
     model.setAcquirer(toAcquirer(entity.getAcquirer()));
     model.setProcessedFile(toProcessedFile(entity.getProcessedFile()));
+    model.setBankingDomicile(toBankingDomicile(entity.getBankingDomicile()));
 
     model.setAdjustments(adjustments.stream()
       .map(SaleSummaryModelAssembler::toAdjustment)
@@ -157,6 +160,32 @@ public class SaleSummaryModelAssembler extends RepresentationModelAssemblerSuppo
      .build();
   }
 
+  private BankingDomicileMinimalModel toBankingDomicile(BankingDomicileEntity entity) {
+    if (entity == null) {
+      return null;
+    }
+
+    return BankingDomicileMinimalModel.builder()
+      .id(entity.getId())
+      .agency(entity.getAgency())
+      .currentAccount(entity.getCurrentAccount())
+      .bank(toBank(entity.getBank()))
+      .build();
+  }
+
+  private BankMinimalModel toBank(BankEntity entity) {
+    if (entity == null) {
+      return null;
+    }
+
+    return BankMinimalModel.builder()
+      .id(entity.getId())
+      .code(entity.getCode())
+      .name(entity.getName())
+      .status(entity.getStatus())
+      .build();
+  }
+
   private static List<AdjustmentEntity> getAdjustments(SalesSummaryEntity entity) {
     return entity.getAdjustments() == null
       ? List.of()
@@ -170,4 +199,5 @@ public class SaleSummaryModelAssembler extends RepresentationModelAssemblerSuppo
       : entity.getCreditOrders().stream()
       .toList();
   }
+
 }
