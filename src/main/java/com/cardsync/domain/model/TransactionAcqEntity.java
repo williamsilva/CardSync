@@ -53,6 +53,7 @@ public class TransactionAcqEntity extends AuditableEntityBase {
   private Integer statusTransaction;
   private Integer statusPaymentBank;
   private Integer statusTransactionReason;
+  @Column(name = "fee_reconciliation_status", nullable = false)
   private Integer feeReconciliationStatus = FeeReconciliationStatusEnum.PENDING.getCode();
 
   private BigDecimal mdrRate;

@@ -19,18 +19,23 @@ import java.util.Set;
 @Table(name = "cs_contracts")
 public class ContractEntity extends AuditableEntityBase {
 
+  @Column(nullable = false)
   private Integer status;
+
+  @Column(nullable = false, length = 150)
   private String description;
 
   private LocalDate endDate;
+
+  @Column(name = "start_date", nullable = false)
   private LocalDate startDate;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "company_id")
   private CompanyEntity company;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "acquirer_id")
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "acquirer_id", nullable = false)
   private AcquirerEntity acquirer;
 
   @ManyToOne(fetch = FetchType.LAZY)

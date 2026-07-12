@@ -20,7 +20,10 @@ public class CompanyEntity extends AuditableEntityBase {
   @Column(name = "cnpj", nullable = false, unique = true, length = 20)
   private String cnpj;
 
+  @Column(name = "type", nullable = false)
   private Integer type;
+
+  @Column(name = "status", nullable = false)
   private Integer status;
 
   @Column(name = "fantasy_name", nullable = false, length = 50)

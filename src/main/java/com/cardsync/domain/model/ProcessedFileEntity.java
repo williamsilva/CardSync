@@ -99,7 +99,7 @@ public class ProcessedFileEntity extends AuditableEntityBase {
     name = "cs_processed_file_pv",
     joinColumns = @JoinColumn(name = "processed_file_id")
   )
-  @Column(name = "pv_number")
+  @Column(name = "pv_number", nullable = false)
   private Set<Integer> pvNumbers = new LinkedHashSet<>();
 
   @OneToMany(mappedBy = "processedFile", cascade = CascadeType.ALL, orphanRemoval = true)

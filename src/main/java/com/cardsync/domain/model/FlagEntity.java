@@ -17,8 +17,13 @@ import java.util.*;
 @Table(name = "cs_flag")
 public class FlagEntity extends AuditableEntityBase {
 
+  @Column(nullable = false, unique = true, length = 20)
   private String name;
+
+  @Column(nullable = false)
   private Integer status;
+
+  @Column(name = "erp_code", nullable = false)
   private Integer erpCode;
 
   @OneToMany(mappedBy = "flag", cascade = CascadeType.ALL, orphanRemoval = true)

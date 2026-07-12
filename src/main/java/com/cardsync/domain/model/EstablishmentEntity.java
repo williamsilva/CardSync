@@ -22,8 +22,13 @@ import lombok.Setter;
 @Table(name = "cs_establishment")
 public class EstablishmentEntity extends AuditableEntityBase {
 
+  @Column(nullable = false)
   private Integer type;
+
+  @Column(nullable = false)
   private Integer status;
+
+  @Column(name = "pv_number", nullable = false)
   private Integer pvNumber;
 
   @Column(name = "opening_date")

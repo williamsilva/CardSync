@@ -24,6 +24,7 @@ import java.util.List;
 @Table(name = "cs_acquirer")
 public class AcquirerEntity extends AuditableEntityBase {
 
+  @Column(name = "status", nullable = false)
   private Integer status;
 
   @Column(name = "status_date")

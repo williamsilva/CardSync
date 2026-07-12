@@ -26,11 +26,11 @@ public class RelationFlagAcquirerEntity {
   @Column(name = "acquirer_code", nullable = false, length = 2)
   private String acquirerCode;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "flag_id")
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "flag_id", nullable = false)
   private FlagEntity flag;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "acquirer_id")
+  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @JoinColumn(name = "acquirer_id", nullable = false)
   private AcquirerEntity acquirer;
 }

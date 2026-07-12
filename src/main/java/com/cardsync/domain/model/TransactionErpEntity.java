@@ -36,8 +36,10 @@ public class TransactionErpEntity extends AuditableEntityBase {
   private Integer reasonExclusionStatus;
   private Integer statusTransactionReason;
   private Integer sourceEstablishmentPvNumber;
+  @Column(name = "fee_reconciliation_status", nullable = false)
   private Integer feeReconciliationStatus = FeeReconciliationStatusEnum.PENDING.getCode();
 
+  @Column(name = "missing_contract_at_sale", nullable = false)
   private Boolean missingContractAtSale = Boolean.FALSE;
 
   private String tid;

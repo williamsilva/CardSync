@@ -22,12 +22,22 @@ public class ContractRateEntity {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
+  @Column(nullable = false)
   private BigDecimal rate;
+
+  @Column(nullable = false)
   private Integer modality;
+
+  @Column(name = "payment_term_days", nullable = false)
   private Integer paymentTermDays;
+
   private Integer installmentMin;
   private Integer installmentMax;
+
+  @Column(name = "rate_ecommerce", nullable = false)
   private BigDecimal rateEcommerce;
+
+  @Column(name = "payment_term_days_ecommerce", nullable = false)
   private Integer paymentTermDaysEcommerce;
 
   @ManyToOne(fetch = FetchType.LAZY)
