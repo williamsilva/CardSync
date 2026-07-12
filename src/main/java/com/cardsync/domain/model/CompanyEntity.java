@@ -17,10 +17,16 @@ import java.util.List;
 @Table(name = "cs_company")
 public class CompanyEntity extends AuditableEntityBase {
 
+  @Column(name = "cnpj", nullable = false, unique = true, length = 20)
   private String cnpj;
+
   private Integer type;
   private Integer status;
+
+  @Column(name = "fantasy_name", nullable = false, length = 50)
   private String fantasyName;
+
+  @Column(name = "social_reason", nullable = false, length = 50)
   private String socialReason;
 
   @OneToMany(mappedBy = "company")

@@ -35,9 +35,16 @@ public class AcquirerEntity extends AuditableEntityBase {
   @Column(name = "closing_date")
   private LocalDate closingDate;
 
+  @Column(name = "cnpj", nullable = false, unique = true, length = 20)
   private String cnpj;
+
+  @Column(name = "fantasy_name", nullable = false, length = 50)
   private String fantasyName;
+
+  @Column(name = "social_reason", nullable = false, length = 50)
   private String socialReason;
+
+  @Column(name = "file_identifier", nullable = false, unique = true, length = 30)
   private String fileIdentifier;
 
   @OneToMany(mappedBy = "acquirer", cascade = CascadeType.ALL, orphanRemoval = true)
