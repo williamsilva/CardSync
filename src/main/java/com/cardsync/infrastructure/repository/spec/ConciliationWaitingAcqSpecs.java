@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -26,20 +26,20 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingAcqTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields;
 
   public ConciliationWaitingAcqSpecs(
-    CardsyncAppProperties appProperties,
+    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     ConciliationWaitingAcqTableFields conciliationWaitingTableFields,
     ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
-    this.appProperties = appProperties;
+    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
@@ -72,7 +72,7 @@ public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<Transa
     }
 
     spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));
-    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", implantationDateProvider.get(), false));
     spec = spec.and(inCodes("statusTransactionReason", List.of(StatusTransactionReasonEnum.CV_NOT_FOUND_ERP), StatusTransactionReasonEnum::getCode));
 
     return spec;

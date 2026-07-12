@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.TransactionAcqSalesFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -25,20 +25,20 @@ import java.util.Map;
 @Component
 public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final TransactionAcqTableFields transactionAcqTableFields;
   private final TransactionAcqAdvancedFields transactionAcqAdvancedFields;
 
   public TransactionAcqSpecs(
-    CardsyncAppProperties appProperties,
+    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     TransactionAcqTableFields transactionAcqFields,
     TransactionAcqAdvancedFields transactionAcqAdvancedFields
   ) {
     super(dateFilterService);
-    this.appProperties = appProperties;
+    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.transactionAcqTableFields = transactionAcqFields;
     this.transactionAcqAdvancedFields = transactionAcqAdvancedFields;
@@ -88,7 +88,7 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
       inCodes("modality", getModalityEnum(), ModalityEnum::getCode)
     ));
 
-    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", implantationDateProvider.get(), false));
 
     return spec;
   }

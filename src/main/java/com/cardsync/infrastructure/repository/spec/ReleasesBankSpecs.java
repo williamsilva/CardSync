@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -22,20 +22,20 @@ import java.util.Map;
 @Component
 public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEntity> {
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final ReleasesBankTableFields releasesBankTableFields;
   private final ReleasesBankAdvancedFields releasesBankAdvancedFields;
 
   public ReleasesBankSpecs(
     DateFilterService dateFilterService,
-    CardsyncAppProperties appProperties,
+    ImplantationDateProvider implantationDateProvider,
     SpecificationFactory specificationFactory,
     ReleasesBankTableFields releasesBankTableFields,
     ReleasesBankAdvancedFields releasesBankAdvancedFields
   ) {
     super(dateFilterService);
-    this.appProperties = appProperties;
+    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.releasesBankTableFields = releasesBankTableFields;
     this.releasesBankAdvancedFields = releasesBankAdvancedFields;
@@ -66,7 +66,7 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       spec = spec.and(releasesBankAdvancedFields.advanced(query.advanced()));
       spec = spec.and(inCodes("releaseCategory", getReleaseCategory(), ReleaseCategoryEnum::getCode));
       spec = spec.and(inCodes("modalityPaymentBank", getModalityPaymentBank(), ModalityPaymentBankEnum::getCode));
-      spec = spec.and(dateGreaterThanOrEqual("releaseDate", appProperties.getImplantationDate(), false));
+      spec = spec.and(dateGreaterThanOrEqual("releaseDate", implantationDateProvider.get(), false));
     }
 
     return spec;

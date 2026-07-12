@@ -1,6 +1,7 @@
 package com.cardsync.bff.controller.v1.representation.model.conciliation;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record ReconciliationSettingsModel(
   int erpAcquirerPreviousDaysLookback,
@@ -27,5 +28,13 @@ public record ReconciliationSettingsModel(
   int dateToleranceDaysBefore,
   int dateToleranceDaysAfter,
   BigDecimal valueTolerance,
-  int bankMarkNotReconciledAfterDays
+  int bankMarkNotReconciledAfterDays,
+  // Implantação e marcação de lançamentos como legado
+  LocalDate goLiveDate,
+  int legacyMarkingMonths,
+  /**
+   * Calculado: go-live + meses. Lançamentos bancários com data de lançamento até
+   * esta data (inclusive) podem ser marcados como legado; posteriores, não.
+   */
+  LocalDate legacyMarkingCutoffDate
 ) {}

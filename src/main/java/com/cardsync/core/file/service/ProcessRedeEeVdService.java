@@ -159,9 +159,17 @@ public class ProcessRedeEeVdService {
           + ", registros=" + countsByIdentifier);
 
       ensureSalesSummariesBankingDomicile(summaries);
-      processedFilePvService.collectFromSalesSummary(processedFile);
+
+      // EEVD não possui registro de cabeçalho de matriz; em arquivos sem movimento
+      // (zero resumos de vendas), o PV grupo do header (registro 00) é a única fonte
+      // para marcar o PV como "presente" no calendário.
+      if (processedFile.getPvGroupNumber() != null) {
+        processedFile.getPvNumbers().add(processedFile.getPvGroupNumber());
+      }
+
       processedFileRepository.save(processedFile);
       salesSummaryRepository.saveAll(summaries);
+      processedFilePvService.collectFromSalesSummary(processedFile);
       transactionAcqRepository.saveAll(transactions);
       installmentAcqRepository.saveAll(installments);
       List<AdjustmentEntity> savedAdjustments = adjustmentRepository.saveAll(adjustments);

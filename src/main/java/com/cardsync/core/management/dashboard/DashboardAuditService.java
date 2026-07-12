@@ -6,7 +6,7 @@ import com.cardsync.bff.controller.v1.representation.model.management.AuditSales
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel;
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel.AcquirerGroup;
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel.DayDetail;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.TransactionAcqEntity;
@@ -51,7 +51,7 @@ public class DashboardAuditService {
   private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
   private final EntityManager entityManager;
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final DateFilterService dateFilterService;
   private final AcquirerRepository acquirerRepository;
   private final ConciliationWaitingErpSpecs conciliationWaitingErpSpecs;
@@ -70,7 +70,7 @@ public class DashboardAuditService {
     String offset = currentBusinessOffset();
 
     LocalDate minDay = today.minusDays(DAYS - 1L);
-    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate implantationDate = implantationDateProvider.get();
     LocalDate effectiveMin = minDay.isBefore(implantationDate) ? implantationDate : minDay;
     OffsetDateTime start = effectiveMin.atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime end = today.atTime(23, 59, 59).atOffset(ZoneOffset.UTC);

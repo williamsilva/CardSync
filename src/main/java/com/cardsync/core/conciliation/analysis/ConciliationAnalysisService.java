@@ -1,7 +1,7 @@
 package com.cardsync.core.conciliation.analysis;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.model.*;
@@ -48,7 +48,7 @@ public class ConciliationAnalysisService {
   private final TransactionAcqRepository transactionAcqRepository;
   private final AcquirerRepository acquirerRepository;
   private final FileProcessingProperties fileProcessingProperties;
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final ConciliationFeeAnalysisService feeAnalysisService;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
@@ -133,7 +133,7 @@ public class ConciliationAnalysisService {
     boolean reprocess = reconciliationSettingsService.isReprocessErpAcquirerFees();
     List<Integer> reconciledStatuses = erpAcquirerReconciledStatusCodes();
     List<Integer> pendingFeeStatuses = pendingFeeReconciliationStatusCodes();
-    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime implantationDate = implantationDateProvider.get().atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime lookbackDate = reconciliationLookbackDate();
     List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForFeeReconciliation(
       reprocess,
@@ -286,7 +286,7 @@ public class ConciliationAnalysisService {
     boolean reconcileAlreadyReconciled = shouldReconcileAlreadyReconciledErpAcquirerSales();
     List<Integer> pendingStatuses = erpAcquirerPendingStatusCodes();
 
-    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime implantationDate = implantationDateProvider.get().atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime lookbackDate = reconciliationLookbackDate();
 
     UUID redeAcquirerId = acquirerRepository.findByFileIdentifierIgnoreCase("REDE")
@@ -1035,7 +1035,7 @@ public class ConciliationAnalysisService {
 
     Map<UUID, TransactionAcqEntity> candidates = new LinkedHashMap<>();
 
-    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime implantationDate = implantationDateProvider.get().atStartOfDay().atOffset(ZoneOffset.UTC);
 
     if (!nsus.isEmpty()) {
       transactionAcqRepository.findRedeAcqCandidatesForReconciliationByNsus(
@@ -1096,7 +1096,7 @@ public class ConciliationAnalysisService {
 
     Map<UUID, TransactionAcqEntity> candidates = new LinkedHashMap<>();
 
-    OffsetDateTime implantationDateSwapped = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime implantationDateSwapped = implantationDateProvider.get().atStartOfDay().atOffset(ZoneOffset.UTC);
 
     if (!swappedNsus.isEmpty()) {
       transactionAcqRepository.findRedeAcqCandidatesForReconciliationByNsus(

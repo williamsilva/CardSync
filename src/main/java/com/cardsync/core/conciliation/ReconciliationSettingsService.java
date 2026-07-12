@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,11 +44,34 @@ public class ReconciliationSettingsService {
         s.getDateToleranceDaysBefore(),
         s.getDateToleranceDaysAfter(),
         s.getValueTolerance(),
-        s.getBankMarkNotReconciledAfterDays()))
+        s.getBankMarkNotReconciledAfterDays(),
+        s.getGoLiveDate(),
+        s.getLegacyMarkingMonths(),
+        legacyMarkingCutoff(s.getGoLiveDate(), s.getLegacyMarkingMonths())))
       .orElse(new ReconciliationSettingsModel(0, 0, 1, 30,
         true, true, true, true, true, true, true,
         false, false, false, false, false, false, false,
-        5, 10, new BigDecimal("0.05"), 3));
+        5, 10, new BigDecimal("0.05"), 3,
+        com.cardsync.core.config.ImplantationDateProvider.DEFAULT_IMPLANTATION_DATE, 12,
+        legacyMarkingCutoff(
+          com.cardsync.core.config.ImplantationDateProvider.DEFAULT_IMPLANTATION_DATE, 12)));
+  }
+
+  /**
+   * Data-limite para marcação de legado: lançamentos bancários com data de
+   * lançamento até go-live + N meses (inclusive) podem ser marcados como legado.
+   * Null quando não há go-live definido (marcação sempre permitida).
+   */
+  @Transactional(readOnly = true)
+  public LocalDate getLegacyMarkingCutoffDate() {
+    return repository.findFirstBy()
+      .map(s -> legacyMarkingCutoff(s.getGoLiveDate(), s.getLegacyMarkingMonths()))
+      .orElse(legacyMarkingCutoff(
+        com.cardsync.core.config.ImplantationDateProvider.DEFAULT_IMPLANTATION_DATE, 12));
+  }
+
+  private LocalDate legacyMarkingCutoff(LocalDate goLiveDate, int legacyMarkingMonths) {
+    return goLiveDate == null ? null : goLiveDate.plusMonths(legacyMarkingMonths);
   }
 
   // ── Campos numéricos ───────────────────────────────────────────────────────
@@ -277,6 +301,8 @@ public class ReconciliationSettingsService {
     settings.setDateToleranceDaysAfter(request.dateToleranceDaysAfter());
     settings.setValueTolerance(request.valueTolerance());
     settings.setBankMarkNotReconciledAfterDays(request.bankMarkNotReconciledAfterDays());
+    settings.setGoLiveDate(request.goLiveDate());
+    settings.setLegacyMarkingMonths(request.legacyMarkingMonths());
     settings = repository.save(settings);
     return new ReconciliationSettingsModel(
       settings.getErpAcquirerPreviousDaysLookback(),
@@ -300,6 +326,9 @@ public class ReconciliationSettingsService {
       settings.getDateToleranceDaysBefore(),
       settings.getDateToleranceDaysAfter(),
       settings.getValueTolerance(),
-      settings.getBankMarkNotReconciledAfterDays());
+      settings.getBankMarkNotReconciledAfterDays(),
+      settings.getGoLiveDate(),
+      settings.getLegacyMarkingMonths(),
+      legacyMarkingCutoff(settings.getGoLiveDate(), settings.getLegacyMarkingMonths()));
   }
 }

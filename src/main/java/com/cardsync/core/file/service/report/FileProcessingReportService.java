@@ -31,7 +31,7 @@ import com.cardsync.domain.repository.ProcessedFileRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import com.cardsync.infrastructure.repository.spec.ProcessedFileSpecs;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.core.file.config.FileProcessingProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -65,7 +65,7 @@ public class FileProcessingReportService {
 
   private final ProcessedFileSpecs processedFileSpecs;
   private final FileProcessingProperties fileProcessingProperties;
-  private final CardsyncAppProperties cardsyncAppProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Sao_Paulo");
   private static final Set<String> REDE_REQUIRED_FILE_TYPES = Set.of("EEVC", "EEVD", "EEFI");
 
@@ -265,7 +265,7 @@ public class FileProcessingReportService {
     int erpFiles,
     List<com.cardsync.domain.model.NoFileDayEntity> noFileDayEntries
   ) {
-    boolean exempt = date.isBefore(cardsyncAppProperties.getImplantationDate())
+    boolean exempt = date.isBefore(implantationDateProvider.get())
       || isErpExemptOnDate(date, noFileDayEntries);
     int expected = (!exempt && fileProcessingProperties.getCalendar().isErpEnabled()) ? 1 : 0;
     int received = erpFiles > 0 ? 1 : 0;
@@ -331,7 +331,11 @@ public class FileProcessingReportService {
             .filter(file -> REDE_REQUIRED_FILE_TYPES.contains(resolveAcquirerSubtype(file)))
             .forEach(file -> fileBySubtype.putIfAbsent(resolveAcquirerSubtype(file), file));
 
-          Set<Integer> foundPvNumbers = fileBySubtype.values().stream()
+          // Agrega PVs de TODOS os arquivos do adquirente com subtipo válido,
+          // não apenas do primeiro por subtipo — evita que o arquivo de um PV
+          // "vença" o putIfAbsent e oculte PVs de outros arquivos do mesmo subtipo.
+          Set<Integer> foundPvNumbers = acquirerFiles.stream()
+            .filter(file -> REDE_REQUIRED_FILE_TYPES.contains(resolveAcquirerSubtype(file)))
             .flatMap(file -> establishmentsByFileId.getOrDefault(file.getId(), List.of()).stream())
             .map(ProcessedFileEstablishmentModel::pvNumber)
             .collect(Collectors.toSet());
@@ -345,13 +349,13 @@ public class FileProcessingReportService {
 
           List<String> present = new ArrayList<>();
           for (String subtype : fileBySubtype.keySet().stream().sorted().toList()) {
-            ProcessedFileEntity subtypeFile = fileBySubtype.get(subtype);
-            List<ProcessedFileEstablishmentModel> subtypeEsts =
-              establishmentsByFileId.getOrDefault(subtypeFile.getId(), List.of());
+            Set<Integer> subtypePvs = acquirerFiles.stream()
+              .filter(f -> subtype.equals(resolveAcquirerSubtype(f)))
+              .flatMap(f -> establishmentsByFileId.getOrDefault(f.getId(), List.of()).stream())
+              .map(ProcessedFileEstablishmentModel::pvNumber)
+              .collect(Collectors.toSet());
 
-            Set<Integer> displayPvs = subtypeEsts.isEmpty()
-              ? foundPvNumbers
-              : subtypeEsts.stream().map(ProcessedFileEstablishmentModel::pvNumber).collect(Collectors.toSet());
+            Set<Integer> displayPvs = subtypePvs.isEmpty() ? foundPvNumbers : subtypePvs;
 
             String estsPart = allActiveEsts.stream()
               .filter(e -> displayPvs.contains(e.getPvNumber()))

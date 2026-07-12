@@ -183,10 +183,22 @@ public class ProcessRedeEeFiService {
           + ", avisos=" + warnings
           + ", avisosLayout=" + (collector == null ? 0 : collector.totalWarnings()));
 
-      processedFilePvService.collectFromCreditOrder(processedFile);
+      // Registra os PVs declarados nos cabeçalhos de matriz (registro 032) antes de salvar,
+      // garantindo que arquivos sem movimento (zero ordens de crédito) ainda marquem seus
+      // PVs como "presentes" no calendário. Arquivos totalmente zerados vêm sem o registro
+      // 032; nesses casos o PV grupo do header (registro 030) é a única fonte disponível.
+      pvMatrixHeaders.stream()
+          .map(PvMatrixHeaderEntity::getPvNumber)
+          .filter(java.util.Objects::nonNull)
+          .forEach(processedFile.getPvNumbers()::add);
+      if (processedFile.getPvGroupNumber() != null) {
+        processedFile.getPvNumbers().add(processedFile.getPvGroupNumber());
+      }
+
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
       creditOrderRepository.saveAll(creditOrders);
+      processedFilePvService.collectFromCreditOrder(processedFile);
       anticipationRepository.saveAll(anticipations);
       creditTotalizerRepository.saveAll(creditTotalizers);
       serasaConsultationRepository.saveAll(serasaConsultations);

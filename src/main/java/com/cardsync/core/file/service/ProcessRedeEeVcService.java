@@ -195,10 +195,22 @@ public class ProcessRedeEeVcService {
           + ", ids=" + countsByIdentifier
           + ", unidentified=" + unidentified);
 
-      processedFilePvService.collectFromSalesSummary(processedFile);
+      // Registra os PVs declarados nos cabeçalhos de matriz (registro 004) antes de salvar,
+      // garantindo que arquivos sem movimento (zero resumos de vendas) ainda marquem seus
+      // PVs como "presentes" no calendário. Arquivos totalmente zerados vêm sem o registro
+      // 004; nesses casos o PV grupo do header (registro 002) é a única fonte disponível.
+      pvMatrixHeaders.stream()
+          .map(PvMatrixHeaderEntity::getPvNumber)
+          .filter(java.util.Objects::nonNull)
+          .forEach(processedFile.getPvNumbers()::add);
+      if (processedFile.getPvGroupNumber() != null) {
+        processedFile.getPvNumbers().add(processedFile.getPvGroupNumber());
+      }
+
       processedFileRepository.save(processedFile);
       pvMatrixHeaderRepository.saveAll(pvMatrixHeaders);
       salesSummaryRepository.saveAll(summaries);
+      processedFilePvService.collectFromSalesSummary(processedFile);
       transactionAcqRepository.saveAll(transactions);
       installmentAcqRepository.saveAll(installments);
       redeRequestNoticeRepository.saveAll(requestNotices);

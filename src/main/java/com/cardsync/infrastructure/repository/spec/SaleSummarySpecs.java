@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -27,20 +27,20 @@ import java.util.Map;
 @Component
 public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntity> {
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final SaleSummaryTableFields saleSummaryTableFields;
   private final SaleSummaryAdvancedFields saleSummaryAdvancedFields;
 
   public SaleSummarySpecs(
     DateFilterService dateFilterService,
-    CardsyncAppProperties appProperties,
+    ImplantationDateProvider implantationDateProvider,
     SpecificationFactory specificationFactory,
     SaleSummaryTableFields saleSummaryTableFields,
     SaleSummaryAdvancedFields saleSummaryAdvancedFields
   ) {
     super(dateFilterService);
-    this.appProperties = appProperties;
+    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.saleSummaryTableFields = saleSummaryTableFields;
     this.saleSummaryAdvancedFields = saleSummaryAdvancedFields;
@@ -112,7 +112,7 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
 
   /**
    * Garante que a próxima parcela a ser gerada tenha vencimento <= ontem.
-   *
+
    * Sem ordens existentes: baseDate (parcela 1) <= yesterday.
    * Com ordens existentes: max(releaseDate) <= monthAgo, equivalente a max + 1 mês <= yesterday.
    * Isso impede gerar ordens com vencimento futuro que ainda podem vir no arquivo da adquirente.
@@ -166,7 +166,7 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
       spec = spec.and(saleSummaryAdvancedFields.advanced(query.advanced()));
     }
 
-    spec = spec.and(dateGreaterThanOrEqual("rvDate", appProperties.getImplantationDate(), false));
+    spec = spec.and(dateGreaterThanOrEqual("rvDate", implantationDateProvider.get(), false));
     return spec;
   }
 

@@ -1,7 +1,7 @@
 package com.cardsync.core.conciliation.analysis;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconcileErpAcquirerResultModel;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
@@ -49,7 +49,7 @@ import java.util.UUID;
 public class ConciliationManualSwapReconciliationService {
 
   private final PlatformTransactionManager transactionManager;
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
@@ -67,7 +67,7 @@ public class ConciliationManualSwapReconciliationService {
     // sobrou pendente após a conciliação principal.
     List<Integer> pendingStatuses = conciliationAnalysisService.erpAcquirerPendingStatusCodes();
 
-    OffsetDateTime implantationDate = appProperties.getImplantationDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+    OffsetDateTime implantationDate = implantationDateProvider.get().atStartOfDay().atOffset(ZoneOffset.UTC);
     OffsetDateTime lookbackDate = LocalDate.now()
       .minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths())
       .atStartOfDay().atOffset(ZoneOffset.UTC);

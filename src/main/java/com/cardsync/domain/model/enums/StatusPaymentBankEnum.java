@@ -18,7 +18,13 @@ public enum StatusPaymentBankEnum {
   DIVERGENT(4),
   CANCELED(5),
   DELETED(6),
-  PARTIALLY_PAID(7);
+  PARTIALLY_PAID(7),
+  /**
+   * Lançamento anterior à implantação do sistema: a venda correspondente nunca
+   * existirá como ordem de crédito, portanto não deve permanecer na fila de
+   * conciliação pendente. Mantido para auditoria e conferência de extrato.
+   */
+  LEGACY(8);
 
   private final int code;
 

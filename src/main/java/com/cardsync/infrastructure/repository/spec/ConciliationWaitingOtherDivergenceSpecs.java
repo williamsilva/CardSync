@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.repository.spec;
 
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.query.SortDto;
@@ -23,20 +23,20 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final ConciliationWaitingErpTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields;
 
   public ConciliationWaitingOtherDivergenceSpecs(
-    CardsyncAppProperties appProperties,
+    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     ConciliationWaitingErpTableFields conciliationWaitingTableFields,
     ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
-    this.appProperties = appProperties;
+    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
@@ -71,7 +71,7 @@ public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSu
     spec = spec.and(Specification.not(inCodes("modality", excludedModalities(), ModalityEnum::getCode)));
     spec = spec.and(Specification.not(inCodes("statusTransaction", otherDivergenceStatus(), StatusTransactionEnum::getCode)));
     spec = spec.and(inCodes("statusTransactionReason", otherDivergenceReasons(), StatusTransactionReasonEnum::getCode));
-    spec = spec.and(dateGreaterThanOrEqual("saleDate", appProperties.getImplantationDate(), false));
+    spec = spec.and(dateGreaterThanOrEqual("saleDate", implantationDateProvider.get(), false));
 
     return spec;
   }

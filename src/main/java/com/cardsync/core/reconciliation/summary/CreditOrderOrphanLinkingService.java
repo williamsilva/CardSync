@@ -1,7 +1,7 @@
 package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
@@ -30,14 +30,14 @@ public class CreditOrderOrphanLinkingService {
 
   private static final int BATCH_SIZE = 1_000;
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final CreditOrderRepository creditOrderRepository;
   private final SalesSummaryRepository salesSummaryRepository;
 
   @Transactional
   public int linkOrphanedCreditOrders() {
-    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate implantationDate = implantationDateProvider.get();
     LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
 
     List<UUID> orphanedIds = creditOrderRepository.findOrphanedIdsWithinDateRange(implantationDate, lookbackDate);

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record ReconciliationSettingsRequest(
   @Min(0) @Max(365) int erpAcquirerPreviousDaysLookback,
@@ -33,5 +34,8 @@ public record ReconciliationSettingsRequest(
   @Min(0) @Max(60) int dateToleranceDaysBefore,
   @Min(0) @Max(60) int dateToleranceDaysAfter,
   @NotNull @DecimalMin("0.00") @DecimalMax("10.00") BigDecimal valueTolerance,
-  @Min(0) @Max(60) int bankMarkNotReconciledAfterDays
+  @Min(0) @Max(60) int bankMarkNotReconciledAfterDays,
+  // Implantação e marcação de lançamentos como legado
+  @NotNull LocalDate goLiveDate,
+  @Min(0) @Max(120) int legacyMarkingMonths
 ) {}

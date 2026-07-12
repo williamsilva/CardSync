@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -103,4 +104,21 @@ public class ReconciliationSettingsEntity extends AuditableEntityBase {
 
   @Column(name = "bank_mark_not_reconciled_after_days", nullable = false)
   private int bankMarkNotReconciledAfterDays = 3;
+
+  // ── Implantação e marcação de lançamentos como legado ─────────────────────
+
+  /**
+   * Data em que o CardSync entrou em operação (go-live). Datas anteriores são
+   * tratadas como completas nas agendas operacionais e filtradas nas listagens,
+   * pois não havia expectativa de arquivos.
+   */
+  @Column(name = "go_live_date", nullable = false)
+  private LocalDate goLiveDate = LocalDate.of(2024, 7, 1);
+
+  /**
+   * Meses após o go-live em que a marcação manual de lançamentos bancários como
+   * legado permanece disponível. Após o período, o botão é ocultado.
+   */
+  @Column(name = "legacy_marking_months", nullable = false)
+  private int legacyMarkingMonths = 12;
 }

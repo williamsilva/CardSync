@@ -1,8 +1,10 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ManualBankReconciliationRequest;
+import com.cardsync.bff.controller.v1.representation.model.conciliation.MarkLegacyReleasesRequest;
 import com.cardsync.core.reconciliation.ManualBankReconciliationResult;
 import com.cardsync.core.reconciliation.ManualBankReconciliationService;
+import com.cardsync.core.reconciliation.MarkLegacyResult;
 import com.cardsync.core.security.CheckSecurity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,5 +24,11 @@ public class ManualBankReconciliationController {
     @CheckSecurity.FileProcessing.CanProcess
     public ManualBankReconciliationResult reconcile(@Valid @RequestBody ManualBankReconciliationRequest request) {
         return manualBankReconciliationService.reconcile(request.releaseBankId(), request.creditOrderIds());
+    }
+
+    @PostMapping("/legacy")
+    @CheckSecurity.FileProcessing.CanProcess
+    public MarkLegacyResult markLegacy(@Valid @RequestBody MarkLegacyReleasesRequest request) {
+        return manualBankReconciliationService.markLegacy(request.releaseBankIds());
     }
 }

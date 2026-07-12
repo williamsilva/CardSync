@@ -6,7 +6,7 @@ import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualResu
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderSkipReason;
 import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSummaryModel;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.CreditOrderEntity;
@@ -43,12 +43,12 @@ public class CreditOrderManualService {
   private static final int RECONCILIATION_STATUS_PENDING = 1;
 
   private final SaleSummarySpecs saleSummarySpecs;
-  private final SalesSummaryRepository salesSummaryRepository;
+  private final ImplantationDateProvider implantationDateProvider;
   private final CreditOrderRepository creditOrderRepository;
+  private final SalesSummaryRepository salesSummaryRepository;
   private final TransactionAcqRepository transactionAcqRepository;
-  private final ReconciliationSettingsService reconciliationSettingsService;
-  private final CardsyncAppProperties appProperties;
   private final SaleSummaryModelAssembler saleSummaryModelAssembler;
+  private final ReconciliationSettingsService reconciliationSettingsService;
 
   @Transactional(readOnly = true)
   public Page<SaleSummaryModel> searchPendingSummaries(Pageable pageable, ListQueryDto<SaleSummaryFilter> query) {
@@ -76,7 +76,7 @@ public class CreditOrderManualService {
     LocalDate cutoff    = LocalDate.now().minusDays(days);
     LocalDate yesterday = LocalDate.now().minusDays(1);
     LocalDate monthAgo  = yesterday.minusMonths(1);
-    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate implantationDate = implantationDateProvider.get();
     List<SalesSummaryEntity> summaries = salesSummaryRepository.findSummariesMissingCreditOrders(
       implantationDate, cutoff, yesterday, monthAgo);
     // Force-load lazy associations while the session is still open (OSIV disabled)

@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,9 +30,12 @@ public class ManualBankReconciliationService {
     private final ReleasesBankRepository releasesBankRepository;
     private final CreditOrderRepository creditOrderRepository;
     private final SalesSummaryRepository salesSummaryRepository;
+    private final com.cardsync.core.conciliation.ReconciliationSettingsService reconciliationSettingsService;
 
     @Transactional
     public ManualBankReconciliationResult reconcile(UUID releaseBankId, List<UUID> creditOrderIds) {
+        int zeroValueReconciled = reconcileZeroValueOrders();
+
         ReleasesBankEntity release = releasesBankRepository.findById(releaseBankId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorCode.NOT_FOUND, "bank.release.not.found: " + releaseBankId));
 
@@ -65,10 +69,84 @@ public class ManualBankReconciliationService {
             updateSalesSummaryStatuses(toSave);
         }
 
-        log.info("Conciliação manual bancária: lançamento={}, conciliadas={}, já conciliadas={}",
-                releaseBankId, reconciled, alreadyReconciled);
+        log.info("Conciliação manual bancária: lançamento={}, conciliadas={}, já conciliadas={}, valor_zero={}",
+                releaseBankId, reconciled, alreadyReconciled, zeroValueReconciled);
 
-        return new ManualBankReconciliationResult(reconciled, alreadyReconciled);
+        return new ManualBankReconciliationResult(reconciled, alreadyReconciled, zeroValueReconciled);
+    }
+
+    /**
+     * Marca lançamentos bancários como legado (liquidações de vendas anteriores à
+     * implantação do sistema). Elegibilidade por lançamento: somente pendentes com
+     * data de lançamento até go-live + N meses (configuração de conciliação) são
+     * marcados; os demais são ignorados para não sobrescrever conciliações nem
+     * marcar lançamentos fora da janela de legado.
+     */
+    @Transactional
+    public MarkLegacyResult markLegacy(List<UUID> releaseBankIds) {
+        java.time.LocalDate cutoffDate = reconciliationSettingsService.getLegacyMarkingCutoffDate();
+
+        List<ReleasesBankEntity> releases = releasesBankRepository.findAllById(releaseBankIds);
+
+        if (releases.size() != releaseBankIds.size()) {
+            throw BusinessException.notFound(ErrorCode.NOT_FOUND, "bank.release.not.found");
+        }
+
+        int updated = 0;
+        int skipped = 0;
+        List<ReleasesBankEntity> toSave = new ArrayList<>();
+
+        for (ReleasesBankEntity release : releases) {
+            if (release.getReconciliationStatus() != StatusPaymentBankEnum.PENDING
+                    || !isEligibleForLegacy(release, cutoffDate)) {
+                skipped++;
+                continue;
+            }
+            release.setReconciliationStatus(StatusPaymentBankEnum.LEGACY);
+            toSave.add(release);
+            updated++;
+        }
+
+        if (!toSave.isEmpty()) {
+            releasesBankRepository.saveAll(toSave);
+        }
+
+        log.info("Marcação de lançamentos como legado: solicitados={}, marcados={}, ignorados={}",
+                releaseBankIds.size(), updated, skipped);
+
+        return new MarkLegacyResult(updated, skipped);
+    }
+
+    /**
+     * Um lançamento é elegível para legado quando sua data de lançamento é até a
+     * data-limite (go-live + N meses), inclusive. Sem data-limite configurada,
+     * qualquer lançamento é elegível; sem data de lançamento, não é possível
+     * verificar a elegibilidade e o lançamento é ignorado.
+     */
+    private boolean isEligibleForLegacy(ReleasesBankEntity release, java.time.LocalDate cutoffDate) {
+        if (cutoffDate == null) return true;
+        java.time.LocalDate releaseDate = release.getReleaseDate();
+        return releaseDate != null && !releaseDate.isAfter(cutoffDate);
+    }
+
+    private int reconcileZeroValueOrders() {
+        List<CreditOrderEntity> zeroValueOrders = creditOrderRepository
+                .findPendingZeroValueOrders(StatusPaymentBankEnum.PENDING.getCode(), BigDecimal.ZERO);
+
+        if (zeroValueOrders.isEmpty()) return 0;
+
+        for (CreditOrderEntity order : zeroValueOrders) {
+            order.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+            order.setReconciliationStatus(BankReconciliationStatus.RECONCILED.getCode());
+            order.setCreditStatus(BankReconciliationStatus.RECONCILED.getCode());
+        }
+
+        creditOrderRepository.saveAll(zeroValueOrders);
+        updateSalesSummaryStatuses(zeroValueOrders);
+
+        log.info("Conciliação automática de ordens com valor zero: {} ordens conciliadas", zeroValueOrders.size());
+
+        return zeroValueOrders.size();
     }
 
     private void updateSalesSummaryStatuses(List<CreditOrderEntity> reconciledOrders) {

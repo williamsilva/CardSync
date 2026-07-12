@@ -1,7 +1,7 @@
 package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
-import com.cardsync.core.config.CardsyncAppProperties;
+import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
@@ -43,7 +43,7 @@ public class AcquirerSaleSummaryReconciliationService {
     FeeReconciliationStatusEnum.MISSING_VALID_CONTRACT.getCode()
   );
 
-  private final CardsyncAppProperties appProperties;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
 
@@ -72,7 +72,7 @@ public class AcquirerSaleSummaryReconciliationService {
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
-    LocalDate implantationDate = appProperties.getImplantationDate();
+    LocalDate implantationDate = implantationDateProvider.get();
     LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
 
     List<AcquirerSaleSummaryStats> stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(

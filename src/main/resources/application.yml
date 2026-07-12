@@ -48,10 +48,6 @@ cardsync:
     # Timezone de negócio usada por schedulers, cálculos de início/fim de dia e logs operacionais.
     business-zone: America/Sao_Paulo
 
-    # Data de implantação do CardSync. Dias anteriores são considerados completos
-    # na agenda de arquivos, pois ainda não existia expectativa de recebimento.
-    implantation-date: ${CARDSYNC_IMPLANTATION_DATE:2024-07-01}
-
   maintenance:
     # Cron do ANALYZE TABLE (domingo 02h por padrão).
     # Desativar com ANALYZE_TABLE_ENABLED=false se o banco já faz manutenção automática.
