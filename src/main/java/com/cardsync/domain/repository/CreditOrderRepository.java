@@ -240,6 +240,14 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   @Query("select coalesce(max(co.installmentNumber), 0) from CreditOrderEntity co where co.salesSummary.id = :summaryId")
   int findMaxInstallmentNumberBySalesSummaryId(@Param("summaryId") UUID summaryId);
 
+  /** Desfazer conciliação: carrega as ordens vinculadas a um lançamento bancário, com o resumo em fetch join. */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.salesSummary
+    where co.releaseBank.id = :releaseBankId
+  """)
+  List<CreditOrderEntity> findByReleaseBank_Id(@Param("releaseBankId") UUID releaseBankId);
+
   /** Retorna todos os installmentNumbers existentes para um resumo. */
   @Query("select co.installmentNumber from CreditOrderEntity co where co.salesSummary.id = :summaryId")
   Set<Integer> findInstallmentNumbersBySalesSummaryId(@Param("summaryId") UUID summaryId);

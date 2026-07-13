@@ -2,6 +2,8 @@ package com.cardsync.core.reconciliation;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
+import com.cardsync.domain.exception.BusinessException;
+import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
@@ -9,6 +11,7 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
@@ -30,6 +33,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -353,6 +357,134 @@ public class BankReconciliationService {
     return orders.size();
   }
 
+  /**
+   * Desfaz a conciliação de um lançamento bancário: as ordens de crédito e
+   * parcelas vinculadas voltam ao estado anterior (pendentes), o próprio
+   * lançamento volta a PENDING, e as transações/resumos de venda afetados têm
+   * seu status recalculado a partir do que sobrar reconciliado (caso o resumo
+   * ou a transação tenham outras ordens/parcelas ligadas a lançamentos
+   * diferentes). Não altera o vínculo resumo↔ordem (salesSummaryStatus da
+   * ordem, etapa 6) nem nenhum dado importado do arquivo — só o que a
+   * conciliação bancária (etapa 7) escreveu.
+   */
+  @Transactional
+  public UndoBankReconciliationResult undoReconciliation(UUID releaseBankId) {
+    ReleasesBankEntity release = releasesBankRepository.findById(releaseBankId)
+      .orElseThrow(() -> BusinessException.notFound(ErrorCode.NOT_FOUND, "bank.release.not.found"));
+
+    List<CreditOrderEntity> orders = creditOrderRepository.findByReleaseBank_Id(releaseBankId);
+    List<InstallmentAcqEntity> installments = installmentAcqRepository.findByReleaseBank_Id(releaseBankId);
+
+    if (orders.isEmpty() && installments.isEmpty()) {
+      throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "bank.release.not.reconciled");
+    }
+
+    Set<UUID> affectedSummaryIds = new HashSet<>();
+    for (CreditOrderEntity order : orders) {
+      order.setReleaseBank(null);
+      order.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+      order.setReconciliationStatus(BankReconciliationStatus.PENDING.getCode());
+      order.setCreditStatus(BankReconciliationStatus.PENDING.getCode());
+      if (order.getSalesSummary() != null && order.getSalesSummary().getId() != null) {
+        affectedSummaryIds.add(order.getSalesSummary().getId());
+      }
+    }
+    creditOrderRepository.saveAll(orders);
+
+    for (InstallmentAcqEntity installment : installments) {
+      installment.setReleaseBank(null);
+      installment.setPaymentDate(null);
+      installment.setStatusPaymentBank(BankReconciliationStatus.PENDING.getCode());
+      installment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
+      installment.setReconciliationBankLine(null);
+      installment.setReconciliationBankFile(null);
+      installment.setReconciliationBankProcessedAt(null);
+    }
+    installmentAcqRepository.saveAll(installments);
+
+    recomputeTransactionsAfterUndo(installments);
+    recomputeSalesSummariesFromCreditOrders(orders, affectedSummaryIds);
+
+    release.setReconciliationStatus(StatusPaymentBankEnum.PENDING);
+    release.setNumberCreditOrders(0);
+    release.setNumberReconciliations(Math.max(0, safeInt(release.getNumberReconciliations()) - orders.size()));
+    releasesBankRepository.save(release);
+
+    log.info(
+      "↩ Conciliação desfeita. releaseBank={}, ordensDesvinculadas={}, parcelasDesvinculadas={}",
+      releaseBankId, orders.size(), installments.size()
+    );
+
+    return new UndoBankReconciliationResult(orders.size(), installments.size());
+  }
+
+  /** Recalcula o status das transações ADQ (e do ERP correspondente) afetadas pelas parcelas revertidas. */
+  private void recomputeTransactionsAfterUndo(List<InstallmentAcqEntity> resetInstallments) {
+    Set<UUID> transactionIds = resetInstallments.stream()
+      .map(InstallmentAcqEntity::getTransaction)
+      .filter(Objects::nonNull)
+      .map(TransactionAcqEntity::getId)
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+    if (transactionIds.isEmpty()) return;
+
+    Map<UUID, List<InstallmentAcqEntity>> installmentsByTx = installmentAcqRepository
+      .findByTransactionIdIn(transactionIds).stream()
+      .filter(i -> i.getTransaction() != null && i.getTransaction().getId() != null)
+      .collect(Collectors.groupingBy(i -> i.getTransaction().getId()));
+
+    Map<UUID, TransactionErpEntity> erpByTxId = transactionErpRepository
+      .findByTransactionAcqIdIn(transactionIds).stream()
+      .filter(e -> e.getTransactionAcq() != null && e.getTransactionAcq().getId() != null)
+      .collect(Collectors.toMap(e -> e.getTransactionAcq().getId(), e -> e, (a, b) -> a));
+
+    Set<UUID> updatedTransactions = new HashSet<>();
+    for (InstallmentAcqEntity installment : resetInstallments) {
+      TransactionAcqEntity transaction = installment.getTransaction();
+      if (transaction == null || transaction.getId() == null || updatedTransactions.contains(transaction.getId())) continue;
+      List<InstallmentAcqEntity> txInstallments = installmentsByTx.getOrDefault(transaction.getId(), List.of());
+      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()));
+      updatedTransactions.add(transaction.getId());
+    }
+  }
+
+  /**
+   * Recalcula creditOrderStatus/statusPaymentBank dos resumos de venda afetados,
+   * a partir de TODAS as ordens de crédito ligadas a cada resumo (não só as que
+   * foram revertidas) — cobre o caso de um resumo com ordens conciliadas via
+   * outro lançamento bancário, que devem permanecer intactas.
+   */
+  private void recomputeSalesSummariesFromCreditOrders(List<CreditOrderEntity> resetOrders, Set<UUID> affectedSummaryIds) {
+    if (affectedSummaryIds.isEmpty()) return;
+
+    Map<UUID, SalesSummaryEntity> summaries = new HashMap<>();
+    for (CreditOrderEntity order : resetOrders) {
+      SalesSummaryEntity summary = order.getSalesSummary();
+      if (summary != null && summary.getId() != null && affectedSummaryIds.contains(summary.getId())) {
+        summaries.putIfAbsent(summary.getId(), summary);
+      }
+    }
+
+    for (SalesSummaryEntity summary : summaries.values()) {
+      List<CreditOrderEntity> siblings = List.copyOf(summary.getCreditOrders());
+      boolean anyPaid = siblings.stream()
+        .anyMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+      boolean allPaid = !siblings.isEmpty() && siblings.stream()
+        .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+
+      if (allPaid) {
+        summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+      } else if (anyPaid) {
+        summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
+      } else {
+        summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+      }
+    }
+  }
+
   private boolean isOrderStillEligible(CreditOrderEntity order, Set<UUID> reconciledOrderIds, boolean reprocess) {
     if (order == null) return false;
     if (!reprocess && order.getReleaseBank() != null) return false;
@@ -643,16 +775,26 @@ public class BankReconciliationService {
     );
   }
 
+  /**
+   * order.getTransactionType() vem bruto da posição 93-94 do EEFI (Rede) e codifica
+   * "à vista (1) vs. parcelado (2-5)" — não débito/crédito. Todo pedido de crédito
+   * importado do EEFI é, por natureza, uma transação de CRÉDITO (débito à vista
+   * liquida via EEVD, sem passar por CreditOrder). Por isso derivamos o tipo de
+   * pagamento da modalidade real do resumo de vendas vinculado, igual ao caminho
+   * de geração manual (ver transactionTypeFromSummary), em vez do campo bruto.
+   */
   private ReconciliationMatchContext.PaymentKind paymentKindFromCreditOrder(CreditOrderEntity order) {
-    Integer type = order.getTransactionType();
-    if (type == null) return ReconciliationMatchContext.PaymentKind.UNKNOWN;
-    if (type == 1) return ReconciliationMatchContext.PaymentKind.DEBIT;
-    if (type == 2 || type == 3 || type == 4 || type == 5) return ReconciliationMatchContext.PaymentKind.CREDIT;
-    return ReconciliationMatchContext.PaymentKind.UNKNOWN;
+    SalesSummaryEntity summary = order.getSalesSummary();
+    if (summary == null) return ReconciliationMatchContext.PaymentKind.UNKNOWN;
+    return paymentKindFromModality(summary.getModality());
   }
 
   private ReconciliationMatchContext.PaymentKind paymentKindFromTransaction(TransactionAcqEntity tx) {
-    ModalityEnum modality = ModalityEnum.fromCode(tx.getModality());
+    return paymentKindFromModality(tx.getModality());
+  }
+
+  private ReconciliationMatchContext.PaymentKind paymentKindFromModality(Integer modalityCode) {
+    ModalityEnum modality = ModalityEnum.fromCode(modalityCode);
     if (modality == ModalityEnum.CASH_DEBIT) return ReconciliationMatchContext.PaymentKind.DEBIT;
     if (modality == ModalityEnum.CASH_CREDIT
       || modality == ModalityEnum.INSTALLMENT_CREDIT_2_6
