@@ -29,6 +29,7 @@ public class CreditOrderModelAssembler extends RepresentationModelAssemblerSuppo
     CreditOrderModel model = createModelWithId(entity.getId(), entity);
 
     model.setId(entity.getId());
+    model.setReleaseBankId(entity.getReleaseBank() == null ? null : entity.getReleaseBank().getId());
     model.setRvDate(entity.getRvDate());
     model.setRvNumber(entity.getRvNumber());
     model.setReleaseDate(entity.getReleaseDate());

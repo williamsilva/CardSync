@@ -21,6 +21,7 @@ import java.util.UUID;
 public class CreditOrderModel extends RepresentationModel<@NonNull CreditOrderModel> {
 
   private UUID id;
+  private UUID releaseBankId;
 
   private Integer rvNumber;
   private Integer originalPvNumber;

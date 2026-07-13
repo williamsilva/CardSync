@@ -24,6 +24,7 @@ public class ReleasesBankAdvancedFields extends BaseSpecificationSupport<Release
     }
     Specification<ReleasesBankEntity> spec = Specs.all();
 
+    spec = spec.and(equalsTo("id", filter.id()));
     spec = spec.and(inCodes("releaseCategory", filter.releaseCategory(), ReleaseCategoryEnum::getCode));
     spec = spec.and(inCodes("reconciliationStatus", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("modalityPaymentBank", filter.modalityPaymentBank(), ModalityPaymentBankEnum::getCode));

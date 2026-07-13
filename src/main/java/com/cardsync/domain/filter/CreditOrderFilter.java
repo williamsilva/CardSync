@@ -18,6 +18,9 @@ public record CreditOrderFilter(
   List<String> acquirers,
   List<Integer> establishments,
 
+  /** Filtro exato: ordens vinculadas a lançamento(s) bancário(s) específico(s) (releaseBank.id). */
+  List<String> releaseBankIds,
+
   List<ModalityEnum> modality,
   List<StatusPaymentBankEnum> statusPaymentBank,
   List<StatusReconciliationEnum> salesSummaryStatus,
