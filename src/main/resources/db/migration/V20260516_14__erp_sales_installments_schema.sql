@@ -40,9 +40,7 @@ CREATE TABLE cs_transaction_erp (
   CONSTRAINT fk_cs_transaction_erp_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_transaction_erp_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_transaction_erp_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_transaction_erp_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_transaction_erp_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_transaction_erp_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_transaction_erp_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_transaction_erp_nsu ON cs_transaction_erp(nsu);
@@ -76,9 +74,7 @@ CREATE TABLE cs_installment_erp (
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_installment_erp_bank_file FOREIGN KEY (reconciliation_bank_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_erp_payment_file FOREIGN KEY (reconciliation_payment_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_erp_transaction FOREIGN KEY (transaction_id) REFERENCES cs_transaction_erp(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_erp_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_erp_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_installment_erp_transaction FOREIGN KEY (transaction_id) REFERENCES cs_transaction_erp(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_installment_erp_transaction ON cs_installment_erp(transaction_id);

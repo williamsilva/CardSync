@@ -1,7 +1,6 @@
 package com.cardsync.infrastructure.mail;
 
 import com.cardsync.core.config.EmailSettingsService;
-import com.cardsync.domain.repository.UserRepository;
 import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,8 +22,7 @@ public class EmailSenderConfig {
     RestClient.Builder restClientBuilder,
     EmailSettingsService emailSettingsService,
     EmailTemplateProcessor emailTemplateProcessor,
-    EmailLogService emailLogService,
-    UserRepository userRepository
+    EmailLogService emailLogService
   ) {
     RestClient restClient = restClientBuilder
       .baseUrl(emailSettingsService.getBrevoBaseUrl())
@@ -32,7 +30,6 @@ public class EmailSenderConfig {
 
     return new BrevoEmailSenderService(
       restClient,
-      userRepository,
       emailSettingsService,
       emailLogService,
       emailTemplateProcessor

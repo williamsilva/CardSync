@@ -17,17 +17,13 @@ CREATE TABLE cs_establishment (
 
   PRIMARY KEY (id),
 
-  CONSTRAINT fk_cs_establishment_created_by FOREIGN KEY (created_by_id)
-    REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
 
   CONSTRAINT fk_cs_establishment_company FOREIGN KEY (company_id)
     REFERENCES cs_company(id) ON DELETE SET NULL ON UPDATE CASCADE,
 
   CONSTRAINT fk_cs_establishment_acquirer FOREIGN KEY (acquirer_id)
-    REFERENCES cs_acquirer(id) ON DELETE SET NULL ON UPDATE CASCADE,
+    REFERENCES cs_acquirer(id) ON DELETE SET NULL ON UPDATE CASCADE
 
-  CONSTRAINT fk_cs_establishment_updated_by FOREIGN KEY (updated_by_id)
-   REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_establishment_pv_number ON cs_establishment (pv_number);

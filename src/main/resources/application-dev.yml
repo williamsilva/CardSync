@@ -8,7 +8,7 @@ spring:
     password: ${DB_PASSWORD:root}
     username: ${DB_USERNAME:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:127.0.0.1}/${DB_DATABASE:cardsync}?createDatabaseIfNotExist=true&serverTimezone=UTC&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}/${DB_DATABASE:cardsync1}?createDatabaseIfNotExist=true&serverTimezone=UTC&rewriteBatchedStatements=true&useServerPrepStmts=true&cachePrepStmts=true
 
   jpa:
     hibernate:
@@ -23,9 +23,6 @@ spring:
   properties:
     org.hibernate.envers.audit_table_suffix: _aud
     org.hibernate.envers.revision_table_name: cs_revinfo
-    # mantém o nome padrão do campo de revisão (REV) e revtype (REVTYPE)
-    # org.hibernate.envers.revision_field_name: REV
-    # org.hibernate.envers.revision_type_field_name: REVTYPE
 
   flyway:
     enabled: true
@@ -38,8 +35,8 @@ spring:
         registration:
           cardsync-bff:
             provider: cardsync-as
-            client-id: ${cardsync.security.authserver.client.client-id}
-            client-secret: ${cardsync.security.authserver.client.client-secret}
+            client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
+            client-secret: ${CARDSYNC_BFF_CLIENT_SECRET:changeit-dev}
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
@@ -98,110 +95,18 @@ cardsync:
       ssl: ${MAIL_SMTP_SSL:false}
 
   security:
-    issuer: ${CARDSYNC_ISSUER:http://localhost:9091}
-    password:
-      min-length: 8
-      history-size: 3
-      fail-if-no-expiration-data: false
-      # quais regras validar (todas opcionais e expansíveis)
-      rules:
-        digit: true
-        upper: true
-        symbol: true
-        lower: true
-        noWhitespace: true
-        common: true
-        noUsername: true
-        # regras sintéticas (server-driven)
-        match: true
-        sameAsCurrent: true
-        history: true
-        # recomendado: bloquear sequências (ex: 123 / abc)
-        noSequence: true
-        noRepetition: true
+    # Issuer do NimbusAuth (não é mais o próprio CardSync).
+    issuer: ${CARDSYNC_ISSUER:http://localhost:9090}
 
-      # parâmetros de regras
-      sequence-len: 3
-      max-same-in-row: 3
-      common-passwords:
-        - "123456"
-        - "123456789"
-        - "qwerty"
-        - "password"
-        - "senha123"
-      tokens:
-        # Base pública usada nos links enviados por e-mail (opcional)
-        # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
-        public-base-url: ${CARDSYNC_PUBLIC_BASE_URL:http://localhost:9091}
-        # convite / primeira senha (default 1 dia)
-        invite-ttl: ${CARDSYNC_INVITE_TTL:PT24H}
-        # reset de senha (default 15 min)
-        reset-ttl: ${CARDSYNC_RESET_TTL:PT15M}
-        rate-limit:
-          enabled: true
-          max-requests: 3
-          window: 15m
-
-      expiration:
-        enabled: true
-        warn-days: 5
-        expire-days: 10
-
-    login:
-      default-target: "http://localhost:4200/"
+    session-timeout: ${CARDSYNC_SESSION_TIMEOUT:PT2H}
 
     cookies:
       domain: ${CARDSYNC_COOKIE_DOMAIN:}
       secure: ${CARDSYNC_COOKIE_SECURE:false}
       same-site: ${CARDSYNC_COOKIE_SAMESITE:Lax}
 
-    lockout:
-      enabled: true
-      extend-when-locked: false
-      # Patamares progressivos (OBRIGATÓRIO)
-      # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
-      rules:
-        - attempts: 5
-          duration: PT1M
-        - attempts: 10
-          duration: PT2M
-        - attempts: 15
-          duration: PT3M
-        - attempts: 20
-          duration: PT2H
-
-    auth-server:
-      dev-generate-key: false
-
-      token:
-        # O formato é ISO-8601: PT1H = 1 hora, PT8H = 8 horas, P7D = 7 dias.
-        # Tempo de inatividade até expirar a sessão HTTP
-        session-timeout: ${CARDSYNC_SESSION_TIMEOUT:PT2H}
-        # Validade do access token JWT
-        access-token-ttl: ${CARDSYNC_ACCESS_TOKEN_TTL:PT10M}
-        # Validade do refresh token
-        refresh-token-ttl: ${CARDSYNC_REFRESH_TOKEN_TTL:P30D}
-
-      keystore:
-        location: classpath:keystore/cardsync.jks
-        password: changeit
-        key-alias: cardsync
-        key-password: changeit
-
-      client:
-        client-id: cardsync-bff
-        client-secret: changeit-dev
-        # Redirect URIs OFICIAIS
-        redirect-uri: https://api.cardsync.com.br/login/oauth2/code/cardsync-bff
-        post-logout-redirect-uris:
-          - http://localhost:4200/
-        scopes:
-          - openid
-          - profile
-
-
     resource-server:
-      enable: true
+      enabled: true
       audience: cardsync-api
 
     web:
@@ -209,6 +114,7 @@ cardsync:
       allowed-origins:
         - "http://localhost:4200"
 
-    protected-usernames:
-      - owner
-      - system
+# API interna (machine-to-machine) do NimbusAuth
+nimbus-auth:
+  base-url: ${NIMBUS_AUTH_BASE_URL:http://localhost:9090}
+  internal-api-secret: ${NIMBUS_INTERNAL_API_SECRET:dev-internal-secret-change-me}

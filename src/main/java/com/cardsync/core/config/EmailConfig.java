@@ -1,6 +1,5 @@
 package com.cardsync.core.config;
 
-import com.cardsync.domain.repository.UserRepository;
 import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;
 import com.cardsync.infrastructure.mail.BrevoEmailSenderService;
@@ -17,7 +16,6 @@ import org.springframework.web.client.RestClient;
 @AllArgsConstructor
 public class EmailConfig {
 
-  private final UserRepository userRepository;
   private final EmailSettingsService emailSettingsService;
   private final EmailLogService emailLogService;
   private final RestClient.Builder restClientBuilder;
@@ -33,7 +31,6 @@ public class EmailConfig {
         restClientBuilder
           .baseUrl(emailSettingsService.getBrevoBaseUrl())
           .build(),
-        userRepository,
         emailSettingsService,
         emailLogService,
         emailTemplateProcessor

@@ -69,7 +69,7 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
           } catch (Exception e) {
             return null;
           }
-        }, "createdBy", "id")
+        }, "createdBy")
       );
 
       spec = spec.and(

@@ -3,12 +3,12 @@ package com.cardsync.domain.service;
 import com.cardsync.domain.filter.EmailLogFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.EmailLogEntity;
-import com.cardsync.domain.model.UserEntity;
 import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
 import com.cardsync.domain.model.enums.EmailLogStatusEnum;
 import com.cardsync.domain.repository.EmailLogRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.UUID;
 
 import com.cardsync.infrastructure.repository.spec.EmailLogSpecs;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class EmailLogService {
 
   @Transactional
   public void logSent(EmailLogEventTypeEnum eventType, String recipient, String subject,
-    String template, UserEntity requestedBy) {
+    String template, UUID requestedBy) {
     EmailLogEntity e = new EmailLogEntity();
     e.setEventType(eventType);
     e.setRecipient(recipient);
@@ -49,7 +49,7 @@ public class EmailLogService {
 
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void logError( EmailLogEventTypeEnum eventType, String recipient, String subject,
-    String template, UserEntity requestedBy, Exception ex) {
+    String template, UUID requestedBy, Exception ex) {
     EmailLogEntity e = new EmailLogEntity();
     e.setEventType(eventType);
     e.setRecipient(recipient);

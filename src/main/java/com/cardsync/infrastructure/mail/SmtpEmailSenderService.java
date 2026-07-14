@@ -3,8 +3,6 @@ package com.cardsync.infrastructure.mail;
 import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
-import com.cardsync.domain.model.UserEntity;
-import com.cardsync.domain.repository.UserRepository;
 import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;
 import jakarta.mail.MessagingException;
@@ -16,6 +14,7 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 
 import java.util.Properties;
+import java.util.UUID;
 
 public class SmtpEmailSenderService implements EmailSenderService {
 
@@ -28,12 +27,9 @@ public class SmtpEmailSenderService implements EmailSenderService {
   @Autowired
   private EmailLogService emailLogService;
 
-  @Autowired
-  private UserRepository userRepository;
-
   @Override
   public void sendFreemarker(Message message) {
-    UserEntity requestedBy = resolveRequestedBy(message);
+    UUID requestedBy = resolveRequestedBy(message);
     JavaMailSender mailSender = buildMailSender();
     try {
       MimeMessage mimeMessage = createMimeMessageFreemarker(message, mailSender);
@@ -50,7 +46,7 @@ public class SmtpEmailSenderService implements EmailSenderService {
 
   @Override
   public void sendThymeleaf(Message message) {
-    UserEntity requestedBy = resolveRequestedBy(message);
+    UUID requestedBy = resolveRequestedBy(message);
     JavaMailSender mailSender = buildMailSender();
     try {
       MimeMessage mimeMessage = createMimeMessageThymeleaf(message, mailSender);
@@ -116,9 +112,8 @@ public class SmtpEmailSenderService implements EmailSenderService {
     }
   }
 
-  protected UserEntity resolveRequestedBy(Message message) {
-    if (message.getRequestedByUserId() == null) return null;
-    return userRepository.findById(message.getRequestedByUserId()).orElse(null);
+  protected UUID resolveRequestedBy(Message message) {
+    return message.getRequestedByUserId();
   }
 
   protected String firstRecipient(Message message) {

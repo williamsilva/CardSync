@@ -59,7 +59,7 @@ public class EmailLogSpecs extends BaseSpecificationSupport<EmailLogEntity> {
           } catch (Exception e) {
             return null;
           }
-        }, "createdBy", "id")
+        }, "createdBy")
       );
 
     }

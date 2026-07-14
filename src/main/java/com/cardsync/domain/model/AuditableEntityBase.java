@@ -1,6 +1,5 @@
 package com.cardsync.domain.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
@@ -12,6 +11,11 @@ import lombok.Setter;
 import org.springframework.data.annotation.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+/**
+ * createdBy/updatedBy sao o UUID do usuario no NimbusAuth (dono de UserEntity apos o split
+ * Cardsync/NimbusAuth) - sem FK local, ja que cs_users nao existe mais neste schema.
+ * Para exibir nome/username, ver UserDirectoryService.
+ */
 @Getter
 @Setter
 @MappedSuperclass
@@ -31,14 +35,10 @@ public abstract class AuditableEntityBase {
   private OffsetDateTime updatedAt;
 
   @CreatedBy
-  @JsonIgnore
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "created_by_id")
-  private UserEntity createdBy;
+  @Column(name = "created_by_id", updatable = false)
+  private UUID createdBy;
 
-  @JsonIgnore
   @LastModifiedBy
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "updated_by_id")
-  private UserEntity updatedBy;
+  @Column(name = "updated_by_id")
+  private UUID updatedBy;
 }

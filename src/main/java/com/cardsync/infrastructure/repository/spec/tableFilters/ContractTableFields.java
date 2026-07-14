@@ -37,9 +37,9 @@ public class ContractTableFields {
         )),
 
       Map.entry("createdBy",
-        FieldSpec.joinedUuid(
+        FieldSpec.uuid(
           "createdBy",
-          (root, query) -> root.join("createdBy", JoinType.LEFT).get("id")
+          (root, query) -> root.get("createdBy")
         )),
 
       Map.entry("company",

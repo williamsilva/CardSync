@@ -1,7 +1,7 @@
 package com.cardsync.core.config;
 
 import com.cardsync.core.security.web.CurrentAuditorAware;
-import com.cardsync.domain.model.UserEntity;
+import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
@@ -15,7 +15,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 public class JpaAuditingConfig {
 
   @Bean("auditorAware")
-  public AuditorAware<UserEntity> auditorAware(CurrentAuditorAware aware) {
+  public AuditorAware<UUID> auditorAware(CurrentAuditorAware aware) {
     return aware;
   }
 

@@ -8,9 +8,7 @@ CREATE TABLE cs_origin_file (
   name VARCHAR(80) NOT NULL,
   description VARCHAR(150) NULL,
   PRIMARY KEY (id),
-  CONSTRAINT uk_cs_origin_file_code UNIQUE (code),
-  CONSTRAINT fk_cs_origin_file_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_origin_file_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT uk_cs_origin_file_code UNIQUE (code)
 ) ENGINE=InnoDB;
 
 CREATE TABLE cs_processed_file (
@@ -43,9 +41,7 @@ CREATE TABLE cs_processed_file (
   origin_file_id BINARY(16) NOT NULL,
   PRIMARY KEY (id),
   CONSTRAINT uk_cs_processed_file_file_origin UNIQUE (file_name, origin_file_id),
-  CONSTRAINT fk_cs_processed_file_origin FOREIGN KEY (origin_file_id) REFERENCES cs_origin_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_processed_file_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_processed_file_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_processed_file_origin FOREIGN KEY (origin_file_id) REFERENCES cs_origin_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_processed_file_file_name ON cs_processed_file(file_name);
@@ -84,9 +80,7 @@ CREATE TABLE cs_sales_summary (
   CONSTRAINT fk_cs_sales_summary_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_sales_summary_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_sales_summary_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_sales_summary_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_sales_summary_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_sales_summary_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_sales_summary_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_sales_summary_rv_number ON cs_sales_summary(rv_number);
@@ -140,9 +134,7 @@ CREATE TABLE cs_transaction_acq (
   CONSTRAINT fk_cs_transaction_acq_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_transaction_acq_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_transaction_acq_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_transaction_acq_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_transaction_acq_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_transaction_acq_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_transaction_acq_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_transaction_acq_nsu ON cs_transaction_acq(nsu);

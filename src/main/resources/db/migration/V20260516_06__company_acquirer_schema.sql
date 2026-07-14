@@ -15,13 +15,9 @@ CREATE TABLE cs_company (
   social_reason VARCHAR(50) NOT NULL,
   cnpj VARCHAR(20) NOT NULL UNIQUE,
 
-  PRIMARY KEY (id),
+  PRIMARY KEY (id)
 
-  CONSTRAINT fk_cs_company_created_by FOREIGN KEY (created_by_id)
-    REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
 
-  CONSTRAINT fk_cs_company_updated_by FOREIGN KEY (updated_by_id)
-   REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_company_fantasy_name ON cs_company (fantasy_name);
@@ -45,13 +41,9 @@ CREATE TABLE cs_acquirer (
   cnpj VARCHAR(20) NOT NULL UNIQUE,
   file_identifier VARCHAR(30) NOT NULL UNIQUE,
 
-  PRIMARY KEY (id),
+  PRIMARY KEY (id)
 
-  CONSTRAINT fk_cs_acquirer_created_by FOREIGN KEY (created_by_id)
-    REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
 
-  CONSTRAINT fk_cs_acquirer_updated_by FOREIGN KEY (updated_by_id)
-   REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_acquirer_fantasy_name ON cs_acquirer (fantasy_name);

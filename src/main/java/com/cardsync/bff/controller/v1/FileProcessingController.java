@@ -95,14 +95,26 @@ public class FileProcessingController {
 
   @GetMapping("/erp/pending-sales")
   @CheckSecurity.FileProcessing.CanRead
-  public Page<ErpPendingSaleModel> listPendingErpSales(Pageable pageable) {
-    return erpPendingSaleService.listPending(pageable);
+  public PagedModel<ErpPendingSaleModel> listPendingErpSales(Pageable pageable) {
+    return toPagedModel(erpPendingSaleService.listPending(pageable));
   }
 
   @GetMapping("/rede/totalizers")
   @CheckSecurity.FileProcessing.CanRead
-  public Page<RedeTotalizerModel> listRedeTotalizers(Pageable pageable) {
-    return redeFinancialQueryService.listTotalizers(pageable);
+  public PagedModel<RedeTotalizerModel> listRedeTotalizers(Pageable pageable) {
+    return toPagedModel(redeFinancialQueryService.listTotalizers(pageable));
+  }
+
+  private static <T> PagedModel<T> toPagedModel(Page<T> page) {
+    return PagedModel.of(
+      page.getContent(),
+      new PagedModel.PageMetadata(
+        page.getSize(),
+        page.getNumber(),
+        page.getTotalElements(),
+        page.getTotalPages()
+      )
+    );
   }
   
   @GetMapping("/schedules/status")

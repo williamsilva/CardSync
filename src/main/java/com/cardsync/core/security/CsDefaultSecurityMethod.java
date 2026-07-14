@@ -1,6 +1,5 @@
 package com.cardsync.core.security;
 
-import com.cardsync.core.security.password.CardSyncUserDetails;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +9,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
 
+/**
+ * No Cardsync a identidade sempre chega via NimbusAuth: Jwt (Resource Server, /api/**)
+ * ou OidcUser (BFF, oauth2Login contra o NimbusAuth). Não existe mais login local
+ * (form login / CardSyncUserDetails) - isso agora vive só no NimbusAuth.
+ */
 public abstract class CsDefaultSecurityMethod extends CsPermissions {
 
   public Authentication getAuthentication() {
@@ -54,10 +58,6 @@ public abstract class CsDefaultSecurityMethod extends CsPermissions {
 
     Object principal = authentication.getPrincipal();
 
-    if (principal instanceof CardSyncUserDetails ud) {
-      return Optional.ofNullable(ud.getId());
-    }
-
     if (principal instanceof Jwt jwt) {
       return Optional.ofNullable(readUserIdFromJwt(jwt));
     }
@@ -81,10 +81,6 @@ public abstract class CsDefaultSecurityMethod extends CsPermissions {
 
     Object principal = authentication.getPrincipal();
 
-    if (principal instanceof CardSyncUserDetails ud) {
-      return Optional.ofNullable(safeTrim(ud.getUsername()));
-    }
-
     if (principal instanceof Jwt jwt) {
       return Optional.ofNullable(readUsernameFromJwt(jwt));
     }
@@ -107,20 +103,6 @@ public abstract class CsDefaultSecurityMethod extends CsPermissions {
 
   public boolean hasAuthenticatedUser() {
     return getCurrentUserId().isPresent();
-  }
-
-  public Optional<CardSyncUserDetails> getCurrentUserDetails() {
-    Authentication authentication = getAuthentication();
-    if (authentication == null || !authentication.isAuthenticated()) {
-      return Optional.empty();
-    }
-
-    Object principal = authentication.getPrincipal();
-    if (principal instanceof CardSyncUserDetails ud) {
-      return Optional.of(ud);
-    }
-
-    return Optional.empty();
   }
 
   private UUID readUserIdFromJwt(Jwt jwt) {

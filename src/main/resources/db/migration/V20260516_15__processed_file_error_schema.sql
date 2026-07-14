@@ -11,9 +11,7 @@ CREATE TABLE cs_processed_file_error (
   message VARCHAR(500) NOT NULL,
   raw_line TEXT NULL,
   PRIMARY KEY (id),
-  CONSTRAINT fk_cs_processed_file_error_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_processed_file_error_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_processed_file_error_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_processed_file_error_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_processed_file_error_file ON cs_processed_file_error(processed_file_id);

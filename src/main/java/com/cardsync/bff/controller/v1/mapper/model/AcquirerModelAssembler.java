@@ -6,6 +6,7 @@ import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.RelationAcquirerEstablishmentEntity;
 import com.cardsync.domain.model.RelationAcquirerCompanyEntity;
+import com.cardsync.domain.service.UserDirectoryService;
 import lombok.NonNull;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ public class AcquirerModelAssembler extends RepresentationModelAssemblerSupport<
 
   @Autowired
   private ModelMapper modelMapper;
+
+  @Autowired
+  private UserDirectoryService userDirectoryService;
 
   public AcquirerModelAssembler() {
     super(AcquirerController.class, AcquirerModel.class);
@@ -38,13 +42,7 @@ public class AcquirerModelAssembler extends RepresentationModelAssemblerSupport<
     model.setFileIdentifier(entity.getFileIdentifier());
     model.setStatus(entity.getStatus() != null ? entity.getStatus().name() : null);
 
-    if (entity.getCreatedBy() != null) {
-      model.setCreatedBy(new UserMinimalModel(
-        entity.getCreatedBy().getId(),
-        entity.getCreatedBy().getName(),
-        entity.getCreatedBy().getUserName()
-      ));
-    }
+    userDirectoryService.summaryFor(entity.getCreatedBy()).ifPresent(model::setCreatedBy);
 
     model.setCompanies(
       entity.getAcquirerCompanies().stream()

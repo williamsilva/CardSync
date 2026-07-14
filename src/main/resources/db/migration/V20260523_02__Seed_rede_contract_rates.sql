@@ -210,7 +210,7 @@ SELECT
   establishment.id,
   CURRENT_TIMESTAMP(6),
   CURRENT_TIMESTAMP(6),
-  user_created.id
+  NULL
 FROM tmp_rede_contract_seed_establishments seed
 JOIN cs_company company
   ON company.cnpj = seed.cnpj
@@ -220,8 +220,6 @@ JOIN cs_establishment establishment
   ON establishment.company_id = company.id
  AND establishment.acquirer_id = acquirer.id
  AND establishment.pv_number = seed.pv_number
-LEFT JOIN cs_users user_created
-  ON user_created.user_name = 'suporte@cardsync.com.br'
 WHERE NOT EXISTS (
   SELECT 1
   FROM cs_contracts existing

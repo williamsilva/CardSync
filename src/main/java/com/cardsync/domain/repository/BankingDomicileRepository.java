@@ -17,7 +17,7 @@ import java.util.UUID;
 public interface BankingDomicileRepository extends JpaRepository<BankingDomicileEntity, UUID>, JpaSpecificationExecutor<BankingDomicileEntity> {
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "bank"})
+  @EntityGraph(attributePaths = {"company", "bank"})
   List<BankingDomicileEntity> findAll(Sort sort);
 
   @Override

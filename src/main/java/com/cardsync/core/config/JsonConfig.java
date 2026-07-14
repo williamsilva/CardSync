@@ -2,17 +2,19 @@ package com.cardsync.core.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 public class JsonConfig {
 
+  /**
+   * Não é @Primary: o ObjectMapper default do app é o autoconfigurado pelo Spring Boot
+   * (jacksonJsonMapper, com os módulos padrão - ex: JavaTimeModule). Este é só para quem
+   * precisar explicitamente de um mapper "limpo", via @Qualifier("cleanHttpObjectMapper").
+   */
   @Bean
-  @Primary
   public ObjectMapper cleanHttpObjectMapper() {
-    ObjectMapper mapper = JsonMapper.builder().build();
-    return mapper;
+    return JsonMapper.builder().build();
   }
 }

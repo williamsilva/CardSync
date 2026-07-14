@@ -56,7 +56,7 @@ public class CompanySpecs extends BaseSpecificationSupport<CompanyEntity> {
           } catch (Exception e) {
             return null;
           }
-        }, "createdBy", "id")
+        }, "createdBy")
       );
 
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));

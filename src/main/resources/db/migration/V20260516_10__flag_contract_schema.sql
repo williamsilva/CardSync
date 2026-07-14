@@ -12,12 +12,7 @@ CREATE TABLE cs_flag (
   name VARCHAR(20) NOT NULL UNIQUE,
   text_color VARCHAR(20) NULL,
 
-  PRIMARY KEY (id),
-  CONSTRAINT fk_cs_flag_created_by FOREIGN KEY (created_by_id)
-      REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-
-  CONSTRAINT fk_cs_flag_updated_by FOREIGN KEY (updated_by_id)
-     REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE cs_flag_acquirer (
@@ -38,20 +33,6 @@ CREATE TABLE cs_flag_company (
   FOREIGN KEY (company_id) REFERENCES cs_company(id),
    UNIQUE (flag_id, company_id)
 )engine=InnoDB DEFAULT CHARSET=utf8mb4;
-
-INSERT INTO cs_permissions (id, name, description) VALUES
-  (UUID_TO_BIN(UUID()), 'FLAGS_CHANGE', 'Altera bandeiras'), (UUID_TO_BIN(UUID()), 'FLAGS_CREATE', 'Cadastra bandeiras'),
-  (UUID_TO_BIN(UUID()), 'FLAGS_CONSULT', 'Consulta bandeiras'), (UUID_TO_BIN(UUID()), 'FLAGS_DELETE', 'Excluir bandeiras'),
-  (UUID_TO_BIN(UUID()), 'FLAGS_MANAGE_RELATIONS', 'Relaciona bandeiras a adquirentes e empresas'),
-  (UUID_TO_BIN(UUID()), 'FLAGS_ACTIVE_OR_INACTIVE', 'Ativa ou desativa bandeiras');
-
-INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'FLAGS_CHANGE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'FLAGS_CONSULT')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'FLAGS_CREATE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'FLAGS_DELETE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'FLAGS_MANAGE_RELATIONS')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'FLAGS_ACTIVE_OR_INACTIVE'));
 
 CREATE TABLE cs_contracts (
     id BINARY(16) NOT NULL,
@@ -111,14 +92,6 @@ CREATE INDEX idx_cs_contracts_establishment_id ON cs_contracts (establishment_id
 CREATE INDEX idx_cs_contracts_created_by_id ON cs_contracts (created_by_id);
 CREATE INDEX idx_cs_contracts_updated_by_id ON cs_contracts (updated_by_id);
 
-ALTER TABLE cs_contracts
-  ADD CONSTRAINT fk_cs_contracts_created_by FOREIGN KEY (created_by_id)
-  REFERENCES cs_users(id) ON UPDATE CASCADE;
-
-ALTER TABLE cs_contracts
-  ADD CONSTRAINT fk_cs_contracts_updated_by FOREIGN KEY (updated_by_id)
-  REFERENCES cs_users(id) ON UPDATE CASCADE;
-
 CREATE UNIQUE INDEX uq_cs_contract_flags_contract_flag
   ON cs_contract_flags (contract_id, flag_id);
 
@@ -142,18 +115,6 @@ CREATE UNIQUE INDEX uq_cs_contracts_company_acquirer_description_start_date
 
 CREATE UNIQUE INDEX uq_cs_contracts_establishment_description_start_date
   ON cs_contracts (establishment_id, description, start_date);
-
-INSERT INTO cs_permissions (id, name, description) VALUES
-  (UUID_TO_BIN(UUID()), 'CONTRACTS_CHANGE', 'Altera contratos'), (UUID_TO_BIN(UUID()), 'CONTRACTS_CREATE', 'Cadastra contratos'),
-  (UUID_TO_BIN(UUID()), 'CONTRACTS_CONSULT', 'Consulta contratos'), (UUID_TO_BIN(UUID()), 'CONTRACTS_DELETE', 'Excluir contratos'),
-  (UUID_TO_BIN(UUID()), 'CONTRACTS_ACTIVE_OR_INACTIVE', 'Ativa ou desativa contratos');
-
-INSERT INTO cs_groups_permissions (group_id, permission_id) VALUES
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'CONTRACTS_CHANGE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'CONTRACTS_CONSULT')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'CONTRACTS_CREATE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'CONTRACTS_DELETE')),
-  ((SELECT id FROM cs_groups WHERE name = 'ADMINISTRADOR'), (SELECT id FROM cs_permissions WHERE name = 'CONTRACTS_ACTIVE_OR_INACTIVE'));
 
 ALTER TABLE cs_contract_rates
   ADD COLUMN installment_min INT NULL AFTER payment_term_days,

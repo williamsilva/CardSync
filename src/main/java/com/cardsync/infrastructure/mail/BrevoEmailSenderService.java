@@ -3,10 +3,9 @@ package com.cardsync.infrastructure.mail;
 import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
-import com.cardsync.domain.model.UserEntity;
-import com.cardsync.domain.repository.UserRepository;
 import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -15,20 +14,17 @@ import org.springframework.web.client.RestClient;
 public class BrevoEmailSenderService implements EmailSenderService {
 
   private final RestClient restClient;
-  private final UserRepository userRepository;
   private final EmailSettingsService emailSettingsService;
   private final EmailLogService emailLogService;
   private final EmailTemplateProcessor emailTemplateProcessor;
 
   public BrevoEmailSenderService(
     RestClient restClient,
-    UserRepository userRepository,
     EmailSettingsService emailSettingsService,
     EmailLogService emailLogService,
     EmailTemplateProcessor emailTemplateProcessor
   ) {
     this.restClient = restClient;
-    this.userRepository = userRepository;
     this.emailSettingsService = emailSettingsService;
     this.emailLogService = emailLogService;
     this.emailTemplateProcessor = emailTemplateProcessor;
@@ -45,7 +41,7 @@ public class BrevoEmailSenderService implements EmailSenderService {
   }
 
   private void send(Message message, String htmlBody) {
-    UserEntity requestedBy = resolveRequestedBy(message);
+    UUID requestedBy = resolveRequestedBy(message);
 
     try {
       BrevoSendEmailRequest payload = BrevoSendEmailRequest.builder()
@@ -95,11 +91,8 @@ public class BrevoEmailSenderService implements EmailSenderService {
     }
   }
 
-  private UserEntity resolveRequestedBy(Message message) {
-    if (message.getRequestedByUserId() == null) {
-      return null;
-    }
-    return userRepository.findById(message.getRequestedByUserId()).orElse(null);
+  private UUID resolveRequestedBy(Message message) {
+    return message.getRequestedByUserId();
   }
 
   private String firstRecipient(Message message) {

@@ -23,18 +23,18 @@ public interface EstablishmentRepository extends JpaRepository<EstablishmentEnti
   JpaSpecificationExecutor<EstablishmentEntity> {
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
+  @EntityGraph(attributePaths = {"company", "acquirer"})
   List<EstablishmentEntity> findAll(Sort sort);
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
+  @EntityGraph(attributePaths = {"company", "acquirer"})
   Page<EstablishmentEntity> findAll(Specification<EstablishmentEntity> spec, Pageable pageable);
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
+  @EntityGraph(attributePaths = {"company", "acquirer"})
   Optional<EstablishmentEntity> findById(UUID id);
 
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy", "company", "acquirer"})
+  @EntityGraph(attributePaths = {"company", "acquirer"})
   List<EstablishmentEntity> findByCompany_IdAndAcquirer_IdOrderByPvNumberAsc(UUID companyId, UUID acquirerId);
 
   @Query("""

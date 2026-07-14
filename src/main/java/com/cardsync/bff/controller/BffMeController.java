@@ -1,6 +1,5 @@
 package com.cardsync.bff.controller;
 
-import com.cardsync.core.security.password.CardSyncUserDetails;
 import java.time.Instant;
 import java.util.List;
 
@@ -54,27 +53,26 @@ public class BffMeController {
       .distinct()
       .toList();
 
-    // defaults para formLogin
+    // defaults
     String iss = null;
-    Instant expiresAt = null;
     String userId = null;
     String name = username;
 
-    // 1) Se for formLogin (CardSyncUserDetails), pega id e nome real
-    if (auth != null && auth.getPrincipal() instanceof CardSyncUserDetails u) {
-      if (u.getId() != null) userId = u.getId().toString();
-      if (u.getName() != null && !u.getName().isBlank()) name = u.getName();
-
-      expiresAt = sessionExpiresAt(request);
-      return new MeResponse(authenticated, iss, groups, userId, name, username, perms, expiresAt);
+    // Expiração reportada ao SPA é a da sessão HTTP do BFF (renovada a cada request),
+    // não a do id_token (fixa desde o login) - senão o "renew" do front nunca avança
+    // e a sessão parece expirar mesmo com o cookie/sessão ainda válidos.
+    Instant expiresAt = null;
+    HttpSession session = request.getSession(false);
+    if (authenticated && session != null) {
+      expiresAt = Instant.ofEpochMilli(session.getLastAccessedTime())
+        .plusSeconds(session.getMaxInactiveInterval());
     }
 
-    // 2) Se for OIDC, tenta enriquecer com claims do id_token
+    // Se for OIDC (BFF via oauth2Login contra o NimbusAuth), enriquece com claims do id_token
     if (auth != null && auth.getPrincipal() instanceof OidcUser oidc) {
       OidcIdToken idToken = oidc.getIdToken();
       if (idToken != null) {
         if (idToken.getIssuer() != null) iss = idToken.getIssuer().toString();
-        expiresAt = idToken.getExpiresAt();
 
         Object userIdRaw = idToken.getClaim("userId");
         if (userIdRaw != null) userId = String.valueOf(userIdRaw);
@@ -92,15 +90,5 @@ public class BffMeController {
 
     // fallback genérico
     return new MeResponse(authenticated, iss, groups, userId, name, username, perms, expiresAt);
-  }
-
-  private static Instant sessionExpiresAt(HttpServletRequest request) {
-    HttpSession session = request.getSession(false);
-    if (session == null) return null;
-
-    int seconds = session.getMaxInactiveInterval(); // timeout por inatividade
-    if (seconds <= 0) return null; // 0 ou negativo => sem expiração configurada
-
-    return Instant.now().plusSeconds(seconds);
   }
 }

@@ -14,9 +14,7 @@ CREATE TABLE cs_no_file_day (
   updated_by_id BINARY(16) NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_no_file_day_bank FOREIGN KEY (bank_id) REFERENCES cs_bank (id),
-  CONSTRAINT fk_cs_no_file_day_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer (id),
-  CONSTRAINT fk_cs_no_file_day_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users (id),
-  CONSTRAINT fk_cs_no_file_day_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users (id)
+  CONSTRAINT fk_cs_no_file_day_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer (id)
 );
 
 CREATE INDEX idx_cs_no_file_day_status_date ON cs_no_file_day (status, no_file_date);

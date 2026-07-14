@@ -1,36 +1,24 @@
 package com.cardsync.core.security.web;
 
 import com.cardsync.core.security.CardsyncSecurityProperties;
-import com.cardsync.core.security.password.LoginFailureHandler;
-import com.cardsync.core.security.password.LoginSuccessHandler;
-import com.cardsync.core.security.password.PasswordExpiryAuthenticationProvider;
-import com.cardsync.core.security.password.PasswordExpiryService;
 import com.cardsync.core.security.resourceserver.ResourceServerJwtBeans;
 import com.cardsync.core.security.web.headers.ConditionalHstsHeaderWriter;
 import com.cardsync.core.security.web.headers.CspHeaderWriter;
-import com.cardsync.core.security.web.nonce.CspNonceFilter;
 import com.cardsync.core.web.CorrelationIdFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.EnvironmentAware;
-import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
-import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
@@ -54,13 +42,16 @@ import org.springframework.security.web.header.HeaderWriter;
 import org.springframework.security.web.header.HeaderWriterFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
-import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
-import org.springframework.security.web.util.matcher.RequestMatcher;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.util.LinkedHashSet;
 
+/**
+ * Segurança do Cardsync após o split com o NimbusAuth: não há mais Authorization Server
+ * nem login local aqui - só o BFF (sessão/cookies/CSRF, oauth2Login contra o NimbusAuth)
+ * e o Resource Server (/api/**, valida JWT emitido pelo NimbusAuth via JWKS remoto).
+ */
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -79,7 +70,6 @@ public class SecurityConfig implements EnvironmentAware {
   }
 
   private String buildPageCsp() {
-    // IMPORTANTE: o CspHeaderWriter vai substituir {nonce} pelo nonce real.
     return String.join(
       " ",
       "default-src 'self';",
@@ -99,15 +89,26 @@ public class SecurityConfig implements EnvironmentAware {
     return "default-src 'none'; frame-ancestors 'none';";
   }
 
+  /**
+   * JWKS remoto do NimbusAuth: os tokens são emitidos lá, não pelo Cardsync.
+   * Usa withJwkSetUri (carregamento preguiçoso, só na primeira validação de token) em vez de
+   * withIssuerLocation (faria discovery via rede aqui mesmo, no boot do Cardsync, exigindo que
+   * o NimbusAuth já esteja no ar nesse instante).
+   */
+  @Bean
+  public JwtDecoder jwtDecoder() {
+    return NimbusJwtDecoder.withJwkSetUri(props.getIssuer() + "/oauth2/jwks").build();
+  }
+
   @Bean
   public AuthenticationEntryPoint spa401EntryPoint(
-    ObjectMapper objectMapper, Clock clock, MessageSource messages) {
+    ObjectMapper objectMapper, Clock clock, org.springframework.context.MessageSource messages) {
     return new Spa401EntryPoint(objectMapper, clock, messages);
   }
 
   @Bean
   public AccessDeniedHandler spa403AccessDeniedHandler(
-    ObjectMapper objectMapper, Clock clock, MessageSource messages) {
+    ObjectMapper objectMapper, Clock clock, org.springframework.context.MessageSource messages) {
     return new Spa403AccessDeniedHandler(objectMapper, clock, messages);
   }
 
@@ -125,32 +126,19 @@ public class SecurityConfig implements EnvironmentAware {
   public AuthenticationEntryPoint bffAuthenticationEntryPoint(AuthenticationEntryPoint spa401EntryPoint) {
     return DelegatingAuthenticationEntryPoint.builder()
       .addEntryPointFor(spa401EntryPoint, new SpaRequestMatcher())
-      // fallback (NÃO SPA): manda para /bff/login
       .defaultEntryPoint(new LoginUrlAuthenticationEntryPoint("/bff/login"))
       .build();
   }
 
   @Bean
-  public AuthenticationProvider authenticationProvider(
-    UserDetailsService userDetailsService,
-    PasswordExpiryService passwordExpiryService,
-    PasswordEncoder passwordEncoder
-  ) {
-    DaoAuthenticationProvider dao = new DaoAuthenticationProvider(userDetailsService);
-    dao.setPasswordEncoder(passwordEncoder);
-
-    return new PasswordExpiryAuthenticationProvider(dao, passwordExpiryService);
-  }
-
-  @Bean
-  public OAuth2UserService<OidcUserRequest, OidcUser > bffOidcUserService() {
+  public OAuth2UserService<OidcUserRequest, OidcUser> bffOidcUserService() {
 
     var delegate = new OidcUserService();
 
     return (req) -> {
       var oidc = delegate.loadUser(req);
 
-      var out = new LinkedHashSet<GrantedAuthority>(oidc.getAuthorities()); // mantém OIDC_USER + SCOPE_*
+      var out = new LinkedHashSet<GrantedAuthority>(oidc.getAuthorities());
 
       var idToken = oidc.getIdToken();
 
@@ -168,7 +156,6 @@ public class SecurityConfig implements EnvironmentAware {
         }
       }
 
-      // ✅ deixa auth.getName() virar o email
       return new DefaultOidcUser(
         out,
         oidc.getIdToken(),
@@ -176,53 +163,6 @@ public class SecurityConfig implements EnvironmentAware {
         "username"
       );
     };
-  }
-
-  // ---------------------------
-  // 0) AUTHORIZATION SERVER CHAIN
-  // ---------------------------
-  @Bean
-  @Order(5)
-  public SecurityFilterChain authServerChain(HttpSecurity http, AuthenticationEntryPoint spa401EntryPoint,
-                                             AccessDeniedHandler spa403AccessDeniedHandler) throws Exception {
-
-    OAuth2AuthorizationServerConfigurer authServer = new OAuth2AuthorizationServerConfigurer();
-    authServer.oidc(Customizer.withDefaults());
-
-    RequestMatcher endpointsMatcher = authServer.getEndpointsMatcher();
-
-    http.securityMatcher(endpointsMatcher);
-
-    http.authorizeHttpRequests(a -> a.anyRequest().authenticated());
-
-    // Quando não autenticado, manda pra UI /login (WEB chain)
-    var spaMatcher = new SpaRequestMatcher();
-    var nonSpaMatcher = new NegatedRequestMatcher(spaMatcher);
-
-    http.exceptionHandling(ex -> ex
-      .defaultAuthenticationEntryPointFor(spa401EntryPoint, spaMatcher)
-      .defaultAccessDeniedHandlerFor(spa403AccessDeniedHandler, spaMatcher)
-
-      // fallback APENAS para requests que NÃO são SPA
-      .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/login"), nonSpaMatcher)
-    );
-
-    http.requestCache(RequestCacheConfigurer::disable);
-
-    // CSRF não se aplica nos endpoints do Authorization Server
-    http.csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher));
-
-    http.cors(Customizer.withDefaults());
-
-    // Spring Security 7: use with(...) em vez de apply(...)
-    http.with(authServer, Customizer.withDefaults());
-
-    http.addFilterBefore(new CspNonceFilter(), HeaderWriterFilter.class);
-    http.addFilterBefore(new CorrelationIdFilter(), HeaderWriterFilter.class);
-
-    applySecurityHeaders(http, true);
-
-    return http.build();
   }
 
   // ---------------------------
@@ -246,11 +186,9 @@ public class SecurityConfig implements EnvironmentAware {
     http.authorizeHttpRequests(auth -> auth
       .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
       .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-
-      // password policy (fonte da verdade)
+      // política de senha: proxy público para o NimbusAuth (ver PasswordPolicyProxyController)
       .requestMatchers(HttpMethod.GET, "/api/password/policy").permitAll()
       .requestMatchers(HttpMethod.POST, "/api/password/policy/check").permitAll()
-
       .anyRequest().authenticated()
     );
 
@@ -282,23 +220,28 @@ public class SecurityConfig implements EnvironmentAware {
   public SecurityFilterChain bffChain(
     HttpSecurity http, AuthenticationSuccessHandler oauth2SpaSuccessHandler,
     AuthenticationEntryPoint bffAuthenticationEntryPoint, AuthenticationEntryPoint spa401EntryPoint,
-    AccessDeniedHandler spa403AccessDeniedHandler
+    AccessDeniedHandler spa403AccessDeniedHandler, CookieProps cookieProps
   ) throws Exception {
 
     http.securityMatcher("/bff/**", "/oauth2/authorization/**", "/login/oauth2/**");
 
-    // IMPORTANTÍSSIMO pro SPA: não salvar request, não tentar "voltar" em POST
     http.requestCache(rc -> rc.disable());
 
     http.sessionManagement(sm -> sm
       .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
       .sessionFixation(sf -> sf.migrateSession())
       .invalidSessionStrategy((req, res) -> {
-        // se for SPA => 401 JSON; senão => redirect /bff/login
         if (new SpaRequestMatcher().matches(req)) {
           spa401EntryPoint.commence(req, res, null);
         } else {
-          res.sendRedirect("/login");
+          // Cookie de sessão antigo/inválido (ex: sessão expirou ou a tabela de sessão foi
+          // recriada) - precisa limpar o cookie antes de redirecionar, senão o navegador
+          // reenvia o mesmo cookie inválido e cai num loop de redirecionamento em "/bff/login".
+          // O nome do cookie é "SESSION" (default do Spring Session com store-type: jdbc),
+          // não "JSESSIONID" (esse é o nome do cookie de sessão nativo do servlet container,
+          // que não é usado aqui) - limpar o nome errado deixava o cookie real intacto.
+          res.addHeader("Set-Cookie", CookieBuilder.clearCookie("SESSION", cookieProps, true));
+          res.sendRedirect("/bff/login");
         }
       })
     );
@@ -322,7 +265,6 @@ public class SecurityConfig implements EnvironmentAware {
       .anyRequest().authenticated()
     );
 
-    // ✅ Aqui: UMA fonte de verdade
     http.exceptionHandling(ex -> ex
       .authenticationEntryPoint(bffAuthenticationEntryPoint)
       .accessDeniedHandler(spa403AccessDeniedHandler)
@@ -338,86 +280,7 @@ public class SecurityConfig implements EnvironmentAware {
 
     return http.build();
   }
-  // ---------------------------
-  // 3) WEB CHAIN (THYMELEAF) STATEFUL
-  // ---------------------------
-  @Bean
-  @Order(30)
-  public SecurityFilterChain webChain(
-    HttpSecurity http,
-    LoginSuccessHandler loginSuccessHandler,
-    LoginFailureHandler loginFailureHandler,
-    AuthenticationProvider authenticationProvider
-  ) throws Exception {
 
-    // Tudo que NÃO é /api/**, /bff/** e também não é callback/oauth2-client
-    http.securityMatcher(request -> {
-      String path = request.getRequestURI();
-      return !path.startsWith("/api/")
-        && !path.startsWith("/bff/")
-        && !path.startsWith("/oauth2/")
-        && !path.startsWith("/login/oauth2/");
-    });
-
-    http.sessionManagement(sm -> sm
-      .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-      .sessionFixation(sf -> sf.migrateSession())
-      .maximumSessions(1)
-      .maxSessionsPreventsLogin(false)
-    );
-
-    http.cors(Customizer.withDefaults());
-    http.authenticationProvider(authenticationProvider);
-
-    http.csrf(csrf -> csrf
-      .csrfTokenRepository(csrfRepo())
-      .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-      .ignoringRequestMatchers("/login/password/status"));
-
-    http.authorizeHttpRequests(auth -> auth
-      .requestMatchers(
-        "/favicon.ico",
-        "/login",
-        "/error",
-        "/success",
-        "/forget-password",
-        "/password/reset/**",
-        "/password/set/**",
-        "/password/expired",
-        "/.well-known/**",
-        "/assets/**", "/css/**", "/js/**", "/images/**", "/webjars/**",
-        "/actuator/health",
-        "/actuator/health/**",
-        "/actuator/info"
-      ).permitAll()
-      .requestMatchers(HttpMethod.POST, "/login/password/status").permitAll()
-      .anyRequest().authenticated()
-    );
-
-    // ✅ AQUI é onde o /login realmente é processado.
-    http.formLogin(fl -> fl
-      .loginPage("/login")
-      .loginProcessingUrl("/login")
-      .successHandler(loginSuccessHandler)
-      .failureHandler(loginFailureHandler)
-      .permitAll()
-    );
-
-    // ⚠️ Importantíssimo: evitar página default OAuth2
-    http.oauth2Login(AbstractHttpConfigurer::disable);
-
-    http.addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class);
-    http.addFilterBefore(new CspNonceFilter(), HeaderWriterFilter.class);
-    http.addFilterBefore(new CorrelationIdFilter(), HeaderWriterFilter.class);
-
-    applySecurityHeaders(http, true);
-
-    return http.build();
-  }
-
-  // ---------------------------
-  // CSRF repo (double submit)
-  // ---------------------------
   private CookieCsrfTokenRepository csrfRepo() {
     CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
     repo.setCookieName("XSRF-TOKEN");

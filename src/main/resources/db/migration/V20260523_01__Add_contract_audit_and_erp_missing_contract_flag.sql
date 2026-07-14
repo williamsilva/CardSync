@@ -33,9 +33,7 @@ CREATE TABLE cs_contract_audit (
   CONSTRAINT fk_cs_contract_audit_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT fk_cs_contract_audit_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT fk_cs_contract_audit_transaction_acq FOREIGN KEY (transaction_acq_id) REFERENCES cs_transaction_acq(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_contract_audit_transaction_erp FOREIGN KEY (transaction_erp_id) REFERENCES cs_transaction_erp(id) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_contract_audit_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_contract_audit_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_contract_audit_transaction_erp FOREIGN KEY (transaction_erp_id) REFERENCES cs_transaction_erp(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE UNIQUE INDEX uq_cs_contract_audit_transaction_acq ON cs_contract_audit(transaction_acq_id);

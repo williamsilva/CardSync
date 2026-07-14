@@ -5,10 +5,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.cardsync</groupId>
-  <artifactId>cardsync-security</artifactId>
+  <artifactId>cardsync</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-  <name>CardSync Security Baseline</name>
-  <description>Baseline oficial de segurança do CardSync (OAuth2 + BFF + Refresh server-side + Session/CSRF + RS JWT)</description>
+  <name>Cardsync</name>
+  <description>API de negocio e BFF do CardSync (conciliacao, contratos, arquivos, transacoes, dashboards) - valida JWT emitido pelo NimbusAuth</description>
 
   <properties>
     <java.version>21</java.version>
@@ -42,17 +42,13 @@
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
 
+    <!-- Resource Server: valida o JWT emitido pelo NimbusAuth (issuer/JWKS remotos) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
     </dependency>
 
-    <!-- Authorization Server (SAS) -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-oauth2-authorization-server</artifactId>
-    </dependency>
-
+    <!-- OAuth2 Client: BFF (oauth2Login contra o NimbusAuth) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-oauth2-client</artifactId>

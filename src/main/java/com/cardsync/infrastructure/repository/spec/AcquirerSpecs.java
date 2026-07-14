@@ -55,7 +55,7 @@ public class AcquirerSpecs extends BaseSpecificationSupport<AcquirerEntity> {
           } catch (Exception e) {
             return null;
           }
-        }, "createdBy", "id")
+        }, "createdBy")
       );
 
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));

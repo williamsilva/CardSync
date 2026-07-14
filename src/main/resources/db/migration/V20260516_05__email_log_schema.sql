@@ -18,10 +18,7 @@ CREATE TABLE cs_email_log (
   created_by BINARY(16),
   last_modified_by BINARY(16),
 
-  PRIMARY KEY (id),
-
-  CONSTRAINT fk_cs_email_log_requested_by
-    FOREIGN KEY (requested_by_id) REFERENCES cs_users(id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_email_log_recipient ON cs_email_log (recipient);

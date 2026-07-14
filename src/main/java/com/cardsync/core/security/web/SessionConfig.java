@@ -21,7 +21,7 @@ public class SessionConfig {
   @Bean
   org.springframework.session.config.SessionRepositoryCustomizer<JdbcIndexedSessionRepository> springSessionTimeoutCustomizer() {
     return repository -> repository.setDefaultMaxInactiveInterval(
-      props.getAuthserver().getToken().getSessionTimeout()
+      props.getSessionTimeout()
     );
   }
 }

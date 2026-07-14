@@ -20,10 +20,8 @@ public interface AcquirerRepository extends JpaRepository<AcquirerEntity, UUID>,
   JpaSpecificationExecutor<AcquirerEntity> {
 
   @Override
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy"})
   Page<AcquirerEntity> findAll(Specification<AcquirerEntity> spec, Pageable pageable);
 
-  @EntityGraph(attributePaths = {"createdBy", "updatedBy"})
   @Query("""
     select distinct a
     from AcquirerEntity a
@@ -35,8 +33,6 @@ public interface AcquirerRepository extends JpaRepository<AcquirerEntity, UUID>,
 
   @Override
   @EntityGraph(attributePaths = {
-    "createdBy",
-    "updatedBy",
     "acquirerCompanies",
     "acquirerCompanies.company",
     "acquirerEstablishments",

@@ -1,8 +1,11 @@
 package com.cardsync.bff.service;
 
-import com.cardsync.core.security.authserver.AuthorizationRevocationService;
+import com.cardsync.infrastructure.nimbusauth.NimbusAuthInternalClient;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.*;
@@ -18,8 +21,22 @@ public class BffAccessTokenService {
   public static final String REGISTRATION_ID = "cardsync-bff";
 
   private final OAuth2AuthorizedClientManager clientManager;
-  private final AuthorizationRevocationService revocationService;
+  private final NimbusAuthInternalClient nimbusAuthClient;
   private final OAuth2AuthorizedClientRepository authorizedClientRepository;
+
+  /**
+   * Lock por sessão para serializar tentativas concorrentes de refresh do mesmo usuário
+   * (ex: várias chamadas em paralelo no load do dashboard após o access token expirar).
+   * Sem isso, threads concorrentes disputam o mesmo refresh token - como a rotação está
+   * habilitada (reuseRefreshTokens(false)), só a primeira tentativa vale; as demais usam
+   * um refresh token já invalidado, caem em OAuth2AuthorizationException e derrubam a
+   * sessão inteira via revokeChainAndClearSession, forçando login de novo a cada refresh
+   * de página.
+   */
+  private final Cache<String, Object> sessionLocks = Caffeine.newBuilder()
+    .expireAfterAccess(Duration.ofMinutes(30))
+    .maximumSize(10_000)
+    .build();
 
   /**
    * Resolve um access token válido. Se precisar, faz refresh server-side.
@@ -34,23 +51,28 @@ public class BffAccessTokenService {
       throw new IllegalStateException("Não autenticado via oauth2Login.");
     }
 
-    try {
-      OAuth2AuthorizeRequest req = OAuth2AuthorizeRequest
-        .withClientRegistrationId(REGISTRATION_ID)
-        .principal(oauth2Auth)
-        .build();
+    String sessionId = request.getSession(true).getId();
+    Object lock = sessionLocks.get(sessionId, k -> new Object());
 
-      OAuth2AuthorizedClient client = clientManager.authorize(req);
-      if (client == null || client.getAccessToken() == null) {
-        throw new IllegalStateException("OAuth2AuthorizedClient nulo/sem access token.");
+    synchronized (lock) {
+      try {
+        OAuth2AuthorizeRequest req = OAuth2AuthorizeRequest
+          .withClientRegistrationId(REGISTRATION_ID)
+          .principal(oauth2Auth)
+          .build();
+
+        OAuth2AuthorizedClient client = clientManager.authorize(req);
+        if (client == null || client.getAccessToken() == null) {
+          throw new IllegalStateException("OAuth2AuthorizedClient nulo/sem access token.");
+        }
+        return client.getAccessToken().getTokenValue();
+
+      } catch (OAuth2AuthorizationException ex) {
+        // RFC 9700: em caso de reuse/refresh inválido, revogar cadeia e forçar novo login
+        revokeChainAndClearSession(authentication, request, response);
+        // Re-throw como "não autenticado" para o caller decidir redirecionar/401
+        throw ex;
       }
-      return client.getAccessToken().getTokenValue();
-
-    } catch (OAuth2AuthorizationException ex) {
-      // RFC 9700: em caso de reuse/refresh inválido, revogar cadeia e forçar novo login
-      revokeChainAndClearSession(authentication, request, response);
-      // Re-throw como "não autenticado" para o caller decidir redirecionar/401
-      throw ex;
     }
   }
 
@@ -62,7 +84,7 @@ public class BffAccessTokenService {
     String principal = authentication.getName();
 
     // Revoke chain no AS para este principal + client
-    revocationService.revokeAllForPrincipalAndClient(principal, REGISTRATION_ID);
+    nimbusAuthClient.revokeAuthorization(principal, REGISTRATION_ID);
 
     // Remove authorized client (session)
     authorizedClientRepository.removeAuthorizedClient(
@@ -75,8 +97,9 @@ public class BffAccessTokenService {
       session.invalidate();
     }
 
-    // Limpa cookies básicos (DEV defaults)
-    response.addHeader("Set-Cookie", "JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+    // Limpa cookies básicos (DEV defaults) - nome do cookie de sessão é "SESSION"
+    // (default do Spring Session com store-type: jdbc), não "JSESSIONID"
+    response.addHeader("Set-Cookie", "SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
     response.addHeader("Set-Cookie", "XSRF-TOKEN=; Path=/; Max-Age=0; SameSite=Lax");
   }
 }

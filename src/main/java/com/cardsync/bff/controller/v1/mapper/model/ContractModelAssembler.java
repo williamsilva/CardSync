@@ -5,6 +5,7 @@ import com.cardsync.bff.controller.v1.representation.model.*;
 import com.cardsync.domain.model.ContractEntity;
 import com.cardsync.domain.model.ContractFlagEntity;
 import com.cardsync.domain.model.ContractRateEntity;
+import com.cardsync.domain.service.UserDirectoryService;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.server.mvc.RepresentationModelAssemblerSupport;
 import org.springframework.stereotype.Component;
@@ -15,8 +16,11 @@ import java.util.List;
 @Component
 public class ContractModelAssembler extends RepresentationModelAssemblerSupport<ContractEntity, ContractModel> {
 
-  public ContractModelAssembler() {
+  private final UserDirectoryService userDirectoryService;
+
+  public ContractModelAssembler(UserDirectoryService userDirectoryService) {
     super(ContractController.class, ContractModel.class);
+    this.userDirectoryService = userDirectoryService;
   }
 
   @Override
@@ -32,21 +36,8 @@ public class ContractModelAssembler extends RepresentationModelAssemblerSupport<
     model.setUpdatedAt(entity.getUpdatedAt());
     model.setStatus(entity.getStatus() != null ? entity.getStatus().name() : null);
 
-    if (entity.getCreatedBy() != null) {
-      model.setCreatedBy(new UserMinimalModel(
-        entity.getCreatedBy().getId(),
-        entity.getCreatedBy().getName(),
-        entity.getCreatedBy().getUserName()
-      ));
-    }
-
-    if (entity.getUpdatedBy() != null) {
-      model.setUpdatedBy(new UserMinimalModel(
-        entity.getUpdatedBy().getId(),
-        entity.getUpdatedBy().getName(),
-        entity.getUpdatedBy().getUserName()
-      ));
-    }
+    userDirectoryService.summaryFor(entity.getCreatedBy()).ifPresent(model::setCreatedBy);
+    userDirectoryService.summaryFor(entity.getUpdatedBy()).ifPresent(model::setUpdatedBy);
 
     if (entity.getCompany() != null) {
       model.setCompany(CompanyMinimalModel.builder()

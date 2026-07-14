@@ -51,7 +51,7 @@ public class OAuth2SpaSuccessHandler implements AuthenticationSuccessHandler {
       return;
     }
 
-    String fallback = props.getLogin().getDefaultTarget();
+    String fallback = props.getWeb().getSpaBaseUrl();
     if (fallback == null || fallback.isBlank()) {
       fallback = "/";
     }

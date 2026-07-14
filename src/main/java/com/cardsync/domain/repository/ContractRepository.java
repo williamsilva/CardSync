@@ -22,12 +22,12 @@ public interface ContractRepository extends JpaRepository<ContractEntity, UUID>,
 
   @Override
   @EntityGraph(attributePaths = {
-    "company", "acquirer", "establishment", "createdBy", "updatedBy",
+    "company", "acquirer", "establishment",
     "contractFlags", "contractFlags.flag", "contractFlags.contractRates"})
   Page<ContractEntity> findAll(Specification<ContractEntity> spec, Pageable pageable);
 
   @EntityGraph(attributePaths = {
-    "company", "acquirer", "establishment", "createdBy", "updatedBy",
+    "company", "acquirer", "establishment",
     "contractFlags", "contractFlags.flag", "contractFlags.contractRates"
   })
   @Query("select c from ContractEntity c where c.id = :id")

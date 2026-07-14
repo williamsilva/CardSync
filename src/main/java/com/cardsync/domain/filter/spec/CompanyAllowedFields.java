@@ -5,7 +5,6 @@ import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.TypeCompanyEnum;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.FieldSpec;
-import jakarta.persistence.criteria.JoinType;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -32,8 +31,8 @@ public class CompanyAllowedFields {
         FieldSpec.offsetDateTime("createdAt", (root, query) -> root.get("createdAt"), dateFilterService)),
 
       Map.entry("createdBy",
-        FieldSpec.joinedUuid("createdBy", (root, query) ->
-          root.join("createdBy", JoinType.LEFT).get("id"))),
+        FieldSpec.uuid("createdBy", (root, query) ->
+          root.get("createdBy"))),
 
       Map.entry("typeCompanyEnum",
         FieldSpec.enumAsIntegerCode(

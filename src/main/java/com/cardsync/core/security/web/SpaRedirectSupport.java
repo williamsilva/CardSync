@@ -83,7 +83,7 @@ public class SpaRedirectSupport {
   }
 
   public String defaultSpaTarget() {
-    String fallback = props.getLogin().getDefaultTarget();
+    String fallback = props.getWeb().getSpaBaseUrl();
     if (fallback == null || fallback.isBlank()) {
       fallback = "/";
     }

@@ -16,9 +16,7 @@ CREATE TABLE cs_pv_matrix_header (
   CONSTRAINT fk_cs_pv_matrix_header_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pv_matrix_header_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pv_matrix_header_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_pv_matrix_header_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_pv_matrix_header_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_pv_matrix_header_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_pv_matrix_header_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_pv_matrix_header_pv ON cs_pv_matrix_header(pv_number);
 
@@ -44,9 +42,7 @@ CREATE TABLE cs_serasa_consultation (
   CONSTRAINT fk_cs_serasa_consultation_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_serasa_consultation_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_serasa_consultation_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_serasa_consultation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_serasa_consultation_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_serasa_consultation_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_serasa_consultation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_serasa_consultation_pv_period ON cs_serasa_consultation(pv_number, start_consultation_period, end_consultation_period);
 
@@ -88,9 +84,7 @@ CREATE TABLE cs_pending_debt (
   CONSTRAINT fk_cs_pending_debt_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pending_debt_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pending_debt_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_pending_debt_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_pending_debt_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_pending_debt_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_pending_debt_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_pending_debt_pv_date ON cs_pending_debt(pv_number, date_debit_order);
 CREATE INDEX idx_cs_pending_debt_nsu ON cs_pending_debt(nsu);
@@ -132,9 +126,7 @@ CREATE TABLE cs_installment_unscheduling (
   CONSTRAINT fk_cs_installment_unscheduling_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_unscheduling_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_unscheduling_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_unscheduling_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_unscheduling_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_unscheduling_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_installment_unscheduling_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_installment_unscheduling_rv ON cs_installment_unscheduling(pv_number_original, rv_number_original);
 CREATE INDEX idx_cs_installment_unscheduling_nsu ON cs_installment_unscheduling(nsu);
@@ -164,9 +156,7 @@ CREATE TABLE cs_totalizer_matrix (
   CONSTRAINT fk_cs_totalizer_matrix_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_totalizer_matrix_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_totalizer_matrix_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_totalizer_matrix_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_totalizer_matrix_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_totalizer_matrix_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_totalizer_matrix_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_totalizer_matrix_pv ON cs_totalizer_matrix(pv_number);
 
@@ -197,9 +187,7 @@ CREATE TABLE cs_archive_trailer (
   CONSTRAINT fk_cs_archive_trailer_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_archive_trailer_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_archive_trailer_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_archive_trailer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_archive_trailer_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_archive_trailer_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_archive_trailer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_archive_trailer_file ON cs_archive_trailer(processed_file_id);
 
@@ -235,9 +223,7 @@ CREATE TABLE cs_rede_request_notice (
   CONSTRAINT fk_cs_rede_request_notice_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_request_notice_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_request_notice_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_request_notice_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_request_notice_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_request_notice_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_request_notice_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cs_rede_request_notice_pv_rv ON cs_rede_request_notice(pv_number, rv_number);
@@ -271,9 +257,7 @@ CREATE TABLE cs_rede_eevd_totalizer (
   CONSTRAINT fk_cs_rede_eevd_totalizer_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_eevd_totalizer_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_eevd_totalizer_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_eevd_totalizer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_eevd_totalizer_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_eevd_totalizer_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_eevd_totalizer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_rede_eevd_totalizer_file_type ON cs_rede_eevd_totalizer(processed_file_id, record_type);
 CREATE INDEX idx_cs_rede_eevd_totalizer_pv ON cs_rede_eevd_totalizer(pv_number);
@@ -318,9 +302,7 @@ CREATE TABLE cs_rede_negotiated_transaction (
   CONSTRAINT fk_cs_rede_negotiated_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_negotiated_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_negotiated_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_negotiated_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_negotiated_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_negotiated_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_negotiated_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_rede_negotiated_rv ON cs_rede_negotiated_transaction(establishment_number, rv_number);
 CREATE INDEX idx_cs_rede_negotiated_file ON cs_rede_negotiated_transaction(processed_file_id);
@@ -354,9 +336,7 @@ CREATE TABLE cs_rede_ic_plus_transaction (
   CONSTRAINT fk_cs_rede_ic_plus_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_ic_plus_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_ic_plus_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_ic_plus_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_ic_plus_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_ic_plus_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_ic_plus_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_rede_ic_plus_rv ON cs_rede_ic_plus_transaction(pv_number, rv_number_original);
 CREATE INDEX idx_cs_rede_ic_plus_nsu ON cs_rede_ic_plus_transaction(nsu);
@@ -458,9 +438,7 @@ CREATE TABLE cs_rede_pix_cancellation (
   CONSTRAINT fk_cs_rede_pix_cancellation_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_pix_cancellation_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_pix_cancellation_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_pix_cancellation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_pix_cancellation_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_pix_cancellation_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_pix_cancellation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_rede_pix_cancellation_pv ON cs_rede_pix_cancellation(pv_number);
 
@@ -499,9 +477,7 @@ CREATE TABLE cs_rede_suspended_payment (
   CONSTRAINT fk_cs_rede_suspended_payment_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_suspended_payment_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_suspended_payment_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_suspended_payment_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_suspended_payment_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_suspended_payment_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_suspended_payment_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_rede_suspended_payment_pv_rv ON cs_rede_suspended_payment(pv_number, rv_number);
 
@@ -540,8 +516,6 @@ CREATE TABLE cs_rede_technical_reserve (
   CONSTRAINT fk_cs_rede_technical_reserve_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_technical_reserve_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_technical_reserve_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_technical_reserve_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_technical_reserve_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_rede_technical_reserve_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_rede_technical_reserve_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_rede_technical_reserve_pv_rv ON cs_rede_technical_reserve(pv_number, rv_number_original);

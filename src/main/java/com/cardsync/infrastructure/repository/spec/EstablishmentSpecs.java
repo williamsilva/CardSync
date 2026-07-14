@@ -61,7 +61,7 @@ public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEn
   private Specification<EstablishmentEntity> fetchListAssociations() {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
-        fetchIfNotFetched(root, "createdBy");
+        // createdBy não é mais associação (é UUID puro pós-split), nada a fazer fetch
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
 
@@ -75,7 +75,7 @@ public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEn
 
   private Specification<EstablishmentEntity> orderByTableSort(List<SortDto> sort) {
     return tableSort(sort, "PvNumber", Map.of(
-      "createdBy",            sortJoin("createdBy", "name"),
+      "createdBy",            sortField("createdBy"),
       "company",             sortJoin("company", "fantasyName"),
       "acquirer",            sortJoin("acquirer", "fantasyName")
     ));

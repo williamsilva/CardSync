@@ -42,9 +42,8 @@ public class EmailLogEntity {
   @Column(length = 1000)
   private String errorMessage;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "requested_by_id")
-  private UserEntity requestedBy;
+  @Column(name = "requested_by_id")
+  private UUID requestedBy;
 
   @LastModifiedDate
   private OffsetDateTime updatedAt;
@@ -53,14 +52,12 @@ public class EmailLogEntity {
   private OffsetDateTime sentAt;
 
   @CreatedBy
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "created_by")
-  private UserEntity createdBy;
+  @Column(name = "created_by")
+  private UUID createdBy;
 
   @LastModifiedBy
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "last_modified_by")
-  private UserEntity lastModifiedBy;
+  @Column(name = "last_modified_by")
+  private UUID lastModifiedBy;
 
   @CreatedDate
   @Column(nullable = false)

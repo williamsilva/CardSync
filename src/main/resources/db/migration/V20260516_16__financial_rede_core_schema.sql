@@ -53,9 +53,7 @@ CREATE TABLE cs_adjustment (
   CONSTRAINT fk_cs_adjustment_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_adjustment_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_adjustment_transaction FOREIGN KEY (transaction_id) REFERENCES cs_transaction_acq(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_adjustment_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_adjustment_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_adjustment_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_adjustment_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_adjustment_nsu ON cs_adjustment(nsu);
 CREATE INDEX idx_cs_adjustment_rv_adjustment ON cs_adjustment(rv_number_adjustment, pv_number_adjustment);
@@ -105,9 +103,7 @@ CREATE TABLE cs_releases_bank (
   CONSTRAINT fk_cs_releases_bank_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_releases_bank_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_releases_bank_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_releases_bank_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_releases_bank_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_releases_bank_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_releases_bank_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_releases_bank_date_value ON cs_releases_bank(release_date, release_value);
 CREATE INDEX idx_cs_releases_bank_context ON cs_releases_bank(company_id, acquirer_id, establishment_id, flag_id);
@@ -152,9 +148,7 @@ CREATE TABLE cs_credit_order (
   CONSTRAINT fk_cs_credit_order_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_order_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_order_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_credit_order_release_bank FOREIGN KEY (release_bank_id) REFERENCES cs_releases_bank(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_credit_order_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_credit_order_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_credit_order_release_bank FOREIGN KEY (release_bank_id) REFERENCES cs_releases_bank(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_credit_order_rv ON cs_credit_order(rv_number, installment_number, installment_total);
 CREATE INDEX idx_cs_credit_order_release ON cs_credit_order(release_date, release_value);
@@ -188,9 +182,7 @@ CREATE TABLE cs_installment_acq (
   CONSTRAINT fk_cs_installment_acq_transaction FOREIGN KEY (transaction_id) REFERENCES cs_transaction_acq(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_acq_credit_order FOREIGN KEY (credit_order_id) REFERENCES cs_credit_order(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_acq_release_bank FOREIGN KEY (release_bank_id) REFERENCES cs_releases_bank(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_acq_adjustment FOREIGN KEY (adjustment_id) REFERENCES cs_adjustment(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_acq_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_installment_acq_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_installment_acq_adjustment FOREIGN KEY (adjustment_id) REFERENCES cs_adjustment(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_installment_acq_expected_payment ON cs_installment_acq(expected_payment_date);
 CREATE INDEX idx_cs_installment_acq_transaction ON cs_installment_acq(transaction_id);
@@ -235,9 +227,7 @@ CREATE TABLE cs_anticipation (
   CONSTRAINT fk_cs_anticipation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_anticipation_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_anticipation_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_anticipation_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_anticipation_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_anticipation_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_anticipation_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_anticipation_pv_release ON cs_anticipation(pv_number, release_date);
 
@@ -263,9 +253,7 @@ CREATE TABLE cs_credit_totalizer (
   CONSTRAINT fk_cs_credit_totalizer_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_totalizer_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_totalizer_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_credit_totalizer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_credit_totalizer_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_credit_totalizer_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_credit_totalizer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_credit_totalizer_pv_credit_date ON cs_credit_totalizer(pv_number, credit_date);
 
@@ -309,9 +297,7 @@ CREATE TABLE cs_settled_debt (
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_settled_debt_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_settled_debt_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_settled_debt_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_settled_debt_created_by FOREIGN KEY (created_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_cs_settled_debt_updated_by FOREIGN KEY (updated_by_id) REFERENCES cs_users(id) ON DELETE SET NULL ON UPDATE CASCADE
+  CONSTRAINT fk_cs_settled_debt_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 CREATE INDEX idx_cs_settled_debt_pv_date ON cs_settled_debt(pv_number, liquidated_date);
 CREATE INDEX idx_cs_settled_debt_nsu ON cs_settled_debt(nsu);
