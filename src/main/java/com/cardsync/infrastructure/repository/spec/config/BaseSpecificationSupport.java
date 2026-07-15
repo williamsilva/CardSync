@@ -74,11 +74,13 @@ public abstract class BaseSpecificationSupport<T> {
   }
 
   /**
-   * Filtro global para campo NSU (Long): usa igualdade exata quando o valor for numérico,
-   * ou prefixo de string quando não for. Evita CAST implícito com LIKE bilateral que
-   * invalidaria o índice idx_acq_nsu / idx_erp_nsu.
+   * Filtro para campo numérico (Long/Integer) buscado como texto livre: usa igualdade exata
+   * quando o valor digitado for numérico, ou prefixo de string quando não for. Evita LOWER()/
+   * CAST implícito com LIKE bilateral em coluna numérica — o Postgres não faz esse cast
+   * automático que o MySQL fazia, e além disso invalidaria índices como idx_acq_nsu/idx_erp_nsu.
+   * Usar para qualquer campo numérico (nsu, rvNumber, pvNumber, etc.) exposto em busca de texto.
    */
-  protected Specification<T> nsuGlobalFilter(String value, String field) {
+  protected Specification<T> numberFilter(String value, String field) {
     if (isBlank(value)) {
       return alwaysTrue();
     }

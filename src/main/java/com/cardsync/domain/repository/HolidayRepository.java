@@ -49,8 +49,8 @@ public interface HolidayRepository extends JpaRepository<HolidayEntity, UUID>, J
         (h.recurring = false AND h.holidayDate = :date)
         OR
         (h.recurring = true
-          AND FUNCTION('MONTH', h.holidayDate) = FUNCTION('MONTH', :date)
-          AND FUNCTION('DAY',   h.holidayDate) = FUNCTION('DAY',   :date))
+          AND FUNCTION('date_part', 'month', h.holidayDate) = FUNCTION('date_part', 'month', :date)
+          AND FUNCTION('date_part', 'day',   h.holidayDate) = FUNCTION('date_part', 'day',   :date))
       )
     """)
   List<HolidayEntity> findActiveByDate(@org.springframework.data.repository.query.Param("date") LocalDate date);

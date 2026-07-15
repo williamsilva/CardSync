@@ -76,7 +76,7 @@ public class AdjustmentCancellationSpecs extends BaseSpecificationSupport<Adjust
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
         spec = spec.and(anyOf(
-          nsuGlobalFilter(gf, "nsu"),
+          numberFilter(gf, "nsu"),
           startsWith(gf, "authorization")
         ));
       }
@@ -94,6 +94,7 @@ public class AdjustmentCancellationSpecs extends BaseSpecificationSupport<Adjust
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
         fetchIfNotFetched(root, "establishment");
+        fetchIfNotFetched(root, "transaction");
 
         query.distinct(true);
       }

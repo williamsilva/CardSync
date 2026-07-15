@@ -61,8 +61,10 @@ public class HolidaySpecs extends BaseSpecificationSupport<HolidayEntity> {
       ),
       cb.and(
         cb.equal(root.get("recurring"), true),
-        cb.equal(cb.function("MONTH", Integer.class, root.get("holidayDate")), date.getMonthValue()),
-        cb.equal(cb.function("DAY", Integer.class, root.get("holidayDate")), date.getDayOfMonth())
+        // MONTH()/DAY() (MySQL) não existem no Postgres; date_part(field, source) é o
+        // equivalente nativo de EXTRACT(field FROM source).
+        cb.equal(cb.function("date_part", Integer.class, cb.literal("month"), root.get("holidayDate")), date.getMonthValue()),
+        cb.equal(cb.function("date_part", Integer.class, cb.literal("day"), root.get("holidayDate")), date.getDayOfMonth())
       )
     );
   }
@@ -72,8 +74,8 @@ public class HolidaySpecs extends BaseSpecificationSupport<HolidayEntity> {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
         query.orderBy(
-          cb.asc(cb.function("MONTH", Integer.class, root.get("holidayDate"))),
-          cb.asc(cb.function("DAY", Integer.class, root.get("holidayDate"))),
+          cb.asc(cb.function("date_part", Integer.class, cb.literal("month"), root.get("holidayDate"))),
+          cb.asc(cb.function("date_part", Integer.class, cb.literal("day"), root.get("holidayDate"))),
           cb.desc(root.get("holidayDate"))
         );
       }

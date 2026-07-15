@@ -1,4 +1,4 @@
-ALTER TABLE cs_bank ADD COLUMN status INT NOT NULL DEFAULT 1 AFTER code;
+ALTER TABLE cs_bank ADD COLUMN status INT NOT NULL DEFAULT 1;
 
 UPDATE cs_bank SET status = CASE
   WHEN active = TRUE THEN 1

@@ -216,8 +216,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     select a.id
       from TransactionAcqEntity a
      where a.statusTransaction = :canceledStatus
-       and function('YEAR', a.saleDate) = :year
-       and function('MONTH', a.saleDate) = :month
+       and function('date_part', 'year', a.saleDate) = :year
+       and function('date_part', 'month', a.saleDate) = :month
      order by a.saleDate asc, a.id asc
   """)
   List<UUID> findCancelledAcqIdsForMonthReprocess(

@@ -48,6 +48,10 @@ public class TransactionErpEntity extends AuditableEntityBase {
   private String cardName;
   private String cardNumber;
   private String observations;
+
+  // "authorization" é palavra reservada no Postgres (AUTHORIZATION) - precisa de identificador
+  // entre aspas; o Hibernate traduz backtick para o quote-char do dialect alvo.
+  @Column(name = "`authorization`")
   private String authorization;
   private String transactionType;
   private String installmentType;

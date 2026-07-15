@@ -76,7 +76,7 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
 
         spec = spec.and(
           anyOf(
-            nsuGlobalFilter(gf, "nsu"),
+            numberFilter(gf, "nsu"),
             startsWith(gf, "authorization")
           )
         );

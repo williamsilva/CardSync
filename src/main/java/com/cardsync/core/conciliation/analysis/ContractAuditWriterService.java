@@ -51,8 +51,10 @@ public class ContractAuditWriterService {
       return;
     }
 
-    Map<UUID, ContractAuditEntity> existingByTransactionAcqId = contractAuditRepository
-      .findByTransactionAcq_IdIn(commandsByTransactionAcqId.keySet())
+    // Mesma restrição de 65.535 parâmetros do Postgres/JDBC do deleteByTransactionAcqIds:
+    // busca em lotes para não estourar o limite em reprocessamentos grandes.
+    Map<UUID, ContractAuditEntity> existingByTransactionAcqId = findByTransactionAcqIdsBatched(
+      commandsByTransactionAcqId.keySet())
       .stream()
       .filter(audit -> audit.getTransactionAcq() != null && audit.getTransactionAcq().getId() != null)
       .collect(Collectors.toMap(
@@ -74,6 +76,26 @@ public class ContractAuditWriterService {
     deleteByTransactionAcqIds(transactionAcqId == null ? List.of() : List.of(transactionAcqId));
   }
 
+  // Postgres/JDBC limita uma PreparedStatement a 65.535 parâmetros no total; um WHERE id
+  // IN (...) com um lote de reprocessamento grande (ex.: backfill histórico) pode facilmente
+  // passar disso. Divide em lotes seguros abaixo desse teto, tanto pra busca quanto pro delete.
+  private static final int IN_CLAUSE_BATCH_SIZE = 1000;
+
+  private List<ContractAuditEntity> findByTransactionAcqIdsBatched(Collection<UUID> transactionAcqIds) {
+    List<UUID> ids = transactionAcqIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+
+    List<ContractAuditEntity> result = new java.util.ArrayList<>(ids.size());
+    for (int start = 0; start < ids.size(); start += IN_CLAUSE_BATCH_SIZE) {
+      List<UUID> chunk = ids.subList(start, Math.min(start + IN_CLAUSE_BATCH_SIZE, ids.size()));
+      result.addAll(contractAuditRepository.findByTransactionAcq_IdIn(chunk));
+    }
+    return result;
+  }
+
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void deleteByTransactionAcqIds(Collection<UUID> transactionAcqIds) {
     if (transactionAcqIds == null || transactionAcqIds.isEmpty()) {
@@ -89,7 +111,10 @@ public class ContractAuditWriterService {
       return;
     }
 
-    contractAuditRepository.deleteByTransactionAcqIdInBulk(ids);
+    for (int start = 0; start < ids.size(); start += IN_CLAUSE_BATCH_SIZE) {
+      List<UUID> chunk = ids.subList(start, Math.min(start + IN_CLAUSE_BATCH_SIZE, ids.size()));
+      contractAuditRepository.deleteByTransactionAcqIdInBulk(chunk);
+    }
   }
 
   private ContractAuditEntity fill(ContractAuditEntity audit, ContractAuditCommand command) {

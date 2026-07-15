@@ -1,5 +1,6 @@
 package com.cardsync.domain.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
@@ -33,6 +34,10 @@ public class RequestNoticeEntity extends AuditableEntityBase {
   private String tid;
   private String recordType;
   private String cardNumber;
+
+  // "authorization" é palavra reservada no Postgres (AUTHORIZATION) - precisa de identificador
+  // entre aspas; o Hibernate traduz backtick para o quote-char do dialect alvo.
+  @Column(name = "`authorization`")
   private String authorization;
   private String ecommerceOrderNumber;
 

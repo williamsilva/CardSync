@@ -2,7 +2,7 @@
 -- Utilizado para enriquecer o calendário de arquivos com os estabelecimentos
 -- cadastrados e ativos que aparecem em cada arquivo.
 CREATE TABLE cs_processed_file_pv (
-  processed_file_id BINARY(16) NOT NULL,
+  processed_file_id UUID NOT NULL,
   pv_number         INT        NOT NULL,
   PRIMARY KEY (processed_file_id, pv_number),
   CONSTRAINT fk_cs_processed_file_pv_file

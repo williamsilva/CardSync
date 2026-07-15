@@ -3,6 +3,7 @@ package com.cardsync.domain.model;
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ContractAuditStatusEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -29,6 +30,10 @@ public class ContractAuditEntity extends AuditableEntityBase {
   private Integer modality;
 
   private Long nsu;
+
+  // "authorization" é palavra reservada no Postgres (AUTHORIZATION) - precisa de identificador
+  // entre aspas; o Hibernate traduz backtick para o quote-char do dialect alvo.
+  @Column(name = "`authorization`")
   private String authorization;
 
   private BigDecimal grossValue;

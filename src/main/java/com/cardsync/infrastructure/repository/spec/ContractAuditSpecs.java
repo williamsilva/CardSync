@@ -66,7 +66,7 @@ public class ContractAuditSpecs extends BaseSpecificationSupport<ContractAuditEn
 
         spec = spec.and(
           anyOf(
-            nsuGlobalFilter(gf, "nsu"),
+            numberFilter(gf, "nsu"),
             startsWith(gf, "authorization")
           )
         );
@@ -83,6 +83,8 @@ public class ContractAuditSpecs extends BaseSpecificationSupport<ContractAuditEn
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
         fetchIfNotFetched(root, "establishment");
+        fetchIfNotFetched(root, "transactionAcq");
+        fetchIfNotFetched(root, "transactionErp");
 
         // distinct apenas na query de dados
         query.distinct(true);

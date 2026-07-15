@@ -61,6 +61,29 @@ public class AcquirerSpecs extends BaseSpecificationSupport<AcquirerEntity> {
       spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
     }
 
+    spec = spec.and(fetchListAssociations());
+
     return spec.and(orderByAsc("fantasyName"));
+  }
+
+  /**
+   * initializeRelations() (AcquirerService) toca acquirerCompanies+company e
+   * acquirerEstablishments+establishment+company para cada linha da página — sem fetch,
+   * isso era N+1 puro. Só dá pra fetch-joinar UMA das duas coleções (acquirerCompanies e
+   * acquirerEstablishments são ambas List/bag — join fetch nas duas ao mesmo tempo dispara
+   * MultipleBagFetchException do Hibernate). A outra fica coberta por @BatchSize(100) na
+   * entidade, que agrupa o lazy-load em poucas queries em vez de uma por linha.
+   */
+  private Specification<AcquirerEntity> fetchListAssociations() {
+    return (root, query, cb) -> {
+      if (!isCountQuery(query)) {
+        var acquirerCompanies = fetchIfNotFetched(root, "acquirerCompanies");
+        fetchIfNotFetched(acquirerCompanies, "company");
+
+        query.distinct(true);
+      }
+
+      return cb.conjunction();
+    };
   }
 }

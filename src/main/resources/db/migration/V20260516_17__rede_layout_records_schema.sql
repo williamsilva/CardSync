@@ -1,31 +1,31 @@
 CREATE TABLE cs_pv_matrix_header (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   pv_number INT NULL,
   line_number INT NULL,
   record_type VARCHAR(20) NULL,
   commercial_name VARCHAR(120) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_pv_matrix_header_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pv_matrix_header_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pv_matrix_header_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pv_matrix_header_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_pv_matrix_header_pv ON cs_pv_matrix_header(pv_number);
 
 CREATE TABLE cs_serasa_consultation (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   pv_number INT NULL,
   line_number INT NULL,
   record_type VARCHAR(20) NULL,
@@ -34,24 +34,24 @@ CREATE TABLE cs_serasa_consultation (
   start_consultation_period DATE NULL,
   end_consultation_period DATE NULL,
   value_consultation_period DECIMAL(18,8) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_serasa_consultation_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_serasa_consultation_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_serasa_consultation_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_serasa_consultation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_serasa_consultation_pv_period ON cs_serasa_consultation(pv_number, start_consultation_period, end_consultation_period);
 
 CREATE TABLE cs_pending_debt (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   tid VARCHAR(80) NULL,
   nsu BIGINT NULL,
   pv_number INT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE cs_pending_debt (
   card_number VARCHAR(80) NULL,
   line_number INT NULL,
   reason_code INT NULL,
-  authorization VARCHAR(80) NULL,
+  "authorization" VARCHAR(80) NULL,
   letter_number BIGINT NULL,
   letter_date DATE NULL,
   reference_month VARCHAR(20) NULL,
@@ -74,27 +74,27 @@ CREATE TABLE cs_pending_debt (
   number_process_chargeback BIGINT NULL,
   date_original_transaction DATE NULL,
   original_transaction_value DECIMAL(18,8) NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_pending_debt_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pending_debt_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pending_debt_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pending_debt_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_pending_debt_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_pending_debt_pv_date ON cs_pending_debt(pv_number, date_debit_order);
 CREATE INDEX idx_cs_pending_debt_nsu ON cs_pending_debt(nsu);
 
 CREATE TABLE cs_installment_unscheduling (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   nsu BIGINT NULL,
   tid VARCHAR(80) NULL,
   order_number VARCHAR(80) NULL,
@@ -107,7 +107,7 @@ CREATE TABLE cs_installment_unscheduling (
   rv_number_original INT NULL,
   unscheduling_status INT NULL,
   reference_number VARCHAR(80) NULL,
-  ecommerce BIT NULL,
+  ecommerce BOOLEAN NULL,
   date_credit DATE NULL,
   cancellation_date DATE NULL,
   transaction_date DATE NULL,
@@ -116,27 +116,27 @@ CREATE TABLE cs_installment_unscheduling (
   cancellation_value DECIMAL(18,8) NULL,
   new_installment_value DECIMAL(18,8) NULL,
   original_value_changed_installment DECIMAL(18,8) NULL,
-  flag_rv_origin_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_rv_origin_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_installment_unscheduling_flag FOREIGN KEY (flag_rv_origin_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_unscheduling_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_unscheduling_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_unscheduling_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_unscheduling_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_installment_unscheduling_rv ON cs_installment_unscheduling(pv_number_original, rv_number_original);
 CREATE INDEX idx_cs_installment_unscheduling_nsu ON cs_installment_unscheduling(nsu);
 
 CREATE TABLE cs_totalizer_matrix (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   pv_number INT NULL,
   line_number INT NULL,
   record_type VARCHAR(20) NULL,
@@ -148,24 +148,24 @@ CREATE TABLE cs_totalizer_matrix (
   total_value_credit_adjustments DECIMAL(18,8) NULL,
   amount_debit_adjustments INT NULL,
   total_value_debit_adjustments DECIMAL(18,8) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_totalizer_matrix_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_totalizer_matrix_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_totalizer_matrix_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_totalizer_matrix_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_totalizer_matrix_pv ON cs_totalizer_matrix(pv_number);
 
 CREATE TABLE cs_archive_trailer (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   line_number INT NULL,
   record_type VARCHAR(20) NULL,
   number_matrices INT NULL,
@@ -179,24 +179,24 @@ CREATE TABLE cs_archive_trailer (
   total_value_credit_adjustments DECIMAL(18,8) NULL,
   debit_adjustment_quantity INT NULL,
   total_value_debit DECIMAL(18,8) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_archive_trailer_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_archive_trailer_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_archive_trailer_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_archive_trailer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_archive_trailer_file ON cs_archive_trailer(processed_file_id);
 
 CREATE TABLE cs_rede_request_notice (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   line_number INT NULL,
   record_type VARCHAR(20) NULL,
   pv_number INT NULL,
@@ -207,16 +207,16 @@ CREATE TABLE cs_rede_request_notice (
   reference_number DECIMAL(38,0) NULL,
   process_number DECIMAL(38,0) NULL,
   nsu BIGINT NULL,
-  authorization VARCHAR(80) NULL,
+  "authorization" VARCHAR(80) NULL,
   request_code INT NULL,
   deadline DATE NULL,
   request_status INT NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  sales_summary_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_request_notice_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_request_notice_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
@@ -224,18 +224,18 @@ CREATE TABLE cs_rede_request_notice (
   CONSTRAINT fk_cs_rede_request_notice_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_request_notice_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_request_notice_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 
 CREATE INDEX idx_cs_rede_request_notice_pv_rv ON cs_rede_request_notice(pv_number, rv_number);
 CREATE INDEX idx_cs_rede_request_notice_nsu ON cs_rede_request_notice(nsu);
 CREATE INDEX idx_cs_rede_request_notice_processed_file ON cs_rede_request_notice(processed_file_id);
 
 CREATE TABLE cs_rede_eevd_totalizer (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
   pv_number INT NULL,
@@ -249,25 +249,25 @@ CREATE TABLE cs_rede_eevd_totalizer (
   predating_discount_value DECIMAL(18,8) NULL,
   predating_liquid_value DECIMAL(18,8) NULL,
   total_file_records INT NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_eevd_totalizer_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_eevd_totalizer_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_eevd_totalizer_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_eevd_totalizer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_rede_eevd_totalizer_file_type ON cs_rede_eevd_totalizer(processed_file_id, record_type);
 CREATE INDEX idx_cs_rede_eevd_totalizer_pv ON cs_rede_eevd_totalizer(pv_number);
 
 CREATE TABLE cs_rede_negotiated_transaction (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
   establishment_number INT NULL,
@@ -290,12 +290,12 @@ CREATE TABLE cs_rede_negotiated_transaction (
   agency INT NULL,
   account BIGINT NULL,
   credit_status INT NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  sales_summary_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_negotiated_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_negotiated_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
@@ -303,17 +303,17 @@ CREATE TABLE cs_rede_negotiated_transaction (
   CONSTRAINT fk_cs_rede_negotiated_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_negotiated_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_negotiated_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_rede_negotiated_rv ON cs_rede_negotiated_transaction(establishment_number, rv_number);
 CREATE INDEX idx_cs_rede_negotiated_file ON cs_rede_negotiated_transaction(processed_file_id);
 CREATE INDEX idx_cs_rede_negotiated_liquidation ON cs_rede_negotiated_transaction(liquidation_date);
 
 CREATE TABLE cs_rede_ic_plus_transaction (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
   pv_number INT NULL,
@@ -326,18 +326,18 @@ CREATE TABLE cs_rede_ic_plus_transaction (
   interchange_value DECIMAL(18,8) NULL,
   plus_value DECIMAL(18,8) NULL,
   entry_mode VARCHAR(10) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  sales_summary_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_ic_plus_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_ic_plus_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_ic_plus_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_ic_plus_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_ic_plus_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_rede_ic_plus_rv ON cs_rede_ic_plus_transaction(pv_number, rv_number_original);
 CREATE INDEX idx_cs_rede_ic_plus_nsu ON cs_rede_ic_plus_transaction(nsu);
 CREATE INDEX idx_cs_rede_ic_plus_file ON cs_rede_ic_plus_transaction(processed_file_id);
@@ -375,7 +375,7 @@ ALTER TABLE cs_rede_request_notice
   ADD COLUMN ecommerce_order_number VARCHAR(30) NULL;
 
 ALTER TABLE cs_serasa_consultation
-  ADD COLUMN flag_id BINARY(16) NULL,
+  ADD COLUMN flag_id UUID NULL,
   ADD CONSTRAINT fk_cs_serasa_consultation_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE;
 
 CREATE INDEX idx_cs_rede_request_notice_tid ON cs_rede_request_notice(tid);
@@ -395,10 +395,10 @@ ALTER TABLE cs_pending_debt
   ADD COLUMN reason_code2 INT NULL;
 
 ALTER TABLE cs_settled_debt
-  MODIFY COLUMN nsu BIGINT NULL,
-  MODIFY COLUMN letter_number BIGINT NULL,
-  MODIFY COLUMN number_debit_order BIGINT NULL,
-  MODIFY COLUMN retention_process_number BIGINT NULL;
+  ALTER COLUMN nsu TYPE BIGINT,
+  ALTER COLUMN letter_number TYPE BIGINT,
+  ALTER COLUMN number_debit_order TYPE BIGINT,
+  ALTER COLUMN retention_process_number TYPE BIGINT;
 
 ALTER TABLE cs_installment_unscheduling
   ADD COLUMN original_installment_number INT NULL,
@@ -412,7 +412,7 @@ ALTER TABLE cs_installment_unscheduling
   ADD COLUMN negotiation_date DATE NULL,
   ADD COLUMN negotiation_contract_number BIGINT NULL,
   ADD COLUMN partner_cnpj VARCHAR(20) NULL,
-  ADD COLUMN flag_rv_adjusted_id BINARY(16) NULL;
+  ADD COLUMN flag_rv_adjusted_id UUID NULL;
 
 ALTER TABLE cs_installment_unscheduling
   ADD CONSTRAINT fk_cs_installment_unscheduling_flag_adjusted FOREIGN KEY (flag_rv_adjusted_id) REFERENCES cs_flag(id) ON UPDATE CASCADE;
@@ -420,34 +420,34 @@ ALTER TABLE cs_installment_unscheduling
 CREATE INDEX idx_cs_installment_unscheduling_adjusted_rv ON cs_installment_unscheduling(adjusted_pv_number, adjusted_rv_number);
 
 CREATE TABLE cs_rede_pix_cancellation (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
   pv_number INT NULL,
   debit_order_number BIGINT NULL,
   internal_charge_id VARCHAR(40) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_pix_cancellation_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_pix_cancellation_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_pix_cancellation_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_pix_cancellation_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_rede_pix_cancellation_pv ON cs_rede_pix_cancellation(pv_number);
 
 CREATE TABLE cs_rede_suspended_payment (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
   pv_number INT NULL,
@@ -465,12 +465,12 @@ CREATE TABLE cs_rede_suspended_payment (
   installment_number INT NULL,
   original_contract_date DATE NULL,
   cip_contract_number VARCHAR(30) NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  sales_summary_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_suspended_payment_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_suspended_payment_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
@@ -478,15 +478,15 @@ CREATE TABLE cs_rede_suspended_payment (
   CONSTRAINT fk_cs_rede_suspended_payment_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_suspended_payment_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_suspended_payment_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_rede_suspended_payment_pv_rv ON cs_rede_suspended_payment(pv_number, rv_number);
 
 CREATE TABLE cs_rede_technical_reserve (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
   pv_number INT NULL,
@@ -504,12 +504,12 @@ CREATE TABLE cs_rede_technical_reserve (
   agency INT NULL,
   account BIGINT NULL,
   reserve_status INT NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  sales_summary_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_rede_technical_reserve_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_technical_reserve_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
@@ -517,5 +517,5 @@ CREATE TABLE cs_rede_technical_reserve (
   CONSTRAINT fk_cs_rede_technical_reserve_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_technical_reserve_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_rede_technical_reserve_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_rede_technical_reserve_pv_rv ON cs_rede_technical_reserve(pv_number, rv_number_original);

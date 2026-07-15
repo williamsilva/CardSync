@@ -1,6 +1,6 @@
 ALTER TABLE cs_holiday
-  ADD COLUMN status INT NOT NULL DEFAULT 1 AFTER name,
-  ADD COLUMN status_date DATETIME(6) NULL AFTER status;
+  ADD COLUMN status INT NOT NULL DEFAULT 1,
+  ADD COLUMN status_date TIMESTAMP(6) NULL;
 
 UPDATE cs_holiday
 SET status = CASE
@@ -9,8 +9,9 @@ SET status = CASE
 END,
 status_date = COALESCE(updated_at, created_at);
 
+DROP INDEX IF EXISTS idx_cs_holiday_active_date;
+
 ALTER TABLE cs_holiday
-  DROP INDEX idx_cs_holiday_active_date,
   DROP COLUMN active;
 
 CREATE INDEX idx_cs_holiday_status_date

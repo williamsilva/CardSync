@@ -25,7 +25,9 @@ public class ContractAuditAdvancedFields extends BaseSpecificationSupport<Contra
     }
 
     // Filtros diretos da Venda
-    spec = spec.and(contains(filter.cvNsu(), "nsu"));
+    // nsu é BIGINT: contains() faz LOWER(coluna), que quebra no Postgres (funcionava no
+    // MySQL por cast implícito). numberFilter faz igualdade quando o valor é numérico.
+    spec = spec.and(numberFilter(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.authorization(), "authorization"));
 
     spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode ));

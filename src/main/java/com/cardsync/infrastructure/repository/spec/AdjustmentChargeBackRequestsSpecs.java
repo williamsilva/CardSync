@@ -74,6 +74,7 @@ public class AdjustmentChargeBackRequestsSpecs extends BaseSpecificationSupport<
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
         fetchIfNotFetched(root, "establishment");
+        fetchIfNotFetched(root, "salesSummary");
 
         query.distinct(true);
       }

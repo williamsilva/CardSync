@@ -27,7 +27,7 @@ public class AdjustmentAdvancedFields extends BaseSpecificationSupport<Adjustmen
     Specification<AdjustmentEntity> spec = Specs.all();
 
     // Buscas por texto (startsWith para aproveitar índices)
-    spec = spec.and(nsuGlobalFilter(filter.nsu(), "nsu"));
+    spec = spec.and(numberFilter(filter.nsu(), "nsu"));
     spec = spec.and(startsWith(filter.authorization(), "authorization"));
 
     // RV Ajuste (inteiro)

@@ -75,6 +75,14 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
   private Specification<ReleasesBankEntity> fetchListAssociations() {
     return (root, query, cb) -> {
       if (!isCountQuery(query)) {
+        fetchIfNotFetched(root, "flag");
+        fetchIfNotFetched(root, "bank");
+        fetchIfNotFetched(root, "acquirer");
+        fetchIfNotFetched(root, "company");
+        fetchIfNotFetched(root, "establishment");
+        fetchIfNotFetched(root, "processedFile");
+        fetchIfNotFetched(root, "bankingDomicile");
+
         // distinct apenas na query de dados
         query.distinct(true);
       }

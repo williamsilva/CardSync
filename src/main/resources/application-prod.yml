@@ -5,17 +5,13 @@ spring:
       initialize-schema: never
 
   datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
+    driver-class-name: org.postgresql.Driver
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      data-source-properties:
-        rewriteBatchedStatements: "true"
-        useServerPrepStmts: "true"
-        cachePrepStmts: "true"
-      # Pool de conexões — ajustar maximum-pool-size ao limite do banco no Railway.
-      # Railway plano básico: ~25 conexões MySQL. Usar no máximo 70% = ~17.
+      # Pool de conexões — ajustar maximum-pool-size ao limite do banco no Railway (conferir
+      # o limite de conexões do plano Postgres contratado).
       # Fórmula geral: (núcleos_cpu_banco * 2) + spindle_disks
       maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:15}
       minimum-idle: ${HIKARI_MIN_IDLE:3}
@@ -23,7 +19,7 @@ spring:
       connection-timeout: ${HIKARI_CONNECTION_TIMEOUT:30000}
       # Conexão ociosa é fechada após este tempo (ms) — libera recursos no banco
       idle-timeout: ${HIKARI_IDLE_TIMEOUT:600000}
-      # Vida máxima de uma conexão — evita usar conexões que o MySQL já fechou (ms)
+      # Vida máxima de uma conexão — evita usar conexões que o Postgres já fechou (ms)
       max-lifetime: ${HIKARI_MAX_LIFETIME:1800000}
       # Loga stack trace se uma conexão ficar aberta por mais de 60s — ajuda a detectar leaks
       leak-detection-threshold: ${HIKARI_LEAK_DETECTION:60000}

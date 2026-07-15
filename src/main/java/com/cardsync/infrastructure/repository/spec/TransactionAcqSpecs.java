@@ -71,13 +71,13 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
 
-        // Usa nsuGlobalFilter (equals ou prefixo) e startsWith para authorization
+        // Usa numberFilter (equals ou prefixo) e startsWith para authorization
         // para aproveitar os índices idx_acq_nsu e idx_acq_authorization.
         // containsPath("establishment","pvNumber") foi removido: join + CAST + LIKE bilateral
         // não usa índice e degrada queries sem filtro de estabelecimento.
         spec = spec.and(
           anyOf(
-            nsuGlobalFilter(gf, "nsu"),
+            numberFilter(gf, "nsu"),
             startsWith(gf, "authorization")
           )
         );

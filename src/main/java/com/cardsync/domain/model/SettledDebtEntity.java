@@ -25,6 +25,10 @@ public class SettledDebtEntity extends AuditableEntityBase {
   private Integer lineNumber;
   private Integer reasonCode;
   private String compensation;
+
+  // "authorization" é palavra reservada no Postgres (AUTHORIZATION) - precisa de identificador
+  // entre aspas; o Hibernate traduz backtick para o quote-char do dialect alvo.
+  @Column(name = "`authorization`")
   private String authorization;
   private Long letterNumber;
   private LocalDate letterDate;

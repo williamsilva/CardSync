@@ -176,6 +176,10 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
         fetchIfNotFetched(root, "flag");
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
+        fetchIfNotFetched(root, "processedFile");
+
+        var bankingDomicile = fetchIfNotFetched(root, "bankingDomicile");
+        fetchIfNotFetched(bankingDomicile, "bank");
 
         // distinct apenas na query de dados
         query.distinct(true);

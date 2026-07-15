@@ -2,6 +2,7 @@ package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
 import com.cardsync.domain.model.enums.AdjustmentStatusEnum;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
@@ -47,6 +48,10 @@ public class AdjustmentEntity extends AuditableEntityBase {
   private String debitType;
   private String cardNumber;
   private String recordType;
+
+  // "authorization" é palavra reservada no Postgres (AUTHORIZATION) - precisa de identificador
+  // entre aspas; o Hibernate traduz backtick para o quote-char do dialect alvo.
+  @Column(name = "`authorization`")
   private String authorization;
   private String adjustmentType;
   private String referenceMonth;

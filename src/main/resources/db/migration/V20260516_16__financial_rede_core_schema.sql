@@ -1,9 +1,9 @@
 CREATE TABLE cs_adjustment (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   nsu BIGINT NULL,
   letter_number BIGINT NULL,
   number_debit_order BIGINT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE cs_adjustment (
   debit_type VARCHAR(30) NULL,
   card_number VARCHAR(80) NULL,
   record_type VARCHAR(20) NULL,
-  authorization VARCHAR(80) NULL,
+  "authorization" VARCHAR(80) NULL,
   adjustment_type VARCHAR(30) NULL,
   reference_month VARCHAR(20) NULL,
   adjustment_description VARCHAR(255) NULL,
@@ -41,12 +41,12 @@ CREATE TABLE cs_adjustment (
   original_value_installment DECIMAL(18,8) NULL,
   cancellation_value_requested DECIMAL(18,8) NULL,
   original_gross_sales_summary_value DECIMAL(18,8) NULL,
-  rv_flag_adjustment_id BINARY(16) NULL,
-  rv_flag_origin_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  transaction_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
+  rv_flag_adjustment_id UUID NULL,
+  rv_flag_origin_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  transaction_id UUID NULL,
+  sales_summary_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_adjustment_rv_flag_adjustment FOREIGN KEY (rv_flag_adjustment_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_adjustment_rv_flag_origin FOREIGN KEY (rv_flag_origin_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
@@ -54,16 +54,16 @@ CREATE TABLE cs_adjustment (
   CONSTRAINT fk_cs_adjustment_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_adjustment_transaction FOREIGN KEY (transaction_id) REFERENCES cs_transaction_acq(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_adjustment_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_adjustment_nsu ON cs_adjustment(nsu);
 CREATE INDEX idx_cs_adjustment_rv_adjustment ON cs_adjustment(rv_number_adjustment, pv_number_adjustment);
 
 CREATE TABLE cs_releases_bank (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   line_number INT NULL,
   service_lot INT NULL,
   number_parcels INT NULL,
@@ -89,13 +89,13 @@ CREATE TABLE cs_releases_bank (
   release_value DECIMAL(18,8) NULL,
   release_date DATE NULL,
   accounting_date DATE NULL,
-  flag_id BINARY(16) NULL,
-  bank_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
-  banking_domicile_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  bank_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  establishment_id UUID NULL,
+  processed_file_id UUID NULL,
+  banking_domicile_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_releases_bank_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_releases_bank_bank FOREIGN KEY (bank_id) REFERENCES cs_bank(id) ON UPDATE CASCADE,
@@ -104,16 +104,16 @@ CREATE TABLE cs_releases_bank (
   CONSTRAINT fk_cs_releases_bank_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_releases_bank_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_releases_bank_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_releases_bank_date_value ON cs_releases_bank(release_date, release_value);
 CREATE INDEX idx_cs_releases_bank_context ON cs_releases_bank(company_id, acquirer_id, establishment_id, flag_id);
 
 CREATE TABLE cs_credit_order (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   credit_order_number BIGINT NULL,
   launch_type VARCHAR(30) NULL,
   record_type VARCHAR(20) NULL,
@@ -134,13 +134,13 @@ CREATE TABLE cs_credit_order (
   release_value DECIMAL(18,8) NULL,
   gross_rv_value DECIMAL(18,8) NULL,
   discount_rate_value DECIMAL(18,8) NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  banking_domicile_id BINARY(16) NULL,
-  release_bank_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  processed_file_id UUID NULL,
+  sales_summary_id UUID NULL,
+  banking_domicile_id UUID NULL,
+  release_bank_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_credit_order_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_order_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
@@ -149,17 +149,17 @@ CREATE TABLE cs_credit_order (
   CONSTRAINT fk_cs_credit_order_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_order_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_order_release_bank FOREIGN KEY (release_bank_id) REFERENCES cs_releases_bank(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_credit_order_rv ON cs_credit_order(rv_number, installment_number, installment_total);
 CREATE INDEX idx_cs_credit_order_release ON cs_credit_order(release_date, release_value);
 CREATE INDEX idx_cs_credit_order_context ON cs_credit_order(company_id, acquirer_id, flag_id, original_pv_number);
 
 CREATE TABLE cs_installment_acq (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   gross_value DECIMAL(18,8) NULL,
   liquid_value DECIMAL(18,8) NULL,
   discount_value DECIMAL(18,8) NULL,
@@ -171,28 +171,28 @@ CREATE TABLE cs_installment_acq (
   payment_date DATE NULL,
   cancellation_date DATE NULL,
   expected_payment_date DATE NULL,
-  reconciliation_bank_processed_at DATETIME(6) NULL,
-  reconciliation_bank_file_id BINARY(16) NULL,
-  transaction_id BINARY(16) NOT NULL,
-  credit_order_id BINARY(16) NULL,
-  release_bank_id BINARY(16) NULL,
-  adjustment_id BINARY(16) NULL,
+  reconciliation_bank_processed_at TIMESTAMP(6) NULL,
+  reconciliation_bank_file_id UUID NULL,
+  transaction_id UUID NOT NULL,
+  credit_order_id UUID NULL,
+  release_bank_id UUID NULL,
+  adjustment_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_installment_acq_reconciliation_file FOREIGN KEY (reconciliation_bank_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_acq_transaction FOREIGN KEY (transaction_id) REFERENCES cs_transaction_acq(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_acq_credit_order FOREIGN KEY (credit_order_id) REFERENCES cs_credit_order(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_acq_release_bank FOREIGN KEY (release_bank_id) REFERENCES cs_releases_bank(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_installment_acq_adjustment FOREIGN KEY (adjustment_id) REFERENCES cs_adjustment(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_installment_acq_expected_payment ON cs_installment_acq(expected_payment_date);
 CREATE INDEX idx_cs_installment_acq_transaction ON cs_installment_acq(transaction_id);
 
 CREATE TABLE cs_anticipation (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   agency INT NULL,
   pv_number INT NULL,
   line_number INT NULL,
@@ -208,18 +208,18 @@ CREATE TABLE cs_anticipation (
   release_date DATE NULL,
   original_due_date DATE NULL,
   date_rv_corresponding DATE NULL,
-  generated_orders BIT NULL,
+  generated_orders BOOLEAN NULL,
   gross_value DECIMAL(18,8) NULL,
   release_value DECIMAL(18,8) NULL,
   discount_rate_value DECIMAL(18,8) NULL,
   original_credit_value DECIMAL(18,8) NULL,
-  flag_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
-  establishment_id BINARY(16) NULL,
-  sales_summary_id BINARY(16) NULL,
-  banking_domicile_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  company_id UUID NULL,
+  acquirer_id UUID NULL,
+  processed_file_id UUID NULL,
+  establishment_id UUID NULL,
+  sales_summary_id UUID NULL,
+  banking_domicile_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_anticipation_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_anticipation_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
@@ -228,15 +228,15 @@ CREATE TABLE cs_anticipation (
   CONSTRAINT fk_cs_anticipation_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_anticipation_sales_summary FOREIGN KEY (sales_summary_id) REFERENCES cs_sales_summary(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_anticipation_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_anticipation_pv_release ON cs_anticipation(pv_number, release_date);
 
 CREATE TABLE cs_credit_totalizer (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   pv_number INT NULL,
   record_type VARCHAR(20) NULL,
   line_number INT NULL,
@@ -245,24 +245,24 @@ CREATE TABLE cs_credit_totalizer (
   advance_credit_date DATE NULL,
   file_generation_date DATE NULL,
   total_value_advance_credits DECIMAL(18,8) NULL,
-  acquirer_id BINARY(16) NULL,
-  company_id BINARY(16) NULL,
-  banking_domicile_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  acquirer_id UUID NULL,
+  company_id UUID NULL,
+  banking_domicile_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_credit_totalizer_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_totalizer_company FOREIGN KEY (company_id) REFERENCES cs_company(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_totalizer_banking_domicile FOREIGN KEY (banking_domicile_id) REFERENCES cs_banking_domicile(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_credit_totalizer_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_credit_totalizer_pv_credit_date ON cs_credit_totalizer(pv_number, credit_date);
 
 CREATE TABLE cs_settled_debt (
-  id BINARY(16) NOT NULL,
-  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  id UUID NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
   tid VARCHAR(80) NULL,
   nsu INT NULL,
   pv_number INT NULL,
@@ -271,7 +271,7 @@ CREATE TABLE cs_settled_debt (
   line_number INT NULL,
   reason_code INT NULL,
   compensation VARCHAR(255) NULL,
-  authorization VARCHAR(80) NULL,
+  "authorization" VARCHAR(80) NULL,
   letter_number INT NULL,
   letter_date DATE NULL,
   reference_month VARCHAR(20) NULL,
@@ -291,19 +291,19 @@ CREATE TABLE cs_settled_debt (
   original_transaction_value DECIMAL(18,8) NULL,
   requested_cancellation_value DECIMAL(18,8) NULL,
   code_reason_adjustment2 INT NULL,
-  flag_id BINARY(16) NULL,
-  acquirer_id BINARY(16) NULL,
-  processed_file_id BINARY(16) NULL,
+  flag_id UUID NULL,
+  acquirer_id UUID NULL,
+  processed_file_id UUID NULL,
   PRIMARY KEY (id),
   CONSTRAINT fk_cs_settled_debt_flag FOREIGN KEY (flag_id) REFERENCES cs_flag(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_settled_debt_acquirer FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id) ON UPDATE CASCADE,
   CONSTRAINT fk_cs_settled_debt_processed_file FOREIGN KEY (processed_file_id) REFERENCES cs_processed_file(id) ON UPDATE CASCADE
-) ENGINE=InnoDB;
+);
 CREATE INDEX idx_cs_settled_debt_pv_date ON cs_settled_debt(pv_number, liquidated_date);
 CREATE INDEX idx_cs_settled_debt_nsu ON cs_settled_debt(nsu);
 
 ALTER TABLE cs_adjustment
-  ADD COLUMN ecommerce BIT(1) NULL,
+  ADD COLUMN ecommerce BOOLEAN NULL,
   ADD COLUMN pv_number INT NULL,
   ADD COLUMN installment_number INT NULL,
   ADD COLUMN installment_total INT NULL,
@@ -315,8 +315,8 @@ ALTER TABLE cs_adjustment
   ADD COLUMN gross_value DECIMAL(18,8) NULL,
   ADD COLUMN liquid_value DECIMAL(18,8) NULL,
   ADD COLUMN discount_value DECIMAL(18,8) NULL,
-  ADD COLUMN establishment_id BINARY(16) NULL,
-  ADD COLUMN processed_file_id BINARY(16) NULL;
+  ADD COLUMN establishment_id UUID NULL,
+  ADD COLUMN processed_file_id UUID NULL;
 
 ALTER TABLE cs_adjustment
   ADD CONSTRAINT fk_cs_adjustment_establishment FOREIGN KEY (establishment_id) REFERENCES cs_establishment(id) ON UPDATE CASCADE,

@@ -75,6 +75,14 @@ public class CreditOrderSpecs extends BaseSpecificationSupport<CreditOrderEntity
         fetchIfNotFetched(root, "flag");
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
+        fetchIfNotFetched(root, "processedFile");
+
+        var bankingDomicile = fetchIfNotFetched(root, "bankingDomicile");
+        fetchIfNotFetched(bankingDomicile, "bank");
+
+        var salesSummary = fetchIfNotFetched(root, "salesSummary");
+        var salesSummaryBankingDomicile = fetchIfNotFetched(salesSummary, "bankingDomicile");
+        fetchIfNotFetched(salesSummaryBankingDomicile, "bank");
 
         // distinct apenas na query de dados
         query.distinct(true);

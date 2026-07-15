@@ -19,13 +19,13 @@
  * 5 = INSTALLMENT_CREDIT_13_21
  */
 
-DROP TEMPORARY TABLE IF EXISTS tmp_rede_contract_seed_establishments;
+DROP TABLE IF EXISTS tmp_rede_contract_seed_establishments;
 CREATE TEMPORARY TABLE tmp_rede_contract_seed_establishments (
   cnpj VARCHAR(14) NOT NULL,
   pv_number BIGINT NOT NULL,
   description VARCHAR(150) NOT NULL,
   PRIMARY KEY (cnpj, pv_number)
-) ENGINE=Memory;
+);
 
 INSERT INTO tmp_rede_contract_seed_establishments (cnpj, pv_number, description) VALUES
   ('39303847000180', 7867379,  'Acquamania Multiplo Lazer S.A - Rede S/A - PV 7867379'),
@@ -35,7 +35,7 @@ INSERT INTO tmp_rede_contract_seed_establishments (cnpj, pv_number, description)
   ('28499334000170', 74705318, 'Mac Serviços e Conveniência LTDA - Rede S/A - PV 74705318'),
   ('28499334000170', 78589126, 'Mac Serviços e Conveniência LTDA - Rede S/A - PV 78589126');
 
-DROP TEMPORARY TABLE IF EXISTS tmp_rede_contract_seed_rates;
+DROP TABLE IF EXISTS tmp_rede_contract_seed_rates;
 CREATE TEMPORARY TABLE tmp_rede_contract_seed_rates (
   flag_name VARCHAR(50) NOT NULL,
   modality INT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TEMPORARY TABLE tmp_rede_contract_seed_rates (
   installment_max INT NULL,
   rate DECIMAL(18,8) NOT NULL,
   payment_term_days INT NOT NULL
-) ENGINE=Memory;
+);
 
 INSERT INTO tmp_rede_contract_seed_rates
   (flag_name, modality, installment_min, installment_max, rate, payment_term_days)
@@ -95,96 +95,23 @@ VALUES
 
 -- Corrige bancos antigos onde cs_flag_company foi criada com índice único apenas em flag_id.
 -- O modelo correto é permitir a mesma bandeira em várias empresas, bloqueando apenas duplicidade do par flag_id + company_id.
-DROP PROCEDURE IF EXISTS cs_create_unique_index_if_missing;
+-- Postgres já tem CREATE/DROP INDEX IF [NOT] EXISTS nativo — sem precisar de procedure condicional.
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cs_flag_company_flag_company ON cs_flag_company (flag_id, company_id);
 
-DELIMITER $$
-
-CREATE PROCEDURE cs_create_unique_index_if_missing(
-    IN p_table_name VARCHAR(128),
-    IN p_index_name VARCHAR(128),
-    IN p_index_columns TEXT
-)
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-          FROM information_schema.statistics
-         WHERE table_schema = DATABASE()
-           AND table_name = p_table_name
-           AND index_name = p_index_name
-    ) THEN
-        SET @sql = CONCAT(
-            'CREATE UNIQUE INDEX `',
-            REPLACE(p_index_name, '`', '``'),
-            '` ON `',
-            REPLACE(p_table_name, '`', '``'),
-            '` (',
-            p_index_columns,
-            ')'
-        );
-
-        PREPARE stmt FROM @sql;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END$$
-
-DELIMITER ;
-
-DROP PROCEDURE IF EXISTS cs_drop_index_if_exists;
-
-DELIMITER $$
-
-CREATE PROCEDURE cs_drop_index_if_exists(
-    IN p_table_name VARCHAR(128),
-    IN p_index_name VARCHAR(128)
-)
-BEGIN
-    IF EXISTS (
-        SELECT 1
-          FROM information_schema.statistics
-         WHERE table_schema = DATABASE()
-           AND table_name = p_table_name
-           AND index_name = p_index_name
-    ) THEN
-        SET @sql = CONCAT(
-            'DROP INDEX `',
-            REPLACE(p_index_name, '`', '``'),
-            '` ON `',
-            REPLACE(p_table_name, '`', '``'),
-            '`'
-        );
-
-        PREPARE stmt FROM @sql;
-        EXECUTE stmt;
-        DEALLOCATE PREPARE stmt;
-    END IF;
-END$$
-
-DELIMITER ;
-
-CALL cs_create_unique_index_if_missing(
-  'cs_flag_company',
-  'uk_cs_flag_company_flag_company',
-  '`flag_id`, `company_id`'
-);
-
-CALL cs_drop_index_if_exists('cs_flag_company', 'flag_id');
-
-DROP PROCEDURE IF EXISTS cs_drop_index_if_exists;
-DROP PROCEDURE IF EXISTS cs_create_unique_index_if_missing;
+DROP INDEX IF EXISTS flag_id;
 
 -- Encerra/inativa contratos genéricos por empresa + Rede da seed anterior, para não concorrerem com os contratos por PV.
-UPDATE cs_contracts contract
-JOIN cs_acquirer acquirer
-  ON acquirer.id = contract.acquirer_id
+UPDATE cs_contracts
 SET
-  contract.status = 2,
-  contract.end_date = '2023-12-31',
-  contract.updated_at = CURRENT_TIMESTAMP(6)
-WHERE acquirer.cnpj = '01425787000104'
-  AND contract.establishment_id IS NULL
-  AND contract.start_date = '2025-01-01'
-  AND contract.description LIKE '%Rede S/A - Taxas padrão%';
+  status = 2,
+  end_date = '2023-12-31',
+  updated_at = CURRENT_TIMESTAMP(6)
+FROM cs_acquirer acquirer
+WHERE acquirer.id = cs_contracts.acquirer_id
+  AND acquirer.cnpj = '01425787000104'
+  AND cs_contracts.establishment_id IS NULL
+  AND cs_contracts.start_date = '2025-01-01'
+  AND cs_contracts.description LIKE '%Rede S/A - Taxas padrão%';
 
 INSERT INTO cs_contracts (
   id,
@@ -200,7 +127,7 @@ INSERT INTO cs_contracts (
   created_by_id
 )
 SELECT
-  UUID_TO_BIN(UUID()),
+  gen_random_uuid(),
   1,
   '2024-01-01',
   '2026-12-31',
@@ -237,7 +164,7 @@ WHERE NOT EXISTS (
 
 INSERT INTO cs_contract_flags (id, flag_id, contract_id)
 SELECT
-  UUID_TO_BIN(UUID()),
+  gen_random_uuid(),
   flag.id,
   contract.id
 FROM tmp_rede_contract_seed_establishments seed
@@ -281,7 +208,7 @@ INSERT INTO cs_contract_rates (
   contract_flag_id
 )
 SELECT
-  UUID_TO_BIN(UUID()),
+  gen_random_uuid(),
   seed_rate.modality,
   seed_rate.rate,
   seed_rate.rate,
@@ -317,9 +244,9 @@ WHERE NOT EXISTS (
   FROM cs_contract_rates existing
   WHERE existing.contract_flag_id = contract_flag.id
     AND existing.modality = seed_rate.modality
-    AND existing.installment_min <=> seed_rate.installment_min
-    AND existing.installment_max <=> seed_rate.installment_max
+    AND existing.installment_min IS NOT DISTINCT FROM seed_rate.installment_min
+    AND existing.installment_max IS NOT DISTINCT FROM seed_rate.installment_max
 );
 
-DROP TEMPORARY TABLE IF EXISTS tmp_rede_contract_seed_rates;
-DROP TEMPORARY TABLE IF EXISTS tmp_rede_contract_seed_establishments;
+DROP TABLE IF EXISTS tmp_rede_contract_seed_rates;
+DROP TABLE IF EXISTS tmp_rede_contract_seed_establishments;

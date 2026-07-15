@@ -80,8 +80,19 @@ public class DashboardAuditService {
       StatusTransactionEnum.CANCELED.getCode()
     );
 
+    // CONVERT_TZ (MySQL) não existe no Postgres; o equivalente nativo é a função
+    // timezone(zone, timestamp), que corresponde ao operador "timestamp AT TIME ZONE zone".
+    // Aninhado (UTC -> offset de negócio) reproduz exatamente o CONVERT_TZ(col, '+00:00', offset).
+    //
+    // offset entra como literal (não bind parameter) de propósito: currentBusinessOffset() só
+    // gera "[+-]HH:MM" (sem entrada de usuário, sem risco de injection), e o Postgres — ao
+    // contrário do MySQL — exige que a expressão do GROUP BY seja estruturalmente idêntica à do
+    // SELECT. Como :offset repetido 3x vira 3 bind parameters distintos ($1/$4/$7), o Postgres
+    // não reconhece a expressão do GROUP BY como igual à do SELECT mesmo com o mesmo valor em
+    // runtime. Com o literal embutido, as 3 ocorrências ficam textualmente idênticas.
+    String offsetLiteral = "'" + offset + "'";
     Query q = entityManager.createQuery(
-      "select function('date', function('CONVERT_TZ', t.saleDate, '+00:00', :offset)) as dia, " +
+      "select function('date', function('timezone', " + offsetLiteral + ", function('timezone', '+00:00', t.saleDate))) as dia, " +
         "       t.acquirer.fantasyName as adquirente, " +
         "       coalesce(sum(t.grossValue),0), " +
         "       count(t.id) " +
@@ -89,12 +100,11 @@ public class DashboardAuditService {
         " where t.saleDate >= :start and t.saleDate <= :end " +
         "   and (t.statusTransaction is null or t.statusTransaction not in :excludedStatuses) " +
         "   and (t.modality is null or t.modality <> :excludedModality) " +
-        " group by function('date', function('CONVERT_TZ', t.saleDate, '+00:00', :offset)), t.acquirer.fantasyName " +
-        " order by function('date', function('CONVERT_TZ', t.saleDate, '+00:00', :offset)) desc, t.acquirer.fantasyName asc"
+        " group by function('date', function('timezone', " + offsetLiteral + ", function('timezone', '+00:00', t.saleDate))), t.acquirer.fantasyName " +
+        " order by function('date', function('timezone', " + offsetLiteral + ", function('timezone', '+00:00', t.saleDate))) desc, t.acquirer.fantasyName asc"
     );
     q.setParameter("start", start);
     q.setParameter("end", end);
-    q.setParameter("offset", offset);
     q.setParameter("excludedStatuses", excludedStatuses);
     q.setParameter("excludedModality", ModalityEnum.DIGITAL_WALLET.getCode());
 
@@ -266,10 +276,16 @@ public class DashboardAuditService {
     // (ex.: vendas após 21:00 BRT não devem cair no dia seguinte), convertemos a
     // coluna de UTC para o offset do fuso de negócio ANTES de extrair a data —
     // o mesmo critério que os specs usam para o filtro de data.
+    // CONVERT_TZ (MySQL) não existe no Postgres; timezone(zone, timestamp) é o equivalente
+    // nativo do operador "timestamp AT TIME ZONE zone". Aninhado (UTC -> offset de negócio)
+    // reproduz exatamente o CONVERT_TZ(col, '+00:00', offset).
     String offset = currentBusinessOffset();
+    Expression<java.sql.Timestamp> utcTs =
+      cb.function("timezone", java.sql.Timestamp.class,
+        cb.literal("+00:00"), root.get("saleDate"));
     Expression<java.sql.Timestamp> localTs =
-      cb.function("CONVERT_TZ", java.sql.Timestamp.class,
-        root.get("saleDate"), cb.literal("+00:00"), cb.literal(offset));
+      cb.function("timezone", java.sql.Timestamp.class,
+        cb.literal(offset), utcTs);
 
     Expression<java.sql.Date> day = cb.function("date", java.sql.Date.class, localTs);
 
@@ -286,9 +302,9 @@ public class DashboardAuditService {
   }
 
   /**
-   * Offset atual do fuso de negócio no formato aceito pelo CONVERT_TZ do MySQL
-   * (ex.: "-03:00"). Usa o offset vigente (Brasil não tem mais horário de verão,
-   * então é estável), evitando depender das tabelas de timezone nomeado do MySQL.
+   * Offset atual do fuso de negócio no formato aceito por timezone()/AT TIME ZONE do
+   * Postgres (ex.: "-03:00"). Usa o offset vigente (Brasil não tem mais horário de verão,
+   * então é estável), evitando depender de nomes de timezone (ex. "America/Sao_Paulo").
    */
   private String currentBusinessOffset() {
     ZoneId zone = dateFilterService.businessZone();

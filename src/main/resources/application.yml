@@ -4,13 +4,6 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  datasource:
-    hikari:
-      data-source-properties:
-        rewriteBatchedStatements: "true"
-        useServerPrepStmts: "true"
-        cachePrepStmts: "true"
-
   jpa:
     properties:
       hibernate.jdbc.batch_size: 1000

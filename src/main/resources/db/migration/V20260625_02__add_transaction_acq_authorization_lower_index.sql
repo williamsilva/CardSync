@@ -1,5 +1,3 @@
--- Índice funcional para consultas que usam LOWER(authorization) na conciliação ERP x Adquirente.
--- Sem este índice, a query `WHERE LOWER(authorization) IN (...)` faz full scan de toda a tabela.
--- MySQL 8.0.13+ suporta índices funcionais (expressão).
-CREATE INDEX idx_transaction_acq_auth_lower
-    ON cs_transaction_acq ((LOWER(authorization)));
+-- Índice funcional duplicado: mesma expressão (LOWER("authorization")) já é criada por
+-- idx_acq_authorization_lower em V20260604_01__Add_search_covering_indexes.sql.
+-- Mantido como no-op nesta migration para preservar a numeração/histórico do Flyway.

@@ -87,10 +87,10 @@
       <artifactId>caffeine</artifactId>
     </dependency>
 
-    <!-- MySQL + Flyway -->
+    <!-- PostgreSQL + Flyway -->
     <dependency>
-      <groupId>com.mysql</groupId>
-      <artifactId>mysql-connector-j</artifactId>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
 
@@ -101,7 +101,7 @@
 
     <dependency>
       <groupId>org.flywaydb</groupId>
-      <artifactId>flyway-mysql</artifactId>
+      <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
 
     <dependency>

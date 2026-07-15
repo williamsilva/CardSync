@@ -10,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -48,9 +49,13 @@ public class AcquirerEntity extends AuditableEntityBase {
   @Column(name = "file_identifier", nullable = false, unique = true, length = 30)
   private String fileIdentifier;
 
+  // Não é fetch-joined junto com acquirerCompanies na busca paginada (dois bags no mesmo
+  // Criteria geram MultipleBagFetchException) - @BatchSize evita N+1 linha a linha mesmo assim.
+  @BatchSize(size = 100)
   @OneToMany(mappedBy = "acquirer", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<RelationAcquirerEstablishmentEntity> acquirerEstablishments = new ArrayList<>();
 
+  @BatchSize(size = 100)
   @OneToMany(mappedBy = "acquirer", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<RelationAcquirerCompanyEntity> acquirerCompanies = new ArrayList<>();
 

@@ -22,7 +22,9 @@ public class EstablishmentAdvancedFields extends BaseSpecificationSupport<Establ
       return spec;
     }
 
-    spec = spec.and(contains(filter.pvNumber(), "pvNumber"));
+    // pvNumber é numérico: contains() faz LOWER(coluna), que quebra no Postgres (funcionava
+    // no MySQL por cast implícito). numberFilter faz igualdade quando o valor é numérico.
+    spec = spec.and(numberFilter(filter.pvNumber(), "pvNumber"));
 
     spec = spec.and(inCodes("status", filter.statusEnum(), StatusEnum::getCode));
     spec = spec.and(inCodes("type", filter.typeEnum(), TypeEstablishmentEnum::getCode));

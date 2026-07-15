@@ -70,6 +70,11 @@ public class AnticipationSpecs extends BaseSpecificationSupport<AnticipationEnti
         fetchIfNotFetched(root, "company");
         fetchIfNotFetched(root, "acquirer");
         fetchIfNotFetched(root, "establishment");
+        fetchIfNotFetched(root, "processedFile");
+        fetchIfNotFetched(root, "salesSummary");
+
+        var bankingDomicile = fetchIfNotFetched(root, "bankingDomicile");
+        fetchIfNotFetched(bankingDomicile, "bank");
 
         // distinct apenas na query de dados
         query.distinct(true);

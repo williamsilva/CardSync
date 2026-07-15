@@ -9,4 +9,4 @@ ALTER TABLE cs_reconciliation_settings
 
 INSERT INTO cs_reconciliation_settings
 	(id, created_at, erp_acquirer_previous_days_lookback, erp_acquirer_future_days_lookback, reconciliation_lookback_months, credit_order_pending_days)
-	VALUES (UUID_TO_BIN(UUID()), NOW(), '30', '30', '120', '30');
+	VALUES (gen_random_uuid(), NOW(), '30', '30', '120', '30');

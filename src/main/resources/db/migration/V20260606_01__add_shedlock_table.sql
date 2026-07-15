@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS shedlock (
   locked_at  TIMESTAMP(3) NOT NULL,
   locked_by  VARCHAR(255) NOT NULL,
   PRIMARY KEY (name)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+);

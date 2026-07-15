@@ -1,11 +1,11 @@
 CREATE TABLE cs_flag (
-  id BINARY(16) NOT NULL,
+  id UUID NOT NULL,
 
   -- EntityBase (auditoria)
   created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  updated_at TIMESTAMP(6) NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
-  created_by_id BINARY(16) NULL,
-  updated_by_id BINARY(16) NULL,
+  updated_at TIMESTAMP(6) NULL DEFAULT NULL,
+  created_by_id UUID NULL,
+  updated_by_id UUID NULL,
 
   status INT NOT NULL DEFAULT 1,
   erp_code BIGINT NOT NULL,
@@ -13,36 +13,36 @@ CREATE TABLE cs_flag (
   text_color VARCHAR(20) NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB;
+);
 
 CREATE TABLE cs_flag_acquirer (
-  id BINARY(16) NOT NULL,
-  acquirer_id BINARY(16) NOT NULL,
-  flag_id BINARY(16) NOT NULL,
+  id UUID NOT NULL,
+  acquirer_id UUID NOT NULL,
+  flag_id UUID NOT NULL,
   acquirer_code VARCHAR(2) NOT NULL,
   FOREIGN KEY (flag_id) REFERENCES cs_flag(id),
   FOREIGN KEY (acquirer_id) REFERENCES cs_acquirer(id),
    UNIQUE (flag_id, acquirer_id)
-)engine=InnoDB DEFAULT CHARSET=utf8mb4;
+);
 
 CREATE TABLE cs_flag_company (
-  id BINARY(16) NOT NULL,
-  company_id BINARY(16) NOT NULL,
-  flag_id BINARY(16) NOT NULL,
+  id UUID NOT NULL,
+  company_id UUID NOT NULL,
+  flag_id UUID NOT NULL,
   FOREIGN KEY (flag_id) REFERENCES cs_flag(id),
   FOREIGN KEY (company_id) REFERENCES cs_company(id),
    UNIQUE (flag_id, company_id)
-)engine=InnoDB DEFAULT CHARSET=utf8mb4;
+);
 
 CREATE TABLE cs_contracts (
-    id BINARY(16) NOT NULL,
+    id UUID NOT NULL,
     status BIGINT NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE,
     description VARCHAR(150) NOT NULL,
-    company_id BINARY(16) NULL,
-    acquirer_id BINARY(16) NOT NULL,
-    establishment_id BINARY(16) NULL,
+    company_id UUID NULL,
+    acquirer_id UUID NOT NULL,
+    establishment_id UUID NULL,
 
     PRIMARY KEY (id),
 
@@ -52,9 +52,9 @@ CREATE TABLE cs_contracts (
 );
 
 CREATE TABLE cs_contract_flags (
-    id BINARY(16) NOT NULL,
-    flag_id BINARY(16) NULL,
-    contract_id BINARY(16) NULL,
+    id UUID NOT NULL,
+    flag_id UUID NULL,
+    contract_id UUID NULL,
 
     PRIMARY KEY (id),
 
@@ -66,22 +66,22 @@ CREATE TABLE cs_contract_flags (
 );
 
 CREATE TABLE cs_contract_rates (
-    id BINARY(16) NOT NULL,
+    id UUID NOT NULL,
     modality BIGINT NOT NULL,
     rate DECIMAL(18,8) NOT NULL,
     rate_ecommerce DECIMAL(18,8) NOT NULL,
     payment_term_days BIGINT NOT NULL,
     payment_term_days_ecommerce BIGINT NOT NULL,
-    contract_flag_id BINARY(16) NULL,
+    contract_flag_id UUID NULL,
     PRIMARY KEY (id),
     FOREIGN KEY (contract_flag_id) REFERENCES cs_contract_flags(id)
 );
 
 ALTER TABLE cs_contracts
-    ADD COLUMN created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-    ADD COLUMN updated_at DATETIME(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-    ADD COLUMN created_by_id BINARY(16) NULL,
-    ADD COLUMN updated_by_id BINARY(16) NULL;
+    ADD COLUMN created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ADD COLUMN updated_at TIMESTAMP(6) NULL DEFAULT CURRENT_TIMESTAMP(6),
+    ADD COLUMN created_by_id UUID NULL,
+    ADD COLUMN updated_by_id UUID NULL;
 
 CREATE INDEX idx_cs_contracts_status ON cs_contracts (status);
 CREATE INDEX idx_cs_contracts_start_date ON cs_contracts (start_date);
@@ -117,10 +117,10 @@ CREATE UNIQUE INDEX uq_cs_contracts_establishment_description_start_date
   ON cs_contracts (establishment_id, description, start_date);
 
 ALTER TABLE cs_contract_rates
-  ADD COLUMN installment_min INT NULL AFTER payment_term_days,
-  ADD COLUMN installment_max INT NULL AFTER installment_min;
+  ADD COLUMN installment_min INT NULL,
+  ADD COLUMN installment_max INT NULL;
 
-DROP INDEX uq_cs_contract_rates_contract_flag_modality ON cs_contract_rates;
+DROP INDEX uq_cs_contract_rates_contract_flag_modality;
 
 CREATE UNIQUE INDEX uq_cs_contract_rates_contract_flag_modality_installment_range
   ON cs_contract_rates (contract_flag_id, modality, installment_min, installment_max);

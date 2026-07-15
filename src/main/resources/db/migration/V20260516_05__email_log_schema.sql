@@ -1,5 +1,5 @@
 CREATE TABLE cs_email_log (
-  id BINARY(16) NOT NULL,
+  id UUID NOT NULL,
 
   recipient VARCHAR(320) NOT NULL,
   subject VARCHAR(300) NOT NULL,
@@ -9,17 +9,17 @@ CREATE TABLE cs_email_log (
   event_type INT NOT NULL DEFAULT 1,
   error_message VARCHAR(1000),
 
-  requested_by_id BINARY(16),
+  requested_by_id UUID,
 
-  sent_at DATETIME(6) NOT NULL,
-  created_at DATETIME(6) NOT NULL,
-  updated_at DATETIME(6),
+  sent_at TIMESTAMP(6) NOT NULL,
+  created_at TIMESTAMP(6) NOT NULL,
+  updated_at TIMESTAMP(6),
 
-  created_by BINARY(16),
-  last_modified_by BINARY(16),
+  created_by UUID,
+  last_modified_by UUID,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB;
+);
 
 CREATE INDEX idx_cs_email_log_recipient ON cs_email_log (recipient);
 CREATE INDEX idx_cs_email_log_sent_at ON cs_email_log (sent_at);

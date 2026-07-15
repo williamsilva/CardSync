@@ -24,7 +24,9 @@ public class CreditOrderAdvancedFields extends BaseSpecificationSupport<CreditOr
       return spec;
     }
 
-    spec = spec.and(contains(filter.rvNumber(), "rvNumber"));
+    // rvNumber é numérico: contains() faz LOWER(coluna), que quebra no Postgres (funcionava
+    // no MySQL por cast implícito). numberFilter faz igualdade quando o valor é numérico.
+    spec = spec.and(numberFilter(filter.rvNumber(), "rvNumber"));
     spec = spec.and(inCodes("originalPvNumber", filter.establishments(), x -> x));
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
     spec = spec.and(inCodes("salesSummaryStatus", filter.salesSummaryStatus(), StatusReconciliationEnum::getCode));

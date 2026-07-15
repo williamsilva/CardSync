@@ -642,13 +642,14 @@ public class ManagementDashboardService {
 
     private String dateExpr(String alias) {
       // Agrupa por ANO. Para Acq (OffsetDateTime) e CreditOrder/Adjustment (LocalDate),
-      // function('year', ...) extrai o ano da data.
+      // date_part('year', ...) extrai o ano da data (YEAR() do MySQL não existe no Postgres;
+      // date_part é o equivalente nativo de EXTRACT(field FROM source)).
       String field = switch (alias) {
         case "t" -> alias + ".saleDate";
         case "c" -> alias + ".releaseDate";
         default -> alias + ".adjustmentDate";
       };
-      return "function('year'," + field + ")";
+      return "function('date_part','year'," + field + ")";
     }
 
     String label(Object raw) {
@@ -663,7 +664,7 @@ public class ManagementDashboardService {
         }
       }
       if (this == DATE && raw instanceof Number number) {
-        // function('year', ...) retorna o ano como número; exibe como inteiro (ex.: "2026").
+        // date_part('year', ...) retorna o ano como número; exibe como inteiro (ex.: "2026").
         return String.valueOf(number.intValue());
       }
       return String.valueOf(raw);

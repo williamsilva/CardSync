@@ -25,7 +25,9 @@ public class SaleSummaryAdvancedFields extends BaseSpecificationSupport<SalesSum
       return spec;
     }
 
-    spec = spec.and(contains(filter.rvNumber(), "rvNumber"));
+    // rvNumber é numérico: contains() faz LOWER(coluna), que quebra no Postgres (funcionava
+    // no MySQL por cast implícito). numberFilter faz igualdade quando o valor é numérico.
+    spec = spec.and(numberFilter(filter.rvNumber(), "rvNumber"));
 
     spec = spec.and(localDatePeriod("rvDate", filter.periodRvDate(), filter.rvDate(), true));
 

@@ -81,7 +81,7 @@ public class AdjustmentTariffsSpecs extends BaseSpecificationSupport<AdjustmentE
       if (!isBlank(query.globalFilter())) {
         String gf = query.globalFilter();
         spec = spec.and(anyOf(
-          nsuGlobalFilter(gf, "nsu"),
+          numberFilter(gf, "nsu"),
           startsWith(gf, "authorization")
         ));
       }

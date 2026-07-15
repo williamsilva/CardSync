@@ -28,7 +28,10 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
 
     // Filtros diretos da Venda
     spec = spec.and(contains(filter.tid(), "tid"));
-    spec = spec.and(contains(filter.cvNsu(), "nsu"));
+    // nsu é BIGINT: contains() faz LOWER(coluna) e quebra no Postgres para tipo numérico
+    // (funcionava no MySQL por cast implícito). numberFilter faz igualdade quando o
+    // valor é numérico, sem LOWER().
+    spec = spec.and(numberFilter(filter.cvNsu(), "nsu"));
     spec = spec.and(contains(filter.machine(), "machine"));
     spec = spec.and(contains(filter.cardNumber(), "cardNumber"));
     spec = spec.and(contains(filter.authorization(), "authorization"));
