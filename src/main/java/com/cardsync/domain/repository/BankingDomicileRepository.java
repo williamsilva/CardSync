@@ -37,6 +37,17 @@ public interface BankingDomicileRepository extends JpaRepository<BankingDomicile
   """)
   List<BankingDomicileEntity> findAllForImportedFilesCalendar();
 
+  /** Opções de filtro: ativos primeiro, depois ordem alfabética por banco. */
+  @EntityGraph(attributePaths = {"bank", "company"})
+  @Query("""
+    select domicile
+      from BankingDomicileEntity domicile
+      left join domicile.bank bank
+     order by case when domicile.status = :activeStatus then 0 else 1 end,
+       bank.name asc, domicile.agency asc, domicile.currentAccount asc
+  """)
+  List<BankingDomicileEntity> findAllOptionsFilterOrderByActiveThenBank(@Param("activeStatus") Integer activeStatus);
+
   @Query("""
     select bd
       from BankingDomicileEntity bd

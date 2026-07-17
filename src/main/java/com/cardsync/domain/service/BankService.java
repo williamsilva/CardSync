@@ -11,7 +11,6 @@ import com.cardsync.infrastructure.repository.spec.BankSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +36,7 @@ public class BankService {
   @Transactional(readOnly = true)
   public List<BankEntity> listOptionsFilter() {
     return bankRepository
-      .findAll(Sort.by(Sort.Direction.ASC, "name", "status"));
+      .findAllOptionsFilterOrderByActiveThenName(StatusEnum.toCode(StatusEnum.ACTIVE));
   }
 
   @Transactional(readOnly = true)

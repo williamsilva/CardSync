@@ -14,7 +14,6 @@ import com.cardsync.infrastructure.repository.spec.BankingDomicileSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +42,7 @@ public class BankingDomicileService {
   @Transactional(readOnly = true)
   public List<BankingDomicileEntity> listOptionsFilter() {
     return bankingDomicileRepository
-      .findAll(Sort.by(Sort.Direction.ASC, "company", "bank"));
+      .findAllOptionsFilterOrderByActiveThenBank(StatusEnum.toCode(StatusEnum.ACTIVE));
   }
 
   @Transactional(readOnly = true)
