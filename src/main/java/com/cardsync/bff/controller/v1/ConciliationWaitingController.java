@@ -228,16 +228,10 @@ public class ConciliationWaitingController {
   }
 
   // Etapa 2 — Resumo de Vendas x TransactionAcq (endpoint independente)
-  // ignoreLookback=true: backfill único, ignora a janela de lookback da esteira normal —
-  // usado para corrigir resumos antigos cujo transactionsStatus ficou desatualizado por
-  // uma ação manual (reconciliação manual, criação de ERP a partir da adquirente) feita
-  // antes do recálculo pontual existir.
   @PostMapping("/reconcile-sales-summary-transactions")
   @CheckSecurity.FileProcessing.CanProcess
-  public SalesSummaryTransactionReconciliationResult reconcileSalesSummaryTransactions(
-    @RequestParam(defaultValue = "false") boolean ignoreLookback
-  ) {
-    return salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL, ignoreLookback);
+  public SalesSummaryTransactionReconciliationResult reconcileSalesSummaryTransactions() {
+    return salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
   }
 
   // Etapa 5 — Venda ADQ x Resumo de Vendas

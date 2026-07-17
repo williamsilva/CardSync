@@ -65,50 +65,28 @@ public class SalesSummaryTransactionReconciliationService {
 
   @Transactional
   public SalesSummaryTransactionReconciliationResult reconcile(FinancialReconciliationTriggerType trigger) {
-    return reconcile(trigger, false);
-  }
-
-  /**
-   * @param ignoreLookback quando {@code true}, ignora o filtro de rvDate/lookback da consulta
-   *                        agregada — usado para um backfill único, corrigindo resumos antigos
-   *                        cujo transactionsStatus ficou desatualizado por uma ação manual e
-   *                        que já saíram da janela de lookback (nunca mais seriam vistos pela
-   *                        execução normal, em lote, da esteira).
-   */
-  @Transactional
-  public SalesSummaryTransactionReconciliationResult reconcile(FinancialReconciliationTriggerType trigger, boolean ignoreLookback) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     boolean includeAll = reconciliationSettingsService.isReprocessSalesSummaryTransactions();
 
     log.info(
-      "📌 Etapa 1b - Resumo x TransactionAcq iniciada. trigger={}, includeAll={}, ignoreLookback={}, excludedStatuses={}, reconciledStatuses={}",
-      trigger, includeAll, ignoreLookback, EXCLUDED_STATUSES, RECONCILED_STATUSES
+      "📌 Etapa 1b - Resumo x TransactionAcq iniciada. trigger={}, includeAll={}, excludedStatuses={}, reconciledStatuses={}",
+      trigger, includeAll, EXCLUDED_STATUSES, RECONCILED_STATUSES
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
 
-    List<SalesSummaryTransactionStats> stats;
-    if (ignoreLookback) {
-      stats = salesSummaryRepository.findStatsForSalesSummaryTransactionReconciliationIgnoringLookback(
-        includeAll,
-        PENDING_STATUSES,
-        EXCLUDED_STATUSES,
-        RECONCILED_STATUSES
-      );
-    } else {
-      LocalDate implantationDate = implantationDateProvider.get();
-      LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+    LocalDate implantationDate = implantationDateProvider.get();
+    LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
 
-      stats = salesSummaryRepository.findStatsForSalesSummaryTransactionReconciliation(
-        includeAll,
-        PENDING_STATUSES,
-        EXCLUDED_STATUSES,
-        RECONCILED_STATUSES,
-        implantationDate,
-        lookbackDate
-      );
-    }
+    List<SalesSummaryTransactionStats> stats = salesSummaryRepository.findStatsForSalesSummaryTransactionReconciliation(
+      includeAll,
+      PENDING_STATUSES,
+      EXCLUDED_STATUSES,
+      RECONCILED_STATUSES,
+      implantationDate,
+      lookbackDate
+    );
 
     log.info(
       "🔎 Etapa 1b - Consulta agregada concluída. trigger={}, resumosCandidatos={}, duração={}s",

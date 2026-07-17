@@ -79,21 +79,26 @@ public class BankReconciliationService {
     BankReconciliationMode mode = config.getBankMode();
     BankReconciliationResult.Counter result = BankReconciliationResult.counter(trigger, mode);
 
-    List<UUID> eligibleOrderIds = creditOrderRepository.findEligibleIdsForBankReconciliation(
+    List<Object[]> eligibleRows = creditOrderRepository.findEligibleIdsGroupedByCompanyForBankReconciliation(
       SUMMARY_RECONCILED_STATUS,
       PAYMENT_PENDING,
       PAYMENT_PARTIAL,
       reconciliationSettingsService.isReprocessBankAcquirer()
     );
 
+    int eligibleOrderCount = eligibleRows.size();
     int batchSize = Math.max(config.getBankBatchSize(), 1);
-    int totalBatches = (eligibleOrderIds.size() + batchSize - 1) / batchSize;
+    int safeDateGapDays = reconciliationSettingsService.getDateToleranceDaysBefore()
+      + reconciliationSettingsService.getDateToleranceDaysAfter()
+      + 1;
+    List<List<UUID>> idBatches = packIdsByCompanyIntoBatches(eligibleRows, batchSize, safeDateGapDays);
+    int totalBatches = idBatches.size();
 
     log.info(
       "📌 Iniciando conciliação Banco x Adquirente dirigida por ordens: trigger={}, ordensElegiveis={}, tamanhoLote={}, " +
         "totalLotes={}, toleranciaAntes={}, toleranciaDepois={}, toleranciaValor={}",
       trigger.getCode(),
-      eligibleOrderIds.size(),
+      eligibleOrderCount,
       batchSize,
       totalBatches,
       reconciliationSettingsService.getDateToleranceDaysBefore(),
@@ -115,9 +120,8 @@ public class BankReconciliationService {
         log.info("✅ Conciliação automática: {} ordem(ns) com releaseValue zero conciliada(s).", zeroValueCount);
       }
 
-      for (int offset = 0, batchNumber = 1; offset < eligibleOrderIds.size(); offset += batchSize, batchNumber++) {
-        int endIndex = Math.min(offset + batchSize, eligibleOrderIds.size());
-        List<UUID> batchIds = eligibleOrderIds.subList(offset, endIndex);
+      for (int batchNumber = 1; batchNumber <= idBatches.size(); batchNumber++) {
+        List<UUID> batchIds = idBatches.get(batchNumber - 1);
 
         List<CreditOrderEntity> batchOrders = creditOrderRepository.findEligibleByIdsForBankReconciliation(
           batchIds,
@@ -201,7 +205,7 @@ public class BankReconciliationService {
     }
 
     BankReconciliationResult partialResult = result.toResult();
-    result.setReleasesWithoutMatch(Math.max(0, eligibleOrderIds.size() - partialResult.getCreditOrdersReconciled()));
+    result.setReleasesWithoutMatch(Math.max(0, eligibleOrderCount - partialResult.getCreditOrdersReconciled()));
 
     BankReconciliationResult built = result.toResult();
     BigDecimal reconciledDifference = built.getTotalReleaseValueReconciled()
@@ -214,7 +218,7 @@ public class BankReconciliationService {
         "valorBancoConciliado={}, valorOrdensConciliado={}, diferença={}",
       built.getTrigger().getCode(),
       built.getMode(),
-      eligibleOrderIds.size(),
+      eligibleOrderCount,
       built.getCreditOrdersReconciled(),
       built.getReleasesWithoutMatch(),
       built.getReleasesAnalyzed(),
@@ -256,6 +260,39 @@ public class BankReconciliationService {
       .filter(this::hasRequiredContext)
       .toList();
 
+    // Pré-calcula contexto e banco de cada ordem uma única vez (O(ordens)) em vez de
+    // recomputar dentro do laço de releases — antes isso rodava O(releases × ordens) vezes,
+    // já que isCreditOrderCandidateCompatible recriava o contexto a cada comparação.
+    Map<UUID, OrderMatchData> orderMatchDataById = new HashMap<>();
+    // Indexa as ordens por data de repasse: como release e ordem só podem casar dentro de
+    // uma janela de poucos dias (toleranceDaysBefore/Depois), varrer TODAS as ordens do lote
+    // pra cada release é O(releases × ordens) — caro quando uma empresa concentra milhares de
+    // ordens num único lote (ver packIdsByCompanyIntoBatches). Um TreeMap por data permite
+    // pegar só a fatia relevante (subMap) por release, em vez do lote inteiro.
+    java.util.TreeMap<LocalDate, List<CreditOrderEntity>> ordersByDate = new java.util.TreeMap<>();
+    for (CreditOrderEntity order : validOrders) {
+      if (order.getId() == null) continue;
+      UUID orderBank = order.getBankingDomicile() != null ? idOrNull(order.getBankingDomicile().getBank()) : null;
+      orderMatchDataById.put(order.getId(), new OrderMatchData(contextOf(order), orderBank));
+      ordersByDate.computeIfAbsent(order.getReleaseDate(), ignored -> new java.util.ArrayList<>()).add(order);
+    }
+
+    // Flush/clear periódico: cada ordem dentro de um match dispara sua própria consulta de
+    // propagação (parcelas, transações, resumo — ver applyCreditOrderMatch), e cada consulta
+    // é um ponto de auto-flush do Hibernate. O auto-flush faz dirty-check + cascade em TODAS
+    // as entidades ainda gerenciadas na sessão (O(n) por flush, independente de quantas
+    // estejam realmente sujas ou precisem de cascade). Sem limpar com frequência, "n" cresce
+    // rápido demais dentro de um único lote (múltiplas consultas por match × dezenas de
+    // matches), tornando o custo total quadrático em vez de linear — confirmado via thread
+    // dump preso primeiro em DirtyHelper.findDirty, depois (com um intervalo de 200 ainda
+    // grande demais) em Cascade.cascade. Por isso o intervalo é bem pequeno — 1 lote inteiro
+    // sem limpar já é lento demais. Entidades usadas depois de um clear() só têm campos já
+    // carregados (fetch/eager) acessados, nunca coleções lazy (ver
+    // updateSalesSummaryFromCreditOrder, que já usa query em vez de
+    // summary.getCreditOrders()) — por isso é seguro desanexar no meio do laço.
+    int matchesSinceFlush = 0;
+    int matchFlushInterval = 5;
+
     for (ReleasesBankEntity release : validReleases) {
       if (release.getId() != null && reconciledReleaseIds.contains(release.getId())) continue;
 
@@ -263,9 +300,25 @@ public class BankReconciliationService {
         result.releaseAnalyzed();
       }
 
-      List<CreditOrderEntity> compatible = validOrders.stream()
+      ReconciliationMatchContext releaseContext = contextOf(release);
+      UUID releaseBank = idOrNull(release.getBank());
+
+      // Janela válida: order.releaseDate entre (release.releaseDate - toleranceDaysAfter) e
+      // (release.releaseDate + toleranceDaysBefore) — ver isCreditOrderCandidateCompatible.
+      LocalDate windowFrom = release.getReleaseDate().minusDays(toleranceDaysAfter);
+      LocalDate windowTo = release.getReleaseDate().plusDays(toleranceDaysBefore);
+      List<CreditOrderEntity> ordersInWindow = ordersByDate.subMap(windowFrom, true, windowTo, true)
+        .values().stream()
+        .flatMap(List::stream)
+        .toList();
+
+      List<CreditOrderEntity> compatible = ordersInWindow.stream()
         .filter(order -> isOrderStillEligible(order, reconciledOrderIds, reprocess))
-        .filter(order -> isCreditOrderCandidateCompatible(release, order, toleranceDaysBefore, toleranceDaysAfter))
+        .filter(order -> isCreditOrderCandidateCompatible(
+          release, releaseContext, releaseBank,
+          order, orderMatchDataById.get(order.getId()),
+          toleranceDaysBefore, toleranceDaysAfter
+        ))
         .toList();
 
       if (compatible.isEmpty()) continue;
@@ -288,6 +341,13 @@ public class BankReconciliationService {
       applyCreditOrderMatch(release, orders, selected, result, reprocess);
       orders.stream().map(CreditOrderEntity::getId).filter(Objects::nonNull).forEach(reconciledOrderIds::add);
       if (release.getId() != null) reconciledReleaseIds.add(release.getId());
+
+      matchesSinceFlush++;
+      if (matchesSinceFlush >= matchFlushInterval) {
+        entityManager.flush();
+        entityManager.clear();
+        matchesSinceFlush = 0;
+      }
     }
   }
 
@@ -496,6 +556,61 @@ public class BankReconciliationService {
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
       }
     }
+  }
+
+  /**
+   * Empacota os ids elegíveis (agrupados por empresa, ordenados por data dentro de cada
+   * empresa) em lotes de tamanho aproximado {@code batchSize}. Antes o corte era por posição
+   * numa lista global (todas as empresas misturadas, desempate por id aleatório), o que podia
+   * separar, entre lotes diferentes, ordens de crédito que pertencem ao mesmo lançamento
+   * bancário — fazendo a conciliação nunca encontrar a combinação correta em nenhum dos dois
+   * lotes.
+   *
+   * Corrige isso sem simplesmente tratar cada empresa como um bloco indivisível (o que faria
+   * uma empresa com muito volume virar um único lote gigante, sem os flush/clear intermediários
+   * do EntityManager entre lotes): dentro de cada empresa, só corta um novo lote quando a
+   * lacuna entre duas ordens consecutivas (por data) é maior que {@code safeDateGapDays} — ou
+   * seja, maior que a janela de tolerância de data usada no matching. Isso garante que nenhuma
+   * ordem que possa cair na janela de tolerância de um mesmo lançamento fique num lote
+   * diferente do resto do seu grupo, mantendo os lotes perto do tamanho configurado.
+   */
+  private List<List<UUID>> packIdsByCompanyIntoBatches(List<Object[]> eligibleRows, int batchSize, int safeDateGapDays) {
+    Map<UUID, List<Object[]>> rowsByCompany = new java.util.LinkedHashMap<>();
+    for (Object[] row : eligibleRows) {
+      UUID companyId = (UUID) row[0];
+      rowsByCompany.computeIfAbsent(companyId, ignored -> new java.util.ArrayList<>()).add(row);
+    }
+
+    List<List<UUID>> chunks = new java.util.ArrayList<>();
+    for (List<Object[]> companyRows : rowsByCompany.values()) {
+      List<UUID> currentChunk = new java.util.ArrayList<>();
+      LocalDate previousDate = null;
+      for (Object[] row : companyRows) {
+        UUID orderId = (UUID) row[1];
+        LocalDate releaseDate = (LocalDate) row[2];
+        boolean safeToCut = previousDate != null
+          && ChronoUnit.DAYS.between(previousDate, releaseDate) > safeDateGapDays;
+        if (safeToCut && currentChunk.size() >= batchSize) {
+          chunks.add(currentChunk);
+          currentChunk = new java.util.ArrayList<>();
+        }
+        currentChunk.add(orderId);
+        previousDate = releaseDate;
+      }
+      if (!currentChunk.isEmpty()) chunks.add(currentChunk);
+    }
+
+    List<List<UUID>> batches = new java.util.ArrayList<>();
+    List<UUID> current = new java.util.ArrayList<>();
+    for (List<UUID> chunk : chunks) {
+      if (!current.isEmpty() && current.size() + chunk.size() > batchSize) {
+        batches.add(current);
+        current = new java.util.ArrayList<>();
+      }
+      current.addAll(chunk);
+    }
+    if (!current.isEmpty()) batches.add(current);
+    return batches;
   }
 
   private boolean isOrderStillEligible(CreditOrderEntity order, Set<UUID> reconciledOrderIds, boolean reprocess) {
@@ -729,9 +844,9 @@ public class BankReconciliationService {
    */
   private void updateSalesSummaryFromCreditOrder(CreditOrderEntity order) {
     SalesSummaryEntity summary = order.getSalesSummary();
-    if (summary == null) return;
+    if (summary == null || summary.getId() == null) return;
 
-    List<CreditOrderEntity> siblings = List.copyOf(summary.getCreditOrders());
+    List<CreditOrderEntity> siblings = creditOrderRepository.findBySalesSummary_Id(summary.getId());
     boolean allPaid = !siblings.isEmpty() && siblings.stream()
       .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
     boolean anyPaid = siblings.stream()
@@ -746,19 +861,29 @@ public class BankReconciliationService {
     }
   }
 
-  private boolean isCreditOrderCandidateCompatible(ReleasesBankEntity release, CreditOrderEntity order, int toleranceDaysBefore, int toleranceDaysAfter) {
-    if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null) return false;
+  /**
+   * Recebe o contexto/banco do release e da ordem já pré-calculados pelo chamador — evita
+   * recriar {@link ReconciliationMatchContext} (e refazer paymentKind/idOrNull) a cada par
+   * release×ordem, quando release e ordem já são fixos por toda a duração do laço externo.
+   */
+  private boolean isCreditOrderCandidateCompatible(
+    ReleasesBankEntity release, ReconciliationMatchContext releaseContext, UUID releaseBank,
+    CreditOrderEntity order, OrderMatchData orderData,
+    int toleranceDaysBefore, int toleranceDaysAfter
+  ) {
+    if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null || orderData == null) return false;
     // daysDiff > 0: lançamento DEPOIS da ordem (normal); < 0: lançamento ANTES da ordem (suspeito)
     long daysDiff = ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate());
     if (daysDiff > toleranceDaysAfter) return false;
     if (daysDiff < -toleranceDaysBefore) return false;
-    if (!contextOf(release).compatible(contextOf(order))) return false;
+    if (!releaseContext.compatible(orderData.context())) return false;
     // Banco obrigatório: release.bank vs order.bankingDomicile.bank
-    UUID releaseBank = idOrNull(release.getBank());
-    UUID orderBank = order.getBankingDomicile() != null ? idOrNull(order.getBankingDomicile().getBank()) : null;
-    if (releaseBank == null || orderBank == null || !releaseBank.equals(orderBank)) return false;
+    if (releaseBank == null || orderData.bankId() == null || !releaseBank.equals(orderData.bankId())) return false;
     return true;
   }
+
+  /** Contexto de matching e banco (via domicílio bancário) de uma ordem, pré-calculados uma única vez por ordem. */
+  private record OrderMatchData(ReconciliationMatchContext context, UUID bankId) {}
 
   private boolean isInstallmentCandidateCompatible(ReleasesBankEntity release, InstallmentAcqEntity installment, int toleranceDaysBefore, int toleranceDaysAfter) {
     if (installment == null || installment.getExpectedPaymentDate() == null) return false;
@@ -911,12 +1036,16 @@ public class BankReconciliationService {
     return value == null ? 0 : value;
   }
 
-  private UUID idOrNull(Object entity) {
-    if (entity == null) return null;
-    try {
-      return (UUID) entity.getClass().getMethod("getId").invoke(entity);
-    } catch (Exception ex) {
-      return null;
-    }
+  /**
+   * Antes usava reflexão ({@code getClass().getMethod("getId").invoke(...)}) sem cache do
+   * Method — chamado a cada comparação release×ordem dentro de {@code contextOf}/
+   * {@code isCreditOrderCandidateCompatible}, ou seja, potencialmente milhões de vezes por
+   * execução. Com lotes maiores (empresas de alto volume não são mais fatiadas por posição
+   * fixa) isso se tornou o gargalo real da Etapa 7. Todas as entidades usadas aqui estendem
+   * {@link com.cardsync.domain.model.AuditableEntityBase}, que já expõe {@code getId()}
+   * tipado via Lombok — chamar direto elimina a reflexão.
+   */
+  private UUID idOrNull(com.cardsync.domain.model.AuditableEntityBase entity) {
+    return entity == null ? null : entity.getId();
   }
 }

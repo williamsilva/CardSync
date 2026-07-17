@@ -5,6 +5,7 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.support.AbstractMessageSource;
 import org.springframework.core.io.ClassPathResource;
 import tools.jackson.databind.ObjectMapper;
@@ -12,7 +13,9 @@ import tools.jackson.databind.ObjectMapper;
 public class JsonMessageSource extends AbstractMessageSource {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
-  private final Map<String, Map<String, String>> cache = new HashMap<>();
+  // HashMap comum quebrava com ConcurrentModificationException quando duas requisições
+  // resolviam uma mensagem ao mesmo tempo e o cache ainda não tinha o locale carregado.
+  private final Map<String, Map<String, String>> cache = new ConcurrentHashMap<>();
 
   @Override
   protected MessageFormat resolveCode(String code, Locale locale) {

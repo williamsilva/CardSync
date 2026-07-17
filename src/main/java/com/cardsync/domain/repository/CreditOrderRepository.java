@@ -21,6 +21,14 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
 
   boolean existsBySalesSummary_IdAndInstallmentNumber(UUID salesSummaryId, Integer installmentNumber);
 
+  /**
+   * Busca via query em vez de navegar {@code SalesSummaryEntity.getCreditOrders()} (coleção
+   * lazy) — usada no laço de conciliação bancária, onde a sessão pode ser limpa
+   * periodicamente (ver BankReconciliationService); navegar a coleção lazy de uma entidade
+   * já desanexada geraria LazyInitializationException.
+   */
+  List<CreditOrderEntity> findBySalesSummary_Id(UUID salesSummaryId);
+
   @Query("""
     SELECT co FROM CreditOrderEntity co
     LEFT JOIN FETCH co.salesSummary
@@ -35,8 +43,15 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   @Query("select co from CreditOrderEntity co where co.releaseDate >= :lookback order by co.releaseDate asc")
   List<CreditOrderEntity> findAllForDashboard(@Param("lookback") LocalDate lookback);
 
+  /**
+   * Agrupado por empresa e ordenado por data dentro de cada empresa (não por id global) para
+   * permitir montar lotes que nunca dividam, entre dois lotes diferentes, ordens de uma mesma
+   * empresa cuja data esteja próxima o bastante para caírem na janela de tolerância do mesmo
+   * lançamento bancário — ver {@link com.cardsync.core.reconciliation.BankReconciliationService},
+   * que empacota lotes a partir deste resultado só cortando em lacunas de data seguras.
+   */
   @Query("""
-    select co.id
+    select co.company.id, co.id, co.releaseDate
     from CreditOrderEntity co
     where (:reprocess = true or co.releaseBank is null)
       and co.salesSummaryStatus = :summaryReconciledStatus
@@ -45,9 +60,9 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
       and co.releaseValue is not null
       and co.company is not null
       and co.bankingDomicile is not null
-    order by co.releaseDate asc, co.id asc
+    order by co.company.id asc, co.releaseDate asc, co.id asc
   """)
-  List<UUID> findEligibleIdsForBankReconciliation(
+  List<Object[]> findEligibleIdsGroupedByCompanyForBankReconciliation(
     @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
     @Param("paymentPendingStatus") Integer paymentPendingStatus,
     @Param("paymentPartialStatus") Integer paymentPartialStatus,

@@ -67,36 +67,6 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
-   * Mesma agregação da Etapa 1b, mas sem o filtro de rvDate/lookback — usada no backfill
-   * único (endpoint com ignoreLookback=true) para corrigir resumos antigos cujo
-   * transactionsStatus nunca foi recalculado após uma ação manual, e que já saíram da
-   * janela de lookback (nunca mais seriam vistos pela query normal).
-   */
-  @Query("""
-    select new com.cardsync.core.reconciliation.summary.SalesSummaryTransactionStats(
-      ss.id,
-      count(tx.id),
-      coalesce(sum(
-        case when tx.statusTransaction in :excludedStatuses then 1L else 0L end
-      ), 0L),
-      coalesce(sum(
-        case when tx.statusTransaction in :reconciledStatuses then 1L else 0L end
-      ), 0L)
-    )
-      from TransactionAcqEntity tx
-      join tx.salesSummary ss
-     where (:includeAll = true or ss.transactionsStatus is null or ss.transactionsStatus in :pendingStatuses)
-     group by ss.id
-     order by min(ss.rvDate) asc, ss.id asc
-  """)
-  List<SalesSummaryTransactionStats> findStatsForSalesSummaryTransactionReconciliationIgnoringLookback(
-    @Param("includeAll") boolean includeAll,
-    @Param("pendingStatuses") Collection<Integer> pendingStatuses,
-    @Param("excludedStatuses") Collection<Integer> excludedStatuses,
-    @Param("reconciledStatuses") Collection<Integer> reconciledStatuses
-  );
-
-  /**
    * Recálculo pontual do rollup de um ou poucos SalesSummary específicos, sem o filtro de
    * lookback da Etapa 1b — usado logo após ações manuais (ex.: reconciliação manual,
    * criação de ERP a partir da adquirente) que mudam o statusTransaction de uma
@@ -147,12 +117,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       ss.id,
       count(tx.id),
       coalesce(sum(
-        case
-          when tx.statusTransaction in :eligibleSaleStatuses
-           and (tx.feeReconciliationStatus is null or tx.feeReconciliationStatus in :eligibleFeeStatuses)
-          then 1L
-          else 0L
-        end
+        case when tx.statusTransaction in :eligibleSaleStatuses then 1L else 0L end
       ), 0L)
     )
       from TransactionAcqEntity tx
@@ -165,7 +130,6 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   """)
   List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliation(
     @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
-    @Param("eligibleFeeStatuses") Collection<Integer> eligibleFeeStatuses,
     @Param("implantationDate") LocalDate implantationDate,
     @Param("lookbackDate") LocalDate lookbackDate
   );
@@ -179,12 +143,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       ss.id,
       count(tx.id),
       coalesce(sum(
-        case
-          when tx.statusTransaction in :eligibleSaleStatuses
-           and (tx.feeReconciliationStatus is null or tx.feeReconciliationStatus in :eligibleFeeStatuses)
-          then 1L
-          else 0L
-        end
+        case when tx.statusTransaction in :eligibleSaleStatuses then 1L else 0L end
       ), 0L)
     )
       from TransactionAcqEntity tx
@@ -196,7 +155,6 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   """)
   List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliationIgnoringLookback(
     @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
-    @Param("eligibleFeeStatuses") Collection<Integer> eligibleFeeStatuses,
     @Param("implantationDate") LocalDate implantationDate
   );
 

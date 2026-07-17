@@ -2,7 +2,6 @@ package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.config.ImplantationDateProvider;
-import com.cardsync.domain.model.enums.FeeReconciliationStatusEnum;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
@@ -33,11 +32,6 @@ public class AcquirerSaleSummaryReconciliationService {
     StatusTransactionEnum.DELETED.getCode()
   );
 
-  private static final List<Integer> ELIGIBLE_FEE_STATUSES = List.of(
-    FeeReconciliationStatusEnum.RECONCILED.getCode(),
-    FeeReconciliationStatusEnum.MISSING_VALID_CONTRACT.getCode()
-  );
-
   private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
@@ -49,6 +43,15 @@ public class AcquirerSaleSummaryReconciliationService {
    * - antes: buscava os summaries e depois fazia 1 consulta por summary para carregar transações;
    * - agora: o banco calcula total/elegíveis por SalesSummary em uma única consulta agregada;
    * - depois são feitos updates em lote por status final.
+   *
+   * Elegibilidade considera só statusTransaction — divergência de taxa (feeReconciliationStatus)
+   * não bloqueia mais o rollup transactionsStatus. Antes, essa etapa também exigia
+   * feeReconciliationStatus elegível, e como ela roda depois da Etapa 1b (SalesSummaryTransactionReconciliationService)
+   * no mesmo pipeline, uma divergência de taxa fazia a Etapa 3 SOBRESCREVER de volta pra PENDING um
+   * resumo que a Etapa 1b já tinha corretamente marcado como conciliado — travando a Etapa 4/7
+   * indefinidamente por causa de algo que não tem relação com o dinheiro ter caído no banco.
+   * Divergência de taxa continua rastreada e visível separadamente na tela de auditoria de
+   * contrato (cs_contract_audit / ContractAuditWriterService), sem depender deste rollup.
    */
   @Transactional
   public AcquirerSaleSummaryReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
@@ -67,10 +70,9 @@ public class AcquirerSaleSummaryReconciliationService {
     boolean reprocess = reconciliationSettingsService.isReprocessAcquirerSaleSummary();
 
     log.info(
-      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, eligibleSaleStatuses={}, eligibleFeeStatuses={}, updateBatchSize={}, reprocess={}, ignoreLookback={}",
+      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, eligibleSaleStatuses={}, updateBatchSize={}, reprocess={}, ignoreLookback={}",
       trigger,
       ELIGIBLE_SALE_STATUSES,
-      ELIGIBLE_FEE_STATUSES,
       UPDATE_BATCH_SIZE,
       reprocess,
       ignoreLookback
@@ -83,14 +85,12 @@ public class AcquirerSaleSummaryReconciliationService {
     if (ignoreLookback) {
       stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliationIgnoringLookback(
         ELIGIBLE_SALE_STATUSES,
-        ELIGIBLE_FEE_STATUSES,
         implantationDate
       );
     } else {
       LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
       stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(
         ELIGIBLE_SALE_STATUSES,
-        ELIGIBLE_FEE_STATUSES,
         implantationDate,
         lookbackDate
       );
