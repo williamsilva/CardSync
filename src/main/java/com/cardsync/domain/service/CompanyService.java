@@ -14,7 +14,6 @@ import com.cardsync.infrastructure.repository.spec.CompanySpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +41,7 @@ public class CompanyService {
   @Transactional(readOnly = true)
   public List<CompanyEntity> listOptionsFilter() {
     return companyRepository
-      .findAll(Sort.by(Sort.Direction.ASC, "fantasyName", "socialReason"));
+      .findAllOptionsFilterOrderByActiveThenName(StatusEnum.toCode(StatusEnum.ACTIVE));
   }
 
   @Transactional(readOnly = true)

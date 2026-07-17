@@ -10,6 +10,8 @@ import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSuppo
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
@@ -46,15 +48,11 @@ public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEn
     Specification<EstablishmentEntity> spec = Specs.all();
 
     if (query != null) {
-      spec = spec.and(
-        specificationFactory.fromTableFilters(
-          query.tableFilters(),
-          establishmentAllowedFields.table()
-        )
-      );
+      spec = spec.and(specificationFactory.fromTableFilters(query.tableFilters(), establishmentAllowedFields.table()));
 
       spec = spec.and(establishmentAdvancedFields.advanced(query.advanced()));
     }
+
     return spec;
   }
 
@@ -74,7 +72,26 @@ public class EstablishmentSpecs extends BaseSpecificationSupport<EstablishmentEn
   }
 
   private Specification<EstablishmentEntity> orderByTableSort(List<SortDto> sort) {
-    return tableSort(sort, "PvNumber", Map.of(
+    boolean hasSort = sort != null && !sort.isEmpty();
+
+    if (!hasSort) {
+      return (root, query, cb) -> {
+        if (isCountQuery(query)) {
+          return cb.conjunction();
+        }
+
+        // Reaproveita o fetch join de "company" (não criar um join novo: com DISTINCT,
+        // o Postgres exige que a coluna do ORDER BY esteja entre as colunas selecionadas).
+        Path<?> companyPath = (Path<?>) fetchIfNotFetched(root, "company");
+        Expression<?> companyName = companyPath.get("fantasyName");
+        query.orderBy(List.of(cb.asc(companyName), cb.desc(root.get("id"))));
+        query.distinct(true);
+
+        return cb.conjunction();
+      };
+    }
+
+    return tableSort(sort, null, Map.of(
       "createdBy",            sortField("createdBy"),
       "company",             sortJoin("company", "fantasyName"),
       "acquirer",            sortJoin("acquirer", "fantasyName")

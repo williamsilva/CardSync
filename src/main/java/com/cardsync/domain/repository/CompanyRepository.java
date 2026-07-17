@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,6 +28,14 @@ public interface CompanyRepository extends JpaRepository<CompanyEntity, UUID>,
   Optional<CompanyEntity> findByCnpj(String cnpj);
   Optional<CompanyEntity> findByFantasyNameIgnoreCase(String fantasyName);
   Optional<CompanyEntity> findBySocialReasonIgnoreCase(String socialReason);
+
+  /** Opções de filtro: ativas primeiro, depois ordem alfabética por fantasyName/socialReason. */
+  @Query("""
+    select c
+      from CompanyEntity c
+     order by case when c.status = :activeStatus then 0 else 1 end, c.fantasyName asc, c.socialReason asc
+  """)
+  List<CompanyEntity> findAllOptionsFilterOrderByActiveThenName(@Param("activeStatus") Integer activeStatus);
 
 
   @Query("""

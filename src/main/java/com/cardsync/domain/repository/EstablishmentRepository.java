@@ -26,6 +26,15 @@ public interface EstablishmentRepository extends JpaRepository<EstablishmentEnti
   @EntityGraph(attributePaths = {"company", "acquirer"})
   List<EstablishmentEntity> findAll(Sort sort);
 
+  /** Opções de filtro: ativos primeiro, depois ordem alfabética pelo nome da empresa. */
+  @EntityGraph(attributePaths = {"company", "acquirer"})
+  @Query("""
+    select e
+      from EstablishmentEntity e
+     order by case when e.status = :activeStatus then 0 else 1 end, e.company.fantasyName asc, e.pvNumber asc
+  """)
+  List<EstablishmentEntity> findAllOptionsFilterOrderByActiveThenCompanyName(@Param("activeStatus") Integer activeStatus);
+
   @Override
   @EntityGraph(attributePaths = {"company", "acquirer"})
   Page<EstablishmentEntity> findAll(Specification<EstablishmentEntity> spec, Pageable pageable);

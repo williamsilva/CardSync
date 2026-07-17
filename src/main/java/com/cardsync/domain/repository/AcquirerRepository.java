@@ -53,4 +53,12 @@ public interface AcquirerRepository extends JpaRepository<AcquirerEntity, UUID>,
 
   List<AcquirerEntity> findAllByOrderByFantasyNameAsc();
 
+  /** Opções de filtro: ativos primeiro, depois ordem alfabética por fantasyName/socialReason. */
+  @Query("""
+    select a
+      from AcquirerEntity a
+     order by case when a.status = :activeStatus then 0 else 1 end, a.fantasyName asc, a.socialReason asc
+  """)
+  List<AcquirerEntity> findAllOptionsFilterOrderByActiveThenName(@Param("activeStatus") Integer activeStatus);
+
 }

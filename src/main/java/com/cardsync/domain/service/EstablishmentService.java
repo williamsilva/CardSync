@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +39,7 @@ public class EstablishmentService {
   @Transactional(readOnly = true)
   public List<EstablishmentEntity> listOptionsFilter() {
     return establishmentRepository
-      .findAll(Sort.by(Sort.Direction.ASC, "pvNumber"));
+      .findAllOptionsFilterOrderByActiveThenCompanyName(StatusEnum.toCode(StatusEnum.ACTIVE));
   }
 
   @Transactional(readOnly = true)
