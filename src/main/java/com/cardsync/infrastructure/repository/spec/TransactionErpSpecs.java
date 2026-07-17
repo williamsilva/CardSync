@@ -25,22 +25,22 @@ import java.util.Map;
 @Component
 public class TransactionErpSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final TransactionErpTableFields transactionErpTableFields;
   private final TransactionErpAdvancedFields transactionErpAdvancedFields;
 
   public TransactionErpSpecs(
-    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     TransactionErpTableFields transactionErpFields,
+    ImplantationDateProvider implantationDateProvider,
     TransactionErpAdvancedFields transactionErpAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.transactionErpTableFields = transactionErpFields;
+    this.implantationDateProvider = implantationDateProvider;
     this.transactionErpAdvancedFields = transactionErpAdvancedFields;
   }
 

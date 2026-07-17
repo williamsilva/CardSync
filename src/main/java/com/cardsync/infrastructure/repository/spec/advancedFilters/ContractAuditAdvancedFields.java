@@ -43,19 +43,12 @@ public class ContractAuditAdvancedFields extends BaseSpecificationSupport<Contra
     spec = spec.and(inPath(filter.establishments(), BaseSpecificationSupport::parseUuidOrNull,  "establishment", "id"));
 
     // Filtros aninhados transactionAcq
-    spec = spec.and(saleDate(filter));
     spec = spec.and(inPath(filter.capture(), CaptureEnum::getCode,"transactionAcq", "capture"));
+    spec = spec.and(offsetDateTimePeriodJoin(
+      "transactionAcq", "saleDate", filter.periodSaleDate(), filter.saleDate(),true));
 
     return spec;
   }
 
-  private Specification<ContractAuditEntity> saleDate(ContractAuditModelFilter filter) {
-    return offsetDateTimePeriodJoin(
-      "transactionAcq",
-      "saleDate",
-      filter.periodSaleDate(),
-      filter.saleDate(),
-      true
-    );
-  }
+
 }

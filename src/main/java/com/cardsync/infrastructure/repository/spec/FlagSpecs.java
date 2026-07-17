@@ -20,12 +20,12 @@ public class FlagSpecs extends BaseSpecificationSupport<FlagEntity> {
 
   public FlagSpecs(
     DateFilterService dateFilterService,
-    SpecificationFactory specificationFactory,
-    FlagAllowedFields flagAllowedFields
+    FlagAllowedFields flagAllowedFields,
+    SpecificationFactory specificationFactory
   ) {
     super(dateFilterService);
-    this.specificationFactory = specificationFactory;
     this.flagAllowedFields = flagAllowedFields;
+    this.specificationFactory = specificationFactory;
   }
 
   public Specification<FlagEntity> fromQuery(ListQueryDto<FlagFilter> query) {

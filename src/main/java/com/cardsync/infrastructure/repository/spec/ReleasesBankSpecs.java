@@ -22,22 +22,22 @@ import java.util.Map;
 @Component
 public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final ReleasesBankTableFields releasesBankTableFields;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ReleasesBankAdvancedFields releasesBankAdvancedFields;
 
   public ReleasesBankSpecs(
     DateFilterService dateFilterService,
-    ImplantationDateProvider implantationDateProvider,
     SpecificationFactory specificationFactory,
     ReleasesBankTableFields releasesBankTableFields,
+    ImplantationDateProvider implantationDateProvider,
     ReleasesBankAdvancedFields releasesBankAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.releasesBankTableFields = releasesBankTableFields;
+    this.implantationDateProvider = implantationDateProvider;
     this.releasesBankAdvancedFields = releasesBankAdvancedFields;
   }
 

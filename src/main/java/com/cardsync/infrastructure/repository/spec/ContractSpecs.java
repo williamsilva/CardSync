@@ -84,17 +84,6 @@ public class ContractSpecs extends BaseSpecificationSupport<ContractEntity> {
 
     }
 
-    if (!isBlank(query.globalFilter())) {
-      String gf = query.globalFilter();
-      // contains em "description" é aceitável (campo texto livre sem índice dedicado).
-      // startsWithPath para fantasyName usa LIKE prefixo sem LOWER() desnecessário.
-      spec = spec.and(anyOf(
-        contains("description", gf),
-        startsWithPath(gf, "company", "fantasyName"),
-        startsWithPath(gf, "acquirer", "fantasyName")
-      ));
-    }
-
     return spec.and(orderByAsc("description"));
   }
 

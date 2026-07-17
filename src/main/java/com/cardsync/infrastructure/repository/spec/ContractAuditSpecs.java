@@ -60,17 +60,6 @@ public class ContractAuditSpecs extends BaseSpecificationSupport<ContractAuditEn
       );
 
       spec = spec.and(conciliationWaitingAdvancedFields.advanced(query.advanced()));
-
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-
-        spec = spec.and(
-          anyOf(
-            numberFilter(gf, "nsu"),
-            startsWith(gf, "authorization")
-          )
-        );
-      }
     }
 
     return spec;

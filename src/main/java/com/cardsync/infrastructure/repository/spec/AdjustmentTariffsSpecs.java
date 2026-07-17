@@ -69,22 +69,9 @@ public class AdjustmentTariffsSpecs extends BaseSpecificationSupport<AdjustmentE
       root.get("adjustmentReason").in(TARIFF_REASONS);
 
     if (query != null) {
-      spec = spec.and(
-        specificationFactory.fromTableFilters(
-          query.tableFilters(),
-          adjustmentTableFields.table()
-        )
-      );
+      spec = spec.and(specificationFactory.fromTableFilters(query.tableFilters(), adjustmentTableFields.table()));
 
       spec = spec.and(adjustmentAdvancedFields.advanced(query.advanced()));
-
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-        spec = spec.and(anyOf(
-          numberFilter(gf, "nsu"),
-          startsWith(gf, "authorization")
-        ));
-      }
     }
 
     return spec;

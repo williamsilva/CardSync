@@ -4,7 +4,11 @@ import com.cardsync.domain.filter.AcquirerFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.AcquirerAllowedFields;
 import com.cardsync.domain.model.AcquirerEntity;
+import com.cardsync.domain.model.TransactionAcqEntity;
+import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusEnum;
+import com.cardsync.infrastructure.repository.spec.advancedFilters.AcquirerAdvancedFields;
+import com.cardsync.infrastructure.repository.spec.advancedFilters.TransactionAcqAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
@@ -19,46 +23,27 @@ public class AcquirerSpecs extends BaseSpecificationSupport<AcquirerEntity> {
 
   private final SpecificationFactory specificationFactory;
   private final AcquirerAllowedFields acquirerAllowedFields;
+  private final AcquirerAdvancedFields acquirerAdvancedFields;
 
   public AcquirerSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
-    AcquirerAllowedFields acquirerAllowedFields
+    AcquirerAllowedFields acquirerAllowedFields,
+    AcquirerAdvancedFields acquirerAdvancedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
     this.acquirerAllowedFields = acquirerAllowedFields;
+    this.acquirerAdvancedFields = acquirerAdvancedFields;
   }
 
   public Specification<AcquirerEntity> fromQuery(ListQueryDto<AcquirerFilter> query) {
     Specification<AcquirerEntity> spec = Specs.all();
 
-    spec = spec.and(
-      specificationFactory.fromTableFilters(
-        query.tableFilters(),
-        acquirerAllowedFields.table()
-      )
-    );
+    if (query != null) {
+      spec = spec.and(specificationFactory.fromTableFilters(query.tableFilters(), acquirerAllowedFields.table()));
 
-    if (query.advanced() != null) {
-      var a = query.advanced();
-
-      spec = spec.and(contains("cnpj", a.cnpj()));
-      spec = spec.and(contains("fantasyName", a.fantasyName()));
-      spec = spec.and(contains("socialReason", a.socialReason()));
-      spec = spec.and(rangeOdt("createdAt", a.createdAtFrom(), a.createdAtTo()));
-
-      spec = spec.and(
-        inPath(a.createdBy(), value -> {
-          try {
-            return UUID.fromString(value);
-          } catch (Exception e) {
-            return null;
-          }
-        }, "createdBy")
-      );
-
-      spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
+      spec = spec.and(acquirerAdvancedFields.advanced(query.advanced()));
     }
 
     spec = spec.and(fetchListAssociations());

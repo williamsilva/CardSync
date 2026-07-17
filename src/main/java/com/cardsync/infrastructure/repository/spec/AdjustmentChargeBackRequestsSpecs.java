@@ -53,12 +53,7 @@ public class AdjustmentChargeBackRequestsSpecs extends BaseSpecificationSupport<
     Specification<RequestNoticeEntity> spec = Specs.all();
 
     if (query != null) {
-      spec = spec.and(
-        specificationFactory.fromTableFilters(
-          query.tableFilters(),
-          adjustmentTableFields.table()
-        )
-      );
+      spec = spec.and(specificationFactory.fromTableFilters(query.tableFilters(), adjustmentTableFields.table()));
 
       spec = spec.and(adjustmentAdvancedFields.advanced(query.advanced()));
     }

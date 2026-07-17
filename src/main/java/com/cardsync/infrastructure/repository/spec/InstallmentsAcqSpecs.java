@@ -22,22 +22,22 @@ import java.util.Map;
 public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAcqEntity> {
 
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final InstallmentsAcqTableFields installmentsAcqTableFields;
   private final InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields;
-  private final ImplantationDateProvider implantationDateProvider;
 
   public InstallmentsAcqSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
+    ImplantationDateProvider implantationDateProvider,
     InstallmentsAcqTableFields installmentsAcqTableFields,
-    InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields,
-    ImplantationDateProvider implantationDateProvider
+    InstallmentsAcqAdvancedFields installmentsAcqAdvancedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
+    this.implantationDateProvider = implantationDateProvider;
     this.installmentsAcqTableFields = installmentsAcqTableFields;
     this.installmentsAcqAdvancedFields = installmentsAcqAdvancedFields;
-    this.implantationDateProvider = implantationDateProvider;
   }
 
   public Specification<InstallmentAcqEntity> fromQuery(ListQueryDto<InstallmentsAcqFilter> query) {
@@ -63,23 +63,9 @@ public class InstallmentsAcqSpecs extends BaseSpecificationSupport<InstallmentAc
       );
 
       spec = spec.and(installmentsAcqAdvancedFields.advanced(query.advanced()));
-
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-        // startsWithPath usa JOIN + LIKE prefixo — aproveita idx_inst_acq_transaction via transaction.nsu
-        spec = spec.and(anyOf(startsWithPath(gf, "transaction", "nsu")));
-      }
     }
 
-    spec = spec.and(
-      notInCodes(
-        getModalityEnum(),
-        ModalityEnum::getCode,
-        "transaction",
-        "modality"
-      )
-    );
-
+    spec = spec.and(notInCodes(getModalityEnum(), ModalityEnum::getCode,"transaction", "modality"));
     spec = spec.and(dateJoinGreaterThanOrEqual("transaction", "saleDate", implantationDateProvider.get(), false));
 
     return spec;

@@ -59,5 +59,4 @@ public class TransactionErpAdvancedFields extends BaseSpecificationSupport<Trans
 
     return spec;
   }
-
 }

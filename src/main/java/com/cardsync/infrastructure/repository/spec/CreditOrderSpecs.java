@@ -20,22 +20,22 @@ import java.util.Map;
 @Component
 public class CreditOrderSpecs extends BaseSpecificationSupport<CreditOrderEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final CreditOrderTableFields creditOrderTableFields;
+  private final ImplantationDateProvider implantationDateProvider;
   private final CreditOrderAdvancedFields creditOrderAdvancedFields;
 
   public CreditOrderSpecs(
-    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     CreditOrderTableFields creditOrderTableFields,
+    ImplantationDateProvider implantationDateProvider,
     CreditOrderAdvancedFields creditOrderAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.creditOrderTableFields = creditOrderTableFields;
+    this.implantationDateProvider = implantationDateProvider;
     this.creditOrderAdvancedFields = creditOrderAdvancedFields;
   }
 

@@ -63,16 +63,6 @@ public class CompanySpecs extends BaseSpecificationSupport<CompanyEntity> {
       spec = spec.and(inCodes("type", a.typeEnum(), TypeCompanyEnum::getCode));
     }
 
-    if (!isBlank(query.globalFilter())) {
-      String gf = query.globalFilter();
-
-      spec = spec.and(
-        anyOf(
-          contains("cnpj", gf)
-        )
-      );
-    }
-
     return spec.and(orderByAsc("fantasyName"));
   }
 }

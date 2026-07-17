@@ -28,21 +28,21 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ConciliationWaitingErpTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields;
 
   public ConciliationWaitingErpSpecs(
     DateFilterService dateFilterService,
-    ImplantationDateProvider implantationDateProvider,
     SpecificationFactory specificationFactory,
+    ImplantationDateProvider implantationDateProvider,
     ConciliationWaitingErpTableFields conciliationWaitingTableFields,
     ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
+    this.implantationDateProvider = implantationDateProvider;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
   }
@@ -70,17 +70,6 @@ public class ConciliationWaitingErpSpecs extends BaseSpecificationSupport<Transa
       );
 
       spec = spec.and(conciliationWaitingAdvancedFields.advanced(query.advanced()));
-
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-
-        spec = spec.and(
-          anyOf(
-            numberFilter(gf, "nsu"),
-            startsWith(gf, "authorization")
-          )
-        );
-      }
     }
 
     spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));

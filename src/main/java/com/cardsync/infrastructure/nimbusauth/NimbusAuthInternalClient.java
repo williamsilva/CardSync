@@ -21,8 +21,8 @@ public class NimbusAuthInternalClient {
 
   public record UserSummary(UUID id, String username, String name) {}
 
-  private final RestClient.Builder restClientBuilder;
   private final NimbusAuthClientProperties props;
+  private final RestClient.Builder restClientBuilder;
 
   private RestClient client() {
     return restClientBuilder

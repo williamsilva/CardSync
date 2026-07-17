@@ -29,29 +29,14 @@ public class ProcessedFileAdvancedFields extends BaseSpecificationSupport<Proces
     spec = spec.and(contains(filter.commercialName(), "commercialName"));
 
     // Enums STRING: comparação enum-a-enum (identity), pois a coluna é @Enumerated(STRING)
-    spec = spec.and(inCodes("status", filter.status(), Function.identity()));
     spec = spec.and(inCodes("group", filter.group(), Function.identity()));
+    spec = spec.and(inCodes("status", filter.status(), Function.identity()));
 
-    spec = spec.and(inPath(
-      filter.origins(),
-      ProcessedFileAdvancedFields::parseUuidOrNull,
-      "originFile",
-      "id"
-    ));
+    spec = spec.and(inPath(filter.origins(), ProcessedFileAdvancedFields::parseUuidOrNull,"originFile", "id"));
 
-    spec = spec.and(offsetDateTimePeriod(
-      "dateImport",
-      filter.periodDateImport(),
-      filter.dateImport(),
-      true
-    ));
+    spec = spec.and(offsetDateTimePeriod("dateImport", filter.periodDateImport(), filter.dateImport(),true));
 
-    spec = spec.and(localDatePeriod(
-      "dateFile",
-      filter.periodDateFile(),
-      filter.dateFile(),
-      true
-    ));
+    spec = spec.and(localDatePeriod("dateFile", filter.periodDateFile(), filter.dateFile(),true));
 
     return spec;
   }

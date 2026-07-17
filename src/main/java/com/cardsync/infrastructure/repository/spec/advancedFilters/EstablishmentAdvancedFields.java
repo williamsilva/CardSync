@@ -32,7 +32,7 @@ public class EstablishmentAdvancedFields extends BaseSpecificationSupport<Establ
 
     spec = spec.and(inPath(filter.company(), EstablishmentAdvancedFields::parseUuidOrNull,"company", "id"));
     spec = spec.and(inPath(filter.acquirer(), EstablishmentAdvancedFields::parseUuidOrNull,"acquirer", "id"));
-    spec = spec.and(inPath(filter.createdBy(), EstablishmentAdvancedFields::parseUuidOrNull,"createdBy"));
+    spec = spec.and(inPath(filter.createdBy(), EstablishmentAdvancedFields::parseUuidOrNull,"createdBy", "id"));
 
     return spec;
   }

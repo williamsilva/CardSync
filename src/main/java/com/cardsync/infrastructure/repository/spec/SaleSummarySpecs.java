@@ -27,22 +27,22 @@ import java.util.Map;
 @Component
 public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
   private final SaleSummaryTableFields saleSummaryTableFields;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SaleSummaryAdvancedFields saleSummaryAdvancedFields;
 
   public SaleSummarySpecs(
     DateFilterService dateFilterService,
-    ImplantationDateProvider implantationDateProvider,
     SpecificationFactory specificationFactory,
     SaleSummaryTableFields saleSummaryTableFields,
+    ImplantationDateProvider implantationDateProvider,
     SaleSummaryAdvancedFields saleSummaryAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.saleSummaryTableFields = saleSummaryTableFields;
+    this.implantationDateProvider = implantationDateProvider;
     this.saleSummaryAdvancedFields = saleSummaryAdvancedFields;
   }
 

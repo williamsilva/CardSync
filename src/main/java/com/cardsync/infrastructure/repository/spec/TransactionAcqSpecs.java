@@ -25,22 +25,22 @@ import java.util.Map;
 @Component
 public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final TransactionAcqTableFields transactionAcqTableFields;
   private final TransactionAcqAdvancedFields transactionAcqAdvancedFields;
 
   public TransactionAcqSpecs(
-    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
     TransactionAcqTableFields transactionAcqFields,
+    ImplantationDateProvider implantationDateProvider,
     TransactionAcqAdvancedFields transactionAcqAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
     this.transactionAcqTableFields = transactionAcqFields;
+    this.implantationDateProvider = implantationDateProvider;
     this.transactionAcqAdvancedFields = transactionAcqAdvancedFields;
   }
 
@@ -59,35 +59,12 @@ public class TransactionAcqSpecs extends BaseSpecificationSupport<TransactionAcq
     Specification<TransactionAcqEntity> spec = Specs.all();
 
     if (query != null) {
-      spec = spec.and(
-        specificationFactory.fromTableFilters(
-          query.tableFilters(),
-          transactionAcqTableFields.table()
-        )
-      );
+      spec = spec.and(specificationFactory.fromTableFilters(query.tableFilters(), transactionAcqTableFields.table()));
 
       spec = spec.and(transactionAcqAdvancedFields.advanced(query.advanced()));
-
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-
-        // Usa numberFilter (equals ou prefixo) e startsWith para authorization
-        // para aproveitar os índices idx_acq_nsu e idx_acq_authorization.
-        // containsPath("establishment","pvNumber") foi removido: join + CAST + LIKE bilateral
-        // não usa índice e degrada queries sem filtro de estabelecimento.
-        spec = spec.and(
-          anyOf(
-            numberFilter(gf, "nsu"),
-            startsWith(gf, "authorization")
-          )
-        );
-      }
     }
 
-    spec = spec.and(Specification.not(
-      inCodes("modality", getModalityEnum(), ModalityEnum::getCode)
-    ));
-
+    spec = spec.and(Specification.not(inCodes("modality", getModalityEnum(), ModalityEnum::getCode)));
     spec = spec.and(dateGreaterThanOrEqual("saleDate", implantationDateProvider.get(), false));
 
     return spec;

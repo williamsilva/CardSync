@@ -54,14 +54,6 @@ public class BankSpecs extends BaseSpecificationSupport<BankEntity> {
         )
       );
 
-      if (query.advanced() != null) {
-        var a = query.advanced();
-        spec = spec.and(contains("code", a.code()));
-        spec = spec.and(contains("name", a.name()));
-        spec = spec.and(contains("ispb", a.ispb()));
-        spec = spec.and(inCodes("status", a.statusEnum(), StatusEnum::getCode));
-      }
-
     }
 
     return spec.and(orderByAsc("name"));

@@ -22,12 +22,12 @@ public class HolidaySpecs extends BaseSpecificationSupport<HolidayEntity> {
 
   public HolidaySpecs(
     DateFilterService dateFilterService,
-    SpecificationFactory specificationFactory,
-    HolidayTableFields holidayTableFields
+    HolidayTableFields holidayTableFields,
+    SpecificationFactory specificationFactory
   ) {
     super(dateFilterService);
-    this.specificationFactory = specificationFactory;
     this.holidayTableFields = holidayTableFields;
+    this.specificationFactory = specificationFactory;
   }
 
   public Specification<HolidayEntity> fromQuery(ListQueryDto<HolidayFilter> query) {

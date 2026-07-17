@@ -22,22 +22,22 @@ import java.util.Map;
 public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentErpEntity> {
 
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final InstallmentsErpTableFields installmentsErpTableFields;
   private final InstallmentsErpAdvancedFields installmentsErpAdvancedFields;
-  private final ImplantationDateProvider implantationDateProvider;
 
   public InstallmentsErpSpecs(
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
+    ImplantationDateProvider implantationDateProvider,
     InstallmentsErpTableFields installmentsErpTableFields,
-    InstallmentsErpAdvancedFields installmentsErpAdvancedFields,
-    ImplantationDateProvider implantationDateProvider
+    InstallmentsErpAdvancedFields installmentsErpAdvancedFields
   ) {
     super(dateFilterService);
     this.specificationFactory = specificationFactory;
+    this.implantationDateProvider = implantationDateProvider;
     this.installmentsErpTableFields = installmentsErpTableFields;
     this.installmentsErpAdvancedFields = installmentsErpAdvancedFields;
-    this.implantationDateProvider = implantationDateProvider;
   }
 
   public Specification<InstallmentErpEntity> fromQuery(ListQueryDto<InstallmentsErpFilter> query) {
@@ -63,22 +63,9 @@ public class InstallmentsErpSpecs extends BaseSpecificationSupport<InstallmentEr
       );
 
       spec = spec.and(installmentsErpAdvancedFields.advanced(query.advanced()));
-
-      if (!isBlank(query.globalFilter())) {
-        String gf = query.globalFilter();
-        spec = spec.and(anyOf(startsWithPath(gf, "transaction", "nsu")));
-      }
     }
 
-    spec = spec.and(
-      notInCodes(
-        getModalityEnum(),
-        ModalityEnum::getCode,
-        "transaction",
-        "modality"
-      )
-    );
-
+    spec = spec.and(notInCodes(getModalityEnum(), ModalityEnum::getCode,"transaction", "modality"));
     spec = spec.and(dateJoinGreaterThanOrEqual("transaction", "saleDate", implantationDateProvider.get(), false));
 
     return spec;
