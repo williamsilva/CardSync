@@ -24,6 +24,7 @@ public class BankingDomicileMinimalModel extends RepresentationModel<BankingDomi
   private Integer agency;
   private Integer currentAccount;
 
+  private String status;
   private String agencyDigit;
   private String accountDigit;
 

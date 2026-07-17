@@ -22,8 +22,9 @@ public class BankingDomicileMinimalModelAssembler extends RepresentationModelAss
     BankingDomicileMinimalModel model = createModelWithId(entity.getId(), entity);
 
     model.setId(entity.getId());
-    model.setStatusDate(entity.getStatusDate());
     model.setAgency(entity.getAgency());
+    model.setStatus(entity.getStatus().name());
+    model.setStatusDate(entity.getStatusDate());
     model.setAgencyDigit(entity.getAgencyDigit());
     model.setAccountDigit(entity.getAccountDigit());
     model.setCurrentAccount(entity.getCurrentAccount());
