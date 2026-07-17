@@ -145,6 +145,21 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   );
 
   /**
+   * Mesma busca acima, mas sem o filtro de lookback — usada no backfill único
+   * (ignoreLookback=true) para vincular órfãs antigas que já saíram da janela normal.
+   */
+  @Query("""
+    select co.id from CreditOrderEntity co
+    where co.salesSummary is null
+      and co.acquirer is not null
+      and co.pvCentralizer is not null
+      and co.rvNumber is not null
+      and co.rvDate >= :implantationDate
+    order by co.rvDate asc, co.id asc
+  """)
+  List<UUID> findOrphanedIdsIgnoringLookback(@Param("implantationDate") LocalDate implantationDate);
+
+  /**
    * Pré-vinculação: carrega CreditOrder órfãs por IDs com acquirer em fetch join.
    */
   @Query("""
@@ -206,6 +221,22 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   int syncSalesSummaryStatusForReconciledSummaries(
     @Param("reconciledStatus") Integer reconciledStatus,
     @Param("lookbackDate") LocalDate lookbackDate
+  );
+
+  /**
+   * Mesmo reparo acima, sem filtro de data — usado no backfill único (ignoreLookback=true)
+   * para corrigir ordens de resumos antigos que já saíram da janela normal.
+   */
+  @Transactional
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query("""
+    update CreditOrderEntity co
+       set co.salesSummaryStatus = :reconciledStatus
+     where co.salesSummary.creditOrderStatus = :reconciledStatus
+       and (co.salesSummaryStatus is null or co.salesSummaryStatus <> :reconciledStatus)
+  """)
+  int syncSalesSummaryStatusForReconciledSummariesIgnoringLookback(
+    @Param("reconciledStatus") Integer reconciledStatus
   );
 
   /** Retorna os pvCentralizer distintos presentes em um arquivo processado (EEFI). */

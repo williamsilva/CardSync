@@ -19,7 +19,7 @@ public record SaleSummaryFilter(
 
   List<ModalityEnum> modality,
   List<StatusPaymentBankEnum> statusPaymentBank,
-  List<StatusTransactionEnum> transactionsStatus,
+  List<StatusReconciliationEnum> transactionsStatus,
   List<StatusReconciliationEnum> creditOrderStatus,
 
   PeriodEnum periodRvDate,

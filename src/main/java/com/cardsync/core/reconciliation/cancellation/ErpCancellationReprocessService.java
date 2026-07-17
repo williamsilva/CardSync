@@ -162,7 +162,9 @@ public class ErpCancellationReprocessService {
       .findUnlinkedByNsuAuthorizationAndAcquirerForCancellationReprocess(
         acq.getNsu(),
         acq.getAuthorization(),
-        acq.getAcquirer().getId()
+        acq.getAcquirer().getId(),
+        acq.getCompany() != null ? acq.getCompany().getId() : null,
+        acq.getEstablishment() != null ? acq.getEstablishment().getId() : null
       );
     return candidates.isEmpty() ? null : candidates.get(0);
   }

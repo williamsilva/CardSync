@@ -74,7 +74,9 @@ public class BankReconciliationService {
   @Transactional
   public BankReconciliationResult reconcilePending(BankReconciliationTriggerType trigger) {
     FileProcessingProperties.Reconciliation config = properties.getReconciliation();
-    BankReconciliationMode mode = BankReconciliationMode.CREDIT_ORDER_ONLY;
+    // Antes hardcoded em CREDIT_ORDER_ONLY, ignorando file-processing.reconciliation.bank-mode
+    // — a configuração existia, era exposta/editável na API, mas não tinha efeito nenhum.
+    BankReconciliationMode mode = config.getBankMode();
     BankReconciliationResult.Counter result = BankReconciliationResult.counter(trigger, mode);
 
     List<UUID> eligibleOrderIds = creditOrderRepository.findEligibleIdsForBankReconciliation(
@@ -99,92 +101,103 @@ public class BankReconciliationService {
       reconciliationSettingsService.getValueTolerance()
     );
 
-    int zeroValueCount = reconcileZeroValueOrders();
-    if (zeroValueCount > 0) {
-      log.info("✅ Conciliação automática: {} ordem(ns) com releaseValue zero conciliada(s).", zeroValueCount);
-    }
-
     Set<UUID> reconciledOrderIds = new HashSet<>();
     Set<UUID> analyzedReleaseIds = new HashSet<>();
 
-    for (int offset = 0, batchNumber = 1; offset < eligibleOrderIds.size(); offset += batchSize, batchNumber++) {
-      int endIndex = Math.min(offset + batchSize, eligibleOrderIds.size());
-      List<UUID> batchIds = eligibleOrderIds.subList(offset, endIndex);
+    // mode controla o que de fato roda: por padrão (CREDIT_ORDER_ONLY) o comportamento é
+    // idêntico ao de antes (só ordem de crédito). Nos outros modos, a conciliação por
+    // parcelas (reconcilePendingReleasesByInstallments) passa a rodar de verdade — antes
+    // esse método nunca era chamado por nenhum ponto de entrada, o que também deixava
+    // bank-mark-not-reconciled-after-days (usado só dentro dele) sem nenhum efeito.
+    if (mode.shouldTryCreditOrders()) {
+      int zeroValueCount = reconcileZeroValueOrders();
+      if (zeroValueCount > 0) {
+        log.info("✅ Conciliação automática: {} ordem(ns) com releaseValue zero conciliada(s).", zeroValueCount);
+      }
 
-      List<CreditOrderEntity> batchOrders = creditOrderRepository.findEligibleByIdsForBankReconciliation(
-        batchIds,
-        SUMMARY_RECONCILED_STATUS,
-        PAYMENT_PENDING,
-        PAYMENT_PARTIAL,
-        reconciliationSettingsService.isReprocessBankAcquirer()
-      );
+      for (int offset = 0, batchNumber = 1; offset < eligibleOrderIds.size(); offset += batchSize, batchNumber++) {
+        int endIndex = Math.min(offset + batchSize, eligibleOrderIds.size());
+        List<UUID> batchIds = eligibleOrderIds.subList(offset, endIndex);
 
-      java.util.Map<UUID, List<CreditOrderEntity>> ordersByCompany = new java.util.LinkedHashMap<>();
-      for (CreditOrderEntity order : batchOrders) {
-        UUID companyId = idOrNull(order.getCompany());
-        if (companyId == null) {
-          log.warn(
-            "⚠ Ordem ignorada por falta de empresa. creditOrder={}, releaseDate={}, releaseValue={}",
-            order.getId(), order.getReleaseDate(), order.getReleaseValue()
-          );
-          continue;
+        List<CreditOrderEntity> batchOrders = creditOrderRepository.findEligibleByIdsForBankReconciliation(
+          batchIds,
+          SUMMARY_RECONCILED_STATUS,
+          PAYMENT_PENDING,
+          PAYMENT_PARTIAL,
+          reconciliationSettingsService.isReprocessBankAcquirer()
+        );
+
+        java.util.Map<UUID, List<CreditOrderEntity>> ordersByCompany = new java.util.LinkedHashMap<>();
+        for (CreditOrderEntity order : batchOrders) {
+          UUID companyId = idOrNull(order.getCompany());
+          if (companyId == null) {
+            log.warn(
+              "⚠ Ordem ignorada por falta de empresa. creditOrder={}, releaseDate={}, releaseValue={}",
+              order.getId(), order.getReleaseDate(), order.getReleaseValue()
+            );
+            continue;
+          }
+          ordersByCompany.computeIfAbsent(companyId, ignored -> new java.util.ArrayList<>()).add(order);
         }
-        ordersByCompany.computeIfAbsent(companyId, ignored -> new java.util.ArrayList<>()).add(order);
-      }
 
-      int reconciledBeforeBatch = result.toResult().getCreditOrdersReconciled();
-      int releasesBeforeBatch = result.toResult().getReleasesReconciled();
+        int reconciledBeforeBatch = result.toResult().getCreditOrdersReconciled();
+        int releasesBeforeBatch = result.toResult().getReleasesReconciled();
 
-      for (var entry : ordersByCompany.entrySet()) {
-        UUID companyId = entry.getKey();
-        List<CreditOrderEntity> companyOrders = entry.getValue();
+        for (var entry : ordersByCompany.entrySet()) {
+          UUID companyId = entry.getKey();
+          List<CreditOrderEntity> companyOrders = entry.getValue();
 
-        LocalDate minOrderDate = companyOrders.stream()
-          .map(CreditOrderEntity::getReleaseDate)
-          .filter(Objects::nonNull)
-          .min(LocalDate::compareTo)
-          .orElse(null);
-        LocalDate maxOrderDate = companyOrders.stream()
-          .map(CreditOrderEntity::getReleaseDate)
-          .filter(Objects::nonNull)
-          .max(LocalDate::compareTo)
-          .orElse(null);
+          LocalDate minOrderDate = companyOrders.stream()
+            .map(CreditOrderEntity::getReleaseDate)
+            .filter(Objects::nonNull)
+            .min(LocalDate::compareTo)
+            .orElse(null);
+          LocalDate maxOrderDate = companyOrders.stream()
+            .map(CreditOrderEntity::getReleaseDate)
+            .filter(Objects::nonNull)
+            .max(LocalDate::compareTo)
+            .orElse(null);
 
-        if (minOrderDate == null || maxOrderDate == null) continue;
+          if (minOrderDate == null || maxOrderDate == null) continue;
 
-        int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
-        int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
-        List<ReleasesBankEntity> companyReleases = releasesBankRepository.findAvailableForCreditOrderBatch(
-          STATUS_PENDING,
-          reconciliationSettingsService.isReprocessBankAcquirer(),
-          companyId,
-          minOrderDate.minusDays(toleranceDaysBefore),
-          maxOrderDate.plusDays(toleranceDaysAfter)
+          int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
+          int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
+          List<ReleasesBankEntity> companyReleases = releasesBankRepository.findAvailableForCreditOrderBatch(
+            STATUS_PENDING,
+            reconciliationSettingsService.isReprocessBankAcquirer(),
+            companyId,
+            minOrderDate.minusDays(toleranceDaysBefore),
+            maxOrderDate.plusDays(toleranceDaysAfter)
+          );
+
+          reconcileEligibleCreditOrders(
+            companyOrders,
+            companyReleases,
+            reconciledOrderIds,
+            analyzedReleaseIds,
+            config,
+            result
+          );
+        }
+
+        entityManager.flush();
+        entityManager.clear();
+
+        BankReconciliationResult partial = result.toResult();
+        log.info(
+          "📦 Lote {}/{} concluído: ordensCarregadas={}, ordensConciliadasNoLote={}, releasesConciliadosNoLote={}, totalOrdensConciliadas={}",
+          batchNumber,
+          totalBatches,
+          batchOrders.size(),
+          partial.getCreditOrdersReconciled() - reconciledBeforeBatch,
+          partial.getReleasesReconciled() - releasesBeforeBatch,
+          partial.getCreditOrdersReconciled()
         );
-
-        reconcileEligibleCreditOrders(
-          companyOrders,
-          companyReleases,
-          reconciledOrderIds,
-          analyzedReleaseIds,
-          config,
-          result
-        );
       }
+    }
 
-      entityManager.flush();
-      entityManager.clear();
-
-      BankReconciliationResult partial = result.toResult();
-      log.info(
-        "📦 Lote {}/{} concluído: ordensCarregadas={}, ordensConciliadasNoLote={}, releasesConciliadosNoLote={}, totalOrdensConciliadas={}",
-        batchNumber,
-        totalBatches,
-        batchOrders.size(),
-        partial.getCreditOrdersReconciled() - reconciledBeforeBatch,
-        partial.getReleasesReconciled() - releasesBeforeBatch,
-        partial.getCreditOrdersReconciled()
-      );
+    if (mode.shouldTryInstallmentsAfterCreditOrders() || mode.shouldTryInstallmentsFirst()) {
+      reconcilePendingReleasesByInstallments(config, analyzedReleaseIds, result);
     }
 
     BankReconciliationResult partialResult = result.toResult();
@@ -706,11 +719,31 @@ public class BankReconciliationService {
     summary.setStatusPaymentBank(transaction.getStatusPaymentBank());
   }
 
+  /**
+   * Recalcula creditOrderStatus/statusPaymentBank do resumo a partir de TODAS as ordens de
+   * crédito ligadas a ele (não só a que acabou de casar) — um resumo parcelado pode ter
+   * várias CreditOrderEntity (uma por parcela), cada uma liquidada em lançamentos bancários
+   * diferentes. Marcar o resumo inteiro como RECONCILED/PAID assim que uma única parcela
+   * bate esconderia parcelas irmãs ainda pendentes. Mesma lógica de
+   * {@link #recomputeSalesSummariesFromCreditOrders}, usada no caminho de desfazer.
+   */
   private void updateSalesSummaryFromCreditOrder(CreditOrderEntity order) {
     SalesSummaryEntity summary = order.getSalesSummary();
     if (summary == null) return;
-    summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
-    summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+
+    List<CreditOrderEntity> siblings = List.copyOf(summary.getCreditOrders());
+    boolean allPaid = !siblings.isEmpty() && siblings.stream()
+      .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+    boolean anyPaid = siblings.stream()
+      .anyMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+
+    if (allPaid) {
+      summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
+      summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+    } else if (anyPaid) {
+      summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
+      summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
+    }
   }
 
   private boolean isCreditOrderCandidateCompatible(ReleasesBankEntity release, CreditOrderEntity order, int toleranceDaysBefore, int toleranceDaysAfter) {

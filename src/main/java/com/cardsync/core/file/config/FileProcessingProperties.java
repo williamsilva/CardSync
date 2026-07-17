@@ -278,8 +278,10 @@ public class FileProcessingProperties {
     private long subsetDpMaxCents = 5_000_000L;
 
     /**
-     * Modo legado da conciliação Banco x adquirente.
-     * A execução automática atual é dirigida exclusivamente pelas ordens de crédito elegíveis.
+     * Modo da conciliação Banco x adquirente (ver BankReconciliationMode). Default
+     * CREDIT_ORDER_ONLY preserva o comportamento histórico (só ordens de crédito elegíveis);
+     * os demais modos ativam a conciliação por parcelas (fallback ou exclusiva) via
+     * BankReconciliationService.reconcilePending.
      */
     private BankReconciliationMode bankMode = BankReconciliationMode.CREDIT_ORDER_ONLY;
 

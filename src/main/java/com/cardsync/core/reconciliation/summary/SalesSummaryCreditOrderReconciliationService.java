@@ -63,18 +63,29 @@ public class SalesSummaryCreditOrderReconciliationService {
 
   @Transactional
   public SalesSummaryCreditOrderReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
+    return reconcilePending(trigger, false);
+  }
+
+  /**
+   * @param ignoreLookback quando {@code true}, ignora o filtro de rvDate/lookback — usado
+   *                        para um backfill único, reavaliando resumos antigos que já saíram
+   *                        da janela normal de lookback.
+   */
+  @Transactional
+  public SalesSummaryCreditOrderReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger, boolean ignoreLookback) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     boolean reprocess = reconciliationSettingsService.isReprocessSalesSummaryCreditOrder();
 
     log.info(
-      "📌 Etapa 4 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}, reprocess={}",
+      "📌 Etapa 4 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}, reprocess={}, ignoreLookback={}",
       trigger,
       ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
       PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
       UPDATE_BATCH_SIZE,
       GENERATION_BATCH_SIZE,
-      reprocess
+      reprocess,
+      ignoreLookback
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
@@ -82,13 +93,20 @@ public class SalesSummaryCreditOrderReconciliationService {
     LocalDate implantationDate = implantationDateProvider.get();
     LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
 
-    List<SalesSummaryCreditOrderStats> stats = salesSummaryRepository.findStatsForSalesSummaryCreditOrderReconciliation(
-      reprocess,
-      ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
-      PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
-      implantationDate,
-      lookbackDate
-    );
+    List<SalesSummaryCreditOrderStats> stats = ignoreLookback
+      ? salesSummaryRepository.findStatsForSalesSummaryCreditOrderReconciliationIgnoringLookback(
+          reprocess,
+          ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
+          PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
+          implantationDate
+        )
+      : salesSummaryRepository.findStatsForSalesSummaryCreditOrderReconciliation(
+          reprocess,
+          ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
+          PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
+          implantationDate,
+          lookbackDate
+        );
 
     log.info(
       "🔎 Etapa 4 - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
@@ -174,10 +192,9 @@ public class SalesSummaryCreditOrderReconciliationService {
     bulkUpdateSalesSummaryStatuses(trigger, "pendente/sem ordem", generated.notGeneratedSummaryIds(), ORDER_SUMMARY_PENDING);
     bulkUpdateManualGenerated(trigger, generated.generatedSummaryIds());
 
-    int fixedOrders = creditOrderRepository.syncSalesSummaryStatusForReconciledSummaries(
-      ORDER_SUMMARY_RECONCILED,
-      lookbackDate
-    );
+    int fixedOrders = ignoreLookback
+      ? creditOrderRepository.syncSalesSummaryStatusForReconciledSummariesIgnoringLookback(ORDER_SUMMARY_RECONCILED)
+      : creditOrderRepository.syncSalesSummaryStatusForReconciledSummaries(ORDER_SUMMARY_RECONCILED, lookbackDate);
     if (fixedOrders > 0) {
       log.warn(
         "⚠️ Etapa 4 - Consistência: {} ordem(ns) de crédito com salesSummaryStatus inconsistente detectada(s) e corrigida(s). trigger={}",

@@ -10,6 +10,7 @@ import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
 import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationResult;
 import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationService;
+import com.cardsync.core.reconciliation.summary.CreditOrderOrphanLinkingService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationResult;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationResult;
@@ -33,14 +34,15 @@ import java.util.UUID;
 @RequestMapping("/bff/v1/conciliation-waiting")
 public class ConciliationWaitingController {
 
+  private final BankReconciliationService bankReconciliationService;
   private final ConciliationWaitingService conciliationWaitingService;
   private final ConciliationAnalysisService conciliationAnalysisService;
   private final ErpAcquirerResolutionService erpAcquirerResolutionService;
   private final ErpCancellationReprocessService erpCancellationReprocessService;
+  private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
+  private final CreditOrderOrphanLinkingService creditOrderOrphanLinkingService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
-  private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
-  private final BankReconciliationService bankReconciliationService;
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
 
   @PostMapping("/missing-acquirer")
@@ -212,23 +214,39 @@ public class ConciliationWaitingController {
     return bankReconciliationService.reconcilePending();
   }
 
+  // ignoreLookback=true: backfill único, ignora a janela de lookback da esteira normal —
+  // usado para corrigir/vincular resumos e ordens antigas que já saíram dessa janela.
+  // Também roda a pré-vinculação de CreditOrder órfãs antes da conciliação, igual à
+  // esteira automática (FinancialReconciliationPipelineService.runSalesSummaryCreditOrder).
   @PostMapping("/reconcile-sales-summary-credit-order")
   @CheckSecurity.FileProcessing.CanProcess
-  public SalesSummaryCreditOrderReconciliationResult reconcileSalesSummaryCreditOrder() {
-    return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
+  public SalesSummaryCreditOrderReconciliationResult reconcileSalesSummaryCreditOrder(
+    @RequestParam(defaultValue = "false") boolean ignoreLookback
+  ) {
+    creditOrderOrphanLinkingService.linkOrphanedCreditOrders(ignoreLookback);
+    return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL, ignoreLookback);
   }
 
   // Etapa 2 — Resumo de Vendas x TransactionAcq (endpoint independente)
+  // ignoreLookback=true: backfill único, ignora a janela de lookback da esteira normal —
+  // usado para corrigir resumos antigos cujo transactionsStatus ficou desatualizado por
+  // uma ação manual (reconciliação manual, criação de ERP a partir da adquirente) feita
+  // antes do recálculo pontual existir.
   @PostMapping("/reconcile-sales-summary-transactions")
   @CheckSecurity.FileProcessing.CanProcess
-  public SalesSummaryTransactionReconciliationResult reconcileSalesSummaryTransactions() {
-    return salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
+  public SalesSummaryTransactionReconciliationResult reconcileSalesSummaryTransactions(
+    @RequestParam(defaultValue = "false") boolean ignoreLookback
+  ) {
+    return salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL, ignoreLookback);
   }
 
   // Etapa 5 — Venda ADQ x Resumo de Vendas
+  // ignoreLookback=true: backfill único, ignora a janela de lookback da esteira normal.
   @PostMapping("/reconcile-acquirer-sale-summary")
   @CheckSecurity.FileProcessing.CanProcess
-  public AcquirerSaleSummaryReconciliationResult reconcileAcquirerSaleSummary() {
-    return acquirerSaleSummaryReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
+  public AcquirerSaleSummaryReconciliationResult reconcileAcquirerSaleSummary(
+    @RequestParam(defaultValue = "false") boolean ignoreLookback
+  ) {
+    return acquirerSaleSummaryReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL, ignoreLookback);
   }
 }

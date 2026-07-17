@@ -3,7 +3,7 @@ package com.cardsync.infrastructure.repository.spec.advancedFilters;
 import com.cardsync.domain.filter.AnticipationFilter;
 import com.cardsync.domain.model.AnticipationEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
-import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
@@ -24,7 +24,7 @@ public class AnticipationAdvancedFields extends BaseSpecificationSupport<Anticip
     }
 
     spec = spec.and(inPath(filter.statusPaymentBank(), StatusPaymentBankEnum::getCode,"salesSummary", "statusPaymentBank"));
-    spec = spec.and(inPath(filter.transactionsStatus(), StatusTransactionEnum::getCode,"salesSummary", "transactionsStatus"));
+    spec = spec.and(inPath(filter.transactionsStatus(), StatusReconciliationEnum::getCode,"salesSummary", "transactionsStatus"));
 
     spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,"flag", "id"));
     spec = spec.and(inPath(filter.companies(), BaseSpecificationSupport::parseUuidOrNull,"company", "id"));

@@ -67,8 +67,75 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
-   * Etapa 3 - Venda ADQ x SalesSummary.
+   * Mesma agregação da Etapa 1b, mas sem o filtro de rvDate/lookback — usada no backfill
+   * único (endpoint com ignoreLookback=true) para corrigir resumos antigos cujo
+   * transactionsStatus nunca foi recalculado após uma ação manual, e que já saíram da
+   * janela de lookback (nunca mais seriam vistos pela query normal).
+   */
+  @Query("""
+    select new com.cardsync.core.reconciliation.summary.SalesSummaryTransactionStats(
+      ss.id,
+      count(tx.id),
+      coalesce(sum(
+        case when tx.statusTransaction in :excludedStatuses then 1L else 0L end
+      ), 0L),
+      coalesce(sum(
+        case when tx.statusTransaction in :reconciledStatuses then 1L else 0L end
+      ), 0L)
+    )
+      from TransactionAcqEntity tx
+      join tx.salesSummary ss
+     where (:includeAll = true or ss.transactionsStatus is null or ss.transactionsStatus in :pendingStatuses)
+     group by ss.id
+     order by min(ss.rvDate) asc, ss.id asc
+  """)
+  List<SalesSummaryTransactionStats> findStatsForSalesSummaryTransactionReconciliationIgnoringLookback(
+    @Param("includeAll") boolean includeAll,
+    @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("excludedStatuses") Collection<Integer> excludedStatuses,
+    @Param("reconciledStatuses") Collection<Integer> reconciledStatuses
+  );
 
+  /**
+   * Recálculo pontual do rollup de um ou poucos SalesSummary específicos, sem o filtro de
+   * lookback da Etapa 1b — usado logo após ações manuais (ex.: reconciliação manual,
+   * criação de ERP a partir da adquirente) que mudam o statusTransaction de uma
+   * TransactionAcqEntity fora da esteira automática. Sem isso, um resumo cujo rvDate já
+   * saiu da janela de lookback nunca mais seria reavaliado pela Etapa 1b.
+   */
+  @Query("""
+    select new com.cardsync.core.reconciliation.summary.SalesSummaryTransactionStats(
+      ss.id,
+      count(tx.id),
+      coalesce(sum(
+        case when tx.statusTransaction in :excludedStatuses then 1L else 0L end
+      ), 0L),
+      coalesce(sum(
+        case when tx.statusTransaction in :reconciledStatuses then 1L else 0L end
+      ), 0L)
+    )
+      from TransactionAcqEntity tx
+      join tx.salesSummary ss
+     where ss.id in :salesSummaryIds
+     group by ss.id
+  """)
+  List<SalesSummaryTransactionStats> findStatsForSalesSummaryTransactionReconciliationByIds(
+    @Param("salesSummaryIds") Collection<UUID> salesSummaryIds,
+    @Param("excludedStatuses") Collection<Integer> excludedStatuses,
+    @Param("reconciledStatuses") Collection<Integer> reconciledStatuses
+  );
+
+  /**
+   * Etapa 3 - Venda ADQ x SalesSummary (gate de taxa).
+   *
+   * NÃO filtra por ss.transactionsStatus: a Etapa 1b (SalesSummaryTransactionReconciliationService)
+   * roda antes desta, no mesmo pipeline, e já promove o resumo para RECONCILED olhando só o
+   * statusTransaction da transação — sem considerar feeReconciliationStatus. Se esta consulta
+   * pulasse resumos com transactionsStatus fora de "pendente", ela nunca reavaliaria um resumo
+   * que a Etapa 1b acabou de marcar como conciliado na mesma execução, e a divergência de taxa
+   * (feeReconciliationStatus) nunca seria detectada no nível do resumo. Por isso reavalia todo
+   * resumo com transação vinculada dentro da janela de lookback, a cada execução.
+   *
    * Consulta otimizada para evitar N+1:
    * - não carrega SalesSummaryEntity;
    * - não carrega TransactionAcqEntity;
@@ -91,19 +158,46 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       from TransactionAcqEntity tx
       join tx.salesSummary ss
      where ss.id is not null
-       and (:includeAlreadyReconciled = true or ss.transactionsStatus is null or ss.transactionsStatus in :pendingSummaryStatuses)
        and ss.rvDate >= :implantationDate
        and ss.rvDate >= :lookbackDate
      group by ss.id
      order by min(ss.rvDate) asc, ss.id asc
   """)
   List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliation(
-    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
-    @Param("pendingSummaryStatuses") Collection<Integer> pendingSummaryStatuses,
     @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
     @Param("eligibleFeeStatuses") Collection<Integer> eligibleFeeStatuses,
     @Param("implantationDate") LocalDate implantationDate,
     @Param("lookbackDate") LocalDate lookbackDate
+  );
+
+  /**
+   * Mesma agregação acima, mas sem o filtro de lookback — usada no backfill único
+   * (ignoreLookback=true) para reavaliar resumos antigos que já saíram da janela normal.
+   */
+  @Query("""
+    select new com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryStats(
+      ss.id,
+      count(tx.id),
+      coalesce(sum(
+        case
+          when tx.statusTransaction in :eligibleSaleStatuses
+           and (tx.feeReconciliationStatus is null or tx.feeReconciliationStatus in :eligibleFeeStatuses)
+          then 1L
+          else 0L
+        end
+      ), 0L)
+    )
+      from TransactionAcqEntity tx
+      join tx.salesSummary ss
+     where ss.id is not null
+       and ss.rvDate >= :implantationDate
+     group by ss.id
+     order by min(ss.rvDate) asc, ss.id asc
+  """)
+  List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliationIgnoringLookback(
+    @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
+    @Param("eligibleFeeStatuses") Collection<Integer> eligibleFeeStatuses,
+    @Param("implantationDate") LocalDate implantationDate
   );
 
   @Modifying(clearAutomatically = true, flushAutomatically = true)
@@ -170,6 +264,32 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     @Param("pendingCreditOrderStatuses") Collection<Integer> pendingCreditOrderStatuses,
     @Param("implantationDate") LocalDate implantationDate,
     @Param("lookbackDate") LocalDate lookbackDate
+  );
+
+  /**
+   * Mesma agregação acima, mas sem o filtro de lookback — usada no backfill único
+   * (ignoreLookback=true) para reavaliar resumos antigos que já saíram da janela normal.
+   */
+  @Query("""
+    select new com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderStats(
+      ss.id,
+      count(co.id),
+      max(ss.grossValue),
+      cast(coalesce(max(co.installmentTotal), 1) as integer)
+    )
+      from SalesSummaryEntity ss
+      left join CreditOrderEntity co on co.salesSummary.id = ss.id
+     where (:includeAlreadyReconciled = true or ss.transactionsStatus is null or ss.transactionsStatus in :eligibleTransactionStatuses)
+       and (:includeAlreadyReconciled = true or ss.creditOrderStatus is null or ss.creditOrderStatus in :pendingCreditOrderStatuses)
+       and ss.rvDate >= :implantationDate
+     group by ss.id
+     order by min(ss.rvDate) asc, ss.id asc
+  """)
+  List<SalesSummaryCreditOrderStats> findStatsForSalesSummaryCreditOrderReconciliationIgnoringLookback(
+    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
+    @Param("eligibleTransactionStatuses") Collection<Integer> eligibleTransactionStatuses,
+    @Param("pendingCreditOrderStatuses") Collection<Integer> pendingCreditOrderStatuses,
+    @Param("implantationDate") LocalDate implantationDate
   );
 
   @Query("""

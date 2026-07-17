@@ -5,7 +5,6 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
-import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
@@ -34,7 +33,7 @@ public class SaleSummaryAdvancedFields extends BaseSpecificationSupport<SalesSum
     spec = spec.and(inCodes("pvNumber", filter.establishments(), x -> x));
     spec = spec.and(inCodes("modality", filter.modality(), ModalityEnum::getCode));
     spec = spec.and(inCodes("statusPaymentBank", filter.statusPaymentBank(), StatusPaymentBankEnum::getCode));
-    spec = spec.and(inCodes("transactionsStatus", filter.transactionsStatus(), StatusTransactionEnum::getCode));
+    spec = spec.and(inCodes("transactionsStatus", filter.transactionsStatus(), StatusReconciliationEnum::getCode));
     spec = spec.and(inCodes("creditOrderStatus", filter.creditOrderStatus(), StatusReconciliationEnum::getCode));
 
     spec = spec.and(inPath(filter.flags(), BaseSpecificationSupport::parseUuidOrNull,"flag", "id"));

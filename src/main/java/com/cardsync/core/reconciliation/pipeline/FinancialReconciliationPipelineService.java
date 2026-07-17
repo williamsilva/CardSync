@@ -78,27 +78,48 @@ public class FinancialReconciliationPipelineService {
         .startedAt(startedAt)
         .build();
 
-      result.addStep(reconciliationSettingsService.isEnabledErpAcquirer()
-        ? executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.ERP_ACQUIRER, "1. ADQ x ERP"));
-      result.addStep(reconciliationSettingsService.isEnabledSalesSummaryTransactions()
-        ? executePipelineStep("2. Resumo de vendas x TransactionAcq", () -> runSalesSummaryTransactions(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.SALES_SUMMARY_TRANSACTION, "2. Resumo de vendas x TransactionAcq"));
-      result.addStep(reconciliationSettingsService.isEnabledAcquirerSaleCancellations()
-        ? executePipelineStep("3. Cancelamentos informados pela adquirente", () -> runAcquirerSaleCancellations(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_CANCELLATION, "3. Cancelamentos informados pela adquirente"));
-      result.addStep(reconciliationSettingsService.isEnabledErpAcquirerFees()
-        ? executePipelineStep("4. Ajustes/taxas ERP x Adquirente", () -> runSaleAdjustments(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_ADJUSTMENTS, "4. Ajustes/taxas ERP x Adquirente"));
-      result.addStep(reconciliationSettingsService.isEnabledAcquirerSaleSummary()
-        ? executePipelineStep("5. Venda ADQ x resumo de vendas", () -> runAcquirerSaleSummary(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_SUMMARY, "5. Venda ADQ x resumo de vendas"));
-      result.addStep(reconciliationSettingsService.isEnabledSalesSummaryCreditOrder()
-        ? executePipelineStep("6. Resumo de vendas x ordem de pagamento", () -> runSalesSummaryCreditOrder(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.SALES_SUMMARY_CREDIT_ORDER, "6. Resumo de vendas x ordem de pagamento"));
-      result.addStep(reconciliationSettingsService.isEnabledBankAcquirer()
-        ? executePipelineStep("7. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger))
-        : skippedStep(ReconciliationPipelineStepEnum.CREDIT_ORDER_BANK_RELEASE, "7. Ordem de pagamento x lançamento bancário"));
+      // Etapas em try/catch próprio: cada etapa gerencia sua própria transação (comentário
+      // da classe), então uma falha no meio já deixa etapas anteriores commitadas de verdade
+      // no banco. Sem isso, uma exceção aqui propagava direto pro finally, pulando o save()
+      // abaixo — o histórico de execução (usado pelo dashboard de conciliação) ficava com um
+      // buraco silencioso: nem "sucesso parcial", nem "falhou na etapa N", nada persistido.
+      try {
+        result.addStep(reconciliationSettingsService.isEnabledErpAcquirer()
+          ? executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.ERP_ACQUIRER, "1. ADQ x ERP"));
+        result.addStep(reconciliationSettingsService.isEnabledSalesSummaryTransactions()
+          ? executePipelineStep("2. Resumo de vendas x TransactionAcq", () -> runSalesSummaryTransactions(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.SALES_SUMMARY_TRANSACTION, "2. Resumo de vendas x TransactionAcq"));
+        result.addStep(reconciliationSettingsService.isEnabledAcquirerSaleCancellations()
+          ? executePipelineStep("3. Cancelamentos informados pela adquirente", () -> runAcquirerSaleCancellations(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_CANCELLATION, "3. Cancelamentos informados pela adquirente"));
+        result.addStep(reconciliationSettingsService.isEnabledErpAcquirerFees()
+          ? executePipelineStep("4. Ajustes/taxas ERP x Adquirente", () -> runSaleAdjustments(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_ADJUSTMENTS, "4. Ajustes/taxas ERP x Adquirente"));
+        result.addStep(reconciliationSettingsService.isEnabledAcquirerSaleSummary()
+          ? executePipelineStep("5. Venda ADQ x resumo de vendas", () -> runAcquirerSaleSummary(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.ACQUIRER_SALE_SUMMARY, "5. Venda ADQ x resumo de vendas"));
+        result.addStep(reconciliationSettingsService.isEnabledSalesSummaryCreditOrder()
+          ? executePipelineStep("6. Resumo de vendas x ordem de pagamento", () -> runSalesSummaryCreditOrder(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.SALES_SUMMARY_CREDIT_ORDER, "6. Resumo de vendas x ordem de pagamento"));
+        result.addStep(reconciliationSettingsService.isEnabledBankAcquirer()
+          ? executePipelineStep("7. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger))
+          : skippedStep(ReconciliationPipelineStepEnum.CREDIT_ORDER_BANK_RELEASE, "7. Ordem de pagamento x lançamento bancário"));
+      } catch (Exception ex) {
+        OffsetDateTime failedAt = OffsetDateTime.now();
+        result.setFinishedAt(failedAt);
+
+        log.error(
+          "❌ ESTEIRA DE CONCILIAÇÃO FINANCEIRA FALHOU: trigger={}, etapasConcluidas={}, duraçãoAtéFalha={}s, erro={}",
+          trigger,
+          result.getSteps().size(),
+          Duration.between(startedAt, failedAt).toSeconds(),
+          ex.getMessage()
+        );
+
+        reconciliationExecutionLogService.save(result);
+        throw ex;
+      }
 
       OffsetDateTime finishedAt = OffsetDateTime.now();
       result.setFinishedAt(finishedAt);

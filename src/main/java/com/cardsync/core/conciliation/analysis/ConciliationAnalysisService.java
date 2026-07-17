@@ -361,6 +361,12 @@ public class ConciliationAnalysisService {
         List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
         Set<UUID> changedAcquirerIds = new HashSet<>();
 
+        // acquirersByIdentity é um snapshot único por lote — sem isso, duas vendas ERP com a
+        // mesma identidade (NSU/autorização duplicados) casariam com a MESMA venda da
+        // adquirente dentro do mesmo lote, e uma venda ADQ já conciliada por outra ERP neste
+        // lote poderia ser rebaixada de volta a PENDING pelos ramos de divergência abaixo.
+        Set<UUID> consumedAcquirerIds = new HashSet<>();
+
         int batchAnalyzed = 0;
         int batchMatched = 0;
         int batchUpdated = 0;
@@ -377,6 +383,16 @@ public class ConciliationAnalysisService {
             continue;
           }
 
+          // Status terminal (DELETED/CANCELED) nunca deve ser reconsiderado, mesmo com
+          // reconcileAlreadyReconciled=true — "reprocessar" significa reavaliar vendas ainda
+          // ativas/conciliadas, não ressuscitar uma venda explicitamente excluída. Sem essa
+          // guarda, uma venda ERP marcada DELETED (ex.: duplicata de importação já resolvida)
+          // podia ser recasada com uma venda ADQ já vinculada a outra venda ERP, violando a
+          // constraint única de transaction_acq_id.
+          if (isFinalStatusTransaction(erp.getStatusTransaction())) {
+            continue;
+          }
+
           if (!reconcileAlreadyReconciled && !isPendingForErpAcquirerReconciliation(erp)) {
             continue;
           }
@@ -386,7 +402,9 @@ public class ConciliationAnalysisService {
           List<TransactionAcqEntity> identityCandidates = acquirersByIdentity.getOrDefault(
             ErpAcquirerIdentityKey.fromErp(erp),
             List.of()
-          );
+          ).stream()
+            .filter(acq -> acq.getId() == null || !consumedAcquirerIds.contains(acq.getId()))
+            .toList();
 
           ErpAcquirerMatchResult matchResult = findBestAcquirerMatchForReconciliation(erp, identityCandidates);
 
@@ -474,6 +492,10 @@ public class ConciliationAnalysisService {
 
           TransactionAcqEntity acq = matchResult.acquirerSale();
           batchMatched++;
+
+          if (acq.getId() != null) {
+            consumedAcquirerIds.add(acq.getId());
+          }
 
           ErpAcquirerApplyResult applyResult = applyAcquirerBusinessContext(erp, acq);
           if (applyResult.changed()) {
@@ -1061,8 +1083,11 @@ public class ConciliationAnalysisService {
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
+    // Mesmo motivo do guard de status terminal no lado ERP: uma venda ADQ DELETED/CANCELED
+    // não deve ser oferecida como candidata de match, mesmo com reconcileAlreadyReconciled=true.
     return candidates.values().stream()
       .filter(acq -> !isExcludedFromCardReconciliation(acq))
+      .filter(acq -> !isFinalAcquirerStatusTransaction(acq))
       .toList();
   }
 
@@ -1172,10 +1197,14 @@ public class ConciliationAnalysisService {
       ? (erp.getNsu() != null ? String.valueOf(erp.getNsu()) : null)
       : erp.getAuthorization();
 
+    // Usa sameIdentityText (tolerante a zeros à esquerda) nos dois fluxos — não só no swap —
+    // para ficar consistente com ErpAcquirerIdentityKey.normalizeKeyText, que já ignora zeros
+    // à esquerda ao indexar as candidatas. Antes, o fluxo normal usava sameText (comparação
+    // estrita) aqui: duas transações do mesmo NSU caíam no mesmo bucket do índice (que já
+    // ignora zeros à esquerda) mas eram rejeitadas neste filtro por causa de zeros à esquerda
+    // diferentes na autorização (ex.: "63451" vs "063451"), gerando falso CV_NOT_FOUND_ADQ.
     List<TransactionAcqEntity> sameIdentity = acquirerSales.stream()
-      .filter(acq -> swapNsuAuth
-        ? sameIdentityText(erpAuthForMatch, acq.getAuthorization())
-        : sameText(erpAuthForMatch, acq.getAuthorization()))
+      .filter(acq -> sameIdentityText(erpAuthForMatch, acq.getAuthorization()))
       .filter(acq -> erpNsuForMatch != null && Objects.equals(erpNsuForMatch, acq.getNsu()))
       .toList();
 
@@ -1183,9 +1212,10 @@ public class ConciliationAnalysisService {
       return ErpAcquirerMatchResult.notMatched();
     }
 
-    // Janela de data da venda: aplicada apenas na conciliação manual (swap), onde a
-    // data digitada pode divergir bastante. Mantém só candidatas cuja saleDate esteja
-    // dentro da tolerância (em dias) configurada em relação à saleDate do ERP.
+    // Janela de data da venda: no fluxo manual (swap), a data digitada pode divergir
+    // bastante, então usa a tolerância em dias configurada. No fluxo normal, a janela
+    // sempre é aplicada — com backwardDays=forwardDays=0 (padrão) ela exige mesmo dia
+    // exato, igual à convenção de "0 = exato" já usada em sameValue/tolerância de valor.
     if (swapNsuAuth) {
       int toleranceDays = manualSwapSaleDateToleranceDays();
       sameIdentity = sameIdentity.stream()
@@ -1198,13 +1228,11 @@ public class ConciliationAnalysisService {
     } else {
       int backwardDays = erpAcquirerPreviousDaysLookback();
       int forwardDays = erpAcquirerFutureDaysLookback();
-      if (backwardDays > 0 || forwardDays > 0) {
-        sameIdentity = sameIdentity.stream()
-          .filter(acq -> withinAsymmetricSaleDateWindow(erp.getSaleDate(), acq.getSaleDate(), backwardDays, forwardDays))
-          .toList();
-        if (sameIdentity.isEmpty()) {
-          return ErpAcquirerMatchResult.notMatched();
-        }
+      sameIdentity = sameIdentity.stream()
+        .filter(acq -> withinAsymmetricSaleDateWindow(erp.getSaleDate(), acq.getSaleDate(), backwardDays, forwardDays))
+        .toList();
+      if (sameIdentity.isEmpty()) {
+        return ErpAcquirerMatchResult.notMatched();
       }
     }
 
@@ -1225,12 +1253,12 @@ public class ConciliationAnalysisService {
     }
 
     int bestScore = sameAcquirer.stream()
-      .mapToInt(acq -> matchScore(erp, acq))
+      .mapToInt(acq -> matchScore(erp, acq, erpNsuForMatch, erpAuthForMatch))
       .max()
       .orElse(0);
 
     List<TransactionAcqEntity> best = sameAcquirer.stream()
-      .filter(acq -> matchScore(erp, acq) == bestScore)
+      .filter(acq -> matchScore(erp, acq, erpNsuForMatch, erpAuthForMatch) == bestScore)
       .toList();
 
     if (best.size() != 1) {
@@ -1314,10 +1342,14 @@ public class ConciliationAnalysisService {
     return left.subtract(right).abs().compareTo(effectiveTolerance) <= 0;
   }
 
-  private int matchScore(TransactionErpEntity erp, TransactionAcqEntity acq) {
+  // erpNsuForMatch/erpAuthForMatch: no fluxo manual (swapNsuAuth=true), o chamador já
+  // troca NSU/autorização antes de comparar contra a candidata — passar erp.getNsu()/
+  // erp.getAuthorization() direto aqui (sem trocar) pontuaria os campos errados, tirando
+  // precisão do desempate exatamente no fluxo desenhado para casos ambíguos/duplicados.
+  private int matchScore(TransactionErpEntity erp, TransactionAcqEntity acq, Long erpNsuForMatch, String erpAuthForMatch) {
     int score = 0;
-    if (erp.getNsu() != null && Objects.equals(erp.getNsu(), acq.getNsu())) score += 40;
-    if (sameText(erp.getAuthorization(), acq.getAuthorization())) score += 40;
+    if (erpNsuForMatch != null && Objects.equals(erpNsuForMatch, acq.getNsu())) score += 40;
+    if (sameText(erpAuthForMatch, acq.getAuthorization())) score += 40;
     if (sameText(erp.getTid(), acq.getTid())) score += 30;
     if (sameValue(erp.getGrossValue(), acq.getGrossValue(), reconciliationValueTolerance())) score += 20;
     if (sameId(erp.getAcquirer(), acq.getAcquirer())) score += 20;
@@ -1331,7 +1363,9 @@ public class ConciliationAnalysisService {
   }
 
   /**
-   * Comparação de identidade tolerante a zeros à esquerda. Usada no fluxo manual, onde
+   * Comparação de identidade tolerante a zeros à esquerda — mesma normalização usada em
+   * ErpAcquirerIdentityKey.normalizeKeyText ao indexar as candidatas por NSU+autorização.
+   * Usada tanto no fluxo normal quanto no fluxo manual (NSU/autorização invertidos), onde
    * comparamos o NSU do ERP (Integer, sem zeros) contra a autorização da adquirente
    * (String, que pode ter zeros à esquerda). Para valores numéricos, ignora os zeros
    * à esquerda ("063451" == "63451"); para os demais, compara como texto.

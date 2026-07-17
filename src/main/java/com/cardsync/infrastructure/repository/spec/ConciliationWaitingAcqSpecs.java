@@ -26,21 +26,21 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingAcqSpecs extends BaseSpecificationSupport<TransactionAcqEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ConciliationWaitingAcqTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields;
 
   public ConciliationWaitingAcqSpecs(
-    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
+    ImplantationDateProvider implantationDateProvider,
     ConciliationWaitingAcqTableFields conciliationWaitingTableFields,
     ConciliationWaitingAcqAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
+    this.implantationDateProvider = implantationDateProvider;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
   }

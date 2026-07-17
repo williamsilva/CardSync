@@ -2,7 +2,6 @@ package com.cardsync.domain.model;
 
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
-import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -92,11 +91,17 @@ public class SalesSummaryEntity extends AuditableEntityBase {
     this.statusPaymentBank = (statusPaymentBank!=null ? statusPaymentBank:StatusPaymentBankEnum.NULL).getCode();
   }
 
-  public StatusTransactionEnum getTransactionsStatus() {
-    return StatusTransactionEnum.fromCode(transactionsStatus);
+  // O rollup de transactionsStatus é escrito pelas etapas 1b/3 da esteira
+  // (SalesSummaryTransactionReconciliationService/AcquirerSaleSummaryReconciliationService) com
+  // códigos de StatusReconciliationEnum (PENDING/RECONCILED/PARTIALLY_RECONCILED) — não com
+  // StatusTransactionEnum. Os dois enums têm PENDING(1) coincidindo por acaso, mas RECONCILED(2)
+  // e PARTIALLY_RECONCILED(3) não têm correspondência real em StatusTransactionEnum, causando
+  // rótulos errados (ex.: RECONCILED aparecia como AUTOMATICALLY_RECONCILED) em toda API/UI.
+  public StatusReconciliationEnum getTransactionsStatus() {
+    return StatusReconciliationEnum.fromCode(transactionsStatus);
   }
 
-  public void setTransactionsStatus(StatusTransactionEnum transactionsStatus) {
-    this.transactionsStatus = Optional.ofNullable(transactionsStatus).orElse(StatusTransactionEnum.NULL).getCode();
+  public void setTransactionsStatus(StatusReconciliationEnum transactionsStatus) {
+    this.transactionsStatus = Optional.ofNullable(transactionsStatus).orElse(StatusReconciliationEnum.NULL).getCode();
   }
 }

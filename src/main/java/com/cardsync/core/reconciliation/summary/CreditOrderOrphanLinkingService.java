@@ -37,17 +37,32 @@ public class CreditOrderOrphanLinkingService {
 
   @Transactional
   public int linkOrphanedCreditOrders() {
-    LocalDate implantationDate = implantationDateProvider.get();
-    LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+    return linkOrphanedCreditOrders(false);
+  }
 
-    List<UUID> orphanedIds = creditOrderRepository.findOrphanedIdsWithinDateRange(implantationDate, lookbackDate);
+  /**
+   * @param ignoreLookback quando {@code true}, ignora o filtro de lookback — usado para um
+   *                        backfill único, vinculando órfãs antigas que já saíram da janela
+   *                        normal.
+   */
+  @Transactional
+  public int linkOrphanedCreditOrders(boolean ignoreLookback) {
+    LocalDate implantationDate = implantationDateProvider.get();
+
+    List<UUID> orphanedIds;
+    if (ignoreLookback) {
+      orphanedIds = creditOrderRepository.findOrphanedIdsIgnoringLookback(implantationDate);
+    } else {
+      LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+      orphanedIds = creditOrderRepository.findOrphanedIdsWithinDateRange(implantationDate, lookbackDate);
+    }
 
     if (orphanedIds.isEmpty()) {
-      log.info("✅ Pré-vinculação: nenhuma CreditOrder órfã no período. implantationDate={}, lookbackDate={}", implantationDate, lookbackDate);
+      log.info("✅ Pré-vinculação: nenhuma CreditOrder órfã no período. implantationDate={}, ignoreLookback={}", implantationDate, ignoreLookback);
       return 0;
     }
 
-    log.info("🔗 Pré-vinculação: {} CreditOrder(s) órfã(s) no período. implantationDate={}, lookbackDate={}", orphanedIds.size(), implantationDate, lookbackDate);
+    log.info("🔗 Pré-vinculação: {} CreditOrder(s) órfã(s) no período. implantationDate={}, ignoreLookback={}", orphanedIds.size(), implantationDate, ignoreLookback);
 
     int totalLinked = 0;
     int batchNumber = 0;

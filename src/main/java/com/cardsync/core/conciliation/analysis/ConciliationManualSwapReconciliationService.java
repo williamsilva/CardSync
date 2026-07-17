@@ -157,6 +157,11 @@ public class ConciliationManualSwapReconciliationService {
         List<TransactionAcqEntity> changedAcquirerSales = new ArrayList<>();
         Set<UUID> changedAcquirerIds = new HashSet<>();
 
+        // acquirersByIdentity é um snapshot único por lote — sem isso, duas vendas ERP
+        // manuais com a mesma identidade trocada casariam com a MESMA venda da adquirente
+        // dentro do mesmo lote.
+        Set<UUID> consumedAcquirerIds = new HashSet<>();
+
         int[] counts = new int[11];
         counts[10] = manualPending.size();
 
@@ -167,7 +172,9 @@ public class ConciliationManualSwapReconciliationService {
           List<TransactionAcqEntity> identityCandidates = acquirersByIdentity.getOrDefault(
             ConciliationAnalysisService.ErpAcquirerIdentityKey.fromErpSwapped(erp),
             List.of()
-          );
+          ).stream()
+            .filter(acq -> acq.getId() == null || !consumedAcquirerIds.contains(acq.getId()))
+            .toList();
 
           ConciliationAnalysisService.ErpAcquirerMatchResult matchResult =
             conciliationAnalysisService.findBestAcquirerMatchForReconciliation(erp, identityCandidates, true);
@@ -193,6 +200,10 @@ public class ConciliationManualSwapReconciliationService {
               TransactionAcqEntity acq = matchResult.acquirerSale();
               counts[1]++;   // matched
               counts[9]++;   // batchMatched
+
+              if (acq.getId() != null) {
+                consumedAcquirerIds.add(acq.getId());
+              }
 
               // Corrige os dados do ERP com os da adquirente (fonte da verdade).
               // No caso manual, NSU e autorização estavam invertidos; aproveitamos para

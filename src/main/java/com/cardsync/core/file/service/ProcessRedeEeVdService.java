@@ -258,7 +258,7 @@ public class ProcessRedeEeVdService {
     summary.setFirstInstallmentCreditDate(parseDate(col(c, 2)));
     summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
-    summary.setTransactionsStatus(StatusTransactionEnum.PENDING);
+    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
     summary.setModality(resolveSummaryModality(col(c, 9)));
     summary.setAcquirer(acquirer);
     summary.setCompany(company);

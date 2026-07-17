@@ -74,7 +74,7 @@ public class SalesSummaryManualService {
     summary.setManualGenerated(true);
     summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
     summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
-    summary.setTransactionsStatus(StatusTransactionEnum.PENDING);
+    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
 
     SalesSummaryEntity saved = salesSummaryRepository.save(summary);
 

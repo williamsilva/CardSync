@@ -1,6 +1,7 @@
 package com.cardsync.core.reconciliation.cancellation;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.InstallmentErpEntity;
@@ -22,10 +23,12 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -39,6 +42,7 @@ public class AcquirerSaleCancellationService {
 
   private final EntityManager entityManager;
   private final ReconciliationSettingsService reconciliationSettingsService;
+  private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
   private final AdjustmentRepository adjustmentRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
@@ -86,6 +90,16 @@ public class AcquirerSaleCancellationService {
       counter.merge(batchResult);
 
       entityManager.flush();
+
+      // Ação de cancelamento fora da esteira automática de Etapa 1b: recalcula na hora o
+      // rollup dos SalesSummary vinculados às vendas ACQ canceladas neste lote, sem depender
+      // do próximo run da Etapa 1b (que pode nunca mais reavaliar um resumo cujo rvDate já
+      // saiu da janela de lookback — cancelamentos/chargebacks costumam chegar bem depois
+      // da venda original).
+      if (!batchResult.affectedSalesSummaryIds.isEmpty()) {
+        salesSummaryTransactionReconciliationService.recalculateForSalesSummaryIds(batchResult.affectedSalesSummaryIds);
+      }
+
       entityManager.clear();
 
       log.info(
@@ -170,6 +184,10 @@ public class AcquirerSaleCancellationService {
         result.acquirerSalesCanceled++;
         result.acquirerInstallmentsCanceled += cancelAcquirerInstallments(acq, cancellationDate);
         acquirerSalesToSave.put(acq.getId(), acq);
+
+        if (acq.getSalesSummary() != null && acq.getSalesSummary().getId() != null) {
+          result.affectedSalesSummaryIds.add(acq.getSalesSummary().getId());
+        }
       }
 
       if (erp != null && cancelErpSale(erp, adjustment, cancellationReason, cancellationDate, now, reprocess)) {
@@ -516,5 +534,6 @@ public class AcquirerSaleCancellationService {
     private int skippedPartialCancellations;
     private int skippedWithoutTransaction;
     private int skippedAlreadyCanceled;
+    private final Set<UUID> affectedSalesSummaryIds = new HashSet<>();
   }
 }

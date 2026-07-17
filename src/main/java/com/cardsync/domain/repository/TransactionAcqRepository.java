@@ -244,8 +244,13 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     @Param("ids") Collection<UUID> ids
   );
 
+  /**
+   * Busca em lote os candidatos de "other-divergences": carrega todos os NSUs da página de
+   * uma vez (em vez de 1 query por linha da página) e o filtro fino por authorization/
+   * acquirerId, que é específico de cada ERP, é aplicado em memória no chamador.
+   */
   @Query("""
-    select distinct a
+    select a
       from TransactionAcqEntity a
       left join fetch a.acquirer
       left join fetch a.flag
@@ -254,15 +259,8 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
       left join fetch a.adjustment
       left join fetch a.salesSummary ss
       left join fetch ss.bankingDomicile
-     where (:nsu is null or a.nsu = :nsu)
-       and (:authorization is null or lower(a.authorization) = lower(:authorization))
-       and (:acquirerId is null or a.acquirer.id = :acquirerId)
-     order by a.saleDate desc, a.id desc
+     where a.nsu in :nsus
+     order by a.nsu, a.saleDate desc, a.id desc
   """)
-  List<TransactionAcqEntity> findCandidatesForOtherDivergencePair(
-    @Param("nsu") Long nsu,
-    @Param("authorization") String authorization,
-    @Param("acquirerId") UUID acquirerId,
-    Pageable pageable
-  );
+  List<TransactionAcqEntity> findCandidatesForOtherDivergencePairByNsuIn(@Param("nsus") Collection<Long> nsus);
 }

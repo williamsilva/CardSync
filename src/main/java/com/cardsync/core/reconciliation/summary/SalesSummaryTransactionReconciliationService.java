@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,21 +65,42 @@ public class SalesSummaryTransactionReconciliationService {
 
   @Transactional
   public SalesSummaryTransactionReconciliationResult reconcile(FinancialReconciliationTriggerType trigger) {
+    return reconcile(trigger, false);
+  }
+
+  /**
+   * @param ignoreLookback quando {@code true}, ignora o filtro de rvDate/lookback da consulta
+   *                        agregada — usado para um backfill único, corrigindo resumos antigos
+   *                        cujo transactionsStatus ficou desatualizado por uma ação manual e
+   *                        que já saíram da janela de lookback (nunca mais seriam vistos pela
+   *                        execução normal, em lote, da esteira).
+   */
+  @Transactional
+  public SalesSummaryTransactionReconciliationResult reconcile(FinancialReconciliationTriggerType trigger, boolean ignoreLookback) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     boolean includeAll = reconciliationSettingsService.isReprocessSalesSummaryTransactions();
 
     log.info(
-      "📌 Etapa 1b - Resumo x TransactionAcq iniciada. trigger={}, includeAll={}, excludedStatuses={}, reconciledStatuses={}",
-      trigger, includeAll, EXCLUDED_STATUSES, RECONCILED_STATUSES
+      "📌 Etapa 1b - Resumo x TransactionAcq iniciada. trigger={}, includeAll={}, ignoreLookback={}, excludedStatuses={}, reconciledStatuses={}",
+      trigger, includeAll, ignoreLookback, EXCLUDED_STATUSES, RECONCILED_STATUSES
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
-    LocalDate implantationDate = implantationDateProvider.get();
-    LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
 
-    List<SalesSummaryTransactionStats> stats = salesSummaryRepository
-      .findStatsForSalesSummaryTransactionReconciliation(
+    List<SalesSummaryTransactionStats> stats;
+    if (ignoreLookback) {
+      stats = salesSummaryRepository.findStatsForSalesSummaryTransactionReconciliationIgnoringLookback(
+        includeAll,
+        PENDING_STATUSES,
+        EXCLUDED_STATUSES,
+        RECONCILED_STATUSES
+      );
+    } else {
+      LocalDate implantationDate = implantationDateProvider.get();
+      LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+
+      stats = salesSummaryRepository.findStatsForSalesSummaryTransactionReconciliation(
         includeAll,
         PENDING_STATUSES,
         EXCLUDED_STATUSES,
@@ -86,6 +108,7 @@ public class SalesSummaryTransactionReconciliationService {
         implantationDate,
         lookbackDate
       );
+    }
 
     log.info(
       "🔎 Etapa 1b - Consulta agregada concluída. trigger={}, resumosCandidatos={}, duração={}s",
@@ -168,6 +191,46 @@ public class SalesSummaryTransactionReconciliationService {
     );
 
     return result;
+  }
+
+  /**
+   * Recalcula o transactionsStatus de SalesSummary específicos, ignorando o filtro de
+   * lookback usado pela Etapa 1b em lote. Chamado logo após ações manuais que mudam o
+   * statusTransaction de uma TransactionAcqEntity fora da esteira automática (ex.:
+   * ErpAcquirerResolutionService.reconcileManually, ConciliationWaitingService.createErpFromAcquirer)
+   * — sem isso, o resumo vinculado ficaria com o status antigo (ex.: "Pendente") para
+   * sempre, caso já tenha saído da janela de lookback da esteira automática.
+   */
+  @Transactional
+  public void recalculateForSalesSummaryIds(Collection<UUID> salesSummaryIds) {
+    List<UUID> ids = salesSummaryIds == null
+      ? List.of()
+      : salesSummaryIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+
+    if (ids.isEmpty()) {
+      return;
+    }
+
+    List<SalesSummaryTransactionStats> stats = salesSummaryRepository
+      .findStatsForSalesSummaryTransactionReconciliationByIds(ids, EXCLUDED_STATUSES, RECONCILED_STATUSES);
+
+    List<UUID> reconciledIds = new ArrayList<>();
+    List<UUID> partialIds = new ArrayList<>();
+    List<UUID> pendingIds = new ArrayList<>();
+
+    for (SalesSummaryTransactionStats row : stats) {
+      if (row.isAllExcluded() || row.isFullyReconciled()) {
+        reconciledIds.add(row.getSalesSummaryId());
+      } else if (row.isPartiallyReconciled()) {
+        partialIds.add(row.getSalesSummaryId());
+      } else {
+        pendingIds.add(row.getSalesSummaryId());
+      }
+    }
+
+    bulkUpdate(reconciledIds, StatusReconciliationEnum.RECONCILED.getCode(), "conciliado (recálculo pontual)", FinancialReconciliationTriggerType.MANUAL);
+    bulkUpdate(partialIds, StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode(), "conciliado parcial (recálculo pontual)", FinancialReconciliationTriggerType.MANUAL);
+    bulkUpdate(pendingIds, StatusReconciliationEnum.PENDING.getCode(), "pendente (recálculo pontual)", FinancialReconciliationTriggerType.MANUAL);
   }
 
   private int bulkUpdate(

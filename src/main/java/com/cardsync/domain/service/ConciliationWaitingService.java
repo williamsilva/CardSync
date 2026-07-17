@@ -14,20 +14,26 @@ import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.*;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
+import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingOtherDivergenceSpecs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -36,7 +42,9 @@ public class ConciliationWaitingService {
 
   private static final String ORIGIN_ACQUIRER_GENERATED = "ACQUIRER_GENERATED";
 
+  private final PlatformTransactionManager transactionManager;
   private final TransactionTotalsQueryService totalsQueryService;
+  private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
 
   private final TransactionAcqRepository transactionAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
@@ -90,16 +98,22 @@ public class ConciliationWaitingService {
 
     long total = transactionErpRepository.count(filterSpec);
 
-    List<ConciliationWaitingModel> content = total == 0
-      ? List.of()
-      : transactionErpRepository.findAll(dataSpec, pageable)
-      .stream()
-      .map(erp -> new ConciliationWaitingOtherDivergencePair(
-        erp,
-        findOtherDivergenceAcquirerCandidate(erp).orElse(null)
-      ))
-      .map(conciliationWaitingOtherDivergenceModelAssembler::toModel)
-      .toList();
+    List<ConciliationWaitingModel> content;
+
+    if (total == 0) {
+      content = List.of();
+    } else {
+      List<TransactionErpEntity> erps = transactionErpRepository.findAll(dataSpec, pageable).getContent();
+      Map<Long, List<TransactionAcqEntity>> candidatesByNsu = loadOtherDivergenceAcquirerCandidates(erps);
+
+      content = erps.stream()
+        .map(erp -> new ConciliationWaitingOtherDivergencePair(
+          erp,
+          findOtherDivergenceAcquirerCandidate(erp, candidatesByNsu).orElse(null)
+        ))
+        .map(conciliationWaitingOtherDivergenceModelAssembler::toModel)
+        .toList();
+    }
 
     return new PageImpl<>(content, pageable, total);
   }
@@ -138,8 +152,32 @@ public class ConciliationWaitingService {
 
     copyAcquirerInstallmentsToErp(erp, acq);
 
-    TransactionErpEntity saved = transactionErpRepository.save(erp);
+    // saveAndFlush (não save) + catch: o check "já existe ERP vinculado?" acima é
+    // check-then-act, sem lock — duas chamadas concorrentes para o mesmo acquirerTransactionId
+    // podem passar por ele antes de qualquer uma commitar. A constraint única
+    // uq_cs_transaction_erp_transaction_acq (migration V20260715_01) é quem garante a
+    // exclusividade de verdade; flush imediato aqui faz a violação (se houver) estourar
+    // dentro deste método, como um conflito de negócio normal, em vez de vazar como erro
+    // de banco no commit da transação.
+    TransactionErpEntity saved;
+    try {
+      saved = transactionErpRepository.saveAndFlush(erp);
+    } catch (DataIntegrityViolationException ex) {
+      throw BusinessException.conflict(
+        ErrorCode.BUSINESS_ERROR,
+        "Já existe venda ERP vinculada à venda da adquirente: " + acq.getId()
+      );
+    }
     transactionAcqRepository.save(acq);
+
+    // Ação manual fora da esteira automática: recalcula na hora o rollup do SalesSummary
+    // vinculado, sem depender do próximo run da Etapa 1b (que pode nunca mais reavaliar
+    // este resumo se o rvDate já saiu da janela de lookback).
+    if (acq.getSalesSummary() != null) {
+      salesSummaryTransactionReconciliationService.recalculateForSalesSummaryIds(
+        List.of(acq.getSalesSummary().getId())
+      );
+    }
 
     log.info("✅ Venda ERP criada a partir da adquirente. erpId={}, acqId={}, nsu={}, authorization={}",
       saved.getId(), acq.getId(), acq.getNsu(), acq.getAuthorization());
@@ -150,14 +188,23 @@ public class ConciliationWaitingService {
     );
   }
 
-  @Transactional
+  // Sem @Transactional aqui: cada item roda na sua PRÓPRIA transação física via itemTx
+  // (REQUIRES_NEW), não por self-invocation do método @Transactional de item único abaixo.
+  // Chamar createErpFromAcquirer(id) direto (this.createErpFromAcquirer(id)) não passa pelo
+  // proxy do Spring — o @Transactional dele seria silenciosamente ignorado, e todo o lote
+  // rodaria numa única transação física. Um erro de banco (ex.: violação de constraint) em
+  // um item abortaria a transação inteira do Postgres, cascateando falha pros itens seguintes
+  // mesmo que válidos, e o catch por item deixaria de isolar de verdade as falhas.
   public ErpAcquirerBatchResolutionResultModel createErpFromAcquirerBatch(List<UUID> acquirerTransactionIds) {
     List<UUID> ids = normalizeIds(acquirerTransactionIds);
     List<ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel> items = new ArrayList<>();
 
+    TransactionTemplate itemTx = new TransactionTemplate(transactionManager);
+    itemTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
     for (UUID id : ids) {
       try {
-        ErpAcquirerResolutionResultModel result = createErpFromAcquirer(id);
+        ErpAcquirerResolutionResultModel result = itemTx.execute(status -> createErpFromAcquirer(id));
         items.add(new ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel(
           id,
           result.erpId(),
@@ -259,6 +306,19 @@ public class ConciliationWaitingService {
       );
     }
 
+    // Editar NSU/autorização de uma venda já vinculada/conciliada desalinharia o vínculo
+    // silenciosamente (a venda continuaria "conciliada", apontando para uma
+    // TransactionAcqEntity cujo nsu/authorization não batem mais com os do ERP), sem nunca
+    // mais aparecer em missing-acquirer/missing-erp/other-divergences para correção. Mesma
+    // guarda já usada em markErpAsDeletedMissingAcquirer.
+    if (erp.getTransactionAcq() != null) {
+      throw BusinessException.conflict(
+        ErrorCode.BUSINESS_ERROR,
+        "Não é possível editar NSU/autorização de uma venda ERP já vinculada à venda da adquirente: "
+          + erp.getTransactionAcq().getId()
+      );
+    }
+
     erp.setNsu(request.nsu());
     erp.setAuthorization(request.authorization() != null ? request.authorization().trim() : null);
     transactionErpRepository.save(erp);
@@ -279,14 +339,20 @@ public class ConciliationWaitingService {
     );
   }
 
-  @Transactional
+  // Mesmo motivo do createErpFromAcquirerBatch acima: cada item roda na sua própria
+  // transação física via itemTx (REQUIRES_NEW), não por self-invocation.
   public ErpAcquirerBatchResolutionResultModel markErpAsDeletedMissingAcquirerBatch(ErpAcquirerBatchRequestModel request) {
     List<UUID> ids = normalizeIds(request.transactionIds());
     List<ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel> items = new ArrayList<>();
 
+    TransactionTemplate itemTx = new TransactionTemplate(transactionManager);
+    itemTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
     for (UUID id : ids) {
       try {
-        ErpAcquirerResolutionResultModel result = markErpAsDeletedMissingAcquirer(id, request.reason(), request.observations());
+        ErpAcquirerResolutionResultModel result = itemTx.execute(status ->
+          markErpAsDeletedMissingAcquirer(id, request.reason(), request.observations())
+        );
         items.add(new ErpAcquirerBatchResolutionResultModel.ErpAcquirerBatchResolutionItemModel(
           id,
           result.erpId(),
@@ -354,7 +420,28 @@ public class ConciliationWaitingService {
     );
   }
 
-  private Optional<TransactionAcqEntity> findOtherDivergenceAcquirerCandidate(TransactionErpEntity erp) {
+  // Mesmo teto que a antiga query paginada por linha (LIMIT 20) usava — mantém o mesmo
+  // comportamento de seleção, só que aplicado em memória sobre o lote pré-carregado por NSU.
+  private static final int OTHER_DIVERGENCE_CANDIDATES_PER_NSU_LIMIT = 20;
+
+  private Map<Long, List<TransactionAcqEntity>> loadOtherDivergenceAcquirerCandidates(List<TransactionErpEntity> erps) {
+    List<Long> nsus = erps.stream()
+      .map(TransactionErpEntity::getNsu)
+      .filter(Objects::nonNull)
+      .distinct()
+      .toList();
+
+    if (nsus.isEmpty()) {
+      return Map.of();
+    }
+
+    return transactionAcqRepository.findCandidatesForOtherDivergencePairByNsuIn(nsus).stream()
+      .collect(Collectors.groupingBy(TransactionAcqEntity::getNsu, LinkedHashMap::new, Collectors.toList()));
+  }
+
+  private Optional<TransactionAcqEntity> findOtherDivergenceAcquirerCandidate(
+    TransactionErpEntity erp, Map<Long, List<TransactionAcqEntity>> candidatesByNsu
+  ) {
     if (erp == null || erp.getNsu() == null) {
       return Optional.empty();
     }
@@ -364,12 +451,14 @@ public class ConciliationWaitingService {
       ? erp.getAcquirer().getId()
       : null;
 
-    List<TransactionAcqEntity> candidates = transactionAcqRepository.findCandidatesForOtherDivergencePair(
-      erp.getNsu(),
-      blankToNull(erp.getAuthorization()),
-      acquirerId,
-      PageRequest.of(0, 20)
-    );
+    String authorization = blankToNull(erp.getAuthorization());
+
+    List<TransactionAcqEntity> candidates = candidatesByNsu.getOrDefault(erp.getNsu(), List.of()).stream()
+      .filter(candidate -> authorization == null || normalizedEquals(authorization, candidate.getAuthorization()))
+      .filter(candidate -> acquirerId == null
+        || (candidate.getAcquirer() != null && acquirerId.equals(candidate.getAcquirer().getId())))
+      .limit(OTHER_DIVERGENCE_CANDIDATES_PER_NSU_LIMIT)
+      .toList();
 
     return candidates.stream()
       .max(Comparator.comparingInt(candidate -> scoreOtherDivergenceCandidate(erp, candidate, reason)));

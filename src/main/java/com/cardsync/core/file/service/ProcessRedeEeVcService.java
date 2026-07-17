@@ -305,7 +305,7 @@ public class ProcessRedeEeVcService {
     summary.setLineNumber(lineNumber);
     summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
-    summary.setTransactionsStatus(StatusTransactionEnum.PENDING);
+    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
     summary.setRvNumber(FileParserUtils.extractIntegerLine(line, "12-21", lineNumber));
     summary.setBank(FileParserUtils.extractStringLine(line, "21-24", lineNumber));
     summary.setAgency(agency);

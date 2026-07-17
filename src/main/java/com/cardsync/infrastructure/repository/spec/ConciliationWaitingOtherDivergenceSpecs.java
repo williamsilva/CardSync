@@ -23,21 +23,21 @@ import java.util.Map;
 @Component
 public class ConciliationWaitingOtherDivergenceSpecs extends BaseSpecificationSupport<TransactionErpEntity> {
 
-  private final ImplantationDateProvider implantationDateProvider;
   private final SpecificationFactory specificationFactory;
+  private final ImplantationDateProvider implantationDateProvider;
   private final ConciliationWaitingErpTableFields conciliationWaitingTableFields;
   private final ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields;
 
   public ConciliationWaitingOtherDivergenceSpecs(
-    ImplantationDateProvider implantationDateProvider,
     DateFilterService dateFilterService,
     SpecificationFactory specificationFactory,
+    ImplantationDateProvider implantationDateProvider,
     ConciliationWaitingErpTableFields conciliationWaitingTableFields,
     ConciliationWaitingErpAdvancedFields conciliationWaitingAdvancedFields
   ) {
     super(dateFilterService);
-    this.implantationDateProvider = implantationDateProvider;
     this.specificationFactory = specificationFactory;
+    this.implantationDateProvider = implantationDateProvider;
     this.conciliationWaitingTableFields = conciliationWaitingTableFields;
     this.conciliationWaitingAdvancedFields = conciliationWaitingAdvancedFields;
   }

@@ -26,11 +26,6 @@ public class AcquirerSaleSummaryReconciliationService {
 
   private static final int UPDATE_BATCH_SIZE = 1_000;
 
-  private static final List<Integer> PENDING_SUMMARY_TRANSACTION_STATUSES = List.of(
-    StatusReconciliationEnum.PENDING.getCode(),
-    StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode()
-  );
-
   private static final List<Integer> ELIGIBLE_SALE_STATUSES = List.of(
     StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode(),
     StatusTransactionEnum.MANUALLY_RECONCILED.getCode(),
@@ -57,32 +52,49 @@ public class AcquirerSaleSummaryReconciliationService {
    */
   @Transactional
   public AcquirerSaleSummaryReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
+    return reconcilePending(trigger, false);
+  }
+
+  /**
+   * @param ignoreLookback quando {@code true}, ignora o filtro de rvDate/lookback — usado
+   *                        para um backfill único, reavaliando resumos antigos que já saíram
+   *                        da janela normal de lookback.
+   */
+  @Transactional
+  public AcquirerSaleSummaryReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger, boolean ignoreLookback) {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     boolean reprocess = reconciliationSettingsService.isReprocessAcquirerSaleSummary();
 
     log.info(
-      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, pendingSummaryStatuses={}, eligibleSaleStatuses={}, eligibleFeeStatuses={}, updateBatchSize={}, reprocess={}",
+      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, eligibleSaleStatuses={}, eligibleFeeStatuses={}, updateBatchSize={}, reprocess={}, ignoreLookback={}",
       trigger,
-      PENDING_SUMMARY_TRANSACTION_STATUSES,
       ELIGIBLE_SALE_STATUSES,
       ELIGIBLE_FEE_STATUSES,
       UPDATE_BATCH_SIZE,
-      reprocess
+      reprocess,
+      ignoreLookback
     );
 
     OffsetDateTime queryStartedAt = OffsetDateTime.now();
     LocalDate implantationDate = implantationDateProvider.get();
-    LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
 
-    List<AcquirerSaleSummaryStats> stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(
-      reprocess,
-      PENDING_SUMMARY_TRANSACTION_STATUSES,
-      ELIGIBLE_SALE_STATUSES,
-      ELIGIBLE_FEE_STATUSES,
-      implantationDate,
-      lookbackDate
-    );
+    List<AcquirerSaleSummaryStats> stats;
+    if (ignoreLookback) {
+      stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliationIgnoringLookback(
+        ELIGIBLE_SALE_STATUSES,
+        ELIGIBLE_FEE_STATUSES,
+        implantationDate
+      );
+    } else {
+      LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
+      stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(
+        ELIGIBLE_SALE_STATUSES,
+        ELIGIBLE_FEE_STATUSES,
+        implantationDate,
+        lookbackDate
+      );
+    }
 
     log.info(
       "🔎 Etapa 3 - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
@@ -151,18 +163,12 @@ public class AcquirerSaleSummaryReconciliationService {
       trigger
     );
 
-    int updatedNoTransactions = salesSummaryRepository.markSummariesWithoutTransactionsAsReconciled(
-      reprocess,
-      PENDING_SUMMARY_TRANSACTION_STATUSES,
-      StatusReconciliationEnum.RECONCILED.getCode()
-    );
-    counter.summariesWithoutTransactions = updatedNoTransactions;
-
-    log.info(
-      "🔗 Etapa 3 - SalesSummary sem transações marcados como conciliados. trigger={}, atualizados={}",
-      trigger,
-      updatedNoTransactions
-    );
+    // Não chama markSummariesWithoutTransactionsAsReconciled aqui: a Etapa 1b
+    // (SalesSummaryTransactionReconciliationService) já faz exatamente essa marcação e roda
+    // antes desta etapa no mesmo pipeline — chamar de novo aqui era um scan redundante que
+    // nunca encontrava nada pra atualizar (e resumos sem transação nem aparecem em `stats`
+    // acima, já que a query usa INNER JOIN com TransactionAcqEntity).
+    counter.summariesWithoutTransactions = 0;
 
     OffsetDateTime finishedAt = OffsetDateTime.now();
     AcquirerSaleSummaryReconciliationResult result = counter.toResult(finishedAt);

@@ -1,7 +1,7 @@
 package com.cardsync.domain.filter;
 
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
-import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -15,7 +15,7 @@ public record AnticipationFilter(
   List<String> establishments,
 
   List<StatusPaymentBankEnum> statusPaymentBank,
-  List<StatusTransactionEnum> transactionsStatus,
+  List<StatusReconciliationEnum> transactionsStatus,
 
   BigDecimal grossValueStart,
   BigDecimal grossValueEnd,

@@ -185,6 +185,10 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
     @Param("transactionAcqIds") Collection<UUID> transactionAcqIds
   );
 
+  // company/establishment além de nsu+autorização+adquirente: NSU é um contador sequencial
+  // por terminal/POS que pode se repetir entre empresas/estabelecimentos diferentes que
+  // processam pela mesma adquirente — sem esse escopo, o reprocessamento de cancelamento
+  // podia vincular e cancelar a venda ERP errada, de outro tenant.
   @Query("""
     select distinct e
       from TransactionErpEntity e
@@ -193,13 +197,17 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
      where e.nsu = :nsu
        and lower(e.authorization) = lower(:authorization)
        and e.acquirer.id = :acquirerId
+       and (:companyId is null or e.company.id = :companyId)
+       and (:establishmentId is null or e.establishment.id = :establishmentId)
        and e.transactionAcq is null
      order by e.saleDate asc, e.id asc
   """)
   List<TransactionErpEntity> findUnlinkedByNsuAuthorizationAndAcquirerForCancellationReprocess(
     @Param("nsu") Long nsu,
     @Param("authorization") String authorization,
-    @Param("acquirerId") UUID acquirerId
+    @Param("acquirerId") UUID acquirerId,
+    @Param("companyId") UUID companyId,
+    @Param("establishmentId") UUID establishmentId
   );
 
 }

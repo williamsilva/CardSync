@@ -20,8 +20,10 @@ import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
+import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +41,7 @@ public class ErpAcquirerResolutionService {
 
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
+  private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
 
   @Transactional(readOnly = true)
   public ErpAcquirerComparisonModel compare(UUID erpTransactionId, UUID acquirerTransactionId) {
@@ -87,6 +90,18 @@ public class ErpAcquirerResolutionService {
       );
     }
 
+    // A venda ADQ pode já estar vinculada a uma venda ERP DIFERENTE (ex.: já conciliada
+    // automaticamente, ou por outra ação manual) — sem esse check, o vínculo abaixo violaria
+    // a constraint única de transaction_acq_id só no flush, sem uma mensagem de negócio clara.
+    transactionErpRepository.findFirstByTransactionAcq_Id(acq.getId())
+      .filter(existing -> !Objects.equals(existing.getId(), erp.getId()))
+      .ifPresent(existing -> {
+        throw BusinessException.conflict(
+          ErrorCode.BUSINESS_ERROR,
+          "A venda da adquirente já está vinculada a outra venda ERP: " + existing.getId()
+        );
+      });
+
     if (truthSource == ErpAcquirerTruthSource.ACQUIRER) {
       copyAcquirerToErp(erp, acq, false);
       erp.setObservations(appendObservation(
@@ -115,8 +130,29 @@ public class ErpAcquirerResolutionService {
     erp.setCommercialStatus(ErpCommercialStatusEnum.OK);
     erp.setCommercialStatusMessage(null);
 
-    transactionErpRepository.save(erp);
+    // saveAndFlush (não save) + catch: mesmo com o check acima, duas chamadas concorrentes
+    // podem passar por ele antes de qualquer uma commitar. A constraint única
+    // uq_cs_transaction_erp_transaction_acq é quem garante a exclusividade de verdade; flush
+    // imediato aqui faz a violação (se houver) estourar como conflito de negócio normal, em
+    // vez de vazar como erro de banco no commit da transação.
+    try {
+      transactionErpRepository.saveAndFlush(erp);
+    } catch (DataIntegrityViolationException ex) {
+      throw BusinessException.conflict(
+        ErrorCode.BUSINESS_ERROR,
+        "A venda da adquirente já está vinculada a outra venda ERP: " + acq.getId()
+      );
+    }
     transactionAcqRepository.save(acq);
+
+    // Ação manual fora da esteira automática: recalcula na hora o rollup do SalesSummary
+    // vinculado, sem depender do próximo run da Etapa 1b (que pode nunca mais reavaliar
+    // este resumo se o rvDate já saiu da janela de lookback).
+    if (acq.getSalesSummary() != null) {
+      salesSummaryTransactionReconciliationService.recalculateForSalesSummaryIds(
+        List.of(acq.getSalesSummary().getId())
+      );
+    }
 
     log.info(
       "🤝 Venda ERP x adquirente conciliada manualmente. erpId={}, acqId={}, truthSource={}",
