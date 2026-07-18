@@ -78,6 +78,7 @@ public class AdjustmentChargeBackRequestsModelAssembler extends RepresentationMo
     if (entity == null) return null;
     return SalesSummaryMinimalModel.builder()
       .id(entity.getId())
+      .rvNumber(entity.getRvNumber())
       .modality(entity.getModality())
       .build();
   }

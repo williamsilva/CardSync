@@ -99,6 +99,7 @@ public class CreditOrderModelAssembler extends RepresentationModelAssemblerSuppo
     return SalesSummaryMinimalModel.builder()
       .id(entity.getId())
       .agency(entity.getAgency())
+      .rvNumber(entity.getRvNumber())
       .pvNumber(entity.getPvNumber())
       .modality(entity.getModality())
       .lineNumber(entity.getLineNumber())

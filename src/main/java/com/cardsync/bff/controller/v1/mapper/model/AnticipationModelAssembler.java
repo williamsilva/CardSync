@@ -58,6 +58,7 @@ public class AnticipationModelAssembler extends RepresentationModelAssemblerSupp
     return SalesSummaryMinimalModel.builder()
       .id(entity.getId())
       .agency(entity.getAgency())
+      .rvNumber(entity.getRvNumber())
       .pvNumber(entity.getPvNumber())
       .lineNumber(entity.getLineNumber())
       .numberCvNsu(entity.getNumberCvNsu())

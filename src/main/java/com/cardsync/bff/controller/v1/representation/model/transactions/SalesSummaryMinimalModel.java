@@ -18,6 +18,7 @@ public class SalesSummaryMinimalModel extends RepresentationModel<@NonNull Sales
   private UUID id;
 
   private Integer agency;
+  private Integer rvNumber;
   private Integer pvNumber;
   private Integer modality;
   private Integer lineNumber;

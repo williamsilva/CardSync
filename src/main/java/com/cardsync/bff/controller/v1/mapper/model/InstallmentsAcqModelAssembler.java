@@ -90,6 +90,7 @@ public class InstallmentsAcqModelAssembler extends RepresentationModelAssemblerS
     return SalesSummaryMinimalModel.builder()
       .id(entity.getId())
       .agency(entity.getAgency())
+      .rvNumber(entity.getRvNumber())
       .pvNumber(entity.getPvNumber())
       .currentAccount(entity.getCurrentAccount())
       .bankingDomicile(toDomicile(entity.getBankingDomicile()))

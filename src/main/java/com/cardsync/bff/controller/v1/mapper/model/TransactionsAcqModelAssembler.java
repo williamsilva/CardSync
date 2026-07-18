@@ -109,6 +109,7 @@ public class TransactionsAcqModelAssembler extends RepresentationModelAssemblerS
         .id(entity.getSalesSummary().getId())
         .agency(entity.getSalesSummary().getAgency())
         .currentAccount(entity.getSalesSummary().getCurrentAccount())
+        .rvNumber(entity.getSalesSummary().getRvNumber())
         .pvNumber(entity.getSalesSummary().getPvNumber())
         .bankingDomicile(entity.getSalesSummary().getBankingDomicile() == null ?
           null : toBankingDomicile(entity.getSalesSummary().getBankingDomicile()))
