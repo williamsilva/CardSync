@@ -21,6 +21,13 @@ spring:
   jackson:
     time-zone: UTC
 
+  servlet:
+    multipart:
+      # Tamanho máximo por arquivo e por requisição no upload manual de arquivos
+      # (EEFI/CNAB/ERP). CNAB240 de bancos com muitos lançamentos pode passar de alguns MB.
+      max-file-size: ${FILE_PROCESSING_UPLOAD_MAX_FILE_SIZE:50MB}
+      max-request-size: ${FILE_PROCESSING_UPLOAD_MAX_REQUEST_SIZE:200MB}
+
   messages:
     basename: messages
     encoding: UTF-8
@@ -48,8 +55,11 @@ cardsync:
 
 # File processing migrated from Nimbus API
 file-processing:
-  # Diretório raiz dos arquivos processados pelo CardSync.
-  base-path: C:/cardsync/files
+  # Diretório raiz dos arquivos processados pelo CardSync. Em produção (Railway), deve
+  # apontar para o mount path de um Volume persistente (ex.: /data/cardsync) via
+  # FILE_PROCESSING_BASE_PATH — sem isso, o upload manual grava num disco efêmero que
+  # some a cada deploy/restart do container.
+  base-path: ${FILE_PROCESSING_BASE_PATH:C:/cardsync/files}
 
   # Diretórios base derivados do base-path.
   base-bank: ${file-processing.base-path}/bank
