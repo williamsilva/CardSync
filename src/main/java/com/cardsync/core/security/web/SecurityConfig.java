@@ -265,7 +265,7 @@ public class SecurityConfig implements EnvironmentAware {
           // O nome do cookie é "SESSION" (default do Spring Session com store-type: jdbc),
           // não "JSESSIONID" (esse é o nome do cookie de sessão nativo do servlet container,
           // que não é usado aqui) - limpar o nome errado deixava o cookie real intacto.
-          res.addHeader("Set-Cookie", CookieBuilder.clearCookie("SESSION", cookieProps, true));
+          res.addHeader("Set-Cookie", CookieBuilder.clearCookie("SESSION", cookieProps, true, false));
           res.sendRedirect("/bff/login");
         }
       })

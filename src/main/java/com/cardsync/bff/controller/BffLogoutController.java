@@ -67,8 +67,8 @@ public class BffLogoutController {
       session.invalidate();
     }
 
-    response.addHeader("Set-Cookie", CookieBuilder.clearCookie("SESSION", cookieProps, true));
-    response.addHeader("Set-Cookie", CookieBuilder.clearCookie("XSRF-TOKEN", cookieProps, false));
+    response.addHeader("Set-Cookie", CookieBuilder.clearCookie("SESSION", cookieProps, true, false));
+    response.addHeader("Set-Cookie", CookieBuilder.clearCookie("XSRF-TOKEN", cookieProps, false, true));
 
     return ResponseEntity.ok(new LogoutResponse(logoutUrl));
   }
