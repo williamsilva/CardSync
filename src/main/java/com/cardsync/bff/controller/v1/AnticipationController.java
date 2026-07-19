@@ -23,7 +23,7 @@ public class AnticipationController {
   private final AnticipationService anticipationService;
 
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.Anticipation.CanConsult
   public PagedModel<AnticipationModel> search(@RequestBody ListQueryDto<AnticipationFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -41,7 +41,7 @@ public class AnticipationController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.Anticipation.CanConsult
   public TransactionTotalsModel totals(@RequestBody ListQueryDto<AnticipationFilter> body) {
     return anticipationService.totals(body);
   }

@@ -20,13 +20,13 @@ public class SchedulerSettingsController {
   private final SchedulerSettingsService schedulerSettingsService;
 
   @GetMapping
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Settings.SchedulerSettings.CanConsult
   public SchedulerSettingsModel getSettings() {
     return schedulerSettingsService.getSettings();
   }
 
   @PutMapping
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Settings.SchedulerSettings.CanProcess
   public SchedulerSettingsModel updateSettings(@Valid @RequestBody SchedulerSettingsRequest request) {
     return schedulerSettingsService.update(request);
   }

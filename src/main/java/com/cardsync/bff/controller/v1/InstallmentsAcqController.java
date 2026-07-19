@@ -23,7 +23,7 @@ public class InstallmentsAcqController {
   private final InstallmentsAcqService transactionAcqInstallmentsService;
 
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AcquirersInstallments.CanConsult
   public PagedModel<InstallmentAcqModel> search(@RequestBody ListQueryDto<InstallmentsAcqFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -41,7 +41,7 @@ public class InstallmentsAcqController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AcquirersInstallments.CanConsult
   public TransactionTotalsModel totals(@RequestBody ListQueryDto<InstallmentsAcqFilter> body) {
     return transactionAcqInstallmentsService.totals(body);
   }

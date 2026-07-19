@@ -20,13 +20,13 @@ public class EmailSettingsController {
   private final EmailSettingsService emailSettingsService;
 
   @GetMapping
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Settings.EmailSettings.CanConsult
   public EmailSettingsModel getSettings() {
     return emailSettingsService.getSettings();
   }
 
   @PutMapping
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Settings.EmailSettings.CanProcess
   public EmailSettingsModel updateSettings(@Valid @RequestBody EmailSettingsRequest request) {
     return emailSettingsService.update(request);
   }

@@ -23,7 +23,7 @@ public class InstallmentsErpController {
   private final InstallmentsErpService transactionErpInstallmentsService;
 
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.ErpInstallments.CanConsult
   public PagedModel<InstallmentErpModel> search(@RequestBody ListQueryDto<InstallmentsErpFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -41,7 +41,7 @@ public class InstallmentsErpController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.ErpInstallments.CanConsult
   public TransactionTotalsModel totals(@RequestBody ListQueryDto<InstallmentsErpFilter> body) {
     return transactionErpInstallmentsService.totals(body);
   }

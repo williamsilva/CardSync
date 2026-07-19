@@ -29,7 +29,7 @@ public class TransactionAcqSalesController {
    * Usar na primeira carga da tela ou quando o sort for diferente de saleDate.
    */
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AcquirersSales.CanConsult
   public PagedModel<TransactionsAcqModel> search(@RequestBody ListQueryDto<TransactionAcqSalesFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -59,7 +59,7 @@ public class TransactionAcqSalesController {
    * e {@code hasMore} indicando se há mais resultados.
    */
   @PostMapping("/search-cursor")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AcquirersSales.CanConsult
   public CursorPageResponse<TransactionsAcqModel> searchWithCursor(
     @RequestBody ListQueryDto<TransactionAcqSalesFilter> body,
     @RequestParam(required = false) String cursorDate,
@@ -75,7 +75,7 @@ public class TransactionAcqSalesController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AcquirersSales.CanConsult
   public TransactionTotalsModel totals(@RequestBody ListQueryDto<TransactionAcqSalesFilter> body) {
     return transactionAcqSalesService.totals(body);
   }

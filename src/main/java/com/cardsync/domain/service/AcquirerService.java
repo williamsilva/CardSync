@@ -94,10 +94,6 @@ public class AcquirerService {
     entity.setOpeningDate(input.openingDate());
     entity.setClosingDate(input.closingDate());
 
-    if (input.status() != null && input.status() != StatusEnum.NULL) {
-      entity.setStatus(input.status());
-    }
-
     return acquirerRepository.save(entity);
   }
 

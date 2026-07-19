@@ -23,7 +23,7 @@ public class AdjustmentChargebacksController {
   private final ChargebacksService chargebacksService;
 
   @PostMapping("/chargebacks-lifecycle")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.ChargebackAnalysis.CanConsult
   public PagedModel<ChargebackLifecycleModel> chargebackLifecycles(@RequestBody ListQueryDto<ChargebackAnalysisFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
     Page<ChargebackLifecycleModel> page = chargebacksService.listChargebackLifecycles(pageable, body);
@@ -32,7 +32,7 @@ public class AdjustmentChargebacksController {
   }
 
   @PostMapping("/chargebacks-totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.ChargebackAnalysis.CanConsult
   public ChargebackAnalysisTotalsModel chargebacksTotals(@RequestBody ListQueryDto<ChargebackAnalysisFilter> body) {
     return chargebacksService.chargebacksTotals(body);
   }

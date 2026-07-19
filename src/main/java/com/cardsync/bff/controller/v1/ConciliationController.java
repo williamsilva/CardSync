@@ -16,13 +16,13 @@ public class ConciliationController {
   private final ConciliationAnalysisService conciliationAnalysisService;
 
   @GetMapping("/dashboard")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationDashboard.CanConsult
   public ConciliationDashboardModel dashboard() {
     return conciliationAnalysisService.dashboard();
   }
 
   @GetMapping("/aging")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationDashboard.CanConsult
   public List<ConciliationAgingModel> listAging() {
     return conciliationAnalysisService.aging();
   }

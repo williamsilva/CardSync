@@ -18,7 +18,7 @@ public class ManagementDashboardController {
   private final ManagementDashboardService managementDashboardService;
 
   @PostMapping("/dashboard")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Management.ManagementDashboard.CanConsult
   public ManagementDashboardModel dashboard(@RequestBody ManagementDashboardRequest request) {
     return managementDashboardService.dashboard(request);
   }

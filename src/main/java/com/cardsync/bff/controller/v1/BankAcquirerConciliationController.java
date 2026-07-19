@@ -17,7 +17,7 @@ public class BankAcquirerConciliationController {
   private final BankReconciliationService bankReconciliationService;
 
   @PostMapping("/reconcile")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.BankAcquirerConciliation.CanProcess
   public BankReconciliationResult reconcile() {
     return bankReconciliationService.reconcilePending(BankReconciliationTriggerType.MANUAL);
   }

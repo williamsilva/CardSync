@@ -193,4 +193,153 @@ public class CsSecurity extends CsDefaultSecurityMethod {
   public boolean canActiveOrInactiveNoFileDays() {
     return hasAllWriteScope() && hasAuthority(PERM_NO_FILE_DAY_ACTIVE_OR_INACTIVE);
   }
+
+  /* Banking Domicile */
+  public boolean canConsultBankingDomiciles() {
+    return hasAllReadScope() && hasAuthority(PERM_BANKING_DOMICILE_CONSULT);
+  }
+
+  public boolean canCreateBankingDomiciles() {
+    return hasAllWriteScope() && hasAuthority(PERM_BANKING_DOMICILE_CREATE);
+  }
+
+  public boolean canChangeBankingDomiciles() {
+    return hasAllWriteScope() && hasAuthority(PERM_BANKING_DOMICILE_CHANGE);
+  }
+
+  public boolean canActiveOrInactiveBankingDomiciles() {
+    return hasAllWriteScope() && hasAuthority(PERM_BANKING_DOMICILE_ACTIVE_OR_INACTIVE);
+  }
+
+  /* ERP Sales */
+  public boolean canConsultErpSales() {
+    return hasAllReadScope() && hasAuthority(PERM_ERP_SALES_CONSULT);
+  }
+
+  /* ERP Installments */
+  public boolean canConsultErpInstallments() {
+    return hasAllReadScope() && hasAuthority(PERM_ERP_INSTALLMENTS_CONSULT);
+  }
+
+  /* Acquirers Sales */
+  public boolean canConsultAcquirersSales() {
+    return hasAllReadScope() && hasAuthority(PERM_ACQUIRERS_SALES_CONSULT);
+  }
+
+  /* Acquirers Installments */
+  public boolean canConsultAcquirersInstallments() {
+    return hasAllReadScope() && hasAuthority(PERM_ACQUIRERS_INSTALLMENTS_CONSULT);
+  }
+
+  /* Anticipation */
+  public boolean canConsultAnticipation() {
+    return hasAllReadScope() && hasAuthority(PERM_ANTICIPATION_CONSULT);
+  }
+
+  /* Sales Summary */
+  public boolean canConsultSalesSummary() {
+    return hasAllReadScope() && hasAuthority(PERM_SALES_SUMMARY_CONSULT);
+  }
+
+  /* Credit Order */
+  public boolean canConsultCreditOrder() {
+    return hasAllReadScope() && hasAuthority(PERM_CREDIT_ORDER_CONSULT);
+  }
+
+  /* Bank Statement */
+  public boolean canConsultBankStatement() {
+    return hasAllReadScope() && hasAuthority(PERM_BANK_STATEMENT_CONSULT);
+  }
+
+  /* Adjustments */
+  public boolean canConsultAdjustmentCancellation() {
+    return hasAllReadScope() && hasAuthority(PERM_ADJUSTMENT_CANCELLATION_CONSULT);
+  }
+
+  public boolean canConsultAdjustmentChargeBackRequests() {
+    return hasAllReadScope() && hasAuthority(PERM_ADJUSTMENT_CHARGEBACK_REQUESTS_CONSULT);
+  }
+
+  public boolean canConsultAdjustmentTariffs() {
+    return hasAllReadScope() && hasAuthority(PERM_ADJUSTMENT_TARIFFS_CONSULT);
+  }
+
+  public boolean canConsultChargebackAnalysis() {
+    return hasAllReadScope() && hasAuthority(PERM_CHARGEBACK_ANALYSIS_CONSULT);
+  }
+
+  /* Contract Audit */
+  public boolean canConsultContractAudit() {
+    return hasAllReadScope() && hasAuthority(PERM_CONTRACT_AUDIT_CONSULT);
+  }
+
+  /* Conciliation Waiting */
+  public boolean canConsultConciliationWaiting() {
+    return hasAllReadScope() && hasAuthority(PERM_CONCILIATION_WAITING_CONSULT);
+  }
+
+  public boolean canProcessConciliationWaiting() {
+    return hasAllWriteScope() && hasAuthority(PERM_CONCILIATION_WAITING_PROCESS);
+  }
+
+  /* Conciliation Dashboard */
+  public boolean canConsultConciliationDashboard() {
+    return hasAllReadScope() && hasAuthority(PERM_CONCILIATION_DASHBOARD_CONSULT);
+  }
+
+  /* Manual Bank Reconciliation */
+  public boolean canProcessManualBankReconciliation() {
+    return hasAllWriteScope() && hasAuthority(PERM_MANUAL_BANK_RECONCILIATION_PROCESS);
+  }
+
+  /* Bank x Acquirer Conciliation */
+  public boolean canProcessBankAcquirerConciliation() {
+    return hasAllWriteScope() && hasAuthority(PERM_BANK_ACQUIRER_CONCILIATION_PROCESS);
+  }
+
+  /* Financial Reconciliation Pipeline */
+  public boolean canConsultFinancialReconciliationPipeline() {
+    return hasAllReadScope() && hasAuthority(PERM_FINANCIAL_RECONCILIATION_PIPELINE_CONSULT);
+  }
+
+  public boolean canProcessFinancialReconciliationPipeline() {
+    return hasAllWriteScope() && hasAuthority(PERM_FINANCIAL_RECONCILIATION_PIPELINE_PROCESS);
+  }
+
+  /* Scheduler Settings */
+  public boolean canConsultSchedulerSettings() {
+    return hasAllReadScope() && hasAuthority(PERM_SCHEDULER_SETTINGS_CONSULT);
+  }
+
+  public boolean canProcessSchedulerSettings() {
+    return hasAllWriteScope() && hasAuthority(PERM_SCHEDULER_SETTINGS_PROCESS);
+  }
+
+  /* Email Settings */
+  public boolean canConsultEmailSettings() {
+    return hasAllReadScope() && hasAuthority(PERM_EMAIL_SETTINGS_CONSULT);
+  }
+
+  public boolean canProcessEmailSettings() {
+    return hasAllWriteScope() && hasAuthority(PERM_EMAIL_SETTINGS_PROCESS);
+  }
+
+  /* Reconciliation Settings */
+  public boolean canConsultReconciliationSettings() {
+    return hasAllReadScope() && hasAuthority(PERM_RECONCILIATION_SETTINGS_CONSULT);
+  }
+
+  public boolean canProcessReconciliationSettings() {
+    return hasAllWriteScope() && hasAuthority(PERM_RECONCILIATION_SETTINGS_PROCESS);
+  }
+
+  /* Management Dashboard */
+  public boolean canConsultManagementDashboard() {
+    return hasAllReadScope() && hasAuthority(PERM_MANAGEMENT_DASHBOARD_CONSULT);
+  }
+
+  /* Dashboard Audit */
+  public boolean canConsultDashboardAudit() {
+    return hasAllReadScope() && hasAuthority(PERM_DASHBOARD_AUDIT_CONSULT);
+  }
 }

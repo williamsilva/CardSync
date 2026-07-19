@@ -33,7 +33,7 @@ public class FinancialReconciliationPipelineController {
   private final BankReconciliationService bankReconciliationService;
 
   @GetMapping("/history")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanConsult
   public List<ReconciliationExecutionLogResponse> getHistory(
       @RequestParam(defaultValue = "20") int limit
   ) {
@@ -41,25 +41,25 @@ public class FinancialReconciliationPipelineController {
   }
 
   @PostMapping("/run")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanProcess
   public FinancialReconciliationPipelineResult runFullPipeline() {
     return financialReconciliationPipelineService.run(FinancialReconciliationTriggerType.MANUAL);
   }
 
   @PostMapping("/acquirer-sale-summary/reconcile")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanProcess
   public AcquirerSaleSummaryReconciliationResult reconcileAcquirerSaleSummary() {
     return acquirerSaleSummaryReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
   }
 
   @PostMapping("/sales-summary-credit-order/reconcile")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanProcess
   public SalesSummaryCreditOrderReconciliationResult reconcileSalesSummaryCreditOrder() {
     return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL);
   }
 
   @PostMapping("/credit-order-bank-release/reconcile")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanProcess
   public BankReconciliationResult reconcileCreditOrderBankRelease() {
     return bankReconciliationService.reconcilePending();
   }

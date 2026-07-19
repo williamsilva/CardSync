@@ -38,7 +38,7 @@ public class AdjustmentChargeBackRequestsController {
    * {@code content}, compatível com o componente de lista do frontend.
    */
   @PostMapping("/chargeback-requests")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AdjustmentChargeBackRequests.CanConsult
   public PagedModel<AdjustmentChargeBackRequestsModel> search(@RequestBody ListQueryDto<AdjustmentChargeBackRequestsFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -56,7 +56,7 @@ public class AdjustmentChargeBackRequestsController {
   }
 
   @PostMapping("/chargeback-requests-totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AdjustmentChargeBackRequests.CanConsult
   public ValueTotalsModel totals(@RequestBody ListQueryDto<AdjustmentChargeBackRequestsFilter> body) {
     return adjustmentService.totals(body);
   }

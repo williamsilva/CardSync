@@ -32,7 +32,7 @@ public class BankingDomicileController {
   private final PagedResourcesAssembler<BankingDomicileEntity> pagedResourcesAssembler;
 
   @GetMapping("/{id}")
-  @CheckSecurity.Register.Companies.CanConsult
+  @CheckSecurity.Register.BankingDomiciles.CanConsult
   public BankingDomicileModel getById(@PathVariable UUID id) {
     return modelAssembler.toModel(bankingDomicileService.getById(id));
   }
@@ -44,7 +44,7 @@ public class BankingDomicileController {
   }
 
   @PostMapping("/search")
-  @CheckSecurity.Register.Companies.CanConsult
+  @CheckSecurity.Register.BankingDomiciles.CanConsult
   public PagedModel<BankingDomicileModel> search(@RequestBody ListQueryDto<BankingDomicileFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
     var page = bankingDomicileService.search(pageable, body);
@@ -52,49 +52,49 @@ public class BankingDomicileController {
   }
 
   @PostMapping
-  @CheckSecurity.Register.Companies.CanCreate
+  @CheckSecurity.Register.BankingDomiciles.CanCreate
   public BankingDomicileModel create(@Valid @RequestBody BankingDomicileInput body) {
     return modelAssembler.toModel(bankingDomicileService.create(body));
   }
 
   @PutMapping("/{id}")
-  @CheckSecurity.Register.Companies.CanChange
+  @CheckSecurity.Register.BankingDomiciles.CanChange
   public BankingDomicileModel update(@PathVariable UUID id,  @Valid @RequestBody BankingDomicileInput body) {
     return modelAssembler.toModel(bankingDomicileService.update(id, body));
   }
 
   @PostMapping("/{id}/activate")
-  @CheckSecurity.Register.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.BankingDomiciles.CanActiveOrInactive
   public void activate(@PathVariable UUID id) {
     bankingDomicileService.activate(id);
   }
 
   @PostMapping("/{id}/deactivate")
-  @CheckSecurity.Register.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.BankingDomiciles.CanActiveOrInactive
   public void deactivate(@PathVariable UUID id) {
     bankingDomicileService.deactivate(id);
   }
 
   @PostMapping("/{id}/block")
-  @CheckSecurity.Register.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.BankingDomiciles.CanActiveOrInactive
   public void block(@PathVariable UUID id) {
     bankingDomicileService.block(id);
   }
 
   @PostMapping("/activate")
-  @CheckSecurity.Register.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.BankingDomiciles.CanActiveOrInactive
   public void activateBulk(@Valid @RequestBody ListIdsInput body) {
     bankingDomicileService.activateBulk(body.ids());
   }
 
   @PostMapping("/deactivate")
-  @CheckSecurity.Register.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.BankingDomiciles.CanActiveOrInactive
   public void deactivateBulk(@Valid @RequestBody ListIdsInput body) {
     bankingDomicileService.deactivateBulk(body.ids());
   }
 
   @PostMapping("/block")
-  @CheckSecurity.Register.Companies.CanActiveOrInactive
+  @CheckSecurity.Register.BankingDomiciles.CanActiveOrInactive
   public void blockBulk(@Valid @RequestBody ListIdsInput body) {
     bankingDomicileService.blockBulk(body.ids());
   }

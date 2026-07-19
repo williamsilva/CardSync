@@ -20,13 +20,13 @@ public class ReconciliationSettingsController {
   private final ReconciliationSettingsService reconciliationSettingsService;
 
   @GetMapping
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Settings.ReconciliationSettings.CanConsult
   public ReconciliationSettingsModel getSettings() {
     return reconciliationSettingsService.getSettings();
   }
 
   @PutMapping
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Settings.ReconciliationSettings.CanProcess
   public ReconciliationSettingsModel updateSettings(@Valid @RequestBody ReconciliationSettingsRequest request) {
     return reconciliationSettingsService.update(request);
   }

@@ -81,10 +81,6 @@ public class CompanyService {
     entity.setFantasyName(input.fantasyName().trim());
     entity.setSocialReason(input.socialReason().trim());
 
-    if (input.status() != null && input.status() != StatusEnum.NULL) {
-      entity.setStatus(input.status());
-    }
-
     return companyRepository.save(entity);
   }
 

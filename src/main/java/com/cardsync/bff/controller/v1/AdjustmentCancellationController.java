@@ -38,7 +38,7 @@ public class AdjustmentCancellationController {
    * {@code content}, compatível com o componente de lista do frontend.
    */
   @PostMapping("/cancellation")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AdjustmentCancellation.CanConsult
   public PagedModel<AdjustmentCancellationModel> search(@RequestBody ListQueryDto<AdjustmentFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -56,7 +56,7 @@ public class AdjustmentCancellationController {
   }
 
   @PostMapping("/cancellation-totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AdjustmentCancellation.CanConsult
   public ValueTotalsModel totals(@RequestBody ListQueryDto<AdjustmentFilter> body) {
     return adjustmentService.totals(body);
   }

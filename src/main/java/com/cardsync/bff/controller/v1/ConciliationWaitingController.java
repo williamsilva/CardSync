@@ -46,7 +46,7 @@ public class ConciliationWaitingController {
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
 
   @PostMapping("/missing-acquirer")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   public PagedModel<ConciliationWaitingModel> missingAcquirer(@RequestBody ListQueryDto<ConciliationWaitingModelFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -64,7 +64,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/missing-erp")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   public PagedModel<ConciliationWaitingModel> missingErp(@RequestBody ListQueryDto<ConciliationWaitingModelFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -82,7 +82,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/other-divergences")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   public PagedModel<ConciliationWaitingModel> otherDivergences(@RequestBody ListQueryDto<ConciliationWaitingModelFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -99,31 +99,31 @@ public class ConciliationWaitingController {
     );
   }
 
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   @PostMapping("/missing-acquirer-totals")
   public TransactionTotalsModel missingAcquirerTotals(@RequestBody ListQueryDto<ConciliationWaitingModelFilter> body) {
     return conciliationWaitingService.missingAcquirerTotals(body);
   }
 
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   @PostMapping("/missing-erp-totals")
   public TransactionTotalsModel missingErpTotals(@RequestBody ListQueryDto<ConciliationWaitingModelFilter> body) {
     return conciliationWaitingService.missingErpTotals(body);
   }
 
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   @PostMapping("/other-divergences-totals")
   public TransactionTotalsModel otherDivergencesTotals(@RequestBody ListQueryDto<ConciliationWaitingModelFilter> body) {
     return conciliationWaitingService.otherDivergencesTotals(body);
   }
 
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   @PostMapping("/acquirer/{acquirerId}/create-erp")
   public ErpAcquirerResolutionResultModel createErpFromAcquirer(@PathVariable UUID acquirerId) {
     return conciliationWaitingService.createErpFromAcquirer(acquirerId);
   }
 
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   @PostMapping("/acquirer/create-erp-batch")
   public ErpAcquirerBatchResolutionResultModel createErpFromAcquirerBatch(
     @RequestBody ErpAcquirerBatchRequestModel request
@@ -132,7 +132,7 @@ public class ConciliationWaitingController {
   }
 
   @PatchMapping("/erp/{erpId}/update-identity")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ErpAcquirerResolutionResultModel updateErpIdentity(
     @PathVariable UUID erpId,
     @RequestBody ErpUpdateIdentityRequest request
@@ -141,7 +141,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/erp/{erpId}/mark-deleted")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ErpAcquirerResolutionResultModel markErpAsDeletedMissingAcquirer(
     @PathVariable UUID erpId,
     @RequestBody ErpMarkDeletedRequestModel request
@@ -150,7 +150,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/erp/mark-deleted-batch")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ErpAcquirerBatchResolutionResultModel markErpAsDeletedMissingAcquirerBatch(
     @RequestBody ErpAcquirerBatchRequestModel request
   ) {
@@ -158,7 +158,7 @@ public class ConciliationWaitingController {
   }
 
   @GetMapping("/compare")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
   public ErpAcquirerComparisonModel compareErpAcquirer(
     @RequestParam UUID erpTransactionId,
     @RequestParam UUID acquirerTransactionId
@@ -167,7 +167,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/reconcile")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ReconcileErpAcquirerResultModel reconcileErpVsAcquirer() {
     ReconcileErpAcquirerResultModel result = conciliationAnalysisService.reconcileRedeErpWithAcquirer();
     salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
@@ -175,19 +175,19 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/reconcile-manual-swapped")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
     return conciliationManualSwapReconciliationService.reconcileRedeManualSwapped();
   }
 
   @PostMapping("/reconcile-fees")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
     return conciliationAnalysisService.reconcileRedeErpAcquirerFees();
   }
 
   @PostMapping("/reconcile-manually")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ErpAcquirerResolutionResultModel reconcileManually(
     @RequestParam UUID erpTransactionId,
     @RequestParam UUID acquirerTransactionId,
@@ -201,7 +201,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/reprocess-erp-cancellations")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ErpCancellationReprocessResult reprocessErpCancellations(
     @Valid @RequestBody ErpCancellationReprocessRequest request
   ) {
@@ -209,7 +209,7 @@ public class ConciliationWaitingController {
   }
 
   @PostMapping("/reconcile-bank")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public BankReconciliationResult reconcileBank() {
     return bankReconciliationService.reconcilePending();
   }
@@ -219,7 +219,7 @@ public class ConciliationWaitingController {
   // Também roda a pré-vinculação de CreditOrder órfãs antes da conciliação, igual à
   // esteira automática (FinancialReconciliationPipelineService.runSalesSummaryCreditOrder).
   @PostMapping("/reconcile-sales-summary-credit-order")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public SalesSummaryCreditOrderReconciliationResult reconcileSalesSummaryCreditOrder(
     @RequestParam(defaultValue = "false") boolean ignoreLookback
   ) {
@@ -229,7 +229,7 @@ public class ConciliationWaitingController {
 
   // Etapa 2 — Resumo de Vendas x TransactionAcq (endpoint independente)
   @PostMapping("/reconcile-sales-summary-transactions")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public SalesSummaryTransactionReconciliationResult reconcileSalesSummaryTransactions() {
     return salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
   }
@@ -237,7 +237,7 @@ public class ConciliationWaitingController {
   // Etapa 5 — Venda ADQ x Resumo de Vendas
   // ignoreLookback=true: backfill único, ignora a janela de lookback da esteira normal.
   @PostMapping("/reconcile-acquirer-sale-summary")
-  @CheckSecurity.FileProcessing.CanProcess
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public AcquirerSaleSummaryReconciliationResult reconcileAcquirerSaleSummary(
     @RequestParam(defaultValue = "false") boolean ignoreLookback
   ) {

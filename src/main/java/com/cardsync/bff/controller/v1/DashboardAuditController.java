@@ -17,13 +17,13 @@ public class DashboardAuditController {
   private final DashboardAuditService dashboardAuditService;
 
   @GetMapping("/sales-summary")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Management.DashboardAudit.CanConsult
   public AuditSalesSummaryModel salesSummary() {
     return dashboardAuditService.salesSummary();
   }
 
   @PostMapping("/unreconciled")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Management.DashboardAudit.CanConsult
   public AuditUnreconciledModel unreconciled(@RequestBody(required = false) ListQueryDto<ConciliationWaitingModelFilter> body
   ) {
     return dashboardAuditService.unreconciled(body);

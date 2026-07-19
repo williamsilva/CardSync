@@ -9,7 +9,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.MessageSource;
+import org.springframework.core.env.Environment;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,10 +26,20 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @RequiredArgsConstructor
-public class ApiExceptionHandler {
+public class ApiExceptionHandler implements EnvironmentAware {
 
   private final Clock clock;
   private final MessageSource messages;
+  private Environment env;
+
+  @Override
+  public void setEnvironment(Environment environment) {
+    this.env = environment;
+  }
+
+  private boolean isProd() {
+    return env != null && env.matchesProfiles("prod");
+  }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleValidation(
@@ -124,7 +136,6 @@ public class ApiExceptionHandler {
     DataIntegrityViolationException ex, HttpServletRequest req) {
     Locale locale = req.getLocale();
 
-    ex.getMostSpecificCause();
     String raw = ex.getMostSpecificCause().getMessage();
 
     return build(
@@ -133,7 +144,7 @@ public class ApiExceptionHandler {
       "BUSINESS_ERROR",
       "BUSINESS_ERROR",
       msg("error.business", locale),
-      raw,
+      isProd() ? "Data integrity violation" : raw,
       List.of()
     );
   }
@@ -185,7 +196,7 @@ public class ApiExceptionHandler {
       "INTERNAL_ERROR",
       "INTERNAL_ERROR",
       msg("error.internal", locale),
-      ex.getMessage(),
+      isProd() ? null : ex.getMessage(),
       List.of()
     );
   }

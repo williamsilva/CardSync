@@ -32,7 +32,7 @@ public class ReleasesBanksController {
   private final ReleasesBankService releasesBankService;
 
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.BankStatement.CanConsult
   public PagedModel<ReleasesBankModel> search(@RequestBody ListQueryDto<ReleasesBankFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -50,20 +50,20 @@ public class ReleasesBanksController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.BankStatement.CanConsult
   public ValueTotalsModel totals(@RequestBody ListQueryDto<ReleasesBankFilter> body) {
     return releasesBankService.totals(body);
   }
 
   @PostMapping("/manual")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.FileProcessing.CanProcess
   public ReleasesBankManualResult createManual(@RequestBody ReleasesBankManualInput body) {
     return releasesBankService.createManual(body);
   }
 
   @DeleteMapping("/manual/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.FileProcessing.CanProcess
   public void deleteManual(@PathVariable UUID id) {
     releasesBankService.deleteManual(id);
   }

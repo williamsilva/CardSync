@@ -27,19 +27,19 @@ public class ManualBankReconciliationController {
     private final ManualBankReconciliationService manualBankReconciliationService;
 
     @PostMapping("/manual")
-    @CheckSecurity.FileProcessing.CanProcess
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
     public ManualBankReconciliationResult reconcile(@Valid @RequestBody ManualBankReconciliationRequest request) {
         return manualBankReconciliationService.reconcile(request.releaseBankId(), request.creditOrderIds());
     }
 
     @PostMapping("/legacy")
-    @CheckSecurity.FileProcessing.CanProcess
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
     public MarkLegacyResult markLegacy(@Valid @RequestBody MarkLegacyReleasesRequest request) {
         return manualBankReconciliationService.markLegacy(request.releaseBankIds());
     }
 
     @PostMapping("/undo/{releaseBankId}")
-    @CheckSecurity.FileProcessing.CanProcess
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
     public UndoBankReconciliationResult undo(@PathVariable UUID releaseBankId) {
         return bankReconciliationService.undoReconciliation(releaseBankId);
     }

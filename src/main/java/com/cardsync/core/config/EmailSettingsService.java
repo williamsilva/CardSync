@@ -25,12 +25,24 @@ public class EmailSettingsService {
     return repository.findFirstBy()
       .map(e -> new EmailSettingsModel(
         e.getImpl(), e.getFromName(), e.getFromEmail(),
-        e.getBrevoApiKey(), e.getBrevoBaseUrl(), e.getBrevoPort(), e.getBrevoUsername(),
+        mask(e.getBrevoApiKey()), e.getBrevoBaseUrl(), e.getBrevoPort(), e.getBrevoUsername(),
         e.getChargebackRecipients(),
-        e.getSmtpHost(), e.getSmtpPort(), e.getSmtpUsername(), e.getSmtpPassword(),
+        e.getSmtpHost(), e.getSmtpPort(), e.getSmtpUsername(), mask(e.getSmtpPassword()),
         e.getSmtpAuth(), e.getSmtpStarttls(), e.getSmtpSsl()
       ))
       .orElse(new EmailSettingsModel(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+  }
+
+  /**
+   * Nunca devolve segredo (chave de API, senha) em texto puro pra tela — só indica que um
+   * valor está configurado, mostrando os 4 últimos caracteres como referência visual. O valor
+   * real só é usado internamente (ver getBrevoApiKey()/getSmtpPassword() acima, que alimentam
+   * o cliente de envio de e-mail de verdade, não esta resposta HTTP).
+   */
+  private String mask(String secret) {
+    if (secret == null || secret.isBlank()) return null;
+    int visible = Math.min(4, secret.length());
+    return "•".repeat(Math.max(secret.length() - visible, 6)) + secret.substring(secret.length() - visible);
   }
 
   @Cacheable(value = "email-settings", key = "#root.methodName")
@@ -165,7 +177,12 @@ public class EmailSettingsService {
     settings.setImpl(request.impl());
     settings.setFromName(request.fromName());
     settings.setFromEmail(request.fromEmail());
-    settings.setBrevoApiKey(request.brevoApiKey());
+    // brevoApiKey/smtpPassword: a tela nunca recebe o valor real de volta (ver mask() em
+    // getSettings()), então só troca o segredo salvo quando um valor novo de verdade é
+    // enviado — campo vazio/omitido significa "não mudar", não "apagar o segredo".
+    if (request.brevoApiKey() != null && !request.brevoApiKey().isBlank()) {
+      settings.setBrevoApiKey(request.brevoApiKey());
+    }
     settings.setBrevoBaseUrl(request.brevoBaseUrl());
     settings.setBrevoPort(request.brevoPort());
     settings.setBrevoUsername(request.brevoUsername());
@@ -173,16 +190,18 @@ public class EmailSettingsService {
     settings.setSmtpHost(request.smtpHost());
     settings.setSmtpPort(request.smtpPort());
     settings.setSmtpUsername(request.smtpUsername());
-    settings.setSmtpPassword(request.smtpPassword());
+    if (request.smtpPassword() != null && !request.smtpPassword().isBlank()) {
+      settings.setSmtpPassword(request.smtpPassword());
+    }
     settings.setSmtpAuth(request.smtpAuth());
     settings.setSmtpStarttls(request.smtpStarttls());
     settings.setSmtpSsl(request.smtpSsl());
     settings = repository.save(settings);
     return new EmailSettingsModel(
       settings.getImpl(), settings.getFromName(), settings.getFromEmail(),
-      settings.getBrevoApiKey(), settings.getBrevoBaseUrl(), settings.getBrevoPort(), settings.getBrevoUsername(),
+      mask(settings.getBrevoApiKey()), settings.getBrevoBaseUrl(), settings.getBrevoPort(), settings.getBrevoUsername(),
       settings.getChargebackRecipients(),
-      settings.getSmtpHost(), settings.getSmtpPort(), settings.getSmtpUsername(), settings.getSmtpPassword(),
+      settings.getSmtpHost(), settings.getSmtpPort(), settings.getSmtpUsername(), mask(settings.getSmtpPassword()),
       settings.getSmtpAuth(), settings.getSmtpStarttls(), settings.getSmtpSsl()
     );
   }

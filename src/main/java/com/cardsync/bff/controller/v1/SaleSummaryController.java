@@ -46,7 +46,7 @@ public class SaleSummaryController {
   }
 
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.SalesSummary.CanConsult
   public PagedModel<SaleSummaryModel> search(@RequestBody ListQueryDto<SaleSummaryFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -70,7 +70,7 @@ public class SaleSummaryController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.SalesSummary.CanConsult
   public TransactionTotalsModel totals(@RequestBody ListQueryDto<SaleSummaryFilter> body) {
     return saleSummaryService.totals(body);
   }

@@ -21,7 +21,12 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -130,6 +135,22 @@ public class SecurityConfig implements EnvironmentAware {
       .build();
   }
 
+  /**
+   * PKCE no fluxo authorization_code — mesmo sendo um client confidential (client_secret_basic),
+   * o BFF roda num processo separado da Authorization Server (Railway), então o code_verifier
+   * ainda protege contra um authorization code interceptado em trânsito. Combina com
+   * requireProofKey(true) no RegisteredClient do lado do NimbusAuth.
+   */
+  @Bean
+  public OAuth2AuthorizationRequestResolver pkceAuthorizationRequestResolver(
+    ClientRegistrationRepository clientRegistrationRepository) {
+
+    var resolver = new DefaultOAuth2AuthorizationRequestResolver(
+      clientRegistrationRepository, OAuth2AuthorizationRequestRedirectFilter.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI);
+    resolver.setAuthorizationRequestCustomizer(OAuth2AuthorizationRequestCustomizers.withPkce());
+    return resolver;
+  }
+
   @Bean
   public OAuth2UserService<OidcUserRequest, OidcUser> bffOidcUserService() {
 
@@ -140,16 +161,19 @@ public class SecurityConfig implements EnvironmentAware {
 
       var out = new LinkedHashSet<GrantedAuthority>(oidc.getAuthorities());
 
-      var idToken = oidc.getIdToken();
+      // groups/permissions são claims de autorização — só vêm no access_token (padrão OIDC),
+      // então lemos do /userinfo (chamado pelo OidcUserService com o access_token como bearer),
+      // não do id_token (que agora carrega só identidade).
+      var userInfo = oidc.getUserInfo();
 
-      var groups = idToken.getClaimAsStringList("groups");
+      var groups = userInfo != null ? userInfo.getClaimAsStringList("groups") : null;
       if (groups != null) {
         for (String g : groups) {
           out.add(new SimpleGrantedAuthority("ROLE_" + g));
         }
       }
 
-      var perms = idToken.getClaimAsStringList("permissions");
+      var perms = userInfo != null ? userInfo.getClaimAsStringList("permissions") : null;
       if (perms != null) {
         for (String p : perms) {
           out.add(new SimpleGrantedAuthority("PERM_" + p));
@@ -220,7 +244,8 @@ public class SecurityConfig implements EnvironmentAware {
   public SecurityFilterChain bffChain(
     HttpSecurity http, AuthenticationSuccessHandler oauth2SpaSuccessHandler,
     AuthenticationEntryPoint bffAuthenticationEntryPoint, AuthenticationEntryPoint spa401EntryPoint,
-    AccessDeniedHandler spa403AccessDeniedHandler, CookieProps cookieProps
+    AccessDeniedHandler spa403AccessDeniedHandler, CookieProps cookieProps,
+    OAuth2AuthorizationRequestResolver pkceAuthorizationRequestResolver
   ) throws Exception {
 
     http.securityMatcher("/bff/**", "/oauth2/authorization/**", "/login/oauth2/**");
@@ -271,6 +296,7 @@ public class SecurityConfig implements EnvironmentAware {
     );
 
     http.oauth2Login(o -> o
+      .authorizationEndpoint(a -> a.authorizationRequestResolver(pkceAuthorizationRequestResolver))
       .userInfoEndpoint(u -> u.oidcUserService(bffOidcUserService()))
       .successHandler(oauth2SpaSuccessHandler)
     );

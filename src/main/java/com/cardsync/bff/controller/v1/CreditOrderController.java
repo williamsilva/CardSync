@@ -37,7 +37,7 @@ public class CreditOrderController {
   }
 
   @PostMapping("/search")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.CreditOrder.CanConsult
   public PagedModel<CreditOrderModel> search(@RequestBody ListQueryDto<CreditOrderFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -55,7 +55,7 @@ public class CreditOrderController {
   }
 
   @PostMapping("/totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.CreditOrder.CanConsult
   public TransactionTotalsModel totals(@RequestBody ListQueryDto<CreditOrderFilter> body) {
     return creditOrderService.totals(body);
   }

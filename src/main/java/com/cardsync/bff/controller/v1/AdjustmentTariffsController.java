@@ -38,7 +38,7 @@ public class AdjustmentTariffsController {
    * {@code content}, compatível com o componente de lista do frontend.
    */
   @PostMapping("/tariffs")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AdjustmentTariffs.CanConsult
   public PagedModel<AdjustmentTariffsModel> search(@RequestBody ListQueryDto<AdjustmentFilter> body) {
     var pageable = PageableMapper.toPageable(body.page(), body.size(), body.sort());
 
@@ -56,7 +56,7 @@ public class AdjustmentTariffsController {
   }
 
   @PostMapping("/tariffs-totals")
-  @CheckSecurity.FileProcessing.CanRead
+  @CheckSecurity.Documents.AdjustmentTariffs.CanConsult
   public ValueTotalsModel totals(@RequestBody ListQueryDto<AdjustmentFilter> body) {
     return adjustmentService.totals(body);
   }
