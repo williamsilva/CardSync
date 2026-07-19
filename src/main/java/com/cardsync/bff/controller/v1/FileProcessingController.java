@@ -1,6 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.transactions.ErpPendingSaleModel;
+import com.cardsync.bff.controller.v1.representation.model.fileprocessing.FileBrowserItemModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.FileProcessingScheduleStatusModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.FileUploadItemResultModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ImportedFileCalendarModel;
@@ -12,6 +13,7 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Reproc
 import com.cardsync.bff.controller.v1.representation.model.rede.RedeTotalizerModel;
 import com.cardsync.core.file.erp.service.ErpPendingSaleService;
 import com.cardsync.core.file.rede.service.RedeFinancialQueryService;
+import com.cardsync.core.file.service.FileBrowserService;
 import com.cardsync.core.file.service.FileStorageTask;
 import com.cardsync.core.file.service.FileUploadService;
 import com.cardsync.core.file.service.report.FileProcessingReportService;
@@ -20,9 +22,12 @@ import com.cardsync.domain.filter.ProcessedFileFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.hateoas.PagedModel;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +39,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +53,7 @@ public class FileProcessingController {
 
   private final FileStorageTask fileStorageTask;
   private final FileUploadService fileUploadService;
+  private final FileBrowserService fileBrowserService;
   private final FileProcessingReportService reportService;
   private final ErpPendingSaleService erpPendingSaleService;
   private final RedeFinancialQueryService redeFinancialQueryService;
@@ -139,6 +147,37 @@ public class FileProcessingController {
     @RequestParam("files") MultipartFile[] files
   ) {
     return fileUploadService.upload(system, files);
+  }
+
+  @GetMapping("/browse")
+  @CheckSecurity.FileProcessing.CanRead
+  public List<FileBrowserItemModel> browse(
+    @RequestParam String system,
+    @RequestParam String folder
+  ) {
+    return fileBrowserService.list(system, folder);
+  }
+
+  @GetMapping("/browse/download")
+  @CheckSecurity.FileProcessing.CanRead
+  public ResponseEntity<Resource> download(
+    @RequestParam String system,
+    @RequestParam String folder,
+    @RequestParam String path
+  ) {
+    Resource resource = fileBrowserService.loadForDownload(system, folder, path);
+
+    // "path" pode incluir subpastas (ex.: "2024/arquivo.csv") — o nome pro Content-Disposition
+    // é só o último segmento, senão o navegador tenta salvar com a barra no nome do arquivo.
+    String displayName = Paths.get(path).getFileName().toString();
+    ContentDisposition disposition = ContentDisposition.attachment()
+      .filename(displayName, StandardCharsets.UTF_8)
+      .build();
+
+    return ResponseEntity.ok()
+      .contentType(MediaType.APPLICATION_OCTET_STREAM)
+      .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+      .body(resource);
   }
 
   @PostMapping("/erp/process")

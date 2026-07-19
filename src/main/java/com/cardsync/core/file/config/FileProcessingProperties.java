@@ -293,6 +293,37 @@ public class FileProcessingProperties {
   }
 
   /**
+   * Resolve os caminhos de um sistema (erp, rede, ou qualquer adquirente/banco habilitado)
+   * a partir de uma chave dinâmica vinda da API (upload manual, navegador de arquivos, etc.),
+   * sem lançar exceção — retorna {@code null} se o sistema não existir/não estiver configurado.
+   * Usado nos pontos que precisam validar e responder com uma mensagem de erro própria
+   * (ver {@code FileUploadService}/{@code FileBrowserService}), em vez do
+   * {@code IllegalStateException} genérico de {@link #getPathsOrThrow(String)}.
+   */
+  public FilePaths resolveSystemPaths(String system) {
+    if (system == null || system.isBlank()) {
+      return null;
+    }
+
+    String key = system.trim().toLowerCase(Locale.ROOT);
+
+    if ("erp".equals(key) || "rede".equals(key)) {
+      FilePaths paths = systems == null ? null : systems.byName(key);
+      if (paths == null || paths.getInput() == null || paths.getInput().isBlank()) {
+        return null;
+      }
+      applyFilePathDefaults(key, paths, "erp".equals(key));
+      return paths;
+    }
+
+    FilePaths paths = getAcquirerPaths().get(key);
+    if (paths == null) {
+      paths = getBankPaths().get(key);
+    }
+    return paths;
+  }
+
+  /**
    * Retorna os caminhos de um sistema pelo nome, lançando exceção se {@code input} não estiver
    * configurado. Aplica os defaults de subpastas antes de retornar.
    */

@@ -17,7 +17,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Recebe uploads manuais de arquivos (EEFI/CNAB de adquirentes e bancos, arquivos ERP) e os
@@ -55,24 +54,10 @@ public class FileUploadService {
   }
 
   private FileProcessingProperties.FilePaths resolvePaths(String system) {
-    if (system == null || system.isBlank()) {
-      throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "Informe o sistema de destino do arquivo.");
-    }
-
-    String key = system.trim().toLowerCase(Locale.ROOT);
-
-    if ("erp".equals(key) || "rede".equals(key)) {
-      return properties.getPathsOrThrow(key);
-    }
-
-    FileProcessingProperties.FilePaths paths = properties.getAcquirerPaths().get(key);
-    if (paths == null) {
-      paths = properties.getBankPaths().get(key);
-    }
+    FileProcessingProperties.FilePaths paths = properties.resolveSystemPaths(system);
     if (paths == null) {
       throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "Sistema de arquivo inválido ou não configurado: " + system);
     }
-
     return paths;
   }
 
