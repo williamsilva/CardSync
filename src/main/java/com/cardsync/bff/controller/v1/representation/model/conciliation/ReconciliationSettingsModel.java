@@ -29,6 +29,11 @@ public record ReconciliationSettingsModel(
   int dateToleranceDaysAfter,
   BigDecimal valueTolerance,
   int bankMarkNotReconciledAfterDays,
+  // Rigidez do matching Banco x Ordem de Crédito / Parcela (Etapa 7) — default false =
+  // comportamento legado (campo opcional/coringa quando nulo/desconhecido em qualquer lado)
+  boolean flagMatchRequired,
+  boolean establishmentMatchRequired,
+  boolean paymentKindMatchRequired,
   // Implantação e marcação de lançamentos como legado
   LocalDate goLiveDate,
   int legacyMarkingMonths,

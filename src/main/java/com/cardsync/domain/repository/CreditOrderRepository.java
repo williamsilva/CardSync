@@ -297,4 +297,61 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   /** Retorna todos os installmentNumbers existentes para um resumo. */
   @Query("select co.installmentNumber from CreditOrderEntity co where co.salesSummary.id = :summaryId")
   Set<Integer> findInstallmentNumbersBySalesSummaryId(@Param("summaryId") UUID summaryId);
+
+  /**
+   * Diagnóstico de impacto do modo estrito de conciliação bancária (ver
+   * ReconciliationSettingsEntity.flagMatchRequired): quantas ordens hoje elegíveis para a
+   * Etapa 7 ficariam sem bandeira preenchida, e portanto sem poder casar automaticamente
+   * se a regra virar obrigatória.
+   */
+  @Query("""
+    select count(co.id) from CreditOrderEntity co
+    where co.releaseBank is null
+      and co.salesSummaryStatus = :summaryReconciledStatus
+      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
+      and co.flag is null
+  """)
+  long countEligiblePendingWithoutFlag(
+    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
+    @Param("paymentPendingStatus") Integer paymentPendingStatus,
+    @Param("paymentPartialStatus") Integer paymentPartialStatus
+  );
+
+  /**
+   * Sanity check: pvCentralizer é o identificador de estabelecimento usado no matching
+   * (ver ReconciliationMatchContext.establishmentPv) e é sempre preenchido na ingestão
+   * (ver ProcessRedeEeFiService/SalesSummaryCreditOrderReconciliationService) — o
+   * esperado é ~0. Um valor alto aqui indicaria um problema de dados anterior ao
+   * problema de extração do CNAB do lado do lançamento bancário.
+   */
+  @Query("""
+    select count(co.id) from CreditOrderEntity co
+    where co.releaseBank is null
+      and co.salesSummaryStatus = :summaryReconciledStatus
+      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
+      and co.pvCentralizer is null
+  """)
+  long countEligiblePendingWithoutPvCentralizer(
+    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
+    @Param("paymentPendingStatus") Integer paymentPendingStatus,
+    @Param("paymentPartialStatus") Integer paymentPartialStatus
+  );
+
+  /**
+   * Diagnóstico de impacto de paymentKindMatchRequired: quantas ordens elegíveis têm
+   * modalidade que ainda cai em PaymentKind.UNKNOWN (ver
+   * BankReconciliationService.paymentKindFromModality — hoje só o código 0/ausente).
+   */
+  @Query("""
+    select count(co.id) from CreditOrderEntity co
+    where co.releaseBank is null
+      and co.salesSummaryStatus = :summaryReconciledStatus
+      and co.statusPaymentBank in (:paymentPendingStatus, :paymentPartialStatus)
+      and (co.salesSummary is null or co.salesSummary.modality is null or co.salesSummary.modality = 0)
+  """)
+  long countEligiblePendingWithUnknownPaymentKind(
+    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
+    @Param("paymentPendingStatus") Integer paymentPendingStatus,
+    @Param("paymentPartialStatus") Integer paymentPartialStatus
+  );
 }

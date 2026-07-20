@@ -2,7 +2,9 @@ package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationSettingsModel;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationSettingsRequest;
+import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationStrictModeImpactModel;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.core.reconciliation.ReconciliationStrictModeDiagnosticsService;
 import com.cardsync.core.security.CheckSecurity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReconciliationSettingsController {
 
   private final ReconciliationSettingsService reconciliationSettingsService;
+  private final ReconciliationStrictModeDiagnosticsService strictModeDiagnosticsService;
 
   @GetMapping
   @CheckSecurity.Settings.ReconciliationSettings.CanConsult
@@ -29,5 +32,17 @@ public class ReconciliationSettingsController {
   @CheckSecurity.Settings.ReconciliationSettings.CanProcess
   public ReconciliationSettingsModel updateSettings(@Valid @RequestBody ReconciliationSettingsRequest request) {
     return reconciliationSettingsService.update(request);
+  }
+
+  /**
+   * Diagnóstico de impacto (ver ReconciliationStrictModeDiagnosticsService) — quantos
+   * registros pendentes hoje ficariam sem match automático se cada toggle de matching
+   * rígido (flagMatchRequired/establishmentMatchRequired/paymentKindMatchRequired) fosse
+   * ligado agora. Consultar antes de ligar qualquer um deles nesta tela.
+   */
+  @GetMapping("/strict-mode-impact")
+  @CheckSecurity.Settings.ReconciliationSettings.CanConsult
+  public ReconciliationStrictModeImpactModel getStrictModeImpact() {
+    return strictModeDiagnosticsService.getImpact();
   }
 }

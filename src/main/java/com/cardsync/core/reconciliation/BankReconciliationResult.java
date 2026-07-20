@@ -31,6 +31,16 @@ public class BankReconciliationResult {
   private int releasesSkippedMissingContext;
   private int candidateGroupsSkippedBySafetyCap;
 
+  /**
+   * Diagnóstico de impacto do modo estrito (ver ReconciliationSettingsEntity): quantas ordens
+   * casadas NESTA execução só casaram porque bandeira/estabelecimento/modalidade estavam
+   * nulos/desconhecidos em algum lado (coringa hoje). Responde "se eu ligar a regra X agora,
+   * quantos dos matches que acabei de fazer deixariam de acontecer".
+   */
+  private int ordersMatchedRelyingOnFlagWildcard;
+  private int ordersMatchedRelyingOnEstablishmentWildcard;
+  private int ordersMatchedRelyingOnPaymentKindWildcard;
+
   private BigDecimal totalReleaseValueReconciled;
   private BigDecimal totalCreditOrderValueReconciled;
   private BigDecimal totalInstallmentValueReconciled;
@@ -146,6 +156,10 @@ public class BankReconciliationResult {
     private int releasesSkippedMissingContext;
     private int candidateGroupsSkippedBySafetyCap;
 
+    private int ordersMatchedRelyingOnFlagWildcard;
+    private int ordersMatchedRelyingOnEstablishmentWildcard;
+    private int ordersMatchedRelyingOnPaymentKindWildcard;
+
     @Builder.Default
     private BigDecimal totalReleaseValueReconciled = BigDecimal.ZERO;
 
@@ -198,6 +212,18 @@ public class BankReconciliationResult {
       candidateGroupsSkippedBySafetyCap++;
     }
 
+    public void matchedOrderRelyingOnFlagWildcard() {
+      ordersMatchedRelyingOnFlagWildcard++;
+    }
+
+    public void matchedOrderRelyingOnEstablishmentWildcard() {
+      ordersMatchedRelyingOnEstablishmentWildcard++;
+    }
+
+    public void matchedOrderRelyingOnPaymentKindWildcard() {
+      ordersMatchedRelyingOnPaymentKindWildcard++;
+    }
+
     public BankReconciliationResult toResult() {
       return BankReconciliationResult.builder()
         .trigger(trigger)
@@ -213,6 +239,9 @@ public class BankReconciliationResult {
         .releasesKeptPending(releasesKeptPending)
         .releasesSkippedMissingContext(releasesSkippedMissingContext)
         .candidateGroupsSkippedBySafetyCap(candidateGroupsSkippedBySafetyCap)
+        .ordersMatchedRelyingOnFlagWildcard(ordersMatchedRelyingOnFlagWildcard)
+        .ordersMatchedRelyingOnEstablishmentWildcard(ordersMatchedRelyingOnEstablishmentWildcard)
+        .ordersMatchedRelyingOnPaymentKindWildcard(ordersMatchedRelyingOnPaymentKindWildcard)
         .totalReleaseValueReconciled(totalReleaseValueReconciled)
         .totalCreditOrderValueReconciled(totalCreditOrderValueReconciled)
         .totalInstallmentValueReconciled(totalInstallmentValueReconciled)

@@ -5,6 +5,7 @@ import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.CreditOrderEntity;
+import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
@@ -78,6 +79,14 @@ public class BankReconciliationService {
     // — a configuração existia, era exposta/editável na API, mas não tinha efeito nenhum.
     BankReconciliationMode mode = config.getBankMode();
     BankReconciliationResult.Counter result = BankReconciliationResult.counter(trigger, mode);
+
+    // Com os 3 campos desligados (default), compatible()/strength() reproduzem exatamente o
+    // comportamento legado (establishment/flag opcionais, paymentKind UNKNOWN como coringa).
+    ReconciliationMatchContext.MatchStrictness strictness = new ReconciliationMatchContext.MatchStrictness(
+      reconciliationSettingsService.isFlagMatchRequired(),
+      reconciliationSettingsService.isEstablishmentMatchRequired(),
+      reconciliationSettingsService.isPaymentKindMatchRequired()
+    );
 
     List<Object[]> eligibleRows = creditOrderRepository.findEligibleIdsGroupedByCompanyForBankReconciliation(
       SUMMARY_RECONCILED_STATUS,
@@ -180,6 +189,7 @@ public class BankReconciliationService {
             reconciledOrderIds,
             analyzedReleaseIds,
             config,
+            strictness,
             result
           );
         }
@@ -201,7 +211,7 @@ public class BankReconciliationService {
     }
 
     if (mode.shouldTryInstallmentsAfterCreditOrders() || mode.shouldTryInstallmentsFirst()) {
-      reconcilePendingReleasesByInstallments(config, analyzedReleaseIds, result);
+      reconcilePendingReleasesByInstallments(config, strictness, analyzedReleaseIds, result);
     }
 
     BankReconciliationResult partialResult = result.toResult();
@@ -228,7 +238,40 @@ public class BankReconciliationService {
       built.getTotalCreditOrderValueReconciled(),
       reconciledDifference
     );
+
+    logStrictModeImpactDiagnostics(built);
+
     return built;
+  }
+
+  /**
+   * Diagnóstico de impacto do modo estrito (Fase 1 do plano de correção de conciliações
+   * erradas): mede, sem alterar nenhum resultado, (a) o backlog atual de registros pendentes
+   * sem bandeira/pvCentralizer/estabelecimento/modalidade conhecida, e (b) quantos matches
+   * feitos NESTA execução só aconteceram por causa de um coringa. Use esses números para
+   * decidir quando ligar cada toggle em ReconciliationSettingsEntity com segurança.
+   */
+  private void logStrictModeImpactDiagnostics(BankReconciliationResult built) {
+    long ordersWithoutFlag = creditOrderRepository.countEligiblePendingWithoutFlag(
+      SUMMARY_RECONCILED_STATUS, PAYMENT_PENDING, PAYMENT_PARTIAL);
+    long ordersWithoutPvCentralizer = creditOrderRepository.countEligiblePendingWithoutPvCentralizer(
+      SUMMARY_RECONCILED_STATUS, PAYMENT_PENDING, PAYMENT_PARTIAL);
+    long ordersWithUnknownPaymentKind = creditOrderRepository.countEligiblePendingWithUnknownPaymentKind(
+      SUMMARY_RECONCILED_STATUS, PAYMENT_PENDING, PAYMENT_PARTIAL);
+    long releasesWithoutFlag = releasesBankRepository.countPendingWithoutFlag(STATUS_PENDING);
+    long releasesWithoutEstablishment = releasesBankRepository.countPendingWithoutEstablishment(STATUS_PENDING);
+
+    log.info(
+      "🔬 DIAGNÓSTICO DE IMPACTO (regras rígidas ainda desligadas por padrão): " +
+        "backlogSemBandeira[ordens={}, releases={}], backlogSemPvCentralizer[ordens={} — deveria ser ~0], " +
+        "backlogSemEstabelecimento[releases={}], backlogModalidadeDesconhecida[ordens={}], " +
+        "matchesNesteRunQueQuebrariamSe[bandeiraObrigatoria={}, estabelecimentoObrigatorio={}, modalidadeObrigatoria={}]",
+      ordersWithoutFlag, releasesWithoutFlag, ordersWithoutPvCentralizer,
+      releasesWithoutEstablishment, ordersWithUnknownPaymentKind,
+      built.getOrdersMatchedRelyingOnFlagWildcard(),
+      built.getOrdersMatchedRelyingOnEstablishmentWildcard(),
+      built.getOrdersMatchedRelyingOnPaymentKindWildcard()
+    );
   }
 
   private void reconcileEligibleCreditOrders(
@@ -237,6 +280,7 @@ public class BankReconciliationService {
     Set<UUID> reconciledOrderIds,
     Set<UUID> analyzedReleaseIds,
     FileProcessingProperties.Reconciliation config,
+    ReconciliationMatchContext.MatchStrictness strictness,
     BankReconciliationResult.Counter result
   ) {
     boolean reprocess = reconciliationSettingsService.isReprocessBankAcquirer();
@@ -317,7 +361,7 @@ public class BankReconciliationService {
         .filter(order -> isCreditOrderCandidateCompatible(
           release, releaseContext, releaseBank,
           order, orderMatchDataById.get(order.getId()),
-          toleranceDaysBefore, toleranceDaysAfter
+          toleranceDaysBefore, toleranceDaysAfter, strictness
         ))
         .toList();
 
@@ -338,6 +382,7 @@ public class BankReconciliationService {
       if (!selected.matched()) continue;
 
       List<CreditOrderEntity> orders = selected.typedItems();
+      trackStrictModeImpact(releaseContext, orders, orderMatchDataById, result);
       applyCreditOrderMatch(release, orders, selected, result, reprocess);
       orders.stream().map(CreditOrderEntity::getId).filter(Objects::nonNull).forEach(reconciledOrderIds::add);
       if (release.getId() != null) reconciledReleaseIds.add(release.getId());
@@ -347,6 +392,36 @@ public class BankReconciliationService {
         entityManager.flush();
         entityManager.clear();
         matchesSinceFlush = 0;
+      }
+    }
+  }
+
+  /**
+   * Diagnóstico (não altera nenhum resultado de matching): entre as ordens que ACABARAM de
+   * casar de verdade com este release, conta quantas só casaram porque bandeira/estabelecimento/
+   * modalidade estavam nulos/desconhecidos em algum lado — ou seja, quantas deixariam de casar
+   * automaticamente se a regra correspondente (ReconciliationSettingsEntity.*MatchRequired)
+   * estivesse ligada nesta mesma execução. Ver BankReconciliationResult.
+   */
+  private void trackStrictModeImpact(
+    ReconciliationMatchContext releaseContext,
+    List<CreditOrderEntity> matchedOrders,
+    Map<UUID, OrderMatchData> orderMatchDataById,
+    BankReconciliationResult.Counter result
+  ) {
+    for (CreditOrderEntity order : matchedOrders) {
+      OrderMatchData data = orderMatchDataById.get(order.getId());
+      if (data == null) continue;
+      ReconciliationMatchContext orderContext = data.context();
+      if (releaseContext.flagId() == null || orderContext.flagId() == null) {
+        result.matchedOrderRelyingOnFlagWildcard();
+      }
+      if (releaseContext.establishmentPv() == null || orderContext.establishmentPv() == null) {
+        result.matchedOrderRelyingOnEstablishmentWildcard();
+      }
+      if (releaseContext.paymentKind() == ReconciliationMatchContext.PaymentKind.UNKNOWN
+        || orderContext.paymentKind() == ReconciliationMatchContext.PaymentKind.UNKNOWN) {
+        result.matchedOrderRelyingOnPaymentKindWildcard();
       }
     }
   }
@@ -388,6 +463,7 @@ public class BankReconciliationService {
 
   private void reconcilePendingReleasesByInstallments(
     FileProcessingProperties.Reconciliation config,
+    ReconciliationMatchContext.MatchStrictness strictness,
     Set<UUID> analyzedReleaseIds,
     BankReconciliationResult.Counter result
   ) {
@@ -406,7 +482,7 @@ public class BankReconciliationService {
         continue;
       }
 
-      BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallmentsWithStats(release, config, result);
+      BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallmentsWithStats(release, config, strictness, result);
       if (installmentResult.matched()) {
         result.releaseReconciled(release.getReleaseValue());
         result.transactionsUpdated(propagateReleaseStatusTransactions(release));
@@ -631,20 +707,13 @@ public class BankReconciliationService {
       && order.getAcquirer().getId() != null;
   }
 
-  private Comparator<ReleasesBankEntity> candidateReleaseComparator(CreditOrderEntity order) {
-    ReconciliationMatchContext orderContext = contextOf(order);
-    return Comparator
-      .comparingInt((ReleasesBankEntity release) -> orderContext.strength(contextOf(release))).reversed()
-      .thenComparingLong(release -> Math.abs(ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate())))
-      .thenComparing(release -> nvl(release.getReleaseValue()).subtract(nvl(order.getReleaseValue())).abs());
-  }
-
   private BankReconciliationMatcher.MatchResult reconcileByInstallmentsWithStats(
     ReleasesBankEntity release,
     FileProcessingProperties.Reconciliation config,
+    ReconciliationMatchContext.MatchStrictness strictness,
     BankReconciliationResult.Counter result
   ) {
-    BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallments(release, config);
+    BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallments(release, config, strictness);
     if (installmentResult.skippedBySafetyCap()) {
       result.candidateGroupSkippedBySafetyCap();
     }
@@ -654,7 +723,11 @@ public class BankReconciliationService {
     return installmentResult;
   }
 
-  private BankReconciliationMatcher.MatchResult reconcileByInstallments(ReleasesBankEntity release, FileProcessingProperties.Reconciliation config) {
+  private BankReconciliationMatcher.MatchResult reconcileByInstallments(
+    ReleasesBankEntity release,
+    FileProcessingProperties.Reconciliation config,
+    ReconciliationMatchContext.MatchStrictness strictness
+  ) {
     int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
     int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
     BigDecimal valueTolerance = reconciliationSettingsService.getValueTolerance();
@@ -674,9 +747,9 @@ public class BankReconciliationService {
         dateFrom,
         dateTo
       ).stream()
-      .filter(installment -> isInstallmentCandidateCompatible(release, installment, toleranceDaysBefore, toleranceDaysAfter))
+      .filter(installment -> isInstallmentCandidateCompatible(release, installment, toleranceDaysBefore, toleranceDaysAfter, strictness))
       .sorted(Comparator.comparingInt(
-        (InstallmentAcqEntity installment) -> releaseContext.strength(contextOf(installment))).reversed())
+        (InstallmentAcqEntity installment) -> releaseContext.strength(contextOf(installment), strictness)).reversed())
       .toList();
 
     BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
@@ -869,14 +942,14 @@ public class BankReconciliationService {
   private boolean isCreditOrderCandidateCompatible(
     ReleasesBankEntity release, ReconciliationMatchContext releaseContext, UUID releaseBank,
     CreditOrderEntity order, OrderMatchData orderData,
-    int toleranceDaysBefore, int toleranceDaysAfter
+    int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
   ) {
     if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null || orderData == null) return false;
     // daysDiff > 0: lançamento DEPOIS da ordem (normal); < 0: lançamento ANTES da ordem (suspeito)
     long daysDiff = ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate());
     if (daysDiff > toleranceDaysAfter) return false;
     if (daysDiff < -toleranceDaysBefore) return false;
-    if (!releaseContext.compatible(orderData.context())) return false;
+    if (!releaseContext.compatible(orderData.context(), strictness)) return false;
     // Banco obrigatório: release.bank vs order.bankingDomicile.bank
     if (releaseBank == null || orderData.bankId() == null || !releaseBank.equals(orderData.bankId())) return false;
     return true;
@@ -885,7 +958,10 @@ public class BankReconciliationService {
   /** Contexto de matching e banco (via domicílio bancário) de uma ordem, pré-calculados uma única vez por ordem. */
   private record OrderMatchData(ReconciliationMatchContext context, UUID bankId) {}
 
-  private boolean isInstallmentCandidateCompatible(ReleasesBankEntity release, InstallmentAcqEntity installment, int toleranceDaysBefore, int toleranceDaysAfter) {
+  private boolean isInstallmentCandidateCompatible(
+    ReleasesBankEntity release, InstallmentAcqEntity installment,
+    int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
+  ) {
     if (installment == null || installment.getExpectedPaymentDate() == null) return false;
     if (installment.getTransaction() != null && installment.getTransaction().getSaleDate() != null) {
       LocalDate saleDate = installment.getTransaction().getSaleDate().toLocalDate();
@@ -895,25 +971,33 @@ public class BankReconciliationService {
     long daysDiff = ChronoUnit.DAYS.between(installment.getExpectedPaymentDate(), release.getReleaseDate());
     if (daysDiff > toleranceDaysAfter) return false;
     if (daysDiff < -toleranceDaysBefore) return false;
-    return contextOf(release).compatible(contextOf(installment));
+    return contextOf(release).compatible(contextOf(installment), strictness);
   }
 
-  private ReconciliationMatchContext contextOf(ReleasesBankEntity release) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  ReconciliationMatchContext contextOf(ReleasesBankEntity release) {
+    EstablishmentEntity establishment = release.getEstablishment();
     return new ReconciliationMatchContext(
       idOrNull(release.getCompany()),
       idOrNull(release.getAcquirer()),
-      idOrNull(release.getEstablishment()),
+      idOrNull(establishment),
+      establishment != null ? establishment.getPvNumber() : null,
       idOrNull(release.getFlag()),
       paymentKindFromBank(release.getModalityPaymentBank().getCode(), release.getDescriptionHistoricalBank(),
         release.getComplementRelease(), release.getDocumentComplementNumber())
     );
   }
 
-  private ReconciliationMatchContext contextOf(CreditOrderEntity order) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  ReconciliationMatchContext contextOf(CreditOrderEntity order) {
     return new ReconciliationMatchContext(
       idOrNull(order.getCompany()),
       idOrNull(order.getAcquirer()),
       null,
+      // CreditOrderEntity não tem relação com EstablishmentEntity — pvCentralizer é o
+      // identificador de estabelecimento já usado com esse propósito na Etapa 4
+      // (CreditOrderOrphanLinkingService: acquirer + pvCentralizer + rvNumber).
+      order.getPvCentralizer(),
       idOrNull(order.getFlag()),
       paymentKindFromCreditOrder(order)
     );
@@ -922,12 +1006,14 @@ public class BankReconciliationService {
   private ReconciliationMatchContext contextOf(InstallmentAcqEntity installment) {
     TransactionAcqEntity tx = installment.getTransaction();
     if (tx == null) {
-      return new ReconciliationMatchContext(null, null, null, null, ReconciliationMatchContext.PaymentKind.UNKNOWN);
+      return new ReconciliationMatchContext(null, null, null, null, null, ReconciliationMatchContext.PaymentKind.UNKNOWN);
     }
+    EstablishmentEntity establishment = tx.getEstablishment();
     return new ReconciliationMatchContext(
       idOrNull(tx.getCompany()),
       idOrNull(tx.getAcquirer()),
-      idOrNull(tx.getEstablishment()),
+      idOrNull(establishment),
+      establishment != null ? establishment.getPvNumber() : null,
       idOrNull(tx.getFlag()),
       paymentKindFromTransaction(tx)
     );
@@ -951,13 +1037,20 @@ public class BankReconciliationService {
     return paymentKindFromModality(tx.getModality());
   }
 
-  private ReconciliationMatchContext.PaymentKind paymentKindFromModality(Integer modalityCode) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  ReconciliationMatchContext.PaymentKind paymentKindFromModality(Integer modalityCode) {
     ModalityEnum modality = ModalityEnum.fromCode(modalityCode);
     if (modality == ModalityEnum.CASH_DEBIT) return ReconciliationMatchContext.PaymentKind.DEBIT;
     if (modality == ModalityEnum.CASH_CREDIT
       || modality == ModalityEnum.INSTALLMENT_CREDIT_2_6
       || modality == ModalityEnum.INSTALLMENT_CREDIT_7_12
-      || modality == ModalityEnum.INSTALLMENT_CREDIT_13_21) {
+      || modality == ModalityEnum.INSTALLMENT_CREDIT_13_21
+      // DIGITAL_WALLET e OUTROS são modalidades de cartão de crédito reais (ver
+      // ModalityResolver, ProcessRedeEeVcService/ProcessRedeEeVdService) — antes caíam em
+      // UNKNOWN, que age como coringa em ReconciliationMatchContext.compatible() e permitia
+      // essas ordens casarem indevidamente com lançamentos bancários de DÉBITO.
+      || modality == ModalityEnum.DIGITAL_WALLET
+      || modality == ModalityEnum.OUTROS) {
       return ReconciliationMatchContext.PaymentKind.CREDIT;
     }
     return ReconciliationMatchContext.PaymentKind.UNKNOWN;

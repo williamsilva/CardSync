@@ -105,6 +105,22 @@ public class ReconciliationSettingsEntity extends AuditableEntityBase {
   @Column(name = "bank_mark_not_reconciled_after_days", nullable = false)
   private int bankMarkNotReconciledAfterDays = 3;
 
+  // ── Rigidez do matching Banco x Ordem de Crédito / Parcela (Etapa 7) ──────
+  // Default false nos três = comportamento legado (campo opcional/coringa quando nulo/
+  // desconhecido em qualquer lado). Ver ReconciliationMatchContext.MatchStrictness.
+
+  /** Bandeira (flag) obrigatória no matching — hoje coringa quando nula em qualquer lado. */
+  @Column(name = "flag_match_required", nullable = false)
+  private boolean flagMatchRequired = false;
+
+  /** Estabelecimento (por número de PV) obrigatório no matching — hoje coringa quando nulo em qualquer lado. */
+  @Column(name = "establishment_match_required", nullable = false)
+  private boolean establishmentMatchRequired = false;
+
+  /** Modalidade de pagamento (débito/crédito) obrigatória no matching — hoje UNKNOWN age como coringa. */
+  @Column(name = "payment_kind_match_required", nullable = false)
+  private boolean paymentKindMatchRequired = false;
+
   // ── Implantação e marcação de lançamentos como legado ─────────────────────
 
   /**

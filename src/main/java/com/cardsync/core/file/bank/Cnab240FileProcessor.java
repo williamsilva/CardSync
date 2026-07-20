@@ -274,6 +274,12 @@ public class Cnab240FileProcessor {
       layout,
       codeBank
     );
+    // Notas calculadas pela classificação (ex.: "pv_candidates_without_establishment",
+    // "flag_not_detected_by_text") eram descartadas silenciosamente após este retorno —
+    // agrupá-las aqui dá visibilidade, por arquivo/banco, à confiabilidade da extração de
+    // estabelecimento/bandeira a partir do CNAB antes de tornar esses campos obrigatórios
+    // no matching (ver ReconciliationSettingsEntity.establishmentMatchRequired).
+    classification.getNotes().forEach(note -> warningCollector.classificationNote(lineNumber, note));
 
     ReleasesBankEntity release = new ReleasesBankEntity();
     release.setLineNumber(lineNumber);

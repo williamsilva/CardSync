@@ -45,7 +45,7 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
       and rb.releaseDate is not null
       and rb.releaseValue is not null
-    order by rb.releaseDate asc, rb.releaseValue asc
+    order by rb.releaseValue asc, rb.releaseDate asc
   """)
   List<ReleasesBankEntity> findForBankReconciliation(
     @Param("pendingStatus") Integer pendingStatus,
@@ -66,7 +66,7 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
       and rb.releaseDate between :dateFrom and :dateTo
       and rb.releaseValue is not null
       and rb.company.id = :companyId
-    order by rb.releaseDate asc, rb.releaseValue asc
+    order by rb.releaseValue asc, rb.releaseDate asc
   """)
   List<ReleasesBankEntity> findAvailableForCreditOrderBatch(
     @Param("pendingStatus") Integer pendingStatus,
@@ -75,5 +75,31 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     @Param("dateFrom") java.time.LocalDate dateFrom,
     @Param("dateTo") java.time.LocalDate dateTo
   );
+
+  /**
+   * Diagnóstico de impacto do modo estrito de conciliação bancária (ver
+   * ReconciliationSettingsEntity.flagMatchRequired): quantos lançamentos pendentes hoje
+   * ficariam sem bandeira preenchida, e portanto sem poder casar automaticamente se a
+   * regra virar obrigatória.
+   */
+  @Query("""
+    select count(rb.id) from ReleasesBankEntity rb
+    where (rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
+      and rb.flag is null
+  """)
+  long countPendingWithoutFlag(@Param("pendingStatus") Integer pendingStatus);
+
+  /**
+   * Diagnóstico de impacto de establishmentMatchRequired: quantos lançamentos pendentes
+   * hoje estão sem estabelecimento resolvido — depende da extração de PV a partir do
+   * CNAB (ver BankStatementClassifierService/BankTextSignalResolver), hoje sem amostra
+   * real nem teste automatizado. Acompanhar esta contagem antes de ligar o toggle.
+   */
+  @Query("""
+    select count(rb.id) from ReleasesBankEntity rb
+    where (rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
+      and rb.establishment is null
+  """)
+  long countPendingWithoutEstablishment(@Param("pendingStatus") Integer pendingStatus);
 
 }
