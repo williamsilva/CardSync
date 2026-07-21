@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BankReconciliationServiceMatchingTest {
 
   private final BankReconciliationService service =
-    new BankReconciliationService(null, null, null, null, null, null, null, null);
+    new BankReconciliationService(null, null, null, null, null, null, null, null, null);
 
   // ── paymentKindFromModality — base da Fase 4 (DIGITAL_WALLET/OUTROS → CREDIT) ──
 
@@ -129,6 +129,21 @@ class BankReconciliationServiceMatchingTest {
     assertThat(context.establishmentId()).isNull();
     assertThat(context.establishmentPv()).isNull();
     assertThat(context.paymentKind()).isEqualTo(ReconciliationMatchContext.PaymentKind.DEBIT);
+  }
+
+  @Test
+  void releaseContextIsNullSafeWhenModalityPaymentBankColumnIsNull() {
+    // modality_payment_bank é NULL-ável no banco (dado legado/importação parcial) — sem
+    // setModalityPaymentBank(...), getModalityPaymentBank() retorna null (ModalityPaymentBankEnum
+    // .fromCode(null) => null). contextOf(ReleasesBankEntity) chamava .getCode() direto sobre
+    // esse null e lançava NPE, derrubando reconcilePending() inteiro (única @Transactional).
+    ReleasesBankEntity release = new ReleasesBankEntity();
+    release.setCompany(entityWithId(new CompanyEntity()));
+    release.setAcquirer(entityWithId(new AcquirerEntity()));
+
+    ReconciliationMatchContext context = service.contextOf(release);
+
+    assertThat(context.paymentKind()).isEqualTo(ReconciliationMatchContext.PaymentKind.UNKNOWN);
   }
 
   private <T extends AuditableEntityBase> T entityWithId(T entity) {

@@ -4,6 +4,7 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
+import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.*;
 import com.cardsync.domain.repository.*;
@@ -26,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -53,6 +55,7 @@ public class ConciliationAnalysisService {
   private final ConciliationFeeAnalysisService feeAnalysisService;
   private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
   private final PlatformTransactionManager transactionManager;
+  private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
 
   private record ErpAcqBatchResult(
     int analyzed, int matched, int updated, int skippedDivergent,
@@ -520,6 +523,16 @@ public class ConciliationAnalysisService {
 
         long tMatch = System.currentTimeMillis() - tMatchStart;
 
+        // Coletado ANTES do flush/clear — depois do clear(), acq.getSalesSummary() (lazy)
+        // lançaria LazyInitializationException numa entidade já desanexada.
+        List<UUID> changedSalesSummaryIds = changedAcquirerSales.stream()
+          .map(TransactionAcqEntity::getSalesSummary)
+          .filter(Objects::nonNull)
+          .map(SalesSummaryEntity::getId)
+          .filter(Objects::nonNull)
+          .distinct()
+          .toList();
+
         long tFlushStart = System.currentTimeMillis();
         if (!changedErpSales.isEmpty()) {
           transactionErpRepository.saveAll(changedErpSales);
@@ -531,9 +544,23 @@ public class ConciliationAnalysisService {
         entityManager.clear();
         long tFlush = System.currentTimeMillis() - tFlushStart;
 
+        // A conciliação ERP x Adquirente (Etapa 1) muda TransactionAcqEntity.statusTransaction,
+        // que alimenta o rollup transactionsStatus do SalesSummary (Etapa 1b). Essa etapa roda
+        // em lote com uma janela de lookback (rvDate >= hoje - N meses) que NÃO é ignorada pelo
+        // flag de reprocessamento — só o filtro de status é. Um resumo cujo rvDate já saiu dessa
+        // janela nunca mais seria reavaliado pelo lote, ficando com transactionsStatus desatualizado
+        // (ex.: "Pendente") para sempre, mesmo com a venda agora corretamente conciliada. Recalcular
+        // pontualmente aqui (sem filtro de data, mesmo caminho já usado pelos fluxos manuais) fecha
+        // essa lacuna sem precisar alargar a janela do lote inteiro (que existe por performance).
+        long tRecalcStart = System.currentTimeMillis();
+        if (!changedSalesSummaryIds.isEmpty()) {
+          salesSummaryTransactionReconciliationService.recalculateForSalesSummaryIds(changedSalesSummaryIds);
+        }
+        long tRecalc = System.currentTimeMillis() - tRecalcStart;
+
         log.info(
-          "⏱️ batch={}/{} erpFetch={}ms acqFetch={}ms match={}ms flush={}ms erp={} acq={}",
-          currentBatch, totalBatches, tErpFetch, tAcqFetch, tMatch, tFlush,
+          "⏱️ batch={}/{} erpFetch={}ms acqFetch={}ms match={}ms flush={}ms recalc={}ms erp={} acq={}",
+          currentBatch, totalBatches, tErpFetch, tAcqFetch, tMatch, tFlush, tRecalc,
           changedErpSales.size(), changedAcquirerSales.size()
         );
 
@@ -1085,9 +1112,62 @@ public class ConciliationAnalysisService {
 
     // Mesmo motivo do guard de status terminal no lado ERP: uma venda ADQ DELETED/CANCELED
     // não deve ser oferecida como candidata de match, mesmo com reconcileAlreadyReconciled=true.
-    return candidates.values().stream()
+    List<TransactionAcqEntity> filteredCandidates = candidates.values().stream()
       .filter(acq -> !isExcludedFromCardReconciliation(acq))
       .filter(acq -> !isFinalAcquirerStatusTransaction(acq))
+      .toList();
+
+    return excludeAcquirerSalesClaimedOutsideBatch(filteredCandidates, erpBatch, reconcileAlreadyReconciled);
+  }
+
+  /**
+   * Com reconcileAlreadyReconciled=true, o filtro "ainda pendente" é neutralizado nas queries
+   * de candidatas (ver findRedeAcqCandidatesForReconciliationByNsus/ByAuthorizations), então uma
+   * venda ADQ já vinculada a ALGUM ERP volta a aparecer como candidata. Sem esta exclusão, um
+   * ERP de um lote POSTERIOR poderia roubar essa mesma venda ADQ de um ERP de um lote ANTERIOR
+   * já commitado (cada lote é uma transação própria, REQUIRES_NEW) — dois ERPs apontando pra
+   * mesma ADQ viola a constraint única uq_cs_transaction_erp_transaction_acq no flush do lote
+   * novo, e essa exceção não tratada derruba a etapa inteira (nenhum lote seguinte é processado).
+   * "Reprocessar" deve reavaliar o PAR já vinculado (mesmo ERP), nunca reatribuir a venda ADQ
+   * pra um ERP diferente que só por coincidência de NSU/autorização parece um candidato melhor.
+   */
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  List<TransactionAcqEntity> excludeAcquirerSalesClaimedOutsideBatch(
+    List<TransactionAcqEntity> candidates, List<TransactionErpEntity> erpBatch, boolean reconcileAlreadyReconciled
+  ) {
+    if (!reconcileAlreadyReconciled || candidates.isEmpty()) {
+      return candidates;
+    }
+    long t0 = System.currentTimeMillis();
+
+    Set<UUID> candidateIds = candidates.stream()
+      .map(TransactionAcqEntity::getId)
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+    Set<UUID> batchErpIds = erpBatch.stream()
+      .map(TransactionErpEntity::getId)
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+
+    Set<UUID> claimedByOtherErp = transactionErpRepository.findByTransactionAcqIdIn(candidateIds).stream()
+      .filter(otherErp -> otherErp.getId() == null || !batchErpIds.contains(otherErp.getId()))
+      .map(otherErp -> otherErp.getTransactionAcq() != null ? otherErp.getTransactionAcq().getId() : null)
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+
+    // Diagnóstico temporário — medir o custo real desta query nova antes de decidir se/como
+    // otimizar (candidateIds pode chegar a milhares de UUIDs por lote com reprocessAlreadyReconciled=true).
+    log.info(
+      "🔎 excludeAcquirerSalesClaimedOutsideBatch: {}ms, candidatos={}, excluídos={}",
+      System.currentTimeMillis() - t0, candidateIds.size(), claimedByOtherErp.size()
+    );
+
+    if (claimedByOtherErp.isEmpty()) {
+      return candidates;
+    }
+
+    return candidates.stream()
+      .filter(acq -> acq.getId() == null || !claimedByOtherErp.contains(acq.getId()))
       .toList();
   }
 
@@ -1147,9 +1227,16 @@ public class ConciliationAnalysisService {
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
-    return candidates.values().stream()
+    // Mesmos dois guards do fluxo padrão (findAcquirerCandidatesForBatch): status terminal
+    // nunca deve ser oferecido como candidato, e uma venda ADQ já vinculada a um ERP de OUTRO
+    // lote não pode ser roubada por um ERP deste lote (mesmo risco de violar
+    // uq_cs_transaction_erp_transaction_acq, só que pelo caminho NSU/autorização invertidos).
+    List<TransactionAcqEntity> swappedCandidates = candidates.values().stream()
       .filter(acq -> !isExcludedFromCardReconciliation(acq))
+      .filter(acq -> !isFinalAcquirerStatusTransaction(acq))
       .toList();
+
+    return excludeAcquirerSalesClaimedOutsideBatch(swappedCandidates, erpBatch, reconcileAlreadyReconciled);
   }
 
   Map<ErpAcquirerIdentityKey, List<TransactionAcqEntity>> indexAcquirerCandidates(List<TransactionAcqEntity> acquirerCandidates) {

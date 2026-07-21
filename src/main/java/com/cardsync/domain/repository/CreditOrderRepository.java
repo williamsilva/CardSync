@@ -29,6 +29,18 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
    */
   List<CreditOrderEntity> findBySalesSummary_Id(UUID salesSummaryId);
 
+  /**
+   * Mesmo motivo do método acima (evitar coleção lazy numa entidade possivelmente desanexada),
+   * mas em lote: busca as ordens de TODOS os resumos afetados numa única query, em vez de uma
+   * query por resumo — usada no recomputo em lote ao final de um lote de conciliação bancária.
+   */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.salesSummary
+    where co.salesSummary.id in :salesSummaryIds
+  """)
+  List<CreditOrderEntity> findBySalesSummary_IdIn(@Param("salesSummaryIds") Collection<UUID> salesSummaryIds);
+
   @Query("""
     SELECT co FROM CreditOrderEntity co
     LEFT JOIN FETCH co.salesSummary

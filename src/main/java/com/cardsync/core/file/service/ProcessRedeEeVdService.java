@@ -364,7 +364,8 @@ public class ProcessRedeEeVdService {
     return tx;
   }
 
-  private AdjustmentEntity buildAdjustment17(List<String> c, int lineNumber, ProcessedFileEntity processedFile, List<SalesSummaryEntity> summaries) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  AdjustmentEntity buildAdjustment17(List<String> c, int lineNumber, ProcessedFileEntity processedFile, List<SalesSummaryEntity> summaries) {
     Integer rvOriginal = toInteger(col(c, 3));
     Integer pvOriginal = toInteger(col(c, 4));
     AcquirerEntity acquirer = safeAcquirer();
@@ -378,7 +379,16 @@ public class ProcessRedeEeVdService {
     adjustment.setPvNumberOriginal(pvOriginal);
     adjustment.setPvNumber(pvOriginal);
     adjustment.setRvDateOriginal(parseDate(col(c, 5)));
-    adjustment.setTransactionValue(money(col(c, 6)));
+    BigDecimal cancellationValue = money(col(c, 6));
+    adjustment.setTransactionValue(cancellationValue);
+    // Registro 17 (EEVD e-commerce) representa o cancelamento integral da venda — não existe
+    // coluna própria de "valor cancelado" neste layout, só o valor da transação, que É o valor
+    // cancelado aqui. Sem preencher cancellationValueRequested, a query de elegibilidade de
+    // AdjustmentRepository.findIdsForAcquirerSaleCancellationReconciliation (que exige
+    // cancellationValueRequested > 0) descartava esses ajustes antes mesmo de chegarem em
+    // AcquirerSaleCancellationService.isFullCancellation — cancelamentos de vendas e-commerce
+    // nunca eram avaliados, e a venda ADQ correspondente ficava pendente para sempre.
+    adjustment.setCancellationValueRequested(cancellationValue);
     adjustment.setNsu(toLong(col(c, 7)));
     adjustment.setAuthorization(col(c, 8));
     adjustment.setTid(col(c, 9));

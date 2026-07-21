@@ -43,10 +43,10 @@ public class CreditOrderManualService {
   private static final int RECONCILIATION_STATUS_PENDING = 1;
 
   private final SaleSummarySpecs saleSummarySpecs;
-  private final ImplantationDateProvider implantationDateProvider;
   private final CreditOrderRepository creditOrderRepository;
   private final SalesSummaryRepository salesSummaryRepository;
   private final TransactionAcqRepository transactionAcqRepository;
+  private final ImplantationDateProvider implantationDateProvider;
   private final SaleSummaryModelAssembler saleSummaryModelAssembler;
   private final ReconciliationSettingsService reconciliationSettingsService;
 
@@ -106,15 +106,14 @@ public class CreditOrderManualService {
         int installmentTotal = transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId);
         Set<Integer> existing = creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId);
 
-        int installmentNumber = -1;
+        List<Integer> missingInstallments = new ArrayList<>();
         for (int i = 1; i <= installmentTotal; i++) {
           if (!existing.contains(i)) {
-            installmentNumber = i;
-            break;
+            missingInstallments.add(i);
           }
         }
 
-        if (installmentNumber == -1) {
+        if (missingInstallments.isEmpty()) {
           skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "ALL_INSTALLMENTS_COVERED", installmentTotal));
           continue;
         }
@@ -122,21 +121,31 @@ public class CreditOrderManualService {
         LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
           ? summary.getFirstInstallmentCreditDate()
           : summary.getRvDate();
-        LocalDate nextReleaseDate = baseDate != null ? baseDate.plusMonths(installmentNumber - 1) : null;
-        if (nextReleaseDate != null && nextReleaseDate.isAfter(LocalDate.now().minusDays(1))) {
-          skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "FUTURE_RELEASE_DATE", installmentNumber));
-          log.info("⏭️ Parcela {}/{} ignorada — vencimento futuro: {}", installmentNumber, installmentTotal, nextReleaseDate);
-          continue;
+
+        // Fecha TODAS as lacunas do resumo nesta chamada, não só a primeira parcela faltante —
+        // antes, um resumo com múltiplas parcelas ausentes exigia uma chamada manual por parcela.
+        int createdForThisSummary = 0;
+        for (int installmentNumber : missingInstallments) {
+          LocalDate nextReleaseDate = baseDate != null ? baseDate.plusMonths(installmentNumber - 1) : null;
+          if (nextReleaseDate != null && nextReleaseDate.isAfter(LocalDate.now().minusDays(1))) {
+            skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "FUTURE_RELEASE_DATE", installmentNumber));
+            log.info("⏭️ Parcela {}/{} ignorada — vencimento futuro: {}", installmentNumber, installmentTotal, nextReleaseDate);
+            // Datas crescem com o número da parcela — as seguintes também seriam futuras.
+            break;
+          }
+
+          CreditOrderEntity co = buildCreditOrder(summary, installmentNumber, installmentTotal);
+          co = creditOrderRepository.save(co);
+          createdIds.add(co.getId());
+          createdForThisSummary++;
+
+          log.info("✅ Ordem de crédito manual criada: id={}, summaryId={}, parcela={}/{}, releaseDate={}, releaseValue={}",
+            co.getId(), summaryId, installmentNumber, installmentTotal, co.getReleaseDate(), co.getReleaseValue());
         }
 
-        CreditOrderEntity co = buildCreditOrder(summary, installmentNumber, installmentTotal);
-        co = creditOrderRepository.save(co);
-        createdIds.add(co.getId());
-
-        log.info("✅ Ordem de crédito manual criada: id={}, summaryId={}, parcela={}/{}, releaseDate={}, releaseValue={}",
-          co.getId(), summaryId, installmentNumber, installmentTotal, co.getReleaseDate(), co.getReleaseValue());
-
-        updateSummaryCreditOrderStatus(summary, existing.size() + 1, installmentTotal);
+        if (createdForThisSummary > 0) {
+          updateSummaryCreditOrderStatus(summary, existing.size() + createdForThisSummary, installmentTotal);
+        }
 
       } catch (IllegalStateException e) {
         skippedReasons.add(new CreditOrderSkipReason(String.valueOf(summary.getRvNumber()), "UNEXPECTED_ERROR", 0));

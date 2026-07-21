@@ -45,6 +45,20 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
   @Query("select coalesce(max(t.installment), 1) from TransactionAcqEntity t where t.salesSummary.id = :summaryId")
   int findMaxInstallmentBySalesSummaryId(@Param("summaryId") UUID summaryId);
 
+  List<TransactionAcqEntity> findBySalesSummary_Id(UUID salesSummaryId);
+
+  /**
+   * Mesmo motivo do método acima, mas em lote: busca as transações de TODOS os resumos
+   * afetados numa única query, em vez de uma query por resumo — usada no recomputo em lote ao
+   * final de um lote de conciliação bancária (ver BankReconciliationService).
+   */
+  @Query("""
+    select t from TransactionAcqEntity t
+    left join fetch t.salesSummary
+    where t.salesSummary.id in :salesSummaryIds
+  """)
+  List<TransactionAcqEntity> findBySalesSummary_IdIn(@Param("salesSummaryIds") Collection<UUID> salesSummaryIds);
+
   Optional<TransactionAcqEntity> findFirstBySalesSummary_IdAndNsuAndAuthorizationOrderBySaleDateDesc(
     UUID salesSummaryId,
     Long nsu,

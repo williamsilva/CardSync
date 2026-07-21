@@ -27,7 +27,18 @@ public class AcquirerSaleSummaryReconciliationService {
 
   private static final List<Integer> ELIGIBLE_SALE_STATUSES = List.of(
     StatusTransactionEnum.AUTOMATICALLY_RECONCILED.getCode(),
-    StatusTransactionEnum.MANUALLY_RECONCILED.getCode(),
+    StatusTransactionEnum.MANUALLY_RECONCILED.getCode()
+  );
+
+  /**
+   * Ignoradas na análise — mesmo critério de {@code SalesSummaryTransactionReconciliationService
+   * .EXCLUDED_STATUSES} (Etapa 1b). Antes, CANCELED/DELETED entravam em ELIGIBLE_SALE_STATUSES
+   * (contavam pra "eligible" sem sair do total), então um resumo só com canceladas+pendentes —
+   * NENHUMA de fato conciliada — virava PARTIALLY_RECONCILED e sobrescrevia de volta a
+   * classificação correta (PENDING) que a Etapa 1b já tinha calculado, liberando indevidamente
+   * a Etapa 6 (Resumo x Ordem de Pagamento) a gerar/vincular ordem de crédito.
+   */
+  private static final List<Integer> EXCLUDED_SALE_STATUSES = List.of(
     StatusTransactionEnum.CANCELED.getCode(),
     StatusTransactionEnum.DELETED.getCode()
   );
@@ -85,12 +96,14 @@ public class AcquirerSaleSummaryReconciliationService {
     if (ignoreLookback) {
       stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliationIgnoringLookback(
         ELIGIBLE_SALE_STATUSES,
+        EXCLUDED_SALE_STATUSES,
         implantationDate
       );
     } else {
       LocalDate lookbackDate = LocalDate.now().minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths());
       stats = salesSummaryRepository.findStatsForAcquirerSaleSummaryReconciliation(
         ELIGIBLE_SALE_STATUSES,
+        EXCLUDED_SALE_STATUSES,
         implantationDate,
         lookbackDate
       );
@@ -114,7 +127,7 @@ public class AcquirerSaleSummaryReconciliationService {
       counter.transactionsAnalyzed += row.totalTransactionsAsInt();
       counter.transactionsEligible += row.eligibleTransactionsAsInt();
 
-      if (row.isFullyEligible()) {
+      if (row.isAllExcluded() || row.isFullyEligible()) {
         reconciledIds.add(row.getSalesSummaryId());
         counter.summariesReconciled++;
         continue;

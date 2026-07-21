@@ -12,6 +12,7 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
@@ -19,6 +20,7 @@ import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
+import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
 
 import java.util.Map;
@@ -36,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -65,6 +68,7 @@ public class BankReconciliationService {
   private final ReleasesBankRepository releasesBankRepository;
   private final InstallmentAcqRepository installmentAcqRepository;
   private final TransactionErpRepository transactionErpRepository;
+  private final TransactionAcqRepository transactionAcqRepository;
   private final ReconciliationSettingsService reconciliationSettingsService;
 
   @Transactional
@@ -274,7 +278,8 @@ public class BankReconciliationService {
     );
   }
 
-  private void reconcileEligibleCreditOrders(
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void reconcileEligibleCreditOrders(
     List<CreditOrderEntity> eligibleOrders,
     List<ReleasesBankEntity> candidateReleases,
     Set<UUID> reconciledOrderIds,
@@ -337,6 +342,16 @@ public class BankReconciliationService {
     int matchesSinceFlush = 0;
     int matchFlushInterval = 5;
 
+    // Acumulados no laço inteiro (não recomputados a cada match) e só aplicados uma vez no
+    // final — ver comentário de recomputeReleasesAfterOrderReassignment: cada recomputo dispara
+    // queries (findByReleaseBank_Id/findAllById/findBySalesSummary_Id) que forçam auto-flush do
+    // Hibernate, reintroduzindo o mesmo custo O(n) por flush que o matchFlushInterval acima
+    // existe pra evitar. affectedSalesSummaryIds cobre TODO match (não só realocação) — antes
+    // rodava pra CADA ordem casada, ou seja, com muito mais frequência que a realocação.
+    Map<UUID, Integer> reassignedCountByPreviousReleaseId = new LinkedHashMap<>();
+    Set<UUID> affectedSalesSummaryIds = new HashSet<>();
+    Set<UUID> affectedSalesSummaryIdsFromTransactions = new HashSet<>();
+
     for (ReleasesBankEntity release : validReleases) {
       if (release.getId() != null && reconciledReleaseIds.contains(release.getId())) continue;
 
@@ -344,48 +359,30 @@ public class BankReconciliationService {
         result.releaseAnalyzed();
       }
 
-      ReconciliationMatchContext releaseContext = contextOf(release);
-      UUID releaseBank = idOrNull(release.getBank());
-
-      // Janela válida: order.releaseDate entre (release.releaseDate - toleranceDaysAfter) e
-      // (release.releaseDate + toleranceDaysBefore) — ver isCreditOrderCandidateCompatible.
-      LocalDate windowFrom = release.getReleaseDate().minusDays(toleranceDaysAfter);
-      LocalDate windowTo = release.getReleaseDate().plusDays(toleranceDaysBefore);
-      List<CreditOrderEntity> ordersInWindow = ordersByDate.subMap(windowFrom, true, windowTo, true)
-        .values().stream()
-        .flatMap(List::stream)
-        .toList();
-
-      List<CreditOrderEntity> compatible = ordersInWindow.stream()
-        .filter(order -> isOrderStillEligible(order, reconciledOrderIds, reprocess))
-        .filter(order -> isCreditOrderCandidateCompatible(
-          release, releaseContext, releaseBank,
-          order, orderMatchDataById.get(order.getId()),
-          toleranceDaysBefore, toleranceDaysAfter, strictness
-        ))
-        .toList();
-
-      if (compatible.isEmpty()) continue;
-
-      BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
-        compatible,
-        CreditOrderEntity::getReleaseValue,
-        release.getReleaseValue(),
-        tolerance,
-        config.getSafeCapCents(),
-        config.getSubsetDpMaxCents()
-      );
-
-      if (selected.skippedBySafetyCap()) {
-        result.candidateGroupSkippedBySafetyCap();
+      // reconcilePending() é uma única @Transactional cobrindo toda a execução (todos os
+      // lotes/empresas) — sem isolar este try/catch, uma exceção inesperada num único
+      // lançamento (ex.: dado incompleto/legado) derrubaria a transação inteira, desfazendo
+      // até os matches legítimos já processados antes dele no mesmo run. O entityManager.clear()
+      // no catch descarta com segurança qualquer alteração ainda não persistida deste
+      // lançamento (nada foi commitado, só o flush periódico grava de fato).
+      try {
+        if (!processReleaseForCreditOrderMatch(
+          release, ordersByDate, reconciledOrderIds, orderMatchDataById,
+          toleranceDaysBefore, toleranceDaysAfter, tolerance, config, strictness, reprocess, result,
+          reassignedCountByPreviousReleaseId, affectedSalesSummaryIds, affectedSalesSummaryIdsFromTransactions
+        )) {
+          continue;
+        }
+        if (release.getId() != null) reconciledReleaseIds.add(release.getId());
+      } catch (RuntimeException ex) {
+        log.error(
+          "❌ Lançamento bancário ignorado por erro inesperado ao tentar conciliar — dado provavelmente incompleto/legado. releaseBank={}",
+          release.getId(), ex
+        );
+        entityManager.clear();
+        matchesSinceFlush = 0;
+        continue;
       }
-      if (!selected.matched()) continue;
-
-      List<CreditOrderEntity> orders = selected.typedItems();
-      trackStrictModeImpact(releaseContext, orders, orderMatchDataById, result);
-      applyCreditOrderMatch(release, orders, selected, result, reprocess);
-      orders.stream().map(CreditOrderEntity::getId).filter(Objects::nonNull).forEach(reconciledOrderIds::add);
-      if (release.getId() != null) reconciledReleaseIds.add(release.getId());
 
       matchesSinceFlush++;
       if (matchesSinceFlush >= matchFlushInterval) {
@@ -394,6 +391,92 @@ public class BankReconciliationService {
         matchesSinceFlush = 0;
       }
     }
+
+    if (!reassignedCountByPreviousReleaseId.isEmpty() || !affectedSalesSummaryIds.isEmpty()
+      || !affectedSalesSummaryIdsFromTransactions.isEmpty()) {
+      entityManager.flush();
+      if (!reassignedCountByPreviousReleaseId.isEmpty()) {
+        recomputeReleasesAfterOrderReassignment(reassignedCountByPreviousReleaseId);
+      }
+      if (!affectedSalesSummaryIds.isEmpty()) {
+        recomputeSalesSummariesFromCreditOrderIds(affectedSalesSummaryIds);
+      }
+      if (!affectedSalesSummaryIdsFromTransactions.isEmpty()) {
+        recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIdsFromTransactions);
+      }
+    }
+  }
+
+  /**
+   * Avalia um único lançamento contra as ordens de crédito candidatas e, se compatível, aplica
+   * o match. Extraído do laço principal para poder ser isolado num try/catch por lançamento
+   * (ver comentário em {@link #reconcileEligibleCreditOrders}) — uma exceção aqui não deve
+   * derrubar os demais lançamentos da mesma execução.
+   *
+   * @return true se um match foi aplicado nesta chamada, false se não houver candidato
+   *         compatível ou nenhum subconjunto bater o valor.
+   */
+  private boolean processReleaseForCreditOrderMatch(
+    ReleasesBankEntity release,
+    java.util.TreeMap<LocalDate, List<CreditOrderEntity>> ordersByDate,
+    Set<UUID> reconciledOrderIds,
+    Map<UUID, OrderMatchData> orderMatchDataById,
+    int toleranceDaysBefore,
+    int toleranceDaysAfter,
+    BigDecimal tolerance,
+    FileProcessingProperties.Reconciliation config,
+    ReconciliationMatchContext.MatchStrictness strictness,
+    boolean reprocess,
+    BankReconciliationResult.Counter result,
+    Map<UUID, Integer> reassignedCountByPreviousReleaseId,
+    Set<UUID> affectedSalesSummaryIds,
+    Set<UUID> affectedSalesSummaryIdsFromTransactions
+  ) {
+    ReconciliationMatchContext releaseContext = contextOf(release);
+    UUID releaseBank = idOrNull(release.getBank());
+
+    // Janela válida: order.releaseDate entre (release.releaseDate - toleranceDaysAfter) e
+    // (release.releaseDate + toleranceDaysBefore) — ver isCreditOrderCandidateCompatible.
+    LocalDate windowFrom = release.getReleaseDate().minusDays(toleranceDaysAfter);
+    LocalDate windowTo = release.getReleaseDate().plusDays(toleranceDaysBefore);
+    List<CreditOrderEntity> ordersInWindow = ordersByDate.subMap(windowFrom, true, windowTo, true)
+      .values().stream()
+      .flatMap(List::stream)
+      .toList();
+
+    List<CreditOrderEntity> compatible = ordersInWindow.stream()
+      .filter(order -> isOrderStillEligible(order, reconciledOrderIds, reprocess))
+      .filter(order -> isCreditOrderCandidateCompatible(
+        release, releaseContext, releaseBank,
+        order, orderMatchDataById.get(order.getId()),
+        toleranceDaysBefore, toleranceDaysAfter, strictness
+      ))
+      .toList();
+
+    if (compatible.isEmpty()) return false;
+
+    BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
+      compatible,
+      CreditOrderEntity::getReleaseValue,
+      release.getReleaseValue(),
+      tolerance,
+      config.getSafeCapCents(),
+      config.getSubsetDpMaxCents()
+    );
+
+    if (selected.skippedBySafetyCap()) {
+      result.candidateGroupSkippedBySafetyCap();
+    }
+    if (!selected.matched()) return false;
+
+    List<CreditOrderEntity> orders = selected.typedItems();
+    trackStrictModeImpact(releaseContext, orders, orderMatchDataById, result);
+    applyCreditOrderMatch(
+      release, orders, selected, result, reprocess,
+      reassignedCountByPreviousReleaseId, affectedSalesSummaryIds, affectedSalesSummaryIdsFromTransactions
+    );
+    orders.stream().map(CreditOrderEntity::getId).filter(Objects::nonNull).forEach(reconciledOrderIds::add);
+    return true;
   }
 
   /**
@@ -426,21 +509,45 @@ public class BankReconciliationService {
     }
   }
 
-  private void applyCreditOrderMatch(
+  /**
+   * Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto
+   * Spring. {@code reassignedCountByPreviousReleaseId} é acumulado pelo chamador ao longo do
+   * laço inteiro de {@link #reconcileEligibleCreditOrders} e recomputado numa única passada no
+   * final — ver comentário lá sobre por que não recomputar aqui, por match.
+   */
+  void applyCreditOrderMatch(
     ReleasesBankEntity release,
     List<CreditOrderEntity> orders,
     BankReconciliationMatcher.MatchResult selected,
     BankReconciliationResult.Counter result,
-    boolean reprocess
+    boolean reprocess,
+    Map<UUID, Integer> reassignedCountByPreviousReleaseId,
+    Set<UUID> affectedSalesSummaryIds,
+    Set<UUID> affectedSalesSummaryIdsFromTransactions
   ) {
     BankReconciliationMatchType matchType = BankReconciliationMatchType.creditOrderByCount(orders.size());
 
+    // Com reprocess=true, uma ordem já vinculada a OUTRO lançamento pode ser realocada para
+    // este aqui (ver isOrderStillEligible). Sem isto, o lançamento antigo nunca é revisitado —
+    // fica com numberCreditOrders/reconciliationStatus presos ao valor anterior, podendo até
+    // continuar "PAID" sem nenhuma ordem real vinculada (ver recomputeReleasesAfterOrderReassignment).
     for (CreditOrderEntity order : orders) {
+      ReleasesBankEntity previousRelease = order.getReleaseBank();
+      if (previousRelease != null && previousRelease.getId() != null
+        && !previousRelease.getId().equals(release.getId())) {
+        reassignedCountByPreviousReleaseId.merge(previousRelease.getId(), 1, Integer::sum);
+      }
       order.setReleaseBank(release);
       order.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
       order.setReconciliationStatus(STATUS_LIQUIDATED);
       order.setCreditStatus(STATUS_LIQUIDATED);
-      updateSalesSummaryFromCreditOrder(order);
+      // Coleta o id em vez de chamar updateSalesSummaryFromCreditOrder aqui — essa chamada
+      // fazia uma query por ORDEM (não só por realocação, ao contrário do bloco acima), rodando
+      // centenas de vezes por lote e sendo o principal responsável pela lentidão observada em
+      // produção (auto-flush do Hibernate disparado a cada query). Recompute em lote no final.
+      if (order.getSalesSummary() != null && order.getSalesSummary().getId() != null) {
+        affectedSalesSummaryIds.add(order.getSalesSummary().getId());
+      }
     }
     propagateCreditOrdersToInstallments(orders, release, reprocess);
 
@@ -453,12 +560,42 @@ public class BankReconciliationService {
 
     result.matchedByCreditOrders(orders.size(), selected.matchedValue());
     result.releaseReconciled(release.getReleaseValue());
-    result.transactionsUpdated(propagateReleaseStatusTransactions(release));
+    result.transactionsUpdated(propagateReleaseStatusTransactions(release, affectedSalesSummaryIdsFromTransactions));
 
     log.debug(
       "✅ Ordem(ns) de pagamento conciliada(s) com lançamento bancário. ordemInicial={}, releaseBank={}, tipoMatch={}, ordens={}, valorRelease={}, valorOrdens={}",
       orders.getFirst().getId(), release.getId(), matchType, orders.size(), release.getReleaseValue(), selected.matchedValue()
     );
+  }
+
+  /**
+   * Recalcula, a partir da contagem real restante (não por incremento/decremento em memória),
+   * os lançamentos que perderam ordem(ns) para outro lançamento num reprocessamento. Se um
+   * lançamento fica sem nenhuma ordem de crédito e sem nenhuma parcela vinculada, volta a
+   * PENDING — do contrário continuaria "conciliado" sem nada de verdade por trás. Mesma lógica
+   * de {@link #recomputeSalesSummariesFromCreditOrders}, aplicada ao lado do lançamento bancário.
+   */
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void recomputeReleasesAfterOrderReassignment(Map<UUID, Integer> reassignedCountByPreviousReleaseId) {
+    for (ReleasesBankEntity previousRelease : releasesBankRepository.findAllById(reassignedCountByPreviousReleaseId.keySet())) {
+      int reassignedCount = reassignedCountByPreviousReleaseId.getOrDefault(previousRelease.getId(), 0);
+      List<CreditOrderEntity> remainingOrders = creditOrderRepository.findByReleaseBank_Id(previousRelease.getId());
+      boolean stillHasInstallments = !installmentAcqRepository.findByReleaseBank_Id(previousRelease.getId()).isEmpty();
+
+      previousRelease.setNumberCreditOrders(remainingOrders.size());
+      previousRelease.setNumberReconciliations(
+        Math.max(0, safeInt(previousRelease.getNumberReconciliations()) - reassignedCount));
+      if (remainingOrders.isEmpty() && !stillHasInstallments) {
+        previousRelease.setReconciliationStatus(StatusPaymentBankEnum.PENDING);
+      }
+      releasesBankRepository.save(previousRelease);
+
+      log.info(
+        "⚠ Lançamento perdeu {} ordem(ns) para outro lançamento em reprocessamento — contador recalculado. " +
+          "releaseBank={}, ordensRestantes={}, statusFinal={}",
+        reassignedCount, previousRelease.getId(), remainingOrders.size(), previousRelease.getReconciliationStatus()
+      );
+    }
   }
 
   private void reconcilePendingReleasesByInstallments(
@@ -471,6 +608,10 @@ public class BankReconciliationService {
       STATUS_PENDING,
       reconciliationSettingsService.isReprocessBankAcquirer()
     );
+
+    // Acumulado pelo laço inteiro e recomputado uma única vez no final — mesmo motivo de
+    // reconcileEligibleCreditOrders/applyCreditOrderMatch.
+    Set<UUID> affectedSalesSummaryIdsFromTransactions = new HashSet<>();
 
     for (ReleasesBankEntity release : releases) {
       if (release.getId() != null && analyzedReleaseIds.add(release.getId())) {
@@ -485,10 +626,15 @@ public class BankReconciliationService {
       BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallmentsWithStats(release, config, strictness, result);
       if (installmentResult.matched()) {
         result.releaseReconciled(release.getReleaseValue());
-        result.transactionsUpdated(propagateReleaseStatusTransactions(release));
+        result.transactionsUpdated(propagateReleaseStatusTransactions(release, affectedSalesSummaryIdsFromTransactions));
       } else {
         markReleaseNotReconciledWhenExpired(release, config, "nenhuma parcela compatível encontrada", result);
       }
+    }
+
+    if (!affectedSalesSummaryIdsFromTransactions.isEmpty()) {
+      entityManager.flush();
+      recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIdsFromTransactions);
     }
   }
 
@@ -588,13 +734,15 @@ public class BankReconciliationService {
       .collect(Collectors.toMap(e -> e.getTransactionAcq().getId(), e -> e, (a, b) -> a));
 
     Set<UUID> updatedTransactions = new HashSet<>();
+    Set<UUID> affectedSalesSummaryIdsFromTransactions = new HashSet<>();
     for (InstallmentAcqEntity installment : resetInstallments) {
       TransactionAcqEntity transaction = installment.getTransaction();
       if (transaction == null || transaction.getId() == null || updatedTransactions.contains(transaction.getId())) continue;
       List<InstallmentAcqEntity> txInstallments = installmentsByTx.getOrDefault(transaction.getId(), List.of());
-      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()));
+      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()), affectedSalesSummaryIdsFromTransactions);
       updatedTransactions.add(transaction.getId());
     }
+    recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIdsFromTransactions);
   }
 
   /**
@@ -641,7 +789,7 @@ public class BankReconciliationService {
    * separar, entre lotes diferentes, ordens de crédito que pertencem ao mesmo lançamento
    * bancário — fazendo a conciliação nunca encontrar a combinação correta em nenhum dos dois
    * lotes.
-   *
+
    * Corrige isso sem simplesmente tratar cada empresa como um bloco indivisível (o que faria
    * uma empresa com muito volume virar um único lote gigante, sem os flush/clear intermediários
    * do EntityManager entre lotes): dentro de cada empresa, só corta um novo lote quando a
@@ -837,7 +985,7 @@ public class BankReconciliationService {
     }
   }
 
-  private int propagateReleaseStatusTransactions(ReleasesBankEntity release) {
+  private int propagateReleaseStatusTransactions(ReleasesBankEntity release, Set<UUID> affectedSalesSummaryIdsFromTransactions) {
     if (release.getId() == null) return 0;
     List<InstallmentAcqEntity> linkedInstallments = installmentAcqRepository.findByReleaseBank_Id(release.getId());
     if (linkedInstallments.isEmpty()) return 0;
@@ -864,16 +1012,18 @@ public class BankReconciliationService {
       TransactionAcqEntity transaction = linked.getTransaction();
       if (transaction == null || transaction.getId() == null || updatedTransactions.contains(transaction.getId())) continue;
       List<InstallmentAcqEntity> txInstallments = installmentsByTx.getOrDefault(transaction.getId(), List.of());
-      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()));
+      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()), affectedSalesSummaryIdsFromTransactions);
       updatedTransactions.add(transaction.getId());
     }
     return updatedTransactions.size();
   }
 
-  private void updateStatusTransactionBatched(
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void updateStatusTransactionBatched(
     TransactionAcqEntity transaction,
     List<InstallmentAcqEntity> installments,
-    TransactionErpEntity erpTx
+    TransactionErpEntity erpTx,
+    Set<UUID> affectedSalesSummaryIdsFromTransactions
   ) {
     if (transaction == null || installments.isEmpty()) return;
 
@@ -890,7 +1040,13 @@ public class BankReconciliationService {
       transaction.setStatusTransaction(StatusTransactionEnum.PENDING);
     }
 
-    updateSalesSummaryFromTransaction(transaction);
+    // Coleta o id em vez de recomputar o resumo aqui — ver recomputeSalesSummariesFromTransactionIds
+    // (mesmo motivo do recompute em lote de ordens de crédito: uma query por TRANSAÇÃO, rodando
+    // centenas/milhares de vezes por lote, era o principal custo de performance em produção).
+    SalesSummaryEntity summary = transaction.getSalesSummary();
+    if (summary != null && summary.getId() != null) {
+      affectedSalesSummaryIdsFromTransactions.add(summary.getId());
+    }
 
     if (erpTx != null) {
       if (allLiquidated) {
@@ -901,10 +1057,44 @@ public class BankReconciliationService {
     }
   }
 
-  private void updateSalesSummaryFromTransaction(TransactionAcqEntity transaction) {
-    SalesSummaryEntity summary = transaction.getSalesSummary();
-    if (summary == null) return;
-    summary.setStatusPaymentBank(transaction.getStatusPaymentBank());
+  /**
+   * Recalcula statusPaymentBank do resumo a partir de TODAS as transações ADQ ligadas a ele —
+   * antes, este método copiava direto o status de UMA única transação (a última processada no
+   * lote) para o resumo inteiro, sem olhar as demais. Num resumo parcelado (várias
+   * TransactionAcqEntity, uma por parcela) isso deixava o status do resumo dependente da ordem
+   * de processamento, e uma transação com liquidação parcial (DIVERGENT — algumas parcelas já
+   * bateram no banco, outras ainda não, o normal enquanto um parcelamento ainda está sendo pago)
+   * virava "Divergente" no resumo inteiro mesmo quando as demais transações já estavam PAID.
+   * Mesmo padrão de {@link #updateSalesSummaryFromCreditOrder}/{@link #recomputeSalesSummariesFromCreditOrderIds},
+   * mas com uma única query para todos os resumos afetados em vez de uma por resumo.
+   */
+  void recomputeSalesSummariesFromTransactionIds(Set<UUID> salesSummaryIds) {
+    if (salesSummaryIds.isEmpty()) return;
+
+    Map<UUID, List<TransactionAcqEntity>> transactionsBySummaryId = transactionAcqRepository
+      .findBySalesSummary_IdIn(salesSummaryIds).stream()
+      .filter(tx -> tx.getSalesSummary() != null && tx.getSalesSummary().getId() != null)
+      .collect(Collectors.groupingBy(tx -> tx.getSalesSummary().getId()));
+
+    for (var entry : transactionsBySummaryId.entrySet()) {
+      List<TransactionAcqEntity> siblings = entry.getValue();
+      SalesSummaryEntity summary = siblings.getFirst().getSalesSummary();
+
+      boolean allPaid = !siblings.isEmpty() && siblings.stream()
+        .allMatch(tx -> StatusPaymentBankEnum.PAID.equals(tx.getStatusPaymentBank()));
+      // DIVERGENT conta como "algum pagamento" — é uma transação com liquidação parcial, não um erro.
+      boolean anyPaid = siblings.stream()
+        .anyMatch(tx -> StatusPaymentBankEnum.PAID.equals(tx.getStatusPaymentBank())
+          || StatusPaymentBankEnum.DIVERGENT.equals(tx.getStatusPaymentBank()));
+
+      if (allPaid) {
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+      } else if (anyPaid) {
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
+      } else {
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+      }
+    }
   }
 
   /**
@@ -931,6 +1121,41 @@ public class BankReconciliationService {
     } else if (anyPaid) {
       summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
       summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
+    }
+  }
+
+  /**
+   * Mesma lógica de {@link #updateSalesSummaryFromCreditOrder}, mas para vários resumos de uma
+   * vez: uma única query ({@code findBySalesSummary_IdIn}) busca as ordens de TODOS os resumos
+   * afetados, em vez de uma query por resumo. Usada no laço de conciliação bancária (ver
+   * {@link #reconcileEligibleCreditOrders}), onde recomputar por ordem individual — centenas de
+   * vezes por lote — se mostrou o principal custo de performance em produção.
+   */
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void recomputeSalesSummariesFromCreditOrderIds(Set<UUID> salesSummaryIds) {
+    if (salesSummaryIds.isEmpty()) return;
+
+    Map<UUID, List<CreditOrderEntity>> ordersBySummaryId = creditOrderRepository
+      .findBySalesSummary_IdIn(salesSummaryIds).stream()
+      .filter(co -> co.getSalesSummary() != null && co.getSalesSummary().getId() != null)
+      .collect(Collectors.groupingBy(co -> co.getSalesSummary().getId()));
+
+    for (var entry : ordersBySummaryId.entrySet()) {
+      List<CreditOrderEntity> siblings = entry.getValue();
+      SalesSummaryEntity summary = siblings.getFirst().getSalesSummary();
+
+      boolean allPaid = siblings.stream()
+        .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+      boolean anyPaid = siblings.stream()
+        .anyMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+
+      if (allPaid) {
+        summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+      } else if (anyPaid) {
+        summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
+        summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
+      }
     }
   }
 
@@ -977,14 +1202,20 @@ public class BankReconciliationService {
   /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
   ReconciliationMatchContext contextOf(ReleasesBankEntity release) {
     EstablishmentEntity establishment = release.getEstablishment();
+    // modality_payment_bank é NULL-ável no banco (dado legado/importação parcial) —
+    // ModalityPaymentBankEnum.fromCode(null) retorna null, e getModalityPaymentBank() propaga
+    // esse null. Sem esta guarda, .getCode() lançava NPE que derrubava a execução inteira
+    // (reconcilePending é uma única @Transactional, sem isolamento por lote/release).
+    ModalityPaymentBankEnum modalityPaymentBank = release.getModalityPaymentBank();
     return new ReconciliationMatchContext(
       idOrNull(release.getCompany()),
       idOrNull(release.getAcquirer()),
       idOrNull(establishment),
       establishment != null ? establishment.getPvNumber() : null,
       idOrNull(release.getFlag()),
-      paymentKindFromBank(release.getModalityPaymentBank().getCode(), release.getDescriptionHistoricalBank(),
-        release.getComplementRelease(), release.getDocumentComplementNumber())
+      paymentKindFromBank(
+        modalityPaymentBank != null ? modalityPaymentBank.getCode() : null,
+        release.getDescriptionHistoricalBank(), release.getComplementRelease(), release.getDocumentComplementNumber())
     );
   }
 
@@ -1080,7 +1311,8 @@ public class BankReconciliationService {
       && release.getBank().getId() != null;
   }
 
-  private void markReleaseNotReconciledWhenExpired(
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void markReleaseNotReconciledWhenExpired(
     ReleasesBankEntity release,
     FileProcessingProperties.Reconciliation config,
     String reason,
@@ -1095,8 +1327,19 @@ public class BankReconciliationService {
       return;
     }
 
-    if (release.getReconciliationStatus() == null || Objects.equals(release.getReconciliationStatus(), STATUS_PENDING)) {
-      release.setReconciliationStatus(StatusPaymentBankEnum.PAID);
+    // getReconciliationStatus() retorna o enum convertido (StatusPaymentBankEnum), não o int
+    // bruto — comparar com STATUS_PENDING (int) via Objects.equals nunca era verdadeiro (tipos
+    // incompatíveis), então este bloco praticamente nunca executava para o caso comum (release
+    // realmente PENDING). Corrigido comparando contra o enum StatusPaymentBankEnum.PENDING.
+    if (release.getReconciliationStatus() == null
+      || Objects.equals(release.getReconciliationStatus(), StatusPaymentBankEnum.PENDING)) {
+      // NOT_PAID (BankReconciliationStatus.NOT_RECONCILED) — não PAID, que é o status de match
+      // real (ver applyCreditOrderMatch/reconcileByInstallments). Usar PAID aqui mascarava um
+      // lançamento sem nenhuma ordem/parcela vinculada como "conciliado", excluindo-o para
+      // sempre de findAvailableForCreditOrderBatch/findForBankReconciliation (que só trazem
+      // releases PENDING quando reprocess=false) mesmo que uma ordem elegível pudesse casar
+      // com ele numa execução futura.
+      release.setReconciliationStatus(StatusPaymentBankEnum.NOT_PAID);
       releasesBankRepository.save(release);
     }
     result.releaseWithoutMatch();

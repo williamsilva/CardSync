@@ -117,6 +117,9 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       ss.id,
       count(tx.id),
       coalesce(sum(
+        case when tx.statusTransaction in :excludedStatuses then 1L else 0L end
+      ), 0L),
+      coalesce(sum(
         case when tx.statusTransaction in :eligibleSaleStatuses then 1L else 0L end
       ), 0L)
     )
@@ -130,6 +133,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   """)
   List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliation(
     @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
+    @Param("excludedStatuses") Collection<Integer> excludedStatuses,
     @Param("implantationDate") LocalDate implantationDate,
     @Param("lookbackDate") LocalDate lookbackDate
   );
@@ -143,6 +147,9 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       ss.id,
       count(tx.id),
       coalesce(sum(
+        case when tx.statusTransaction in :excludedStatuses then 1L else 0L end
+      ), 0L),
+      coalesce(sum(
         case when tx.statusTransaction in :eligibleSaleStatuses then 1L else 0L end
       ), 0L)
     )
@@ -155,6 +162,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   """)
   List<AcquirerSaleSummaryStats> findStatsForAcquirerSaleSummaryReconciliationIgnoringLookback(
     @Param("eligibleSaleStatuses") Collection<Integer> eligibleSaleStatuses,
+    @Param("excludedStatuses") Collection<Integer> excludedStatuses,
     @Param("implantationDate") LocalDate implantationDate
   );
 
@@ -199,17 +207,24 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
    * - não carrega entidades;
    * - conta quantas ordens existem por SalesSummary;
    * - deixa para o service gerar ordens sintéticas apenas para summaries sem ordem.
+   *
+   * includeAlreadyReconciled (reprocessSalesSummaryCreditOrder) só relaxa o filtro de
+   * creditOrderStatus (backfill de resumos cujas ordens já foram geradas) — o filtro de
+   * transactionsStatus continua SEMPRE obrigatório, nunca relaxado por essa flag. Antes o mesmo
+   * booleano controlava os dois filtros ao mesmo tempo: ligar o backfill também aceitava
+   * resumos com transactionsStatus PENDING/DIVERGENT/CANCELED (transações nunca conciliadas),
+   * podendo gerar/vincular ordem de crédito antes de qualquer venda individual ser confirmada.
    */
   @Query("""
     select new com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderStats(
       ss.id,
-      count(co.id),
+      count(distinct co.installmentNumber),
       max(ss.grossValue),
       cast(coalesce(max(co.installmentTotal), 1) as integer)
     )
       from SalesSummaryEntity ss
       left join CreditOrderEntity co on co.salesSummary.id = ss.id
-     where (:includeAlreadyReconciled = true or ss.transactionsStatus is null or ss.transactionsStatus in :eligibleTransactionStatuses)
+     where (ss.transactionsStatus is null or ss.transactionsStatus in :eligibleTransactionStatuses)
        and (:includeAlreadyReconciled = true or ss.creditOrderStatus is null or ss.creditOrderStatus in :pendingCreditOrderStatuses)
        and ss.rvDate >= :implantationDate
        and ss.rvDate >= :lookbackDate
@@ -231,13 +246,13 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   @Query("""
     select new com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderStats(
       ss.id,
-      count(co.id),
+      count(distinct co.installmentNumber),
       max(ss.grossValue),
       cast(coalesce(max(co.installmentTotal), 1) as integer)
     )
       from SalesSummaryEntity ss
       left join CreditOrderEntity co on co.salesSummary.id = ss.id
-     where (:includeAlreadyReconciled = true or ss.transactionsStatus is null or ss.transactionsStatus in :eligibleTransactionStatuses)
+     where (ss.transactionsStatus is null or ss.transactionsStatus in :eligibleTransactionStatuses)
        and (:includeAlreadyReconciled = true or ss.creditOrderStatus is null or ss.creditOrderStatus in :pendingCreditOrderStatuses)
        and ss.rvDate >= :implantationDate
      group by ss.id
@@ -352,7 +367,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
       left join fetch ss.bankingDomicile
      where ss.rvDate >= :implantationDate
        and ss.rvDate <= :cutoffDate
-       and (select count(co) from CreditOrderEntity co where co.salesSummary = ss)
+       and (select count(distinct co.installmentNumber) from CreditOrderEntity co where co.salesSummary = ss)
            < coalesce((select max(co2.installmentTotal) from CreditOrderEntity co2 where co2.salesSummary = ss), 1)
        and (
          (
