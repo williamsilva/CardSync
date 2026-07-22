@@ -140,4 +140,7 @@ public abstract class CsPermissions {
 
   /* Permission for Dashboard Audit */
   protected static final String PERM_DASHBOARD_AUDIT_CONSULT = "PERM_DASHBOARD_AUDIT_CONSULT";
+
+  /* Permission for Backup */
+  protected static final String PERM_BACKUP_PROCESS = "PERM_BACKUP_PROCESS";
 }

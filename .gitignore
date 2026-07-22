@@ -43,3 +43,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Backups de banco de dados (podem conter dados sensíveis)
+scripts/backups/

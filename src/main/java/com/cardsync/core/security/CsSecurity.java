@@ -342,4 +342,9 @@ public class CsSecurity extends CsDefaultSecurityMethod {
   public boolean canConsultDashboardAudit() {
     return hasAllReadScope() && hasAuthority(PERM_DASHBOARD_AUDIT_CONSULT);
   }
+
+  /* Backup */
+  public boolean canProcessBackup() {
+    return hasAllWriteScope() && hasAuthority(PERM_BACKUP_PROCESS);
+  }
 }

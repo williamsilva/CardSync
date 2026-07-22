@@ -425,6 +425,13 @@ public @interface CheckSecurity {
       @PreAuthorize("@csSecurity.canProcessReconciliationSettings()")
       @interface CanProcess {}
     }
+
+    @interface Backup {
+      @Target(METHOD)
+      @Retention(RUNTIME)
+      @PreAuthorize("@csSecurity.canProcessBackup()")
+      @interface CanProcess {}
+    }
   }
 
   @interface Management {

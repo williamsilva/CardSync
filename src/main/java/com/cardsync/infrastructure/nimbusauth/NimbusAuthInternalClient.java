@@ -51,6 +51,24 @@ public class NimbusAuthInternalClient {
     }
   }
 
+  /**
+   * Pede ao NimbusAuth um dump (pg_dump formato custom) do próprio banco dele. Diferente dos
+   * demais métodos desta classe, NÃO degrada silenciosamente em caso de falha — o chamador
+   * (BackupService) precisa saber que este alvo específico falhou para reportar no zip final,
+   * em vez de produzir um backup incompleto sem avisar.
+   */
+  public byte[] fetchDatabaseBackup() {
+    byte[] result = client().get()
+      .uri("/internal/backup/database")
+      .retrieve()
+      .body(byte[].class);
+
+    if (result == null || result.length == 0) {
+      throw new IllegalStateException("NimbusAuth retornou um backup vazio");
+    }
+    return result;
+  }
+
   public int revokeAuthorization(String principalName, String clientId) {
     try {
       var result = client().post()

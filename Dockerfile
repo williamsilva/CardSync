@@ -9,6 +9,10 @@ RUN mvn -DskipTests clean package --no-transfer-progress
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+# postgresql-client fornece o pg_dump usado pelo backup sob demanda do próprio banco
+# (ver PgDumpRunner/BackupService).
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /app/app.jar"]
