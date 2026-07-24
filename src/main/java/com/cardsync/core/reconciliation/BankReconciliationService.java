@@ -17,6 +17,7 @@ import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
+import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -70,6 +72,7 @@ public class BankReconciliationService {
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final ReconciliationSettingsService reconciliationSettingsService;
+  private final AdjustmentRepository adjustmentRepository;
 
   @Transactional
   public BankReconciliationResult reconcilePending() {
@@ -309,6 +312,11 @@ public class BankReconciliationService {
       .filter(this::hasRequiredContext)
       .toList();
 
+    // Ver computeNetCreditOrderValues: o valor bancário já vem líquido de tarifas (ex.: aluguel
+    // de POS) que nunca reduzem CreditOrderEntity.releaseValue — sem descontar aqui, nenhum
+    // subconjunto de valores brutos bate com o release quando há tarifa no meio.
+    Map<UUID, BigDecimal> netValueByOrderId = computeNetCreditOrderValues(validOrders);
+
     // Pré-calcula contexto e banco de cada ordem uma única vez (O(ordens)) em vez de
     // recomputar dentro do laço de releases — antes isso rodava O(releases × ordens) vezes,
     // já que isCreditOrderCandidateCompatible recriava o contexto a cada comparação.
@@ -367,7 +375,7 @@ public class BankReconciliationService {
       // lançamento (nada foi commitado, só o flush periódico grava de fato).
       try {
         if (!processReleaseForCreditOrderMatch(
-          release, ordersByDate, reconciledOrderIds, orderMatchDataById,
+          release, ordersByDate, reconciledOrderIds, orderMatchDataById, netValueByOrderId,
           toleranceDaysBefore, toleranceDaysAfter, tolerance, config, strictness, reprocess, result,
           reassignedCountByPreviousReleaseId, affectedSalesSummaryIds, affectedSalesSummaryIdsFromTransactions
         )) {
@@ -421,6 +429,7 @@ public class BankReconciliationService {
     java.util.TreeMap<LocalDate, List<CreditOrderEntity>> ordersByDate,
     Set<UUID> reconciledOrderIds,
     Map<UUID, OrderMatchData> orderMatchDataById,
+    Map<UUID, BigDecimal> netValueByOrderId,
     int toleranceDaysBefore,
     int toleranceDaysAfter,
     BigDecimal tolerance,
@@ -457,11 +466,11 @@ public class BankReconciliationService {
 
     BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
       compatible,
-      CreditOrderEntity::getReleaseValue,
+      order -> netValueByOrderId.getOrDefault(order.getId(), order.getReleaseValue()),
       release.getReleaseValue(),
       tolerance,
       config.getSafeCapCents(),
-      config.getSubsetDpMaxCents()
+      reconciliationSettingsService.getSubsetDpMaxCents()
     );
 
     if (selected.skippedBySafetyCap()) {
@@ -906,7 +915,7 @@ public class BankReconciliationService {
       release.getReleaseValue(),
       valueTolerance,
       config.getSafeCapCents(),
-      config.getSubsetDpMaxCents()
+      reconciliationSettingsService.getSubsetDpMaxCents()
     );
 
     if (!selected.matched()) return selected;
@@ -1363,6 +1372,60 @@ public class BankReconciliationService {
     }
     return value;
   }
+
+  /**
+   * Algumas tarifas (ex.: aluguel/inatividade de POS-pinpad — Rede EEVD identificador "011", ver
+   * ProcessRedeEeVdService.buildAdjustment011) são descontadas pela adquirente no lançamento
+   * bancário do dia, mas nunca reduzem CreditOrderEntity.releaseValue — esse continua com o
+   * valor bruto da RV. Sem descontar aqui, o subset-sum de {@link BankReconciliationMatcher}
+   * nunca encontra uma combinação de ordens (valores brutos) que bata com o valor líquido do
+   * release (já descontado da tarifa), e o lançamento fica PENDING para sempre.
+   *
+   * Quando mais de uma ordem de crédito da mesma RV cai no mesmo dia de repasse (parcelamento),
+   * a tarifa é dividida igualmente entre elas — a soma do grupo cai exatamente o valor da tarifa,
+   * não importa como ela é distribuída entre as ordens individuais.
+   */
+  private Map<UUID, BigDecimal> computeNetCreditOrderValues(List<CreditOrderEntity> orders) {
+    Set<UUID> summaryIds = orders.stream()
+      .map(order -> idOrNull(order.getSalesSummary()))
+      .filter(Objects::nonNull)
+      .collect(Collectors.toSet());
+
+    Map<SummaryDateKey, BigDecimal> feeTotalByKey = summaryIds.isEmpty()
+      ? Map.of()
+      : adjustmentRepository.sumPosFeeBySalesSummaryAndCreditDate(summaryIds).stream()
+          .collect(Collectors.toMap(
+            row -> new SummaryDateKey((UUID) row[0], (LocalDate) row[1]),
+            row -> (BigDecimal) row[2]
+          ));
+
+    Map<SummaryDateKey, Long> orderCountByKey = orders.stream()
+      .filter(order -> idOrNull(order.getSalesSummary()) != null && order.getReleaseDate() != null)
+      .collect(Collectors.groupingBy(
+        order -> new SummaryDateKey(order.getSalesSummary().getId(), order.getReleaseDate()),
+        Collectors.counting()
+      ));
+
+    Map<UUID, BigDecimal> netValueByOrderId = new HashMap<>();
+    for (CreditOrderEntity order : orders) {
+      BigDecimal grossValue = order.getReleaseValue();
+      UUID summaryId = idOrNull(order.getSalesSummary());
+      if (order.getId() == null || summaryId == null || order.getReleaseDate() == null || grossValue == null) {
+        continue;
+      }
+      SummaryDateKey key = new SummaryDateKey(summaryId, order.getReleaseDate());
+      BigDecimal feeTotal = feeTotalByKey.get(key);
+      if (feeTotal == null || feeTotal.compareTo(BigDecimal.ZERO) == 0) {
+        continue;
+      }
+      long shareCount = orderCountByKey.getOrDefault(key, 1L);
+      BigDecimal feeShare = feeTotal.divide(BigDecimal.valueOf(shareCount), 2, RoundingMode.HALF_UP);
+      netValueByOrderId.put(order.getId(), grossValue.subtract(feeShare));
+    }
+    return netValueByOrderId;
+  }
+
+  private record SummaryDateKey(UUID salesSummaryId, LocalDate date) {}
 
   private BigDecimal nvl(BigDecimal value) {
     return value == null ? BigDecimal.ZERO : value;

@@ -2,9 +2,11 @@ package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.config.ImplantationDateProvider;
+import com.cardsync.domain.model.AnticipationEntity;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.*;
+import com.cardsync.domain.repository.AnticipationRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +62,7 @@ public class SalesSummaryCreditOrderReconciliationService {
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final SalesSummaryRepository salesSummaryRepository;
   private final CreditOrderRepository creditOrderRepository;
+  private final AnticipationRepository anticipationRepository;
 
   @Transactional
   public SalesSummaryCreditOrderReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
@@ -161,9 +164,10 @@ public class SalesSummaryCreditOrderReconciliationService {
     );
 
     GeneratedOrders generated = generateSyntheticOrders(trigger, summariesWithoutOrders);
+    int anticipationGeneratedOrders = generateSyntheticOrdersFromAnticipations(trigger);
 
-    counter.generatedCreditOrders = generated.generatedOrders();
-    counter.creditOrdersAnalyzed += generated.generatedOrders();
+    counter.generatedCreditOrders = generated.generatedOrders() + anticipationGeneratedOrders;
+    counter.creditOrdersAnalyzed += generated.generatedOrders() + anticipationGeneratedOrders;
     counter.summariesWithoutCreditOrders = generated.notGeneratedSummaryIds().size();
     counter.summariesPending = generated.notGeneratedSummaryIds().size();
     counter.summariesReconciled = summariesWithOrders.size() + generated.generatedSummaryIds().size();
@@ -292,6 +296,74 @@ public class SalesSummaryCreditOrderReconciliationService {
     logPvMismatchDiagnosis(notGeneratedSummaries, trigger);
 
     return new GeneratedOrders(generatedSummaryIds, notGeneratedSummaryIds, generatedOrders);
+  }
+
+  /**
+   * Antecipações (Rede EEFI "036" — ver ProcessRedeEeFiService.buildAnticipation) representam
+   * parcelas específicas de uma RV adiantadas pelo banco antes do vencimento normal: o valor cai
+   * na conta, mas nunca gera CreditOrder nenhuma, então nunca participa da conciliação bancária
+   * (Etapa 6). generatedOrders controla a idempotência — uma vez gerada a ordem sintética, a
+   * antecipação não é reavaliada de novo. Independente da geração baseada em SalesSummary acima:
+   * uma mesma RV pode ter algumas parcelas antecipadas (aqui) e outras liquidadas normalmente (via
+   * CreditOrder real ou sintética por SalesSummary) — não é duplicidade, são parcelas diferentes.
+   */
+  private int generateSyntheticOrdersFromAnticipations(FinancialReconciliationTriggerType trigger) {
+    List<UUID> eligibleIds = anticipationRepository.findIdsEligibleForSyntheticCreditOrderGeneration();
+    if (eligibleIds.isEmpty()) {
+      log.info("ℹ️ Etapa 4 - Nenhuma Anticipation elegível para geração sintética. trigger={}", trigger);
+      return 0;
+    }
+
+    OffsetDateTime startedAt = OffsetDateTime.now();
+    int totalBatches = totalBatches(eligibleIds.size(), GENERATION_BATCH_SIZE);
+    int generatedOrders = 0;
+
+    log.info(
+      "🧾 Etapa 4 - Avaliando geração sintética a partir de antecipações. trigger={}, antecipacoesElegiveis={}, batches={}",
+      trigger,
+      eligibleIds.size(),
+      totalBatches
+    );
+
+    int batchNumber = 0;
+    for (List<UUID> batchIds : partition(eligibleIds, GENERATION_BATCH_SIZE)) {
+      batchNumber++;
+      OffsetDateTime batchStartedAt = OffsetDateTime.now();
+
+      List<AnticipationEntity> anticipations = anticipationRepository.findBatchForSyntheticCreditOrderGeneration(batchIds);
+      List<CreditOrderEntity> ordersToGenerate = new ArrayList<>(anticipations.size());
+
+      for (AnticipationEntity anticipation : anticipations) {
+        ordersToGenerate.add(generateSyntheticCreditOrder(anticipation));
+        anticipation.setGeneratedOrders(true);
+      }
+
+      if (!ordersToGenerate.isEmpty()) {
+        creditOrderRepository.saveAll(ordersToGenerate);
+        anticipationRepository.saveAll(anticipations);
+        generatedOrders += ordersToGenerate.size();
+      }
+
+      log.info(
+        "🔄 Etapa 4 - Geração sintética (antecipação) batch {}/{} concluída. ids={}, geradas={}, totalGeradas={}, duração={}s",
+        batchNumber,
+        totalBatches,
+        batchIds.size(),
+        ordersToGenerate.size(),
+        generatedOrders,
+        Duration.between(batchStartedAt, OffsetDateTime.now()).toSeconds()
+      );
+    }
+
+    log.info(
+      "✅ Etapa 4 - Geração sintética (antecipação) concluída. trigger={}, antecipacoesElegiveis={}, ordensGeradas={}, duração={}s",
+      trigger,
+      eligibleIds.size(),
+      generatedOrders,
+      Duration.between(startedAt, OffsetDateTime.now()).toSeconds()
+    );
+
+    return generatedOrders;
   }
 
   private void bulkUpdateExistingCreditOrders(FinancialReconciliationTriggerType trigger, List<UUID> summariesWithOrders) {
@@ -583,6 +655,42 @@ public class SalesSummaryCreditOrderReconciliationService {
     order.setGrossRvValue(nvl(summary.getGrossValue()));
     order.setDiscountRateValue(nvl(summary.getDiscountValue()));
     order.setReleaseValue(firstPositive(summary.getAdjustedValue(), summary.getLiquidValue(), summary.getGrossValue()));
+
+    order.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    order.setCreditStatus(StatusPaymentBankEnum.PENDING.getCode());
+    order.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
+    order.setReconciliationStatus(StatusPaymentBankEnum.PENDING.getCode());
+
+    return order;
+  }
+
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  CreditOrderEntity generateSyntheticCreditOrder(AnticipationEntity anticipation) {
+    CreditOrderEntity order = new CreditOrderEntity();
+    order.setSalesSummary(anticipation.getSalesSummary());
+    order.setAcquirer(anticipation.getAcquirer());
+    order.setFlag(anticipation.getFlag());
+    order.setCompany(anticipation.getCompany());
+    order.setBankingDomicile(anticipation.getBankingDomicile());
+    order.setProcessedFile(anticipation.getProcessedFile());
+
+    order.setRvNumber(anticipation.getNumberRvCorresponding());
+    order.setRvDate(anticipation.getDateRvCorresponding());
+    order.setReleaseDate(anticipation.getReleaseDate());
+    order.setCreditOrderDate(anticipation.getReleaseDate());
+    order.setOriginalPvNumber(anticipation.getPvNumber());
+    order.setPvCentralizer(anticipation.getPvNumber());
+    order.setInstallmentNumber(anticipation.getInstallmentNumber());
+    order.setInstallmentTotal(anticipation.getInstallmentNumberMax());
+    order.setTransactionType(2);
+    // record_type é varchar(20) — "GENERATED_FROM_ANTICIPATION" (28 chars) só cabe em
+    // launch_type (varchar(30)). Ver MANUAL_GENERATED/GENERATED_FROM_SALES_SUMMARY acima.
+    order.setRecordType("GEN_ANTICIPATION");
+    order.setLaunchType("GENERATED_FROM_ANTICIPATION");
+
+    order.setGrossRvValue(nvl(anticipation.getGrossValue()));
+    order.setDiscountRateValue(nvl(anticipation.getDiscountRateValue()));
+    order.setReleaseValue(nvl(anticipation.getReleaseValue()));
 
     order.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     order.setCreditStatus(StatusPaymentBankEnum.PENDING.getCode());

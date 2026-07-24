@@ -33,7 +33,7 @@ public class ManualBankReconciliationService {
     private final com.cardsync.core.conciliation.ReconciliationSettingsService reconciliationSettingsService;
 
     @Transactional
-    public ManualBankReconciliationResult reconcile(UUID releaseBankId, List<UUID> creditOrderIds) {
+    public ManualBankReconciliationResult reconcile(UUID releaseBankId, List<UUID> creditOrderIds, String divergenceReason) {
         int zeroValueReconciled = reconcileZeroValueOrders();
 
         ReleasesBankEntity release = releasesBankRepository.findById(releaseBankId)
@@ -62,17 +62,43 @@ public class ManualBankReconciliationService {
             reconciled++;
         }
 
+        BigDecimal divergenceValue = null;
+
         if (!toSave.isEmpty()) {
+            // Nunca silencioso: um lançamento que mistura vendas anteriores à implantação (sem
+            // CreditOrder no sistema) com vendas atuais nunca vai bater exato — mas o vínculo só
+            // pode seguir em frente com uma justificativa explícita, validada de novo aqui (defesa
+            // em profundidade — o frontend já exige isso, mas a API não pode confiar só nisso).
+            BigDecimal sumOrders = orders.stream()
+                    .map(CreditOrderEntity::getReleaseValue)
+                    .filter(java.util.Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal releaseValue = release.getReleaseValue() != null ? release.getReleaseValue() : BigDecimal.ZERO;
+            BigDecimal diff = releaseValue.subtract(sumOrders).abs();
+            BigDecimal tolerance = reconciliationSettingsService.getValueTolerance();
+
+            if (diff.compareTo(tolerance) > 0) {
+                if (divergenceReason == null || divergenceReason.isBlank()) {
+                    throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "manual.reconciliation.divergence.reason.required");
+                }
+                divergenceValue = diff;
+                release.setDivergenceValue(diff);
+                release.setDivergenceReason(divergenceReason.trim());
+            } else {
+                release.setDivergenceValue(null);
+                release.setDivergenceReason(null);
+            }
+
             creditOrderRepository.saveAll(toSave);
             release.setReconciliationStatus(StatusPaymentBankEnum.PAID);
             releasesBankRepository.save(release);
             updateSalesSummaryStatuses(toSave);
         }
 
-        log.info("Conciliação manual bancária: lançamento={}, conciliadas={}, já conciliadas={}, valor_zero={}",
-                releaseBankId, reconciled, alreadyReconciled, zeroValueReconciled);
+        log.info("Conciliação manual bancária: lançamento={}, conciliadas={}, já conciliadas={}, valor_zero={}, divergencia={}",
+                releaseBankId, reconciled, alreadyReconciled, zeroValueReconciled, divergenceValue);
 
-        return new ManualBankReconciliationResult(reconciled, alreadyReconciled, zeroValueReconciled);
+        return new ManualBankReconciliationResult(reconciled, alreadyReconciled, zeroValueReconciled, divergenceValue);
     }
 
     /**

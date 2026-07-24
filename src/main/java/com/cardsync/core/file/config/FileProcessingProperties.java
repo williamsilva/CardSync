@@ -270,14 +270,6 @@ public class FileProcessingProperties {
     private long safeCapCents = 50_000_000L;
 
     /**
-     * Teto de centavos para a busca de subconjunto por programação dinâmica.
-     * A DP aloca arrays proporcionais ao alvo em centavos; este limite evita uso
-     * excessivo de memória para alvos muito altos. Acima dele, o subconjunto não é
-     * tentado (o release fica pendente). Default R$ 50.000,00 (~arrays de poucos MB).
-     */
-    private long subsetDpMaxCents = 5_000_000L;
-
-    /**
      * Modo da conciliação Banco x adquirente (ver BankReconciliationMode). Default
      * CREDIT_ORDER_ONLY preserva o comportamento histórico (só ordens de crédito elegíveis);
      * os demais modos ativam a conciliação por parcelas (fallback ou exclusiva) via

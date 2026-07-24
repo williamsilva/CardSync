@@ -2,6 +2,8 @@ package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ManualBankReconciliationRequest;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.MarkLegacyReleasesRequest;
+import com.cardsync.core.file.bank.BankStatementFlagReclassificationService;
+import com.cardsync.core.file.bank.ReclassifyBankStatementFlagsResult;
 import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.ManualBankReconciliationResult;
 import com.cardsync.core.reconciliation.ManualBankReconciliationService;
@@ -25,11 +27,14 @@ public class ManualBankReconciliationController {
 
     private final BankReconciliationService bankReconciliationService;
     private final ManualBankReconciliationService manualBankReconciliationService;
+    private final BankStatementFlagReclassificationService bankStatementFlagReclassificationService;
 
     @PostMapping("/manual")
     @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
     public ManualBankReconciliationResult reconcile(@Valid @RequestBody ManualBankReconciliationRequest request) {
-        return manualBankReconciliationService.reconcile(request.releaseBankId(), request.creditOrderIds());
+        return manualBankReconciliationService.reconcile(
+            request.releaseBankId(), request.creditOrderIds(), request.divergenceReason()
+        );
     }
 
     @PostMapping("/legacy")
@@ -42,5 +47,17 @@ public class ManualBankReconciliationController {
     @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
     public UndoBankReconciliationResult undo(@PathVariable UUID releaseBankId) {
         return bankReconciliationService.undoReconciliation(releaseBankId);
+    }
+
+    /**
+     * Backfill único: reclassifica a bandeira de todos os lançamentos bancários CNAB240 já
+     * importados usando a lógica corrigida de BankStatementClassifierService.resolveFlag
+     * (antes casava por erp_code como substring numérica solta, gerando falsos positivos como
+     * Cabal/Banescard virando American Express).
+     */
+    @PostMapping("/reclassify-flags")
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
+    public ReclassifyBankStatementFlagsResult reclassifyFlags() {
+        return bankStatementFlagReclassificationService.reclassifyAll();
     }
 }

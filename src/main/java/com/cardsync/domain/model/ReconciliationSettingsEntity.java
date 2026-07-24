@@ -105,6 +105,18 @@ public class ReconciliationSettingsEntity extends AuditableEntityBase {
   @Column(name = "bank_mark_not_reconciled_after_days", nullable = false)
   private int bankMarkNotReconciledAfterDays = 3;
 
+  /**
+   * Teto de centavos para a busca de subconjunto (subset-sum) por programação dinâmica na
+   * conciliação Banco x Ordem de Crédito/Parcela (Etapa 7). A DP aloca arrays proporcionais ao
+   * alvo em centavos; acima deste limite o subconjunto não é tentado e o lançamento permanece
+   * pendente mesmo com ordens de crédito compatíveis disponíveis. Ver
+   * BankReconciliationMatcher.selectByValue. Antes fixo em application.yml
+   * (file-processing.reconciliation.subset-dp-max-cents); movido para cá para ser ajustável sem
+   * redeploy.
+   */
+  @Column(name = "subset_dp_max_cents", nullable = false)
+  private long subsetDpMaxCents = 50_000_000L;
+
   // ── Rigidez do matching Banco x Ordem de Crédito / Parcela (Etapa 7) ──────
   // Default false nos três = comportamento legado (campo opcional/coringa quando nulo/
   // desconhecido em qualquer lado). Ver ReconciliationMatchContext.MatchStrictness.

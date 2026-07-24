@@ -4,7 +4,6 @@ import com.cardsync.bff.controller.v1.representation.input.BackupExecuteInput;
 import com.cardsync.core.backup.BackupService;
 import com.cardsync.core.security.CheckSecurity;
 import jakarta.validation.Valid;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import org.springframework.core.io.ByteArrayResource;
@@ -33,9 +32,13 @@ public class BackupController {
   public ResponseEntity<Resource> execute(@Valid @RequestBody BackupExecuteInput input) {
     byte[] zip = backupService.execute(input.targets());
 
-    String filename = "cardsync-backup-" + LocalDateTime.now().format(FILENAME_TIMESTAMP) + ".zip";
+    // Nome sempre ASCII (prefixo fixo + timestamp) — sem Charset o Spring emite um filename=
+    // simples, em vez do encoded-word RFC 2047 (=?UTF-8?Q?...?=) que o navegador decodifica
+    // nativamente numa navegação direta, mas que o parser em JS do frontend (blob download,
+    // já que aqui a resposta é o corpo de um POST, não uma URL navegável) não entende.
+    String filename = "backup_nb_" + LocalDateTime.now().format(FILENAME_TIMESTAMP) + ".zip";
     ContentDisposition disposition = ContentDisposition.attachment()
-      .filename(filename, StandardCharsets.UTF_8)
+      .filename(filename)
       .build();
 
     return ResponseEntity.ok()

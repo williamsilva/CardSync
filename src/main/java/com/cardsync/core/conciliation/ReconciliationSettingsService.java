@@ -45,6 +45,7 @@ public class ReconciliationSettingsService {
         s.getDateToleranceDaysAfter(),
         s.getValueTolerance(),
         s.getBankMarkNotReconciledAfterDays(),
+        s.getSubsetDpMaxCents(),
         s.isFlagMatchRequired(),
         s.isEstablishmentMatchRequired(),
         s.isPaymentKindMatchRequired(),
@@ -54,7 +55,7 @@ public class ReconciliationSettingsService {
       .orElse(new ReconciliationSettingsModel(0, 0, 1, 30,
         true, true, true, true, true, true, true,
         false, false, false, false, false, false, false,
-        5, 10, new BigDecimal("0.05"), 3,
+        5, 10, new BigDecimal("0.05"), 3, 50_000_000L,
         false, false, false,
         com.cardsync.core.config.ImplantationDateProvider.DEFAULT_IMPLANTATION_DATE, 12,
         legacyMarkingCutoff(
@@ -276,6 +277,18 @@ public class ReconciliationSettingsService {
       .orElse(3);
   }
 
+  /**
+   * Teto de centavos para o subset-sum por programação dinâmica (Etapa 7). Ver
+   * BankReconciliationMatcher.selectByValue / ReconciliationSettingsEntity.subsetDpMaxCents.
+   */
+  @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
+  @Transactional(readOnly = true)
+  public long getSubsetDpMaxCents() {
+    return repository.findFirstBy()
+      .map(ReconciliationSettingsEntity::getSubsetDpMaxCents)
+      .orElse(50_000_000L);
+  }
+
   // ── Rigidez do matching Banco x Ordem de Crédito / Parcela (Etapa 7) ──────
 
   @Cacheable(value = "reconciliation-settings", key = "#root.methodName")
@@ -331,6 +344,7 @@ public class ReconciliationSettingsService {
     settings.setDateToleranceDaysAfter(request.dateToleranceDaysAfter());
     settings.setValueTolerance(request.valueTolerance());
     settings.setBankMarkNotReconciledAfterDays(request.bankMarkNotReconciledAfterDays());
+    settings.setSubsetDpMaxCents(request.subsetDpMaxCents());
     settings.setFlagMatchRequired(request.flagMatchRequired());
     settings.setEstablishmentMatchRequired(request.establishmentMatchRequired());
     settings.setPaymentKindMatchRequired(request.paymentKindMatchRequired());
@@ -360,6 +374,7 @@ public class ReconciliationSettingsService {
       settings.getDateToleranceDaysAfter(),
       settings.getValueTolerance(),
       settings.getBankMarkNotReconciledAfterDays(),
+      settings.getSubsetDpMaxCents(),
       settings.isFlagMatchRequired(),
       settings.isEstablishmentMatchRequired(),
       settings.isPaymentKindMatchRequired(),

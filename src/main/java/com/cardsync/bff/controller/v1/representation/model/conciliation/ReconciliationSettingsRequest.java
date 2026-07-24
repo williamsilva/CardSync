@@ -35,6 +35,7 @@ public record ReconciliationSettingsRequest(
   @Min(0) @Max(60) int dateToleranceDaysAfter,
   @NotNull @DecimalMin("0.00") @DecimalMax("10.00") BigDecimal valueTolerance,
   @Min(0) @Max(60) int bankMarkNotReconciledAfterDays,
+  @Min(0) @Max(100_000_000L) long subsetDpMaxCents,
   // Rigidez do matching Banco x Ordem de Crédito / Parcela (Etapa 7)
   boolean flagMatchRequired,
   boolean establishmentMatchRequired,

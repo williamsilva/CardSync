@@ -70,7 +70,7 @@ class BankReconciliationMatcher {
     if (targetCents > dpMaxCents) {
       log.debug(
         "Subconjunto não tentado: alvo {} excede o teto de DP ({} centavos). "
-          + "Aumente reconciliation.subset-dp-max-cents se precisar conciliar valores maiores por composição.",
+          + "Aumente subsetDpMaxCents em Configurações de Conciliação se precisar conciliar valores maiores por composição.",
         targetValue, dpMaxCents
       );
       return MatchResult.notMatched();

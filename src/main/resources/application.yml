@@ -116,11 +116,9 @@ file-processing:
     # Evita consumo excessivo de memória/CPU em grupos muito grandes.
     safe-cap-cents: ${RECONCILIATION_SAFE_CAP_CENTS:50000000}
 
-    # Teto de centavos para a busca de subconjunto por programação dinâmica (0/1 knapsack).
-    # A DP aloca arrays proporcionais ao alvo em centavos; acima deste limite o subconjunto
-    # não é tentado e o release permanece pendente. Default R$ 50.000,00 (~arrays de poucos MB).
-    # Aumente com cautela: dobrar o valor dobra o consumo de memória da etapa de subset-sum.
-    subset-dp-max-cents: ${RECONCILIATION_SUBSET_DP_MAX_CENTS:5000000}
+    # Teto de centavos para a busca de subconjunto por programação dinâmica (0/1 knapsack) —
+    # movido para cs_reconciliation_settings.subset_dp_max_cents (tela de Configurações de
+    # Conciliação), ajustável sem redeploy. Ver ReconciliationSettingsService.getSubsetDpMaxCents.
 
     # A conciliação bancária é dirigida somente por ordens de crédito elegíveis.
     bank-mode: ${BANK_RECONCILIATION_MODE:CREDIT_ORDER_ONLY}

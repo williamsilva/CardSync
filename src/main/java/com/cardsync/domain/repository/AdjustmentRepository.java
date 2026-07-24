@@ -60,4 +60,21 @@ public interface AdjustmentRepository extends JpaRepository<AdjustmentEntity, UU
      order by adj.id
   """)
   List<AdjustmentEntity> findBatchForAcquirerSaleCancellationReconciliation(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Soma de tarifas (ex.: aluguel/inatividade de POS — Rede EEVD identificador "011", ver
+   * ProcessRedeEeVdService.buildAdjustment011) descontadas do lançamento bancário do dia mas que
+   * nunca reduzem CreditOrderEntity.releaseValue em si. Agrupado por RV + data do crédito para
+   * permitir descontar o valor certo por dia de repasse em BankReconciliationService — uma RV
+   * parcelada pode ter tarifas lançadas em dias diferentes.
+   */
+  @Query("""
+    select adj.salesSummary.id, adj.creditDate, sum(adj.adjustmentValue)
+      from AdjustmentEntity adj
+     where adj.salesSummary.id in :summaryIds
+       and adj.adjustmentType = 'POS_FEE'
+       and adj.debitType = 'D'
+     group by adj.salesSummary.id, adj.creditDate
+  """)
+  List<Object[]> sumPosFeeBySalesSummaryAndCreditDate(@Param("summaryIds") Collection<UUID> summaryIds);
 }

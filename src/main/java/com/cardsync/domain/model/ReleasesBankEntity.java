@@ -47,6 +47,17 @@ public class ReleasesBankEntity extends AuditableEntityBase {
 
   private BigDecimal releaseValue;
 
+  /**
+   * Diferença aceita entre releaseValue e a soma das ordens de crédito vinculadas manualmente
+   * (ver ManualBankReconciliationService.reconcile) — cobre o caso do lançamento misturar vendas
+   * anteriores à implantação (sem CreditOrder no sistema) com vendas atuais, que nunca fecha por
+   * definição. Null quando o vínculo foi feito com soma exata (dentro da tolerância normal).
+   */
+  private BigDecimal divergenceValue;
+
+  /** Justificativa informada pelo usuário para a divergência acima — nunca fica silenciosa. */
+  private String divergenceReason;
+
   private LocalDate releaseDate;
   private LocalDate accountingDate;
 

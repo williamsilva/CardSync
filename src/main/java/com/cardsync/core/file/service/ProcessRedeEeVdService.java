@@ -42,7 +42,7 @@ public class ProcessRedeEeVdService {
   private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HHmmss");
 
   private static final Set<String> SUPPORTED_IDENTIFIERS = Set.of(
-    "00", "01", "02", "03", "04", "05", "08", "09", "11", "13", "17", "18", "19", "20"
+    "00", "01", "02", "03", "04", "05", "08", "09", "011", "11", "13", "17", "18", "19", "20"
   );
 
   private final BankingDomicileResolver bankingDomicileResolver;
@@ -124,6 +124,7 @@ public class ProcessRedeEeVdService {
             buildTransaction05(columns, lineNumber, processedFile, summaries));
           case "08" -> unschedulings.add(buildUnscheduling08(columns, lineNumber, processedFile));
           case "11" -> adjustments.add(buildAdjustment11(columns, lineNumber, processedFile, summaries));
+          case "011" -> adjustments.add(buildAdjustment011(columns, lineNumber, processedFile, summaries));
           case "13" -> addTransactionWithInstallment(transactions, installments,
             buildTransaction13(columns, lineNumber, processedFile, summaries));
           case "17" -> adjustments.add(buildAdjustment17(columns, lineNumber, processedFile, summaries));
@@ -176,9 +177,10 @@ public class ProcessRedeEeVdService {
       AdjustmentTransactionLinkService.LinkResult adjustmentLinkResult =
         adjustmentTransactionLinkService.linkSavedAdjustments(savedAdjustments);
       log.info(
-        "🔗 Vínculo de ajustes EEVD com transações: analisados={}, vinculados={}",
+        "🔗 Vínculo de ajustes EEVD com transações: analisados={}, vinculados={}, vinculadosSomenteResumo={}",
         adjustmentLinkResult.analyzed(),
-        adjustmentLinkResult.linked()
+        adjustmentLinkResult.linked(),
+        adjustmentLinkResult.linkedBySalesSummaryOnly()
       );
       installmentUnschedulingRepository.saveAll(unschedulings);
       redeEeVdTotalizerRepository.saveAll(totalizers);
@@ -340,6 +342,45 @@ public class ProcessRedeEeVdService {
     adjustment.setRvFlagAdjustment(safeFlag(acquirer, col(c, 28)));
     adjustment.setAdjustmentReason2(toInteger(col(c, 29)));
     adjustment.setRawAdjustmentCode(col(c, 29));
+    return adjustment;
+  }
+
+  /*
+   * Registro "011" (Rede EEVD) - tarifas de serviço/equipamento (ex.: motivo 28 "AL.POS/PINPAD/TX
+   * CON" - aluguel de maquininha, motivo 20 "POS-INATIV/CONEC/PIN" - inatividade/conectividade).
+   * Layout CSV próprio, distinto do registro "11": pv, rv, data do ajuste, valor, D/C, motivo,
+   * descrição do motivo, ..., indicador Net/Desagendamento, data do crédito, ...
+   *
+   * Diferente dos outros builders desta classe, aqui NÃO reaproveitamos findSummary(summaries,...)
+   * puro: essas tarifas são lançadas no arquivo financeiro do dia do lançamento bancário, mas a RV
+   * que elas abatem quase sempre foi criada em um arquivo de um dia anterior (já persistida no
+   * banco) - buscar só na lista em memória deste arquivo cairia no fallback "última RV da lista",
+   * vinculando errado. Por isso resolve primeiro no banco (mesmo padrão do
+   * ProcessRedeEeFiService.safeSalesSummary) e só cai pro em-memória se a RV também tiver sido
+   * criada neste mesmo arquivo.
+   */
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  AdjustmentEntity buildAdjustment011(List<String> c, int lineNumber, ProcessedFileEntity processedFile, List<SalesSummaryEntity> summaries) {
+    Integer pvNumber = toInteger(col(c, 1));
+    Integer rvNumber = toInteger(col(c, 2));
+    AcquirerEntity acquirer = safeAcquirer();
+    EstablishmentEntity establishment = safeEstablishment(pvNumber);
+    SalesSummaryEntity summary = resolveSalesSummaryAcrossFiles(summaries, acquirer, pvNumber, rvNumber);
+
+    AdjustmentEntity adjustment = baseAdjustment(c, lineNumber, processedFile, acquirer, establishment, summary, false);
+    adjustment.setAdjustmentType("POS_FEE");
+    adjustment.setPvNumber(pvNumber);
+    adjustment.setPvNumberOriginal(pvNumber);
+    adjustment.setRvNumberOriginal(rvNumber);
+    adjustment.setAdjustmentDate(parseDate(col(c, 3)));
+    adjustment.setAdjustmentValue(money(col(c, 4)));
+    adjustment.setDebitType(col(c, 5));
+    adjustment.setAdjustmentReason(AdjustmentReasonEnum.fromCode(toInteger(col(c, 6))));
+    adjustment.setAdjustmentDescription(col(c, 7));
+    adjustment.setNet(col(c, 17));
+    adjustment.setCreditDate(parseDate(col(c, 18)));
+    adjustment.setRawAdjustmentCode(col(c, 24));
+    adjustment.setAdjustmentReason2(toInteger(col(c, 29)));
     return adjustment;
   }
 
@@ -683,6 +724,33 @@ public class ProcessRedeEeVdService {
       }
     }
     return summaries.get(summaries.size() - 1);
+  }
+
+  /*
+   * Resolve o resumo de vendas primeiro no banco (RV normalmente já persistida de um arquivo
+   * anterior), caindo para a lista em memória (RV criada neste mesmo arquivo) só se não achar.
+   * Ao contrário de findSummary(...), retorna null em vez de "chutar" a última RV da lista quando
+   * não encontra - usado por registros (ex.: "011") cuja RV referenciada quase sempre é antiga.
+   */
+  private SalesSummaryEntity resolveSalesSummaryAcrossFiles(
+    List<SalesSummaryEntity> summaries, AcquirerEntity acquirer, Integer pvNumber, Integer rvNumber
+  ) {
+    if (acquirer != null && acquirer.getId() != null && pvNumber != null && rvNumber != null) {
+      SalesSummaryEntity persisted = salesSummaryRepository
+        .findFirstByAcquirer_IdAndPvNumberAndRvNumberOrderByRvDateDesc(acquirer.getId(), pvNumber, rvNumber)
+        .orElse(null);
+      if (persisted != null) {
+        return persisted;
+      }
+    }
+
+    for (SalesSummaryEntity summary : summaries) {
+      if (Objects.equals(summary.getPvNumber(), pvNumber) && Objects.equals(summary.getRvNumber(), rvNumber)) {
+        return summary;
+      }
+    }
+
+    return null;
   }
 
   private List<String> splitCsv(String line) {

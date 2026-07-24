@@ -1,8 +1,10 @@
 package com.cardsync.core.file.service;
 
 import com.cardsync.domain.model.AdjustmentEntity;
+import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.repository.AdjustmentRepository;
+import com.cardsync.domain.repository.SalesSummaryRepository;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,15 +24,17 @@ public class AdjustmentTransactionLinkService {
 
   private final AdjustmentRepository adjustmentRepository;
   private final TransactionAcqRepository transactionAcqRepository;
+  private final SalesSummaryRepository salesSummaryRepository;
 
   @Transactional
   public LinkResult linkSavedAdjustments(Collection<AdjustmentEntity> adjustments) {
     if (adjustments == null || adjustments.isEmpty()) {
-      return new LinkResult(0, 0);
+      return new LinkResult(0, 0, 0);
     }
 
     int analyzed = 0;
     int linked = 0;
+    int linkedBySalesSummaryOnly = 0;
 
     Map<UUID, AdjustmentEntity> adjustmentsToUpdate = new LinkedHashMap<>();
     Map<UUID, TransactionAcqEntity> transactionsToUpdate = new LinkedHashMap<>();
@@ -45,8 +49,26 @@ public class AdjustmentTransactionLinkService {
       Optional<TransactionAcqEntity> transactionOpt = findTransaction(adjustment);
 
       if (transactionOpt.isEmpty()) {
+        /*
+         * Ajustes sem NSU (ex.: motivo 28 - aluguel POS/pinpad) nunca têm uma transação
+         * específica para apontar - a Rede não amarra esse tipo de tarifa a um CV. O layout
+         * EEFI, porém, preenche o RV/PV do ajuste independente do motivo (só o NSU é restrito
+         * aos motivos 16/18/23), então ainda dá pra achar o resumo de vendas certo e evitar
+         * que o ajuste fique órfão (sem salesSummary) na conciliação banco x adquirente.
+         */
+        Optional<SalesSummaryEntity> salesSummaryOpt = findSalesSummaryByRvAndPv(adjustment);
+
+        if (salesSummaryOpt.isPresent()) {
+          adjustment.setSalesSummary(salesSummaryOpt.get());
+          if (adjustment.getId() != null) {
+            adjustmentsToUpdate.put(adjustment.getId(), adjustment);
+          }
+          linkedBySalesSummaryOnly++;
+          continue;
+        }
+
         log.debug(
-          "Ajuste não vinculado a transação. adjustmentId={}, recordType={}, nsu={}, authorization={}, pv={}, rvOriginal={}, rvAdjustment={}",
+          "Ajuste não vinculado a transação nem a resumo de vendas. adjustmentId={}, recordType={}, nsu={}, authorization={}, pv={}, rvOriginal={}, rvAdjustment={}",
           adjustment.getId(),
           adjustment.getRecordType(),
           adjustment.getNsu(),
@@ -115,7 +137,7 @@ public class AdjustmentTransactionLinkService {
       transactionAcqRepository.saveAll(transactionsToUpdate.values());
     }
 
-    return new LinkResult(analyzed, linked);
+    return new LinkResult(analyzed, linked, linkedBySalesSummaryOnly);
   }
 
   private Optional<TransactionAcqEntity> findTransaction(AdjustmentEntity adjustment) {
@@ -207,6 +229,44 @@ public class AdjustmentTransactionLinkService {
     return transactionAcqRepository.findFirstByNsu(adjustment.getNsu());
   }
 
+  /*
+   * Fallback para ajustes sem NSU (nenhuma transação "CV" pra apontar - ex.: aluguel de
+   * POS/pinpad, motivo 28). O RV/PV do ajuste ainda identifica o resumo de vendas certo,
+   * então usamos o mesmo par acquirer+pvNumber+rvNumber que o SalesSummaryRepository já
+   * expõe (ver ProcessRedeEeFiService.safeSalesSummary) em vez de deixar o ajuste órfão.
+   */
+  private Optional<SalesSummaryEntity> findSalesSummaryByRvAndPv(AdjustmentEntity adjustment) {
+    if (adjustment.getSalesSummary() != null) {
+      return Optional.of(adjustment.getSalesSummary());
+    }
+
+    if (adjustment.getAcquirer() == null || adjustment.getAcquirer().getId() == null) {
+      return Optional.empty();
+    }
+
+    Integer pvNumber = firstNonNull(
+      adjustment.getPvNumberOriginal(),
+      adjustment.getPvNumber(),
+      adjustment.getPvNumberAdjustment()
+    );
+
+    Integer rvNumber = firstNonNull(
+      adjustment.getRvNumberOriginal(),
+      adjustment.getRvNumberInstallmentOriginal(),
+      adjustment.getRvNumberAdjustment()
+    );
+
+    if (pvNumber == null || rvNumber == null) {
+      return Optional.empty();
+    }
+
+    return salesSummaryRepository.findFirstByAcquirer_IdAndPvNumberAndRvNumberOrderByRvDateDesc(
+      adjustment.getAcquirer().getId(),
+      pvNumber,
+      rvNumber
+    );
+  }
+
   private String normalizeAuthorization(String authorization) {
     if (authorization == null || authorization.isBlank()) {
       return null;
@@ -230,6 +290,6 @@ public class AdjustmentTransactionLinkService {
     return null;
   }
 
-  public record LinkResult(int analyzed, int linked) {
+  public record LinkResult(int analyzed, int linked, int linkedBySalesSummaryOnly) {
   }
 }

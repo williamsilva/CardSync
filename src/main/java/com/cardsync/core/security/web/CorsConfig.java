@@ -20,7 +20,7 @@ public class CorsConfig {
     // headers usados pelo baseline (CSRF, JSON, etc.)
     cfg.setMaxAge(3600L);
     cfg.setAllowedHeaders(List.of("Content-Type", "Accept", "Authorization", "X-XSRF-TOKEN", "X-Requested-With"));
-    cfg.setExposedHeaders(List.of("Authorization","Content-Type","Accept","X-Requested-With","X-XSRF-TOKEN", "Location"));
+    cfg.setExposedHeaders(List.of("Authorization","Content-Type","Accept","X-Requested-With","X-XSRF-TOKEN", "Location", "Content-Disposition"));
     cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

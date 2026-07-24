@@ -29,6 +29,12 @@ public record ReconciliationSettingsModel(
   int dateToleranceDaysAfter,
   BigDecimal valueTolerance,
   int bankMarkNotReconciledAfterDays,
+  /**
+   * Teto de centavos para o subset-sum por programação dinâmica na conciliação Banco x Ordem de
+   * Crédito/Parcela (Etapa 7). Acima dele, o subconjunto não é tentado e o lançamento fica
+   * pendente mesmo com ordens compatíveis disponíveis.
+   */
+  long subsetDpMaxCents,
   // Rigidez do matching Banco x Ordem de Crédito / Parcela (Etapa 7) — default false =
   // comportamento legado (campo opcional/coringa quando nulo/desconhecido em qualquer lado)
   boolean flagMatchRequired,

@@ -116,6 +116,11 @@ public class BankTextSignalResolver {
     return containsAny(normalizedText, "AMEX", "AMERICAN EXPRESS");
   }
 
+  /** Santander abrevia "Banescard" para "BANESC" no histórico (ex.: "867379REDE-BANESC DEB"). */
+  public boolean isBanescardSignal(String normalizedText) {
+    return containsAny(normalizedText, "BANESC", "BANESCARD");
+  }
+
   private boolean looksLikeDate(String value) {
     if (value == null || value.length() != 8) return false;
     try {

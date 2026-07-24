@@ -211,9 +211,10 @@ public class ProcessRedeEeFiService {
       AdjustmentTransactionLinkService.LinkResult financialAdjustmentLinkResult =
         adjustmentTransactionLinkService.linkSavedAdjustments(savedFinancialAdjustments);
       log.info(
-        "🔗 Vínculo de ajustes EEFI com transações: analisados={}, vinculados={}",
+        "🔗 Vínculo de ajustes EEFI com transações: analisados={}, vinculados={}, vinculadosSomenteResumo={}",
         financialAdjustmentLinkResult.analyzed(),
-        financialAdjustmentLinkResult.linked()
+        financialAdjustmentLinkResult.linked(),
+        financialAdjustmentLinkResult.linkedBySalesSummaryOnly()
       );
       negotiatedTransactionRepository.saveAll(negotiatedTransactions);
       pixCancellationRepository.saveAll(pixCancellations);

@@ -15,11 +15,11 @@ public class BankStatementClassifierService {
   private static final int MODALITY_BANK_DEBIT = 1;
   private static final int MODALITY_BANK_CREDIT = 2;
 
+  private final FlagRepository flagRepository;
+  private final AcquirerRepository acquirerRepository;
   private final BankTextSignalResolver textSignalResolver;
   private final BankingDomicileResolver bankingDomicileResolver;
-  private final AcquirerRepository acquirerRepository;
   private final EstablishmentRepository establishmentRepository;
-  private final FlagRepository flagRepository;
 
   public BankStatementClassification classify(
     String rawText,
@@ -85,17 +85,34 @@ public class BankStatementClassifierService {
     return false;
   }
 
-  private Optional<FlagEntity> resolveFlag(String normalizedText) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  Optional<FlagEntity> resolveFlag(String normalizedText) {
+    return resolveFlag(normalizedText, flagRepository.findAll());
+  }
+
+  /**
+   * Mesma resolução, mas recebendo a lista de bandeiras já carregada — usado por
+   * BankStatementFlagReclassificationService para reclassificar em lote sem repetir
+   * flagRepository.findAll() a cada lançamento (antes eram 2 consultas extras por linha).
+   */
+  Optional<FlagEntity> resolveFlag(String normalizedText, List<FlagEntity> flags) {
     if (normalizedText == null || normalizedText.isBlank()) return Optional.empty();
 
-    Optional<FlagEntity> byKnownAlias = flagRepository.findAll().stream()
+    Optional<FlagEntity> byKnownAlias = flags.stream()
       .filter(f -> matchesKnownFlag(normalizedText, f))
       .findFirst();
     if (byKnownAlias.isPresent()) return byKnownAlias;
 
-    return flagRepository.findAll().stream()
-      .filter(f -> textSignalResolver.containsNormalized(normalizedText, f.getName())
-        || textSignalResolver.containsNormalized(normalizedText, String.valueOf(f.getErpCode())))
+    // Antes também casava por erp_code (String.valueOf(f.getErpCode())) como substring solta no
+    // texto — um código de 1-2 dígitos (ex.: American Express=3) quase sempre aparece por
+    // coincidência dentro do PV/referência do lançamento (ex.: "867379"), então bandeiras sem
+    // sinal próprio em matchesKnownFlag (Cabal, Hipercard, ...) nunca chegavam a ser avaliadas
+    // por nome — o primeiro erp_code coincidente na ordem de findAll() vencia antes. Casar só
+    // pelo nome é mais restrito, mas correto para bandeiras cujo texto do banco traz o nome por
+    // extenso (ex.: "867379REDE-CABAL DEB" contém "CABAL"); bandeiras abreviadas pelo banco
+    // (ex.: Banescard -> "BANESC") continuam precisando de sinal próprio em matchesKnownFlag.
+    return flags.stream()
+      .filter(f -> textSignalResolver.containsNormalized(normalizedText, f.getName()))
       .findFirst();
   }
 
@@ -105,6 +122,9 @@ public class BankStatementClassifierService {
     if (textSignalResolver.isMasterSignal(normalizedText) && (name.contains("MASTER") || name.contains("MASTERCARD"))) return true;
     if (textSignalResolver.isEloSignal(normalizedText) && name.contains("ELO")) return true;
     if (textSignalResolver.isAmexSignal(normalizedText) && (name.contains("AMEX") || name.contains("AMERICAN"))) return true;
+    // Santander abrevia "Banescard" para "BANESC" no histórico — o nome completo nunca aparece,
+    // então o casamento por substring de nome (Pass 2 de resolveFlag) nunca bate sozinho.
+    if (textSignalResolver.isBanescardSignal(normalizedText) && name.contains("BANESCARD")) return true;
     return false;
   }
 

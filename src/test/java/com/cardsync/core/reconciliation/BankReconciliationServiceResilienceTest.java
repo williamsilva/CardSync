@@ -10,6 +10,7 @@ import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
@@ -47,6 +48,8 @@ class BankReconciliationServiceResilienceTest {
   private final EntityManager entityManager = mock(EntityManager.class);
   private final BankReconciliationMatcher matcher = mock(BankReconciliationMatcher.class);
 
+  private final AdjustmentRepository adjustmentRepository = mock(AdjustmentRepository.class);
+
   private final BankReconciliationService service = new BankReconciliationService(
     entityManager,
     matcher,
@@ -56,7 +59,8 @@ class BankReconciliationServiceResilienceTest {
     installmentAcqRepository,
     null, // transactionErpRepository — não usado neste caminho
     null, // transactionAcqRepository — não usado neste caminho
-    settingsService
+    settingsService,
+    adjustmentRepository
   );
 
   @Test

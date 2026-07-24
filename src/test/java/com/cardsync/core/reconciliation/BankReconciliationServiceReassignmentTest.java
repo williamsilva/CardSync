@@ -46,7 +46,8 @@ class BankReconciliationServiceReassignmentTest {
     installmentAcqRepository,
     null, // transactionErpRepository — só usado se houver parcelas vinculadas
     null, // transactionAcqRepository — não usado por applyCreditOrderMatch
-    null  // reconciliationSettingsService — não usado por applyCreditOrderMatch
+    null, // reconciliationSettingsService — não usado por applyCreditOrderMatch
+    null  // adjustmentRepository — não usado por applyCreditOrderMatch
   );
 
   @Test

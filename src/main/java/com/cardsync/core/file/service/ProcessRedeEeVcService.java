@@ -218,9 +218,10 @@ public class ProcessRedeEeVcService {
       AdjustmentTransactionLinkService.LinkResult adjustmentLinkResult =
         adjustmentTransactionLinkService.linkSavedAdjustments(savedAdjustments);
       log.info(
-        "🔗 Vínculo de ajustes EEVC com transações: analisados={}, vinculados={}",
+        "🔗 Vínculo de ajustes EEVC com transações: analisados={}, vinculados={}, vinculadosSomenteResumo={}",
         adjustmentLinkResult.analyzed(),
-        adjustmentLinkResult.linked()
+        adjustmentLinkResult.linked(),
+        adjustmentLinkResult.linkedBySalesSummaryOnly()
       );
       totalizerMatrixRepository.saveAll(totalizerMatrices);
       archiveTrailerRepository.saveAll(archiveTrailers);

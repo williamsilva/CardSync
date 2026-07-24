@@ -102,4 +102,17 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
   """)
   long countPendingWithoutEstablishment(@Param("pendingStatus") Integer pendingStatus);
 
+  /**
+   * Lançamentos ainda pendentes, para o backfill de reclassificação de bandeira
+   * (BankStatementFlagReclassificationService) — escopo reduzido para não varrer a tabela
+   * inteira (que cresce sem limite com o histórico) quando só os pendentes importam de fato
+   * para conciliar agora.
+   */
+  @Query("""
+    select rb from ReleasesBankEntity rb
+    left join fetch rb.flag
+    where rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus
+  """)
+  List<ReleasesBankEntity> findPendingForFlagReclassification(@Param("pendingStatus") Integer pendingStatus);
+
 }
