@@ -38,6 +38,8 @@ public class ReleasesBankModelAssembler extends RepresentationModelAssemblerSupp
     model.setModalityPaymentBank(entity.getModalityPaymentBank());
     model.setDocumentComplementNumber(entity.getDocumentComplementNumber());
     model.setDescriptionHistoricalBank(entity.getDescriptionHistoricalBank());
+    model.setDivergenceValue(entity.getDivergenceValue());
+    model.setDivergenceReason(entity.getDivergenceReason());
 
     model.setFlag(toFlag(entity.getFlag()));
     model.setBank(toBank(entity.getBank()));

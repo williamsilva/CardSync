@@ -121,6 +121,7 @@ public class BankStatementClassifierService {
     if (textSignalResolver.isVisaSignal(normalizedText) && name.contains("VISA")) return true;
     if (textSignalResolver.isMasterSignal(normalizedText) && (name.contains("MASTER") || name.contains("MASTERCARD"))) return true;
     if (textSignalResolver.isEloSignal(normalizedText) && name.contains("ELO")) return true;
+    if (textSignalResolver.isCabalSignal(normalizedText) && name.contains("CABAL")) return true;
     if (textSignalResolver.isAmexSignal(normalizedText) && (name.contains("AMEX") || name.contains("AMERICAN"))) return true;
     // Santander abrevia "Banescard" para "BANESC" no histórico — o nome completo nunca aparece,
     // então o casamento por substring de nome (Pass 2 de resolveFlag) nunca bate sozinho.

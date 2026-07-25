@@ -664,12 +664,13 @@ public class BankReconciliationService {
   /**
    * Desfaz a conciliação de um lançamento bancário: as ordens de crédito e
    * parcelas vinculadas voltam ao estado anterior (pendentes), o próprio
-   * lançamento volta a PENDING, e as transações/resumos de venda afetados têm
-   * seu status recalculado a partir do que sobrar reconciliado (caso o resumo
-   * ou a transação tenham outras ordens/parcelas ligadas a lançamentos
-   * diferentes). Não altera o vínculo resumo↔ordem (salesSummaryStatus da
-   * ordem, etapa 6) nem nenhum dado importado do arquivo — só o que a
-   * conciliação bancária (etapa 7) escreveu.
+   * lançamento volta a PENDING, e os resumos de venda afetados têm seu status
+   * recalculado a partir do que sobrar reconciliado (caso o resumo tenha
+   * outras ordens ligadas a lançamentos diferentes). Não altera o status da
+   * TransactionAcqEntity/TransactionErpEntity (pertence a outra etapa da
+   * esteira), o vínculo resumo↔ordem (salesSummaryStatus da ordem, etapa 6)
+   * nem nenhum dado importado do arquivo — só o que a conciliação bancária
+   * (etapa 7) escreveu.
    */
   @Transactional
   public UndoBankReconciliationResult undoReconciliation(UUID releaseBankId) {
@@ -706,12 +707,13 @@ public class BankReconciliationService {
     }
     installmentAcqRepository.saveAll(installments);
 
-    recomputeTransactionsAfterUndo(installments);
     recomputeSalesSummariesFromCreditOrders(orders, affectedSummaryIds);
 
     release.setReconciliationStatus(StatusPaymentBankEnum.PENDING);
     release.setNumberCreditOrders(0);
     release.setNumberReconciliations(Math.max(0, safeInt(release.getNumberReconciliations()) - orders.size()));
+    release.setDivergenceValue(null);
+    release.setDivergenceReason(null);
     releasesBankRepository.save(release);
 
     log.info(
@@ -720,38 +722,6 @@ public class BankReconciliationService {
     );
 
     return new UndoBankReconciliationResult(orders.size(), installments.size());
-  }
-
-  /** Recalcula o status das transações ADQ (e do ERP correspondente) afetadas pelas parcelas revertidas. */
-  private void recomputeTransactionsAfterUndo(List<InstallmentAcqEntity> resetInstallments) {
-    Set<UUID> transactionIds = resetInstallments.stream()
-      .map(InstallmentAcqEntity::getTransaction)
-      .filter(Objects::nonNull)
-      .map(TransactionAcqEntity::getId)
-      .filter(Objects::nonNull)
-      .collect(Collectors.toSet());
-    if (transactionIds.isEmpty()) return;
-
-    Map<UUID, List<InstallmentAcqEntity>> installmentsByTx = installmentAcqRepository
-      .findByTransactionIdIn(transactionIds).stream()
-      .filter(i -> i.getTransaction() != null && i.getTransaction().getId() != null)
-      .collect(Collectors.groupingBy(i -> i.getTransaction().getId()));
-
-    Map<UUID, TransactionErpEntity> erpByTxId = transactionErpRepository
-      .findByTransactionAcqIdIn(transactionIds).stream()
-      .filter(e -> e.getTransactionAcq() != null && e.getTransactionAcq().getId() != null)
-      .collect(Collectors.toMap(e -> e.getTransactionAcq().getId(), e -> e, (a, b) -> a));
-
-    Set<UUID> updatedTransactions = new HashSet<>();
-    Set<UUID> affectedSalesSummaryIdsFromTransactions = new HashSet<>();
-    for (InstallmentAcqEntity installment : resetInstallments) {
-      TransactionAcqEntity transaction = installment.getTransaction();
-      if (transaction == null || transaction.getId() == null || updatedTransactions.contains(transaction.getId())) continue;
-      List<InstallmentAcqEntity> txInstallments = installmentsByTx.getOrDefault(transaction.getId(), List.of());
-      updateStatusTransactionBatched(transaction, txInstallments, erpByTxId.get(transaction.getId()), affectedSalesSummaryIdsFromTransactions);
-      updatedTransactions.add(transaction.getId());
-    }
-    recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIdsFromTransactions);
   }
 
   /**

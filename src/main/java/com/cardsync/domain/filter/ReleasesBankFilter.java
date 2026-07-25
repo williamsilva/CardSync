@@ -25,6 +25,9 @@ public record ReleasesBankFilter(
   List<StatusPaymentBankEnum> statusPaymentBank,
   List<ModalityPaymentBankEnum> modalityPaymentBank,
 
+  /** Quando true, traz só lançamentos vinculados manualmente com diferença de valor aceita. */
+  Boolean hasDivergence,
+
   PeriodEnum periodReleaseDate,
 
   @JsonFormat(with = JsonFormat.Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY)

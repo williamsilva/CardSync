@@ -37,7 +37,17 @@ public class ReleasesBankAdvancedFields extends BaseSpecificationSupport<Release
     spec = spec.and(inPath(filter.acquirers(), ReleasesBankAdvancedFields::parseUuidOrNull,"acquirer", "id"));
 
     spec = spec.and(localDatePeriod("releaseDate", filter.periodReleaseDate(), filter.releaseDate(), true));
+    spec = spec.and(hasDivergence(filter.hasDivergence()));
 
     return spec;
+  }
+
+  /** Só filtra quando true — lançamentos vinculados manualmente com diferença de valor aceita
+   * (ver ManualBankReconciliationService.reconcile / ReleasesBankEntity.divergenceValue). */
+  private Specification<ReleasesBankEntity> hasDivergence(Boolean value) {
+    if (value == null || !value) {
+      return Specs.all();
+    }
+    return (root, query, cb) -> cb.isNotNull(root.get("divergenceValue"));
   }
 }

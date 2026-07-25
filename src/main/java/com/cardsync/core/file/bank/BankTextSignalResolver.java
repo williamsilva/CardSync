@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /**
  * Normaliza e extrai sinais comerciais de textos bancários/CNAB.
- *
+
  * Mantém a regra fora do parser CNAB para que o Lote 6 possa reutilizar a mesma
  * classificação na conciliação bancária.
  */
@@ -105,11 +105,15 @@ public class BankTextSignalResolver {
   }
 
   public boolean isMasterSignal(String normalizedText) {
-    return containsAny(normalizedText, "MASTER", "MASTERCARD", "MAESTRO", "MCD", "MCC");
+    return containsAny(normalizedText, "MASTER", "MAST", "MASTERCARD", "MAESTRO", "MCD", "MCC");
   }
 
   public boolean isEloSignal(String normalizedText) {
     return containsAny(normalizedText, "ELO");
+  }
+
+  public boolean isCabalSignal(String normalizedText) {
+    return containsAny(normalizedText, "CABAL", "CABA");
   }
 
   public boolean isAmexSignal(String normalizedText) {
@@ -118,7 +122,7 @@ public class BankTextSignalResolver {
 
   /** Santander abrevia "Banescard" para "BANESC" no histórico (ex.: "867379REDE-BANESC DEB"). */
   public boolean isBanescardSignal(String normalizedText) {
-    return containsAny(normalizedText, "BANESC", "BANESCARD");
+    return containsAny(normalizedText, "BANESC", "BANE", "BANESCARD");
   }
 
   private boolean looksLikeDate(String value) {

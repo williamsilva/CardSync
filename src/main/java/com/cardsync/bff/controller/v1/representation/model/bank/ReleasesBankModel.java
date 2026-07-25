@@ -39,6 +39,10 @@ public class ReleasesBankModel extends RepresentationModel<@NonNull ReleasesBank
   private StatusPaymentBankEnum statusPaymentBank;
   private ModalityPaymentBankEnum modalityPaymentBank;
 
+  /** Diferença aceita na conciliação manual (ver ManualBankReconciliationService.reconcile), com o motivo informado. Null quando o vínculo bateu exato. */
+  private BigDecimal divergenceValue;
+  private String divergenceReason;
+
   private FlagMinimalModel flag;
   private BankMinimalModel bank;
   private CompanyMinimalModel company;
