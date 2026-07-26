@@ -115,4 +115,39 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
   """)
   List<ReleasesBankEntity> findPendingForFlagReclassification(@Param("pendingStatus") Integer pendingStatus);
 
+  /**
+   * Lançamentos de recebimento (categoria RECEIPT) com modalidade não classificada, para o
+   * backfill de reclassificação de modalidade (BankStatementModalityReclassificationService).
+   * Sem restrição por reconciliationStatus (diferente do backfill de bandeira): o universo aqui
+   * é bem menor (não cresce sem limite — só lançamentos que a esteira nunca conseguiu classificar)
+   * e lançamentos já pagos precisam ser corrigidos também, já que ficam invisíveis no Extrato
+   * Bancário (ReleasesBankSpecs só lista modalidade em {CASH_DEBIT, CASH_CREDIT, ANTECIP_CRED}).
+   */
+  @Query("""
+    select rb from ReleasesBankEntity rb
+    where rb.releaseCategory = :receiptCategory
+      and rb.modalityPaymentBank = :unclassifiedModality
+  """)
+  List<ReleasesBankEntity> findUnclassifiedModalityForReclassification(
+    @Param("receiptCategory") Integer receiptCategory,
+    @Param("unclassifiedModality") Integer unclassifiedModality
+  );
+
+  /**
+   * Lançamentos de recebimento (categoria RECEIPT) sem estabelecimento vinculado, para o backfill
+   * de reclassificação de estabelecimento (BankStatementEstablishmentReclassificationService).
+   * Causa raiz: BankTextSignalResolver#extractPvCandidates usava \\b\\d{5,12}\\b — \\b não separa
+   * letra de dígito, então PVs colados direto num marcador de texto (ex.: "CD0007866470",
+   * "350834GETNET-VISA") nunca eram extraídos e o estabelecimento nunca era resolvido.
+   */
+  @Query("""
+    select rb from ReleasesBankEntity rb
+    left join fetch rb.acquirer
+    where rb.releaseCategory = :receiptCategory
+      and rb.establishment is null
+  """)
+  List<ReleasesBankEntity> findWithoutEstablishmentForReclassification(
+    @Param("receiptCategory") Integer receiptCategory
+  );
+
 }

@@ -107,6 +107,22 @@ public interface EstablishmentRepository extends JpaRepository<EstablishmentEnti
 
   Optional<EstablishmentEntity> findFirstByPvNumberAndCompany_Cnpj(Integer pvNumber, String companyCnpj);
 
+  /**
+   * Fallback pra quando o banco trunca o PV no texto do extrato (ex.: Santander guarda só os
+   * últimos 6 dígitos do PV real em alguns campos — "867379" em vez de "7867379", sem sobrar
+   * essa informação em nenhum outro campo do CNAB). Escopado ao mesmo adquirente pra não linkar
+   * o estabelecimento de uma empresa errada por coincidência de sufixo.
+   */
+  @Query("""
+    select e from EstablishmentEntity e
+    where e.acquirer.id = :acquirerId
+      and cast(e.pvNumber as string) like concat('%', :suffix)
+  """)
+  List<EstablishmentEntity> findByPvNumberSuffixAndAcquirerId(
+    @Param("suffix") String suffix,
+    @Param("acquirerId") UUID acquirerId
+  );
+
   boolean existsByPvNumberAndCompany_IdAndAcquirer_Id(Integer pvNumber, UUID companyId, UUID acquirerId);
 
   boolean existsByPvNumberAndCompany_IdAndAcquirer_IdAndIdNot(Integer pvNumber, UUID companyId, UUID acquirerId, UUID id);

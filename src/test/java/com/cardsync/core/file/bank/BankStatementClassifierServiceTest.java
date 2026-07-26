@@ -24,11 +24,11 @@ class BankStatementClassifierServiceTest {
 
   private final FlagRepository flagRepository = mock(FlagRepository.class);
   private final BankStatementClassifierService service = new BankStatementClassifierService(
+    flagRepository,
+    null,
     new BankTextSignalResolver(),
     null,
-    null,
-    null,
-    flagRepository
+    null
   );
 
   @Test

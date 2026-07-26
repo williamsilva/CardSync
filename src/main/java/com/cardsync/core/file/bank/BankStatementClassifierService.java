@@ -129,7 +129,8 @@ public class BankStatementClassifierService {
     return false;
   }
 
-  private Optional<EstablishmentEntity> resolveEstablishment(List<Integer> pvCandidates, AcquirerEntity acquirer) {
+  /** Visibilidade de pacote (não private) para permitir reuso em BankStatementEstablishmentReclassificationService. */
+  Optional<EstablishmentEntity> resolveEstablishment(List<Integer> pvCandidates, AcquirerEntity acquirer) {
     if (pvCandidates == null || pvCandidates.isEmpty()) return Optional.empty();
 
     for (Integer pv : pvCandidates) {
@@ -137,6 +138,22 @@ public class BankStatementClassifierService {
         ? establishmentRepository.findFirstByPvNumberAndAcquirer_Id(pv, acquirer.getId())
         : establishmentRepository.findFirstByPvNumber(pv);
       if (found.isPresent()) return found;
+    }
+
+    // Fallback: alguns bancos (ex.: Santander) guardam só os últimos 6 dígitos do PV real em
+    // certos campos do CNAB ("867379" em vez de "7867379") — a informação não sobra em nenhum
+    // outro campo, então o único jeito de resolver é por sufixo. Restrito ao mesmo adquirente e
+    // só quando o sufixo casa com EXATAMENTE um estabelecimento, pra não linkar a empresa errada
+    // por coincidência.
+    if (acquirer != null) {
+      for (Integer pv : pvCandidates) {
+        String digits = String.valueOf(pv);
+        if (digits.length() != 6) continue;
+
+        List<EstablishmentEntity> matches = establishmentRepository
+          .findByPvNumberSuffixAndAcquirerId(digits, acquirer.getId());
+        if (matches.size() == 1) return Optional.of(matches.get(0));
+      }
     }
 
     return Optional.empty();

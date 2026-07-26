@@ -20,7 +20,12 @@ import java.util.regex.Pattern;
 @Component
 public class BankTextSignalResolver {
 
-  private static final Pattern NUMBER_PATTERN = Pattern.compile("\\b\\d{5,12}\\b");
+  // \b não serve aqui: é limite entre \w e não-\w, e letra-para-dígito (ou dígito-para-letra)
+  // NÃO é uma transição de \w — dígitos e letras são ambos \w. Muitos bancos colam o PV direto
+  // num marcador de texto sem espaço (ex.: "CD0007866470", "DBTO1100125202", "350834GETNET-VISA"),
+  // então \b\d{5,12}\b nunca batia nesses casos e o PV nunca era extraído (establishment ficava
+  // sempre null). Usar lookaround específico de dígito em vez de \w resolve os dois lados.
+  private static final Pattern NUMBER_PATTERN = Pattern.compile("(?<!\\d)\\d{5,12}(?!\\d)");
   private static final Pattern PV_HINT_PATTERN = Pattern.compile("(?:PV|EC|ESTAB|ESTABELECIMENTO|LOJA|COD)\\s*(?:N|NO|NUM|NR|:|-)?\\s*(\\d{5,12})");
 
   public String normalize(String value) {
@@ -78,8 +83,12 @@ public class BankTextSignalResolver {
   }
 
   public boolean isCreditSignal(String normalizedText) {
+    // "CD" é a abreviação real usada pelo Rede/Santander pra crédito (ex.: "REDE   MAST
+    // CD0007866470") — sem ela, lançamentos com bandeira abreviada (MAST, e não MASTER/MASTERCARD)
+    // nunca batem em nenhum sinal e ficam com modalidade não classificada (0), o que os torna
+    // invisíveis no Extrato Bancário (ReleasesBankSpecs só lista modalidade em {1, 2, 13}).
     return containsAny(normalizedText,
-      "CREDITO", "CRED", "CARTAO CREDITO", "VISA", "MASTER", "MASTERCARD", "AMEX", "ELO", "HIPER", "CR");
+      "CREDITO", "CRED", "CARTAO CREDITO", "VISA", "MASTER", "MASTERCARD", "AMEX", "ELO", "HIPER", "CR", "CD");
   }
 
   public boolean isRedeSignal(String normalizedText) {

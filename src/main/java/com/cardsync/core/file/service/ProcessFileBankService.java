@@ -3,9 +3,11 @@ package com.cardsync.core.file.service;
 import com.cardsync.core.file.bank.Cnab240BankLayout;
 import com.cardsync.core.file.bank.Cnab240FileProcessor;
 import com.cardsync.core.file.config.FileProcessingProperties;
+import com.cardsync.core.file.util.FileHashService;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.FileUtil;
 import com.cardsync.core.file.util.MoveFileService;
+import com.cardsync.domain.repository.ProcessedFileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,8 +29,10 @@ public class ProcessFileBankService {
   private static final Charset CNAB_CHARSET = Charset.forName("windows-1252");
 
   private final MoveFileService moveFileService;
+  private final FileHashService fileHashService;
   private final Cnab240FileProcessor cnab240FileProcessor;
   private final FileProcessingProperties fileProcessingProperties;
+  private final ProcessedFileRepository processedFileRepository;
 
   public void processFiles() {
     Map<String, FileProcessingProperties.FilePaths> bankPaths = fileProcessingProperties.getBankPaths();
@@ -124,23 +128,42 @@ public class ProcessFileBankService {
   }
 
   private FileResult validateAndProcess(String bankKey, Path file, FileProcessingProperties.FilePaths paths) {
-    try (BufferedReader reader = Files.newBufferedReader(file, CNAB_CHARSET)) {
-      String firstLine = reader.readLine();
-      String bankCode = FileParserUtils.extractStringLine(firstLine, "0-3", 1);
-      String recordType = FileParserUtils.extractStringLine(firstLine, "7-8", 1);
-      Cnab240BankLayout layout = Cnab240BankLayout.fromBankCode(bankCode);
-
-      if (layout != null && "0".equals(recordType)) {
-        cnab240FileProcessor.processFile(file, paths, layout);
-        return FileResult.PROCESSED;
+    try {
+      // Checagem por conteúdo (mesmo padrão de ProcessFileRedeService/ProcessFileErpService):
+      // a constraint uk_cs_processed_file_file_origin só pega duplicidade quando o NOME do
+      // arquivo bate exatamente. Um reenvio do banco com nome diferente (comum em integrações
+      // SFTP com timestamp/sequencial no nome) passava despercebido e gerava um segundo lote de
+      // lançamentos de extrato bancário, business-idênticos ao original — ver duplicidade em
+      // Extrato Bancário reportada pelo usuário.
+      String contentHash = fileHashService.sha256(file);
+      var originalProcessedFile = processedFileRepository.findFirstByContentHash(contentHash);
+      if (originalProcessedFile.isPresent()) {
+        log.warn(
+          "⚠ Arquivo bancário '{}' duplicado por conteúdo: sha256={}, já processado como '{}'. Movendo para duplicados.",
+          file.getFileName(), contentHash, originalProcessedFile.get().getFile()
+        );
+        moveFileService.moveNowBank(file, paths.getDuplicate(), originalProcessedFile.get().getDateFile(), null, null);
+        return FileResult.DUPLICATE;
       }
 
-      String preview = firstLine == null ? "" : firstLine.substring(0, Math.min(firstLine.length(), 40));
-      log.info("ℹ Arquivo bancário não reconhecido em {}: {}. Movendo para invalid_file. bankCode={}, recordType={}, primeiros40='{}', tamanhoLinha={}",
-        bankKey, file.getFileName(), bankCode, recordType, preview, firstLine == null ? 0 : firstLine.length());
+      try (BufferedReader reader = Files.newBufferedReader(file, CNAB_CHARSET)) {
+        String firstLine = reader.readLine();
+        String bankCode = FileParserUtils.extractStringLine(firstLine, "0-3", 1);
+        String recordType = FileParserUtils.extractStringLine(firstLine, "7-8", 1);
+        Cnab240BankLayout layout = Cnab240BankLayout.fromBankCode(bankCode);
 
-      moveFileService.moveNowBank(file, invalidDestination(paths), null, null, null);
-      return FileResult.INVALID;
+        if (layout != null && "0".equals(recordType)) {
+          cnab240FileProcessor.processFile(file, paths, layout, contentHash);
+          return FileResult.PROCESSED;
+        }
+
+        String preview = firstLine == null ? "" : firstLine.substring(0, Math.min(firstLine.length(), 40));
+        log.info("ℹ Arquivo bancário não reconhecido em {}: {}. Movendo para invalid_file. bankCode={}, recordType={}, primeiros40='{}', tamanhoLinha={}",
+          bankKey, file.getFileName(), bankCode, recordType, preview, firstLine == null ? 0 : firstLine.length());
+
+        moveFileService.moveNowBank(file, invalidDestination(paths), null, null, null);
+        return FileResult.INVALID;
+      }
     } catch (DataIntegrityViolationException ex) {
       if (isAlreadyProcessedFile(ex)) {
         log.info("ℹ Arquivo bancário '{}' já foi processado anteriormente e não será importado novamente.",

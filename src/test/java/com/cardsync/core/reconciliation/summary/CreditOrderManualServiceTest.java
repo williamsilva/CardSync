@@ -33,7 +33,7 @@ class CreditOrderManualServiceTest {
   private final CreditOrderRepository creditOrderRepository = mock(CreditOrderRepository.class);
 
   private final CreditOrderManualService service = new CreditOrderManualService(
-    null, creditOrderRepository, salesSummaryRepository, transactionAcqRepository, null, null, null
+    null, creditOrderRepository, salesSummaryRepository, transactionAcqRepository, null, null
   );
 
   @Test

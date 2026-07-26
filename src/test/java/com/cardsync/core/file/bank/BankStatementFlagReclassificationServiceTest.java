@@ -30,7 +30,7 @@ class BankStatementFlagReclassificationServiceTest {
   private final FlagRepository flagRepository = mock(FlagRepository.class);
   private final BankTextSignalResolver textSignalResolver = new BankTextSignalResolver();
   private final BankStatementClassifierService classifierService = new BankStatementClassifierService(
-    textSignalResolver, null, null, null, flagRepository
+    flagRepository, null, textSignalResolver, null, null
   );
   private final BankStatementFlagReclassificationService service = new BankStatementFlagReclassificationService(
     releasesBankRepository, classifierService, textSignalResolver, flagRepository

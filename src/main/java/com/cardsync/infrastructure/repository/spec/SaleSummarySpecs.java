@@ -92,9 +92,13 @@ public class SaleSummarySpecs extends BaseSpecificationSupport<SalesSummaryEntit
 
   private static Specification<SalesSummaryEntity> missingCreditOrdersSpec() {
     return (root, query, cb) -> {
+      // countDistinct(installmentNumber), não count(id): CreditOrder duplicada para a mesma
+      // parcela (ex.: reenvio de arquivo EEFI da adquirente cobrindo a mesma parcela já
+      // importada — não há constraint único nem checagem de idempotência por parcela) não
+      // pode mascarar uma parcela realmente faltante como "já coberta".
       Subquery<Long> countSq = query.subquery(Long.class);
       Root<CreditOrderEntity> coRoot = countSq.from(CreditOrderEntity.class);
-      countSq.select(cb.count(coRoot.get("id")))
+      countSq.select(cb.countDistinct(coRoot.get("installmentNumber")))
              .where(cb.equal(coRoot.get("salesSummary"), root));
 
       Subquery<Long> maxSq = query.subquery(Long.class);

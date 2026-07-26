@@ -6,7 +6,6 @@ import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualResu
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderSkipReason;
 import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSummaryModel;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
-import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.CreditOrderEntity;
@@ -19,7 +18,6 @@ import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.infrastructure.repository.spec.SaleSummarySpecs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -46,7 +44,6 @@ public class CreditOrderManualService {
   private final CreditOrderRepository creditOrderRepository;
   private final SalesSummaryRepository salesSummaryRepository;
   private final TransactionAcqRepository transactionAcqRepository;
-  private final ImplantationDateProvider implantationDateProvider;
   private final SaleSummaryModelAssembler saleSummaryModelAssembler;
   private final ReconciliationSettingsService reconciliationSettingsService;
 
@@ -68,25 +65,6 @@ public class CreditOrderManualService {
           .toList();
 
     return new PageImpl<>(content, pageable, total);
-  }
-
-  @Transactional(readOnly = true)
-  public List<SalesSummaryEntity> getPendingSummaries() {
-    int days = reconciliationSettingsService.getCreditOrderPendingDays();
-    LocalDate cutoff    = LocalDate.now().minusDays(days);
-    LocalDate yesterday = LocalDate.now().minusDays(1);
-    LocalDate monthAgo  = yesterday.minusMonths(1);
-    LocalDate implantationDate = implantationDateProvider.get();
-    List<SalesSummaryEntity> summaries = salesSummaryRepository.findSummariesMissingCreditOrders(
-      implantationDate, cutoff, yesterday, monthAgo);
-    // Force-load lazy associations while the session is still open (OSIV disabled)
-    summaries.forEach(ss -> {
-      Hibernate.initialize(ss.getProcessedFile());
-      Hibernate.initialize(ss.getAdjustments());
-      Hibernate.initialize(ss.getCreditOrders());
-      ss.getCreditOrders().forEach(co -> Hibernate.initialize(co.getReleaseBank()));
-    });
-    return summaries;
   }
 
   @Transactional

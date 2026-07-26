@@ -47,12 +47,13 @@ public class Cnab240FileProcessor {
   private final com.cardsync.core.file.service.ProcessedFilePvService processedFilePvService;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-  public void processFile(Path file, FileProcessingProperties.FilePaths paths, Cnab240BankLayout layout) {
+  public void processFile(Path file, FileProcessingProperties.FilePaths paths, Cnab240BankLayout layout, String contentHash) {
     ProcessedFileEntity processedFile = null;
     try {
       log.info("▶ Iniciando leitura CNAB240 {}: {}", layout.getDisplayName(), file.getFileName());
       List<String> lines = Files.readAllLines(file, CNAB_CHARSET);
       processedFile = createProcessedFile(file, lines.size(), layout);
+      processedFile.setContentHash(contentHash);
       processedFile.markProcessing();
 
       CnabProcessingWarningCollector warningCollector = new CnabProcessingWarningCollector();

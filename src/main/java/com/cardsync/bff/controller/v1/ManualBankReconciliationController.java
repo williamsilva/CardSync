@@ -2,8 +2,12 @@ package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ManualBankReconciliationRequest;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.MarkLegacyReleasesRequest;
+import com.cardsync.core.file.bank.BankStatementEstablishmentReclassificationService;
 import com.cardsync.core.file.bank.BankStatementFlagReclassificationService;
+import com.cardsync.core.file.bank.BankStatementModalityReclassificationService;
+import com.cardsync.core.file.bank.ReclassifyBankStatementEstablishmentResult;
 import com.cardsync.core.file.bank.ReclassifyBankStatementFlagsResult;
+import com.cardsync.core.file.bank.ReclassifyBankStatementModalityResult;
 import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.ManualBankReconciliationResult;
 import com.cardsync.core.reconciliation.ManualBankReconciliationService;
@@ -28,6 +32,8 @@ public class ManualBankReconciliationController {
     private final BankReconciliationService bankReconciliationService;
     private final ManualBankReconciliationService manualBankReconciliationService;
     private final BankStatementFlagReclassificationService bankStatementFlagReclassificationService;
+    private final BankStatementModalityReclassificationService bankStatementModalityReclassificationService;
+    private final BankStatementEstablishmentReclassificationService bankStatementEstablishmentReclassificationService;
 
     @PostMapping("/manual")
     @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
@@ -59,5 +65,26 @@ public class ManualBankReconciliationController {
     @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
     public ReclassifyBankStatementFlagsResult reclassifyFlags() {
         return bankStatementFlagReclassificationService.reclassifyAll();
+    }
+
+    /**
+     * Backfill único: reclassifica a modalidade (débito/crédito) dos lançamentos bancários de
+     * recebimento já importados com modalidade não classificada (invisíveis no Extrato Bancário
+     * até serem corrigidos — ver BankStatementModalityReclassificationService).
+     */
+    @PostMapping("/reclassify-modality")
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
+    public ReclassifyBankStatementModalityResult reclassifyModality() {
+        return bankStatementModalityReclassificationService.reclassifyAll();
+    }
+
+    /**
+     * Backfill único: vincula o estabelecimento dos lançamentos bancários de recebimento já
+     * importados sem estabelecimento resolvido (ver BankStatementEstablishmentReclassificationService).
+     */
+    @PostMapping("/reclassify-establishment")
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
+    public ReclassifyBankStatementEstablishmentResult reclassifyEstablishment() {
+        return bankStatementEstablishmentReclassificationService.reclassifyAll();
     }
 }
