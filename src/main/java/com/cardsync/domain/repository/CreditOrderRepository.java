@@ -105,6 +105,38 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
     @Param("reprocess") boolean reprocess
   );
 
+  /**
+   * Candidatas para o backfill de divergência pré-implantação
+   * (PreImplantationDivergenceReconciliationService): mesma empresa, ainda pendentes, sem
+   * lançamento vinculado, com o resumo de venda já reconciliado (mesma precondição usada na
+   * conciliação automática — ver findEligibleIdsGroupedByCompanyForBankReconciliation) e dentro
+   * da janela de data configurada. Compatibilidade fina (banco/bandeira/estabelecimento/
+   * modalidade) é resolvida depois em Java via
+   * BankReconciliationService#isCreditOrderCandidateCompatible, para reusar a mesma lógica do
+   * matcher automático.
+   */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.company
+    left join fetch co.acquirer
+    left join fetch co.flag
+    left join fetch co.salesSummary
+    left join fetch co.bankingDomicile bd
+    left join fetch bd.bank
+    where co.company.id = :companyId
+      and co.releaseBank is null
+      and co.statusPaymentBank = :pendingStatus
+      and co.salesSummaryStatus = :summaryReconciledStatus
+      and co.releaseDate between :from and :to
+  """)
+  List<CreditOrderEntity> findCandidatesForPreImplantationDivergence(
+    @Param("companyId") UUID companyId,
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("summaryReconciledStatus") Integer summaryReconciledStatus,
+    @Param("from") LocalDate from,
+    @Param("to") LocalDate to
+  );
+
   @Transactional
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("""
@@ -309,6 +341,14 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   /** Retorna todos os installmentNumbers existentes para um resumo. */
   @Query("select co.installmentNumber from CreditOrderEntity co where co.salesSummary.id = :summaryId")
   Set<Integer> findInstallmentNumbersBySalesSummaryId(@Param("summaryId") UUID summaryId);
+
+  /**
+   * Mesma consulta acima, mas em lote — usada na prévia da data da próxima ordem de crédito na
+   * listagem de Ordem de Pagamento Manual (ver CreditOrderManualService), evitando uma consulta
+   * por linha da página. Cada linha do retorno é (salesSummary.id, installmentNumber).
+   */
+  @Query("select co.salesSummary.id, co.installmentNumber from CreditOrderEntity co where co.salesSummary.id in :salesSummaryIds")
+  List<Object[]> findInstallmentNumbersBySalesSummaryIdIn(@Param("salesSummaryIds") Collection<UUID> salesSummaryIds);
 
   /**
    * Diagnóstico de impacto do modo estrito de conciliação bancária (ver

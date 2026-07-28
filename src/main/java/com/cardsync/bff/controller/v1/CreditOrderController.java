@@ -1,5 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportPreviewResult;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportResult;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualInput;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualResult;
 import com.cardsync.bff.controller.v1.representation.model.transactions.CreditOrderModel;
@@ -15,11 +17,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -34,6 +39,18 @@ public class CreditOrderController {
   @CheckSecurity.FileProcessing.CanProcess
   public CreditOrderManualResult createManual(@Valid @RequestBody CreditOrderManualInput body) {
     return creditOrderManualService.create(body);
+  }
+
+  @PostMapping(value = "/manual/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @CheckSecurity.FileProcessing.CanProcess
+  public CreditOrderImportPreviewResult previewImportManual(@RequestParam("files") MultipartFile[] files) {
+    return creditOrderManualService.previewAcquirerReportImport(files);
+  }
+
+  @PostMapping(value = "/manual/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @CheckSecurity.FileProcessing.CanProcess
+  public CreditOrderImportResult importManual(@RequestParam("files") MultipartFile[] files) {
+    return creditOrderManualService.importFromAcquirerReport(files);
   }
 
   @PostMapping("/search")

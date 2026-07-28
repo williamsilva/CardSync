@@ -28,6 +28,14 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
+   * Importação em lote do relatório de pagamentos da adquirente (ver
+   * CreditOrderManualService#importFromAcquirerReport) — busca todos os resumos candidatos de
+   * uma vez pelo número do RV (chave de match escolhida para essa importação); rvNumber
+   * repetido entre acquirers/pvNumbers diferentes é desambiguado em memória pelo chamador.
+   */
+  List<SalesSummaryEntity> findByRvNumberIn(Collection<Integer> rvNumbers);
+
+  /**
    * Etapa 1b - Resumo de vendas x TransactionAcq.
    *
    * Consulta agregada que calcula, por SalesSummary, o total de transações vinculadas,

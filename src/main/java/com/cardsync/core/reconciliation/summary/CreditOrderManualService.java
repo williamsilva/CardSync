@@ -1,11 +1,18 @@
 package com.cardsync.core.reconciliation.summary;
 
 import com.cardsync.bff.controller.v1.mapper.model.SaleSummaryModelAssembler;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportPreviewResult;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportResult;
+import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportSkipReason;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualInput;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualResult;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderSkipReason;
 import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSummaryModel;
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
+import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportCsvReader;
+import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportRow;
+import com.cardsync.domain.exception.BusinessException;
+import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.model.CreditOrderEntity;
@@ -13,6 +20,7 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
+import com.cardsync.domain.repository.HolidayRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.infrastructure.repository.spec.SaleSummarySpecs;
@@ -20,18 +28,27 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,25 +63,91 @@ public class CreditOrderManualService {
   private final TransactionAcqRepository transactionAcqRepository;
   private final SaleSummaryModelAssembler saleSummaryModelAssembler;
   private final ReconciliationSettingsService reconciliationSettingsService;
+  private final HolidayRepository holidayRepository;
+  private final AcquirerPaymentReportCsvReader acquirerPaymentReportCsvReader;
 
   @Transactional(readOnly = true)
   public Page<SaleSummaryModel> searchPendingSummaries(Pageable pageable, ListQueryDto<SaleSummaryFilter> query) {
     int days = reconciliationSettingsService.getCreditOrderPendingDays();
     LocalDate cutoffDate = LocalDate.now().minusDays(days);
     LocalDate yesterday  = LocalDate.now().minusDays(1);
-    LocalDate monthAgo   = yesterday.minusMonths(1);
 
-    Specification<SalesSummaryEntity> filterSpec = saleSummarySpecs.fromQueryForPendingCreditOrdersTotals(query, cutoffDate, yesterday, monthAgo);
-    Specification<SalesSummaryEntity> dataSpec   = saleSummarySpecs.fromQueryForPendingCreditOrders(query, cutoffDate, yesterday, monthAgo);
+    Specification<SalesSummaryEntity> filterSpec = saleSummarySpecs.fromQueryForPendingCreditOrdersTotals(query, cutoffDate, yesterday);
+    Specification<SalesSummaryEntity> dataSpec   = saleSummarySpecs.fromQueryForPendingCreditOrders(query, cutoffDate, yesterday);
 
     long total = salesSummaryRepository.count(filterSpec);
-    List<SaleSummaryModel> content = total == 0
+    // dataSpec já monta o ORDER BY completo (orderByTableSort/tableSort, com os aliases de
+    // nextInstallmentValue/nextInstallmentDate etc.) — SimpleJpaRepository#findAll(Specification,
+    // Pageable) reaplica pageable.getSort() por cima, usando os nomes de campo crus direto contra
+    // SalesSummaryEntity (sem conhecer os aliases), o que quebra com "No property 'X' found for
+    // type 'SalesSummaryEntity'" pra qualquer campo que só existe no DTO/no map de aliases (ex.:
+    // nextInstallmentValue/nextInstallmentDate). Por isso passamos aqui um Pageable SEM sort —
+    // a ordenação real já vem da Specification; o pageable original (com sort) continua sendo
+    // usado só pro metadado da resposta (PageImpl abaixo).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+    List<SalesSummaryEntity> entities = total == 0
       ? List.of()
-      : salesSummaryRepository.findAll(dataSpec, pageable).stream()
-          .map(saleSummaryModelAssembler::toModel)
-          .toList();
+      : salesSummaryRepository.findAll(dataSpec, pageableWithoutSort).getContent();
+    List<SaleSummaryModel> content = entities.stream().map(saleSummaryModelAssembler::toModel).toList();
+
+    fillNextInstallmentPreview(entities, content);
 
     return new PageImpl<>(content, pageable, total);
+  }
+
+  /**
+   * Prévia (sem gravar nada) do valor e da data de vencimento que a próxima ordem de crédito
+   * teria se {@link #create} fosse chamado agora para cada resumo da página — mesma fórmula de
+   * {@link #buildCreditOrder}, buscando installmentTotal e as parcelas já existentes em lote
+   * (uma consulta pra página inteira, não uma por linha).
+   */
+  private void fillNextInstallmentPreview(List<SalesSummaryEntity> entities, List<SaleSummaryModel> content) {
+    if (entities.isEmpty()) return;
+
+    List<UUID> summaryIds = entities.stream().map(SalesSummaryEntity::getId).toList();
+
+    Map<UUID, Integer> installmentTotalsBySummaryId = new HashMap<>();
+    for (Object[] row : transactionAcqRepository.findMaxInstallmentBySalesSummaryIdIn(summaryIds)) {
+      installmentTotalsBySummaryId.put((UUID) row[0], ((Number) row[1]).intValue());
+    }
+
+    Map<UUID, Set<Integer>> existingInstallmentsBySummaryId = new HashMap<>();
+    for (Object[] row : creditOrderRepository.findInstallmentNumbersBySalesSummaryIdIn(summaryIds)) {
+      existingInstallmentsBySummaryId
+        .computeIfAbsent((UUID) row[0], ignored -> new HashSet<>())
+        .add((Integer) row[1]);
+    }
+
+    Map<UUID, SalesSummaryEntity> entitiesById = entities.stream()
+      .collect(Collectors.toMap(SalesSummaryEntity::getId, e -> e));
+
+    for (SaleSummaryModel model : content) {
+      SalesSummaryEntity summary = entitiesById.get(model.getId());
+      int installmentTotal = installmentTotalsBySummaryId.getOrDefault(model.getId(), 1);
+      Set<Integer> existing = existingInstallmentsBySummaryId.getOrDefault(model.getId(), Set.of());
+
+      model.setNextInstallmentValue(computeInstallmentValue(model.getLiquidValue(), installmentTotal));
+
+      int nextInstallmentNumber = firstMissingInstallmentNumber(existing, installmentTotal);
+      LocalDate baseDate = summary != null
+        ? (summary.getFirstInstallmentCreditDate() != null ? summary.getFirstInstallmentCreditDate() : summary.getRvDate())
+        : null;
+      model.setNextInstallmentDate(baseDate != null
+        ? adjustToPreviousBusinessDay(baseDate.plusMonths(nextInstallmentNumber - 1))
+        : null);
+    }
+  }
+
+  /** Menor número de parcela em [1, installmentTotal] ainda sem ordem de crédito. */
+  private static int firstMissingInstallmentNumber(Set<Integer> existingInstallments, int installmentTotal) {
+    for (int i = 1; i <= installmentTotal; i++) {
+      if (!existingInstallments.contains(i)) {
+        return i;
+      }
+    }
+    return installmentTotal;
   }
 
   @Transactional
@@ -134,22 +217,259 @@ public class CreditOrderManualService {
     return new CreditOrderManualResult(createdIds.size(), skippedReasons.size(), createdIds, skippedReasons);
   }
 
-  private CreditOrderEntity buildCreditOrder(SalesSummaryEntity summary, int installmentNumber, int installmentTotal) {
-    BigDecimal gross = orZero(summary.getGrossValue());
-    BigDecimal discount = orZero(summary.getDiscountValue());
-    BigDecimal liquid = orZero(summary.getLiquidValue());
+  /**
+   * Importação em lote a partir do relatório real de pagamentos da adquirente (CSV), em vez da
+   * fórmula de aproximação de {@link #buildCreditOrder}. Segue a MESMA regra de elegibilidade já
+   * usada pela tela/criação manual (só gera ordem para parcela ainda ausente — nunca sobrescreve
+   * uma ordem já existente, gerada manualmente ou por este próprio import); quando a parcela do
+   * arquivo já tem ordem, a linha é apenas ignorada e reportada.
+   */
+  @Transactional(readOnly = true)
+  public CreditOrderImportPreviewResult previewAcquirerReportImport(MultipartFile[] files) {
+    ImportProcessingResult processed = processAcquirerReport(files, false);
+    return new CreditOrderImportPreviewResult(
+      fileNames(files),
+      processed.analyzedLines(),
+      processed.eligibleCount(),
+      processed.totalValue(),
+      processed.skippedReasons().size(),
+      processed.skippedReasons()
+    );
+  }
 
-    BigDecimal grossPer = installmentTotal > 1
-      ? gross.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN) : gross;
-    BigDecimal discountPer = installmentTotal > 1
-      ? discount.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN) : discount;
-    BigDecimal releaseValue = installmentTotal > 1
-      ? liquid.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN) : liquid;
+  @Transactional
+  public CreditOrderImportResult importFromAcquirerReport(MultipartFile[] files) {
+    ImportProcessingResult processed = processAcquirerReport(files, true);
+    return new CreditOrderImportResult(
+      processed.analyzedLines(),
+      processed.createdIds().size(),
+      processed.skippedReasons().size(),
+      processed.createdIds(),
+      processed.skippedReasons()
+    );
+  }
+
+  private static List<String> fileNames(MultipartFile[] files) {
+    return java.util.Arrays.stream(files).map(MultipartFile::getOriginalFilename).toList();
+  }
+
+  private record ImportProcessingResult(
+    int analyzedLines,
+    List<UUID> createdIds,
+    List<CreditOrderImportSkipReason> skippedReasons,
+    int eligibleCount,
+    BigDecimal totalValue
+  ) {}
+
+  /**
+   * Lógica compartilhada entre a prévia ({@link #previewAcquirerReportImport}, só leitura, usada
+   * pela tela de confirmação antes do usuário confirmar o import) e o import de fato
+   * ({@link #importFromAcquirerReport}) — {@code persist=false} roda a MESMA análise de
+   * elegibilidade (RV encontrado, RV ambíguo, parcela já existente, erro de parsing) sem gravar
+   * nada no banco, garantindo que a prévia mostrada ao usuário reflita exatamente o que a
+   * confirmação vai gerar.
+   */
+  private ImportProcessingResult processAcquirerReport(MultipartFile[] files, boolean persist) {
+    if (files == null || files.length == 0) {
+      throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "Nenhum arquivo enviado.");
+    }
+
+    List<AcquirerPaymentReportRow> fileRows = new ArrayList<>();
+    for (MultipartFile file : files) {
+      try {
+        fileRows.addAll(acquirerPaymentReportCsvReader.read(file));
+      } catch (IOException e) {
+        throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR,
+          "Falha ao ler o arquivo " + file.getOriginalFilename() + ": " + e.getMessage());
+      }
+    }
+
+    // O relatório real pode trazer mais de uma linha para o mesmo RV+parcela (ex.: parte da
+    // parcela antecipada e o restante liquidado à parte, ambos no mesmo lote/data, possivelmente
+    // em arquivos diferentes quando vários são importados juntos) — confirmado com o usuário
+    // após uma conciliação bancária não fechar: RV 54949685 parcela 6 e RV 64749688 parcela 4
+    // vieram cada um em duas linhas, e a primeira versão desta importação processava só a
+    // primeira e descartava a segunda como "já tem ordem", subestimando o valor real da parcela.
+    // Soma os valores de todas as linhas do mesmo RV+parcela (de todos os arquivos do lote) antes
+    // de aplicar a regra de elegibilidade (ver mergeDuplicateInstallmentLines).
+    List<AcquirerPaymentReportRow> rows = mergeDuplicateInstallmentLines(fileRows);
+
+    Set<Integer> rvNumbers = rows.stream()
+      .map(AcquirerPaymentReportRow::rvNumber)
+      .collect(Collectors.toSet());
+    Map<Integer, List<SalesSummaryEntity>> summariesByRvNumber = salesSummaryRepository.findByRvNumberIn(rvNumbers).stream()
+      .collect(Collectors.groupingBy(SalesSummaryEntity::getRvNumber));
+
+    List<UUID> summaryIds = summariesByRvNumber.values().stream()
+      .flatMap(List::stream)
+      .map(SalesSummaryEntity::getId)
+      .toList();
+    Map<UUID, Set<Integer>> existingInstallmentsBySummaryId = new HashMap<>();
+    for (Object[] row : creditOrderRepository.findInstallmentNumbersBySalesSummaryIdIn(summaryIds)) {
+      existingInstallmentsBySummaryId
+        .computeIfAbsent((UUID) row[0], ignored -> new HashSet<>())
+        .add((Integer) row[1]);
+    }
+
+    List<UUID> createdIds = new ArrayList<>();
+    List<CreditOrderImportSkipReason> skippedReasons = new ArrayList<>();
+    Set<SalesSummaryEntity> affectedSummaries = new LinkedHashSet<>();
+    Map<UUID, Integer> installmentTotalBySummaryId = new HashMap<>();
+    int eligibleCount = 0;
+    BigDecimal totalValue = BigDecimal.ZERO;
+
+    for (AcquirerPaymentReportRow row : rows) {
+      String rvNumberText = row.rvNumber() != null ? String.valueOf(row.rvNumber()) : null;
+
+      if (row.installmentNumber() == null || row.installmentTotal() == null
+          || row.releaseDate() == null || row.releaseValue() == null) {
+        skippedReasons.add(new CreditOrderImportSkipReason(row.fileName(), row.lineNumber(), rvNumberText, row.installmentNumber(), "PARSE_ERROR"));
+        continue;
+      }
+
+      List<SalesSummaryEntity> candidates = summariesByRvNumber.getOrDefault(row.rvNumber(), List.of());
+      SalesSummaryEntity summary;
+      if (candidates.isEmpty()) {
+        skippedReasons.add(new CreditOrderImportSkipReason(row.fileName(), row.lineNumber(), rvNumberText, row.installmentNumber(), "SUMMARY_NOT_FOUND"));
+        continue;
+      } else if (candidates.size() == 1) {
+        summary = candidates.get(0);
+      } else {
+        List<SalesSummaryEntity> byPvNumber = row.pvNumber() != null
+          ? candidates.stream().filter(c -> row.pvNumber().equals(c.getPvNumber())).toList()
+          : List.of();
+        if (byPvNumber.size() != 1) {
+          skippedReasons.add(new CreditOrderImportSkipReason(row.fileName(), row.lineNumber(), rvNumberText, row.installmentNumber(), "AMBIGUOUS_RV"));
+          continue;
+        }
+        summary = byPvNumber.get(0);
+      }
+
+      Set<Integer> existing = existingInstallmentsBySummaryId.getOrDefault(summary.getId(), Set.of());
+      if (existing.contains(row.installmentNumber())) {
+        skippedReasons.add(new CreditOrderImportSkipReason(row.fileName(), row.lineNumber(), rvNumberText, row.installmentNumber(), "ALREADY_HAS_CREDIT_ORDER"));
+        continue;
+      }
+
+      eligibleCount++;
+      totalValue = totalValue.add(row.releaseValue());
+
+      if (persist) {
+        CreditOrderEntity co = buildCreditOrderFromImportRow(summary, row);
+        co = creditOrderRepository.save(co);
+        createdIds.add(co.getId());
+
+        log.info("✅ Ordem de crédito importada do relatório da adquirente: id={}, rv={}, parcela={}/{}, releaseDate={}, releaseValue={}",
+          co.getId(), row.rvNumber(), row.installmentNumber(), row.installmentTotal(), co.getReleaseDate(), co.getReleaseValue());
+      }
+
+      existingInstallmentsBySummaryId.computeIfAbsent(summary.getId(), ignored -> new HashSet<>()).add(row.installmentNumber());
+      installmentTotalBySummaryId.put(summary.getId(), row.installmentTotal());
+      affectedSummaries.add(summary);
+    }
+
+    if (persist) {
+      for (SalesSummaryEntity summary : affectedSummaries) {
+        int installmentTotal = installmentTotalBySummaryId.getOrDefault(summary.getId(), 1);
+        int newCount = existingInstallmentsBySummaryId.getOrDefault(summary.getId(), Set.of()).size();
+        updateSummaryCreditOrderStatus(summary, newCount, installmentTotal);
+      }
+    }
+
+    return new ImportProcessingResult(fileRows.size(), createdIds, skippedReasons, eligibleCount, totalValue);
+  }
+
+  /**
+   * Agrupa por RV+parcela e soma os valores de linhas repetidas (ver comentário em
+   * {@link #importFromAcquirerReport}). Linhas sem RV ou parcela válidos (erro de parsing) não
+   * têm chave de agrupamento e passam adiante sem alteração — continuam caindo em PARSE_ERROR.
+   */
+  private List<AcquirerPaymentReportRow> mergeDuplicateInstallmentLines(List<AcquirerPaymentReportRow> rows) {
+    Map<String, AcquirerPaymentReportRow> merged = new java.util.LinkedHashMap<>();
+    for (AcquirerPaymentReportRow row : rows) {
+      if (row.rvNumber() == null || row.installmentNumber() == null) {
+        merged.put("semChave#" + row.fileName() + "#" + row.lineNumber(), row);
+        continue;
+      }
+      String key = row.rvNumber() + "/" + row.installmentNumber();
+      AcquirerPaymentReportRow existing = merged.get(key);
+      merged.put(key, existing == null ? row : sumDuplicateInstallmentLines(existing, row));
+    }
+    return new ArrayList<>(merged.values());
+  }
+
+  private AcquirerPaymentReportRow sumDuplicateInstallmentLines(AcquirerPaymentReportRow a, AcquirerPaymentReportRow b) {
+    log.info("🔗 Combinando duas linhas do relatório para a mesma parcela: rv={}, parcela={}, arquivo/linha={}/{}+{}/{}",
+      a.rvNumber(), a.installmentNumber(), a.fileName(), a.lineNumber(), b.fileName(), b.lineNumber());
+    return new AcquirerPaymentReportRow(
+      a.fileName(),
+      a.lineNumber(),
+      a.rvNumber(),
+      a.pvNumber() != null ? a.pvNumber() : b.pvNumber(),
+      a.installmentNumber(),
+      a.installmentTotal() != null ? a.installmentTotal() : b.installmentTotal(),
+      a.releaseDate() != null ? a.releaseDate() : b.releaseDate(),
+      a.originalDueDate() != null ? a.originalDueDate() : b.originalDueDate(),
+      sumNullable(a.releaseValue(), b.releaseValue()),
+      sumNullable(a.grossValue(), b.grossValue()),
+      sumNullable(a.discountValue(), b.discountValue()),
+      a.status() != null ? a.status() : b.status()
+    );
+  }
+
+  private static BigDecimal sumNullable(BigDecimal a, BigDecimal b) {
+    if (a == null && b == null) return null;
+    return (a != null ? a : BigDecimal.ZERO).add(b != null ? b : BigDecimal.ZERO);
+  }
+
+  private CreditOrderEntity buildCreditOrderFromImportRow(SalesSummaryEntity summary, AcquirerPaymentReportRow row) {
+    BigDecimal grossPer = row.grossValue() != null
+      ? row.grossValue()
+      : computeInstallmentValue(summary.getGrossValue(), row.installmentTotal());
+    BigDecimal discountPer = row.discountValue() != null
+      ? row.discountValue()
+      : computeInstallmentValue(summary.getDiscountValue(), row.installmentTotal());
 
     LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
       ? summary.getFirstInstallmentCreditDate()
       : summary.getRvDate();
-    LocalDate releaseDate = baseDate != null ? baseDate.plusMonths(installmentNumber - 1) : null;
+
+    CreditOrderEntity co = new CreditOrderEntity();
+    co.setPvCentralizer(summary.getPvNumber());
+    co.setOriginalPvNumber(summary.getPvNumber());
+    co.setRvNumber(summary.getRvNumber());
+    co.setRvDate(summary.getRvDate());
+    co.setSalesSummary(summary);
+    co.setAcquirer(summary.getAcquirer());
+    co.setCompany(summary.getCompany());
+    co.setFlag(summary.getFlag());
+    co.setBankingDomicile(summary.getBankingDomicile());
+    co.setInstallmentNumber(row.installmentNumber());
+    co.setInstallmentTotal(row.installmentTotal());
+    co.setGrossRvValue(grossPer);
+    co.setDiscountRateValue(discountPer);
+    co.setReleaseValue(row.releaseValue());
+    co.setReleaseDate(row.releaseDate());
+    co.setCreditOrderDate(baseDate);
+    co.setRecordType("MANUAL_GENERATED");
+    co.setLaunchType("MANUAL_IMPORT");
+    co.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    co.setSalesSummaryStatus(StatusReconciliationEnum.PENDING);
+    co.setReconciliationStatus(RECONCILIATION_STATUS_PENDING);
+    return co;
+  }
+
+  private CreditOrderEntity buildCreditOrder(SalesSummaryEntity summary, int installmentNumber, int installmentTotal) {
+    BigDecimal grossPer = computeInstallmentValue(summary.getGrossValue(), installmentTotal);
+    BigDecimal discountPer = computeInstallmentValue(summary.getDiscountValue(), installmentTotal);
+    BigDecimal releaseValue = computeInstallmentValue(summary.getLiquidValue(), installmentTotal);
+
+    LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
+      ? summary.getFirstInstallmentCreditDate()
+      : summary.getRvDate();
+    LocalDate releaseDate = baseDate != null
+      ? adjustToPreviousBusinessDay(baseDate.plusMonths(installmentNumber - 1))
+      : null;
 
     CreditOrderEntity co = new CreditOrderEntity();
     co.setPvCentralizer(summary.getPvNumber());
@@ -187,7 +507,42 @@ public class CreditOrderManualService {
     }
   }
 
+  /**
+   * Fórmula compartilhada entre a geração real ({@link #buildCreditOrder}) e a prévia exibida
+   * na listagem ({@link #fillNextInstallmentValue}) — divide o valor total do resumo pelo
+   * número de parcelas, truncado em 2 casas, sem redistribuir o resto entre as parcelas.
+   */
+  private static BigDecimal computeInstallmentValue(BigDecimal totalValue, int installmentTotal) {
+    BigDecimal value = orZero(totalValue);
+    return installmentTotal > 1
+      ? value.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN)
+      : value;
+  }
+
   private static BigDecimal orZero(BigDecimal value) {
     return value != null ? value : BigDecimal.ZERO;
+  }
+
+  /**
+   * Recua para o último dia útil quando a data cai em fim de semana ou feriado cadastrado
+   * (cs_holiday, específico ou recorrente — ver HolidayRepository#findActiveByDate). Confirmado
+   * empiricamente com dois casos reais nos RVs 56649219/38949474, ambos gerados 1 dia a mais que
+   * o esperado antes desse ajuste: a parcela 3 tem vencimento nominal em 04/07/2026 (sábado —
+   * dado real da adquirente confirma liquidação em 03/07, sexta); a parcela 2 tem vencimento
+   * nominal em 04/06/2026, que não é fim de semana mas está cadastrado em cs_holiday como
+   * "Corpus Christi" (dia útil real seria 03/06). Visibilidade de pacote (não private) para
+   * permitir teste unitário direto sem contexto Spring.
+   */
+  LocalDate adjustToPreviousBusinessDay(LocalDate date) {
+    LocalDate candidate = date;
+    while (isWeekend(candidate) || !holidayRepository.findActiveByDate(candidate).isEmpty()) {
+      candidate = candidate.minusDays(1);
+    }
+    return candidate;
+  }
+
+  private static boolean isWeekend(LocalDate date) {
+    DayOfWeek dayOfWeek = date.getDayOfWeek();
+    return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
   }
 }

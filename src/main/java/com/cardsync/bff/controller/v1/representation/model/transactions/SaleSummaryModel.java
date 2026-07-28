@@ -40,6 +40,12 @@ public class SaleSummaryModel extends RepresentationModel<@NonNull SaleSummaryMo
   private BigDecimal adjustedValue;
   private BigDecimal discountValue;
 
+  /** Prévia do valor da próxima ordem de crédito a ser gerada (ver CreditOrderManualService#create) — não persistido, calculado sob demanda para a listagem. */
+  private BigDecimal nextInstallmentValue;
+
+  /** Prévia da data de vencimento da próxima ordem de crédito a ser gerada — mesma fórmula/ajuste de dia útil usados na criação real. */
+  private LocalDate nextInstallmentDate;
+
   private LocalDate rvDate;
 
   private FlagMinimalModel flag;

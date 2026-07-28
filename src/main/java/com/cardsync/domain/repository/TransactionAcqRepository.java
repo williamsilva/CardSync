@@ -45,6 +45,21 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
   @Query("select coalesce(max(t.installment), 1) from TransactionAcqEntity t where t.salesSummary.id = :summaryId")
   int findMaxInstallmentBySalesSummaryId(@Param("summaryId") UUID summaryId);
 
+  /**
+   * Mesma agregação acima, mas em lote — usada para a prévia do valor da próxima ordem de
+   * crédito na listagem de Ordem de Pagamento Manual (ver CreditOrderManualService), evitando
+   * uma consulta por linha da página. Resumos sem nenhuma transação não aparecem no resultado
+   * (GROUP BY não gera linha vazia) — o chamador deve tratar ausência como installmentTotal=1,
+   * mesmo default do coalesce acima.
+   */
+  @Query("""
+    select t.salesSummary.id, max(t.installment)
+    from TransactionAcqEntity t
+    where t.salesSummary.id in :salesSummaryIds
+    group by t.salesSummary.id
+  """)
+  List<Object[]> findMaxInstallmentBySalesSummaryIdIn(@Param("salesSummaryIds") Collection<UUID> salesSummaryIds);
+
   List<TransactionAcqEntity> findBySalesSummary_Id(UUID salesSummaryId);
 
   /**

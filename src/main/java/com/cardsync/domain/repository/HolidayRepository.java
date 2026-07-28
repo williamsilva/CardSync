@@ -41,7 +41,14 @@ public interface HolidayRepository extends JpaRepository<HolidayEntity, UUID>, J
     @org.springframework.data.repository.query.Param("endDate") LocalDate endDate
   );
 
-  /** Retorna feriados ativos que cobrem a data: específicos com data exata OU recorrentes com mesmo dia/mês. */
+  /**
+   * Retorna feriados ativos que cobrem a data: específicos com data exata OU recorrentes com
+   * mesmo dia/mês. O CAST explícito do parâmetro é necessário — sem ele, o Postgres recebe
+   * date_part('month', ?) com o parâmetro como tipo "unknown" e falha com "date_part(unknown,
+   * unknown) não é única" (múltiplas sobrecargas de date_part — timestamp/timestamptz/interval —
+   * ficam ambíguas para um parâmetro sem tipo definido; a coluna h.holidayDate não tem esse
+   * problema por já ter tipo concreto).
+   */
   @org.springframework.data.jpa.repository.Query("""
     SELECT h FROM HolidayEntity h
     WHERE h.status = 1
@@ -49,8 +56,8 @@ public interface HolidayRepository extends JpaRepository<HolidayEntity, UUID>, J
         (h.recurring = false AND h.holidayDate = :date)
         OR
         (h.recurring = true
-          AND FUNCTION('date_part', 'month', h.holidayDate) = FUNCTION('date_part', 'month', :date)
-          AND FUNCTION('date_part', 'day',   h.holidayDate) = FUNCTION('date_part', 'day',   :date))
+          AND FUNCTION('date_part', 'month', h.holidayDate) = FUNCTION('date_part', 'month', CAST(:date AS date))
+          AND FUNCTION('date_part', 'day',   h.holidayDate) = FUNCTION('date_part', 'day',   CAST(:date AS date)))
       )
     """)
   List<HolidayEntity> findActiveByDate(@org.springframework.data.repository.query.Param("date") LocalDate date);
