@@ -1143,7 +1143,8 @@ public class BankReconciliationService {
    * recriar {@link ReconciliationMatchContext} (e refazer paymentKind/idOrNull) a cada par
    * release×ordem, quando release e ordem já são fixos por toda a duração do laço externo.
    */
-  private boolean isCreditOrderCandidateCompatible(
+  /** Visibilidade de pacote (não private) para permitir reuso em PreImplantationDivergenceReconciliationService. */
+  boolean isCreditOrderCandidateCompatible(
     ReleasesBankEntity release, ReconciliationMatchContext releaseContext, UUID releaseBank,
     CreditOrderEntity order, OrderMatchData orderData,
     int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
@@ -1159,8 +1160,12 @@ public class BankReconciliationService {
     return true;
   }
 
-  /** Contexto de matching e banco (via domicílio bancário) de uma ordem, pré-calculados uma única vez por ordem. */
-  private record OrderMatchData(ReconciliationMatchContext context, UUID bankId) {}
+  /**
+   * Contexto de matching e banco (via domicílio bancário) de uma ordem, pré-calculados uma única
+   * vez por ordem. Visibilidade de pacote (não private) para permitir reuso em
+   * PreImplantationDivergenceReconciliationService.
+   */
+  record OrderMatchData(ReconciliationMatchContext context, UUID bankId) {}
 
   private boolean isInstallmentCandidateCompatible(
     ReleasesBankEntity release, InstallmentAcqEntity installment,

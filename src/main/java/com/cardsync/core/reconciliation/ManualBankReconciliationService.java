@@ -148,8 +148,9 @@ public class ManualBankReconciliationService {
      * data-limite (go-live + N meses), inclusive. Sem data-limite configurada,
      * qualquer lançamento é elegível; sem data de lançamento, não é possível
      * verificar a elegibilidade e o lançamento é ignorado.
+     * Visibilidade de pacote (não private) para reuso em NoCreditOrderLegacyMarkingService.
      */
-    private boolean isEligibleForLegacy(ReleasesBankEntity release, java.time.LocalDate cutoffDate) {
+    boolean isEligibleForLegacy(ReleasesBankEntity release, java.time.LocalDate cutoffDate) {
         if (cutoffDate == null) return true;
         java.time.LocalDate releaseDate = release.getReleaseDate();
         return releaseDate != null && !releaseDate.isAfter(cutoffDate);

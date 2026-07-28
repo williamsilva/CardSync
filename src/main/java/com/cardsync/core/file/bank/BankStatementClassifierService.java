@@ -58,14 +58,25 @@ public class BankStatementClassifierService {
   }
 
   private Optional<AcquirerEntity> resolveAcquirer(String normalizedText) {
+    return resolveAcquirer(normalizedText, acquirerRepository.findAll());
+  }
+
+  /**
+   * Mesma resolução, mas recebendo a lista de adquirentes já carregada — usado por
+   * BankStatementAcquirerReclassificationService para reclassificar em lote sem repetir
+   * acquirerRepository.findAll() a cada lançamento (antes rodava 2 consultas extras por linha,
+   * mesmo problema já corrigido em resolveFlag/resolveFlag(text, flags)).
+   * Visibilidade de pacote (não private) para permitir esse reuso.
+   */
+  Optional<AcquirerEntity> resolveAcquirer(String normalizedText, List<AcquirerEntity> acquirers) {
     if (normalizedText == null || normalizedText.isBlank()) return Optional.empty();
 
-    Optional<AcquirerEntity> byKnownAlias = acquirerRepository.findAll().stream()
+    Optional<AcquirerEntity> byKnownAlias = acquirers.stream()
       .filter(a -> matchesKnownAcquirer(normalizedText, a))
       .findFirst();
     if (byKnownAlias.isPresent()) return byKnownAlias;
 
-    return acquirerRepository.findAll().stream()
+    return acquirers.stream()
       .filter(a -> textSignalResolver.containsNormalized(normalizedText, a.getFantasyName())
         || textSignalResolver.containsNormalized(normalizedText, a.getSocialReason())
         || textSignalResolver.containsNormalized(normalizedText, a.getFileIdentifier()))

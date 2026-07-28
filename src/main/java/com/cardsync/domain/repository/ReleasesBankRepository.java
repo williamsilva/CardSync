@@ -150,4 +150,54 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     @Param("receiptCategory") Integer receiptCategory
   );
 
+  /**
+   * Lançamentos de recebimento (categoria RECEIPT) sem adquirente vinculado, para o backfill de
+   * reclassificação de adquirente (BankStatementAcquirerReclassificationService). O adquirente é
+   * parte do contexto de casamento da conciliação automática (ver
+   * BankReconciliationService#contextOf) — sem ele, um lançamento pode nunca casar mesmo tendo
+   * ordem de crédito compatível em todo o resto.
+   */
+  @Query("""
+    select rb from ReleasesBankEntity rb
+    where rb.releaseCategory = :receiptCategory
+      and rb.acquirer is null
+  """)
+  List<ReleasesBankEntity> findWithoutAcquirerForReclassification(
+    @Param("receiptCategory") Integer receiptCategory
+  );
+
+  /**
+   * Lançamentos pendentes elegíveis para as ferramentas de análise (divergência pré-implantação e
+   * legado sem ordem de crédito) — restrito à categoria RECEIPT e às modalidades de cartão
+   * ({@code CASH_DEBIT}/{@code CASH_CREDIT}/{@code ANTECIP_CRED}, mesmo escopo do Extrato Bancário
+   * — ver ReleasesBankSpecs#getModalityPaymentBank), pra não desperdiçar a análise em PIX/TED/SISPAG
+   * e afins, que nunca terão ordem de crédito candidata. {@code releaseDate >= :goLiveDate} segue o
+   * mesmo corte de go-live aplicado nas demais listagens (ver ReleasesBankSpecs/CreditOrderSpecs/
+   * TransactionAcqSpecs etc. via ImplantationDateProvider) — lançamentos anteriores à implantação
+   * já são tratados como legado por natureza, não por esta análise.
+   */
+  @Query("""
+    select rb
+    from ReleasesBankEntity rb
+    left join fetch rb.company
+    left join fetch rb.acquirer
+    left join fetch rb.establishment
+    left join fetch rb.bankingDomicile
+    left join fetch rb.flag
+    left join fetch rb.bank
+    where (rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
+      and rb.releaseCategory = :receiptCategory
+      and rb.modalityPaymentBank in :modalityCodes
+      and rb.releaseDate is not null
+      and rb.releaseValue is not null
+      and rb.releaseDate >= :goLiveDate
+    order by rb.releaseValue asc, rb.releaseDate asc
+  """)
+  List<ReleasesBankEntity> findPendingForPreImplantationDivergence(
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("receiptCategory") Integer receiptCategory,
+    @Param("modalityCodes") List<Integer> modalityCodes,
+    @Param("goLiveDate") LocalDate goLiveDate
+  );
+
 }
