@@ -13,11 +13,14 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Acha as ordens de crédito candidatas de um lançamento bancário, reaproveitando a MESMA
- * definição de "candidata compatível" do matcher automático
- * ({@link BankReconciliationService#isCreditOrderCandidateCompatible}) — usado pelas ferramentas
- * de análise que não passam pelo subset-sum do matcher (divergência pré-implantação, legado sem
- * ordem), pra não duplicar essa lógica em cada uma.
+ * Acha as ordens de crédito candidatas de um lançamento bancário, reaproveitando a mesma
+ * definição de "candidata compatível" do matcher automático — exceto por estabelecimento, que
+ * aqui é ignorado (ver
+ * {@link BankReconciliationService#isCreditOrderCandidateCompatibleIgnoringEstablishment}):
+ * algumas empresas têm um único lançamento bancário consolidando valores de mais de um
+ * estabelecimento (PV), então exigir o mesmo PV descartaria candidatas legítimas nestas
+ * ferramentas de análise que não passam pelo subset-sum do matcher (divergência
+ * pré-implantação, legado sem ordem).
  */
 @Component
 @RequiredArgsConstructor
@@ -48,7 +51,7 @@ class CreditOrderCandidateFinder {
 
     return candidatesInWindow.stream()
       .filter(order -> order.getReleaseValue() != null && order.getReleaseDate() != null)
-      .filter(order -> bankReconciliationService.isCreditOrderCandidateCompatible(
+      .filter(order -> bankReconciliationService.isCreditOrderCandidateCompatibleIgnoringEstablishment(
         release, releaseContext, releaseBankId, order, orderMatchDataOf(order),
         settings.toleranceDaysBefore(), settings.toleranceDaysAfter(), settings.strictness()
       ))

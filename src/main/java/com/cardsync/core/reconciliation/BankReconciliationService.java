@@ -1149,15 +1149,39 @@ public class BankReconciliationService {
     CreditOrderEntity order, OrderMatchData orderData,
     int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
   ) {
+    if (!passesDateAndBankChecks(release, releaseBank, order, orderData, toleranceDaysBefore, toleranceDaysAfter)) return false;
+    return releaseContext.compatible(orderData.context(), strictness);
+  }
+
+  /**
+   * Mesma checagem acima, mas ignorando estabelecimento — usada pelo {@link CreditOrderCandidateFinder}
+   * (ferramentas de análise: divergência pré-implantação, legado sem ordem). Confirmado com o
+   * financeiro: alguns bancos (ex.: Santander) consolidam num único lançamento os valores de mais
+   * de um estabelecimento (PV) da mesma empresa — exigir o mesmo PV nessas ferramentas descartava
+   * candidatas legítimas. O matcher automático (Etapa 7) continua estabelecimento-consciente via
+   * {@link #isCreditOrderCandidateCompatible}, para não arriscar vínculos automáticos indevidos
+   * entre PVs diferentes quando a consolidação não se aplica.
+   */
+  boolean isCreditOrderCandidateCompatibleIgnoringEstablishment(
+    ReleasesBankEntity release, ReconciliationMatchContext releaseContext, UUID releaseBank,
+    CreditOrderEntity order, OrderMatchData orderData,
+    int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
+  ) {
+    if (!passesDateAndBankChecks(release, releaseBank, order, orderData, toleranceDaysBefore, toleranceDaysAfter)) return false;
+    return releaseContext.compatibleIgnoringEstablishment(orderData.context(), strictness);
+  }
+
+  private boolean passesDateAndBankChecks(
+    ReleasesBankEntity release, UUID releaseBank, CreditOrderEntity order, OrderMatchData orderData,
+    int toleranceDaysBefore, int toleranceDaysAfter
+  ) {
     if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null || orderData == null) return false;
     // daysDiff > 0: lançamento DEPOIS da ordem (normal); < 0: lançamento ANTES da ordem (suspeito)
     long daysDiff = ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate());
     if (daysDiff > toleranceDaysAfter) return false;
     if (daysDiff < -toleranceDaysBefore) return false;
-    if (!releaseContext.compatible(orderData.context(), strictness)) return false;
     // Banco obrigatório: release.bank vs order.bankingDomicile.bank
-    if (releaseBank == null || orderData.bankId() == null || !releaseBank.equals(orderData.bankId())) return false;
-    return true;
+    return releaseBank != null && orderData.bankId() != null && releaseBank.equals(orderData.bankId());
   }
 
   /**

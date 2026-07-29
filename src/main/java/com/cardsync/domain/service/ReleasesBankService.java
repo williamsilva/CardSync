@@ -4,7 +4,6 @@ import com.cardsync.bff.controller.v1.mapper.model.ReleasesBankModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankManualResult;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
-import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ReleasesBankFilter;
@@ -19,11 +18,11 @@ import com.cardsync.domain.repository.EstablishmentRepository;
 import com.cardsync.domain.repository.FlagRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
 import com.cardsync.domain.service.support.ValueTotalsQueryService;
-import com.cardsync.domain.service.support.TransactionTotalsQueryService;
 import com.cardsync.infrastructure.repository.spec.ReleasesBankSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -35,15 +34,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ReleasesBankService {
 
-  private final ReleasesBankSpecs releasesBankSpecs;
-  private final ValueTotalsQueryService totalsQueryService;
-  private final ReleasesBankRepository releasesBankRepository;
-  private final ReleasesBankModelAssembler releasesBankModelAssembler;
   private final FlagRepository flagRepository;
+  private final ReleasesBankSpecs releasesBankSpecs;
   private final CompanyRepository companyRepository;
   private final AcquirerRepository acquirerRepository;
+  private final ValueTotalsQueryService totalsQueryService;
+  private final ReleasesBankRepository releasesBankRepository;
   private final EstablishmentRepository establishmentRepository;
   private final BankingDomicileRepository bankingDomicileRepository;
+  private final ReleasesBankModelAssembler releasesBankModelAssembler;
 
   @Transactional(readOnly = true)
   public Page<ReleasesBankModel> search(Pageable pageable, ListQueryDto<ReleasesBankFilter> query) {
@@ -52,9 +51,15 @@ public class ReleasesBankService {
 
     long total = releasesBankRepository.count(filterSpec);
 
+    // Pageable só de page/size (sem sort): Spring Data reaplica pageable.getSort() por cima da
+    // Specification, sobrescrevendo o ORDER BY que ReleasesBankSpecs#orderByTableSort já monta
+    // via join (ex.: "company" -> company.fantasyName). Esse sort bruto ordena pela FK direto
+    // (company_id), que não está no SELECT DISTINCT (left join fetch) — Postgres rejeita.
+    Pageable pageOnly = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+
     List<ReleasesBankModel> content = total == 0
       ? List.of()
-      : releasesBankRepository.findAll(dataSpec, pageable)
+      : releasesBankRepository.findAll(dataSpec, pageOnly)
       .stream()
       .map(releasesBankModelAssembler::toModel)
       .toList();

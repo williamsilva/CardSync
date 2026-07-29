@@ -174,7 +174,10 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
    * e afins, que nunca terão ordem de crédito candidata. {@code releaseDate >= :goLiveDate} segue o
    * mesmo corte de go-live aplicado nas demais listagens (ver ReleasesBankSpecs/CreditOrderSpecs/
    * TransactionAcqSpecs etc. via ImplantationDateProvider) — lançamentos anteriores à implantação
-   * já são tratados como legado por natureza, não por esta análise.
+   * já são tratados como legado por natureza, não por esta análise. Também exige
+   * {@code rb.acquirer is not null}: sem adquirente não há como localizar uma CreditOrder
+   * candidata (ver findWithoutAcquirerForReclassification, a ferramenta que existe justamente
+   * pra corrigir esses lançamentos antes de entrarem nesta análise).
    */
   @Query("""
     select rb
@@ -188,6 +191,7 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     where (rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
       and rb.releaseCategory = :receiptCategory
       and rb.modalityPaymentBank in :modalityCodes
+      and rb.acquirer is not null
       and rb.releaseDate is not null
       and rb.releaseValue is not null
       and rb.releaseDate >= :goLiveDate

@@ -1052,6 +1052,19 @@ public abstract class BaseSpecificationSupport<T> {
       }
     }
 
+    // getJoins() e getFetches() são coleções separadas na Criteria API — um fetch já aberto por
+    // fetchIfNotFetched (ex.: pra trazer a associação junto no SELECT) não aparece em getJoins(),
+    // então sem esta checagem um join(...) pra ordenação (ex.: sortJoin) abre um SEGUNDO join pra
+    // a mesma associação. Com SELECT DISTINCT (usado sempre que há fetch), ordenar por uma coluna
+    // desse join duplicado (fora da lista de colunas selecionadas) quebra no Postgres. Todo Fetch
+    // de associação singular (ManyToOne/OneToOne) também implementa Join no Hibernate.
+    for (Fetch<?, ?> fetch : from.getFetches()) {
+      if (fetch.getAttribute().getName().equals(attribute) && fetch.getJoinType().equals(JoinType.LEFT)
+        && fetch instanceof Join<?, ?> fetchAsJoin) {
+        return fetchAsJoin;
+      }
+    }
+
     return from.join(attribute, JoinType.LEFT);
   }
 

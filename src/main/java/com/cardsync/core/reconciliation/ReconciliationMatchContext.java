@@ -54,6 +54,33 @@ record ReconciliationMatchContext(
   }
 
   /**
+   * Mesma comparação de {@link #compatible}, mas ignorando completamente estabelecimento
+   * ({@code establishmentId}/{@code establishmentPv}) — usada pelas ferramentas de análise
+   * (divergência pré-implantação, legado sem ordem), onde uma única linha de extrato pode
+   * consolidar valores de mais de um estabelecimento da mesma empresa (confirmado com o
+   * financeiro: alguns bancos, ex. Santander, agrupam PVs distintos no mesmo lançamento).
+   */
+  boolean compatibleIgnoringEstablishment(ReconciliationMatchContext other, MatchStrictness strictness) {
+    if (other == null) return false;
+    if (!sameRequired(companyId, other.companyId)) return false;
+    if (!sameRequired(acquirerId, other.acquirerId)) return false;
+
+    boolean flagOk = strictness.flagRequired()
+      ? sameRequired(flagId, other.flagId)
+      : sameOptional(flagId, other.flagId);
+    if (!flagOk) return false;
+
+    if (strictness.paymentKindRequired()) {
+      return paymentKind != PaymentKind.UNKNOWN
+        && other.paymentKind != PaymentKind.UNKNOWN
+        && paymentKind == other.paymentKind;
+    }
+    return paymentKind == PaymentKind.UNKNOWN
+      || other.paymentKind == PaymentKind.UNKNOWN
+      || paymentKind == other.paymentKind;
+  }
+
+  /**
    * Força do casamento entre dois contextos compatíveis: quanto mais campos
    * coincidem em ambos os lados (não nulos e iguais), maior o valor.
    *
