@@ -219,6 +219,25 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
   List<UUID> findOrphanedIdsIgnoringLookback(@Param("implantationDate") LocalDate implantationDate);
 
   /**
+   * Órfãs (sem SalesSummary) com rvDate ANTERIOR à implantação — excluídas por desenho do
+   * backfill padrão ({@link #findOrphanedIdsWithinDateRange}/{@link #findOrphanedIdsIgnoringLookback},
+   * ambas exigem {@code rvDate >= implantationDate}). Usada pelo backfill dedicado de vínculo
+   * pré-implantação (ver CreditOrderPreImplantationLinkingService), criado ao investigar por que
+   * milhares de ordens nunca chegam a ser elegíveis pra conciliação bancária: nunca tiveram
+   * SalesSummary vinculado porque seu rvDate é anterior ao go-live.
+   */
+  @Query("""
+    select co.id from CreditOrderEntity co
+    where co.salesSummary is null
+      and co.acquirer is not null
+      and co.pvCentralizer is not null
+      and co.rvNumber is not null
+      and co.rvDate < :implantationDate
+    order by co.rvDate asc, co.id asc
+  """)
+  List<UUID> findOrphanedIdsBeforeImplantation(@Param("implantationDate") LocalDate implantationDate);
+
+  /**
    * Pré-vinculação: carrega CreditOrder órfãs por IDs com acquirer em fetch join.
    */
   @Query("""
@@ -228,6 +247,19 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
       and co.salesSummary is null
   """)
   List<CreditOrderEntity> findOrphanedByIds(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Mesma busca acima, mas também carrega company — usada pelo backfill de vínculo
+   * pré-implantação, que expõe o nome da empresa na prévia.
+   */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.acquirer
+    left join fetch co.company
+    where co.id in :ids
+      and co.salesSummary is null
+  """)
+  List<CreditOrderEntity> findOrphanedByIdsWithCompany(@Param("ids") Collection<UUID> ids);
 
   /**
    * Vinculação direta após criação manual: busca CreditOrders órfãs para um resumo

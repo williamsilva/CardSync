@@ -110,15 +110,15 @@ public class BankTextSignalResolver {
   }
 
   public boolean isVisaSignal(String normalizedText) {
-    return containsAny(normalizedText, "VISA", "ELECTRON", "VSE", "VSA");
+    return containsAny(normalizedText, "VISA", "ELECTRON", "VSE", "VSA", "VS");
   }
 
   public boolean isMasterSignal(String normalizedText) {
-    return containsAny(normalizedText, "MASTER", "MAST", "MASTERCARD", "MAESTRO", "MCD", "MCC");
+    return containsAny(normalizedText, "MASTER", "MAST", "MASTERCARD", "MAESTRO", "MCD", "MCC", "MC");
   }
 
   public boolean isEloSignal(String normalizedText) {
-    return containsAny(normalizedText, "ELO");
+    return containsAny(normalizedText, "ELO", "EL");
   }
 
   public boolean isCabalSignal(String normalizedText) {
@@ -126,7 +126,7 @@ public class BankTextSignalResolver {
   }
 
   public boolean isAmexSignal(String normalizedText) {
-    return containsAny(normalizedText, "AMEX", "AMERICAN EXPRESS");
+    return containsAny(normalizedText, "AMEX", "AMERICAN EXPRESS", "AM");
   }
 
   /** Santander abrevia "Banescard" para "BANESC" no histórico (ex.: "867379REDE-BANESC DEB"). */

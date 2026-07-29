@@ -41,12 +41,12 @@ public class ManualBankReconciliationController {
 
     private final BankReconciliationService bankReconciliationService;
     private final ManualBankReconciliationService manualBankReconciliationService;
+    private final NoCreditOrderLegacyMarkingService noCreditOrderLegacyMarkingService;
     private final BankStatementFlagReclassificationService bankStatementFlagReclassificationService;
     private final BankStatementModalityReclassificationService bankStatementModalityReclassificationService;
     private final BankStatementAcquirerReclassificationService bankStatementAcquirerReclassificationService;
-    private final BankStatementEstablishmentReclassificationService bankStatementEstablishmentReclassificationService;
     private final PreImplantationDivergenceReconciliationService preImplantationDivergenceReconciliationService;
-    private final NoCreditOrderLegacyMarkingService noCreditOrderLegacyMarkingService;
+    private final BankStatementEstablishmentReclassificationService bankStatementEstablishmentReclassificationService;
 
     @PostMapping("/manual")
     @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess

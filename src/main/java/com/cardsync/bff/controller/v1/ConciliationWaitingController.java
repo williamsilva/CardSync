@@ -13,6 +13,8 @@ import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliatio
 import com.cardsync.core.reconciliation.summary.CreditOrderOrphanLinkingService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationResult;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationService;
+import com.cardsync.core.reconciliation.summary.SalesSummaryPreImplantationPreviewResult;
+import com.cardsync.core.reconciliation.summary.SalesSummaryPreImplantationReconciliationService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationResult;
 import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import com.cardsync.core.security.CheckSecurity;
@@ -44,6 +46,7 @@ public class ConciliationWaitingController {
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
+  private final SalesSummaryPreImplantationReconciliationService salesSummaryPreImplantationReconciliationService;
 
   @PostMapping("/missing-acquirer")
   @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
@@ -225,6 +228,29 @@ public class ConciliationWaitingController {
   ) {
     creditOrderOrphanLinkingService.linkOrphanedCreditOrders(ignoreLookback);
     return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL, ignoreLookback);
+  }
+
+  /**
+   * Análise (não grava nada): estima quantos SalesSummary de vendas anteriores à implantação
+   * (nunca avaliados pelo fluxo normal acima, nem pelo backfill de ignoreLookback) passariam a
+   * ficar conciliados/parciais/com ordem sintética gerada se {@link #applySalesSummaryCreditOrderPreImplantation}
+   * fosse executado agora.
+   */
+  @PostMapping("/sales-summary-credit-order/pre-implantation/preview")
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
+  public SalesSummaryPreImplantationPreviewResult previewSalesSummaryCreditOrderPreImplantation() {
+    return salesSummaryPreImplantationReconciliationService.preview();
+  }
+
+  /**
+   * Executa de fato o backfill de SalesSummary pré-implantação (recalcula tudo de novo no
+   * momento da execução, não reusa o preview) — ver
+   * {@link SalesSummaryPreImplantationReconciliationService}.
+   */
+  @PostMapping("/sales-summary-credit-order/pre-implantation/apply")
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
+  public SalesSummaryCreditOrderReconciliationResult applySalesSummaryCreditOrderPreImplantation() {
+    return salesSummaryPreImplantationReconciliationService.apply();
   }
 
   // Etapa 2 — Resumo de Vendas x TransactionAcq (endpoint independente)

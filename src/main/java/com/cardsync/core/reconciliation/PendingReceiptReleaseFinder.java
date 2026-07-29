@@ -25,6 +25,7 @@ import java.util.List;
 class PendingReceiptReleaseFinder {
 
   private static final List<Integer> CARD_MODALITY_CODES = List.of(
+    ModalityPaymentBankEnum.NULL.getCode(),
     ModalityPaymentBankEnum.CASH_DEBIT.getCode(),
     ModalityPaymentBankEnum.CASH_CREDIT.getCode(),
     ModalityPaymentBankEnum.ANTECIP_CRED.getCode()

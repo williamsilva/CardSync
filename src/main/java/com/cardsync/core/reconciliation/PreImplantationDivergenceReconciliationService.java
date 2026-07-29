@@ -47,8 +47,8 @@ public class PreImplantationDivergenceReconciliationService {
   private static final String STANDARD_DIVERGENCE_REASON =
     "Lançamento inclui vendas anteriores à implantação, sem ordem de crédito no sistema";
 
-  private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder;
   private final CreditOrderCandidateFinder creditOrderCandidateFinder;
+  private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder;
   private final ManualBankReconciliationService manualBankReconciliationService;
   private final com.cardsync.core.conciliation.ReconciliationSettingsService reconciliationSettingsService;
 

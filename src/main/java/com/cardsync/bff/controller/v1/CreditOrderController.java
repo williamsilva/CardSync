@@ -1,5 +1,6 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.representation.input.ApplyCreditOrderPreImplantationLinkingRequest;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportPreviewResult;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderImportResult;
 import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualInput;
@@ -7,6 +8,9 @@ import com.cardsync.bff.controller.v1.representation.input.CreditOrderManualResu
 import com.cardsync.bff.controller.v1.representation.model.transactions.CreditOrderModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.core.reconciliation.summary.CreditOrderManualService;
+import com.cardsync.core.reconciliation.summary.CreditOrderPreImplantationLinkingApplyResult;
+import com.cardsync.core.reconciliation.summary.CreditOrderPreImplantationLinkingPreviewResult;
+import com.cardsync.core.reconciliation.summary.CreditOrderPreImplantationLinkingService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.CreditOrderFilter;
 import com.cardsync.domain.filter.query.ListQueryDto;
@@ -33,6 +37,7 @@ public class CreditOrderController {
 
   private final CreditOrderService creditOrderService;
   private final CreditOrderManualService creditOrderManualService;
+  private final CreditOrderPreImplantationLinkingService creditOrderPreImplantationLinkingService;
 
   @PostMapping("/manual")
   @ResponseStatus(HttpStatus.CREATED)
@@ -51,6 +56,23 @@ public class CreditOrderController {
   @CheckSecurity.FileProcessing.CanProcess
   public CreditOrderImportResult importManual(@RequestParam("files") MultipartFile[] files) {
     return creditOrderManualService.importFromAcquirerReport(files);
+  }
+
+  /**
+   * Prévia do backfill de vínculo de CreditOrder órfãs pré-implantação (rvDate anterior ao
+   * go-live) — ver CreditOrderPreImplantationLinkingService. Nunca grava nada.
+   */
+  @PostMapping("/manual/link-preimplantation/preview")
+  @CheckSecurity.FileProcessing.CanProcess
+  public CreditOrderPreImplantationLinkingPreviewResult previewLinkPreImplantation() {
+    return creditOrderPreImplantationLinkingService.preview();
+  }
+
+  @PostMapping("/manual/link-preimplantation/apply")
+  @CheckSecurity.FileProcessing.CanProcess
+  public CreditOrderPreImplantationLinkingApplyResult applyLinkPreImplantation(
+      @RequestBody(required = false) ApplyCreditOrderPreImplantationLinkingRequest body) {
+    return creditOrderPreImplantationLinkingService.apply(body != null ? body.creditOrderIds() : null);
   }
 
   @PostMapping("/search")

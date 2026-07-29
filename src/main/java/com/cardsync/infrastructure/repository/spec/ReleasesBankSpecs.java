@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 @Component
 public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEntity> {
@@ -66,6 +67,8 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       spec = spec.and(releasesBankAdvancedFields.advanced(query.advanced()));
       spec = spec.and(inCodes("releaseCategory", getReleaseCategory(), ReleaseCategoryEnum::getCode));
       spec = spec.and(inCodes("modalityPaymentBank", getModalityPaymentBank(), ModalityPaymentBankEnum::getCode));
+      spec = spec.and(Specification.not(inCodes("historicalCodeBank", getHistoricalCodeBank(), Function.identity())));
+
       spec = spec.and(dateGreaterThanOrEqual("releaseDate", implantationDateProvider.get(), false));
     }
 
@@ -100,6 +103,7 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
 
   private static List<ModalityPaymentBankEnum> getModalityPaymentBank() {
     return List.of(
+      ModalityPaymentBankEnum.NULL,
       ModalityPaymentBankEnum.CASH_DEBIT,
       ModalityPaymentBankEnum.CASH_CREDIT,
       ModalityPaymentBankEnum.ANTECIP_CRED
@@ -110,6 +114,12 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
   private static List<ReleaseCategoryEnum> getReleaseCategory() {
     return List.of(
       ReleaseCategoryEnum.RECEIPT
+    );
+  }
+
+  private static List<Integer> getHistoricalCodeBank() {
+    return List.of(
+      7, 71, 98, 469, 617, 887, 2023, 3212
     );
   }
 }

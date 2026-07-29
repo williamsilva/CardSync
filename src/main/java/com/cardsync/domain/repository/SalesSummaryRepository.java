@@ -36,6 +36,24 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   List<SalesSummaryEntity> findByRvNumberIn(Collection<Integer> rvNumbers);
 
   /**
+   * Candidatas por adquirente+RV, SEM restringir por PV — usada pelo backfill de vínculo de
+   * CreditOrder órfãs pré-implantação (ver CreditOrderPreImplantationLinkingService) para
+   * detectar tanto o vínculo exato (mesmo PV) quanto a divergência de PV entre a ordem
+   * (pvCentralizer) e o resumo (pvNumber) para o mesmo RV, mesmo padrão de diagnóstico já usado
+   * em SalesSummaryCreditOrderReconciliationService#logPvMismatchDiagnosis.
+   */
+  @Query("""
+    select ss from SalesSummaryEntity ss
+    left join fetch ss.acquirer
+    where ss.acquirer.id in :acquirerIds
+      and ss.rvNumber in :rvNumbers
+  """)
+  List<SalesSummaryEntity> findByAcquirerIdInAndRvNumberIn(
+    @Param("acquirerIds") Collection<UUID> acquirerIds,
+    @Param("rvNumbers") Collection<Integer> rvNumbers
+  );
+
+  /**
    * Etapa 1b - Resumo de vendas x TransactionAcq.
    *
    * Consulta agregada que calcula, por SalesSummary, o total de transações vinculadas,
@@ -267,6 +285,35 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
      order by min(ss.rvDate) asc, ss.id asc
   """)
   List<SalesSummaryCreditOrderStats> findStatsForSalesSummaryCreditOrderReconciliationIgnoringLookback(
+    @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
+    @Param("eligibleTransactionStatuses") Collection<Integer> eligibleTransactionStatuses,
+    @Param("pendingCreditOrderStatuses") Collection<Integer> pendingCreditOrderStatuses,
+    @Param("implantationDate") LocalDate implantationDate
+  );
+
+  /**
+   * Complemento das duas consultas acima: SalesSummary de vendas ANTERIORES à implantação
+   * ({@code rvDate < implantationDate}) — nunca avaliadas pelo fluxo normal (ambas as variantes
+   * acima exigem {@code rvDate >= implantationDate}), mesmo quando alguma parcela (CreditOrder)
+   * só vence/libera bem depois do go-live. Usada só pelo backfill dedicado
+   * (SalesSummaryPreImplantationReconciliationService) — nunca chamada pelo fluxo automático.
+   */
+  @Query("""
+    select new com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderStats(
+      ss.id,
+      count(distinct co.installmentNumber),
+      max(ss.grossValue),
+      cast(coalesce(max(co.installmentTotal), 1) as integer)
+    )
+      from SalesSummaryEntity ss
+      left join CreditOrderEntity co on co.salesSummary.id = ss.id
+     where (ss.transactionsStatus is null or ss.transactionsStatus in :eligibleTransactionStatuses)
+       and (:includeAlreadyReconciled = true or ss.creditOrderStatus is null or ss.creditOrderStatus in :pendingCreditOrderStatuses)
+       and ss.rvDate < :implantationDate
+     group by ss.id
+     order by min(ss.rvDate) asc, ss.id asc
+  """)
+  List<SalesSummaryCreditOrderStats> findStatsForSalesSummaryCreditOrderReconciliationPreImplantation(
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("eligibleTransactionStatuses") Collection<Integer> eligibleTransactionStatuses,
     @Param("pendingCreditOrderStatuses") Collection<Integer> pendingCreditOrderStatuses,

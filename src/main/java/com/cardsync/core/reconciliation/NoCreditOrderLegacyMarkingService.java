@@ -40,8 +40,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NoCreditOrderLegacyMarkingService {
 
-  private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder;
   private final CreditOrderCandidateFinder creditOrderCandidateFinder;
+  private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder;
   private final ManualBankReconciliationService manualBankReconciliationService;
   private final com.cardsync.core.conciliation.ReconciliationSettingsService reconciliationSettingsService;
 

@@ -118,6 +118,60 @@ public class SalesSummaryCreditOrderReconciliationService {
       Duration.between(queryStartedAt, OffsetDateTime.now()).toSeconds()
     );
 
+    return processStats(trigger, stats, startedAt, ignoreLookback, lookbackDate);
+  }
+
+  /**
+   * Backfill dedicado: SalesSummary de vendas ANTERIORES à implantação ({@code rvDate <
+   * implantationDate}) — nunca avaliadas pelo fluxo normal acima, mesmo quando alguma parcela
+   * (CreditOrder) só vence/libera bem depois do go-live (ver
+   * SalesSummaryRepository#findStatsForSalesSummaryCreditOrderReconciliationPreImplantation).
+   * Encontrado ao investigar por que milhares de CreditOrder pós go-live nunca ficam elegíveis
+   * pra conciliação bancária (Etapa 6 do matcher): o SalesSummary da venda original (pré-go-live)
+   * nunca tem creditOrderStatus recalculado, então a parcela nunca sai de salesSummaryStatus
+   * PENDENTE — apesar de ter releaseDate e lançamento bancário compatível disponível.
+   * Reaproveita a mesma classificação/geração sintética/atualização em lote de
+   * {@link #reconcilePending}, só muda a origem dos {@code stats} e ignora o filtro de lookback
+   * no reparo de consistência final (dado histórico, sem sentido aplicar janela rolante).
+   */
+  @Transactional
+  public SalesSummaryCreditOrderReconciliationResult reconcilePreImplantation(FinancialReconciliationTriggerType trigger) {
+    OffsetDateTime startedAt = OffsetDateTime.now();
+
+    boolean reprocess = reconciliationSettingsService.isReprocessSalesSummaryCreditOrder();
+    LocalDate implantationDate = implantationDateProvider.get();
+
+    log.info(
+      "📌 Etapa 4 (backfill pré-implantação) iniciada. trigger={}, implantationDate={}, reprocess={}",
+      trigger, implantationDate, reprocess
+    );
+
+    OffsetDateTime queryStartedAt = OffsetDateTime.now();
+
+    List<SalesSummaryCreditOrderStats> stats = salesSummaryRepository.findStatsForSalesSummaryCreditOrderReconciliationPreImplantation(
+      reprocess,
+      ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
+      PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
+      implantationDate
+    );
+
+    log.info(
+      "🔎 Etapa 4 (backfill pré-implantação) - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
+      trigger,
+      stats.size(),
+      Duration.between(queryStartedAt, OffsetDateTime.now()).toSeconds()
+    );
+
+    return processStats(trigger, stats, startedAt, true, null);
+  }
+
+  private SalesSummaryCreditOrderReconciliationResult processStats(
+    FinancialReconciliationTriggerType trigger,
+    List<SalesSummaryCreditOrderStats> stats,
+    OffsetDateTime startedAt,
+    boolean ignoreLookback,
+    LocalDate lookbackDate
+  ) {
     long orphanCreditOrders = creditOrderRepository.countWithoutSalesSummary();
     if (orphanCreditOrders > 0) {
       log.warn(
@@ -614,7 +668,8 @@ public class SalesSummaryCreditOrderReconciliationService {
       .forEach(e -> log.info("   → count={} | {}", e.getValue(), e.getKey()));
   }
 
-  private boolean shouldGenerateSyntheticCreditOrder(SalesSummaryEntity summary) {
+  /** Visibilidade de pacote (não private) para reuso em SalesSummaryPreImplantationReconciliationService#preview. */
+  boolean shouldGenerateSyntheticCreditOrder(SalesSummaryEntity summary) {
     if (summary == null) return false;
 
     ModalityEnum modality = ModalityEnum.fromCode(summary.getModality());
