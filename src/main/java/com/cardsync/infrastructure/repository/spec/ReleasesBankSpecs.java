@@ -67,7 +67,7 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
       spec = spec.and(releasesBankAdvancedFields.advanced(query.advanced()));
       spec = spec.and(inCodes("releaseCategory", getReleaseCategory(), ReleaseCategoryEnum::getCode));
       spec = spec.and(inCodes("modalityPaymentBank", getModalityPaymentBank(), ModalityPaymentBankEnum::getCode));
-      spec = spec.and(Specification.not(inCodes("historicalCodeBank", getHistoricalCodeBank(), Function.identity())));
+      //spec = spec.and(Specification.not(inCodes("historicalCodeBank", getHistoricalCodeBank(), Function.identity())));
 
       spec = spec.and(dateGreaterThanOrEqual("releaseDate", implantationDateProvider.get(), false));
     }
@@ -103,11 +103,16 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
 
   private static List<ModalityPaymentBankEnum> getModalityPaymentBank() {
     return List.of(
-      ModalityPaymentBankEnum.NULL,
+      //ModalityPaymentBankEnum.NULL,
       ModalityPaymentBankEnum.CASH_DEBIT,
       ModalityPaymentBankEnum.CASH_CREDIT,
       ModalityPaymentBankEnum.ANTECIP_CRED
-      //ModalityPaymentBankEnum.PIX_REC
+      // Recebimento/pagamento PIX agora é resolvido com código próprio (ver
+      // BankStatementClassifierService#resolveBankModality) em vez de cair em CASH_CREDIT/
+      // CASH_DEBIT por coincidência de texto — sem isso na lista, todo PIX desapareceria desta
+      // listagem (Extrato Bancário).
+      //ModalityPaymentBankEnum.PIX_REC,
+      //ModalityPaymentBankEnum.PIX_ENV
     );
   }
 

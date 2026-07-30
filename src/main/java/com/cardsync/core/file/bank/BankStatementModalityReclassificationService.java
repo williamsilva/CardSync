@@ -78,6 +78,10 @@ public class BankStatementModalityReclassificationService {
   }
 
   private ModalityPaymentBankEnum resolveModality(String normalizedText) {
+    // Mesma ordem de BankStatementClassifierService#resolveBankModality: PIX antes de
+    // débito/crédito de cartão, já que "PIX_CRED" contém um "CRED" isolado válido.
+    if (textSignalResolver.isPixReceiptSignal(normalizedText)) return ModalityPaymentBankEnum.PIX_REC;
+    if (textSignalResolver.isPixSentSignal(normalizedText)) return ModalityPaymentBankEnum.PIX_ENV;
     if (textSignalResolver.isDebitSignal(normalizedText)) return ModalityPaymentBankEnum.CASH_DEBIT;
     if (textSignalResolver.isCreditSignal(normalizedText)) return ModalityPaymentBankEnum.CASH_CREDIT;
     return null;

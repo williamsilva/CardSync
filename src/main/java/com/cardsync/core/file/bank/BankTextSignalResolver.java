@@ -79,7 +79,12 @@ public class BankTextSignalResolver {
 
   public boolean isDebitSignal(String normalizedText) {
     return containsAny(normalizedText,
-      "DEBITO", "DEB", "MAESTRO", "ELECTRON", "ELO DEB", "ELODEB", "CARTAO DEBITO", "DB");
+      "DEBITO", "MAESTRO", "ELECTRON", "ELO DEB", "ELODEB", "CARTAO DEBITO")
+      // "DEB"/"DB" isolados (não dentro de outra palavra como "DEBITO", já coberto acima) —
+      // mesma classe de abreviação real do "CD" abaixo, mantidos como token isolado em vez de
+      // substring livre para não colidir com nomes/palavras que contenham "DEB"/"DB" no meio.
+      || hasStandaloneToken(normalizedText, "DEB")
+      || hasStandaloneToken(normalizedText, "DB");
   }
 
   public boolean isCreditSignal(String normalizedText) {
@@ -87,8 +92,58 @@ public class BankTextSignalResolver {
     // CD0007866470") — sem ela, lançamentos com bandeira abreviada (MAST, e não MASTER/MASTERCARD)
     // nunca batem em nenhum sinal e ficam com modalidade não classificada (0), o que os torna
     // invisíveis no Extrato Bancário (ReleasesBankSpecs só lista modalidade em {1, 2, 13}).
+    // "CR"/"CD" como substring livre geram falso positivo em qualquer nome que contenha essas
+    // duas letras juntas (ex.: favorecido "CONCRETOCOM" contém "CR"), e "CRED" como substring
+    // livre batia dentro da palavra "SICREDI" (nome do próprio banco aparecendo na descrição de
+    // pagamentos de boleto Sicredi, ex.: "LIQUIDACAO BOLETO SICREDI") — classificando um débito
+    // de conta como se fosse cartão de crédito. Por isso "CR"/"CD" exigem o padrão real
+    // (abreviação + dígitos colados, sem letra antes) e "CRED" exige não estar colado a outra
+    // letra antes/depois (token isolado), preservando o caso real do comentário acima.
     return containsAny(normalizedText,
-      "CREDITO", "CRED", "CARTAO CREDITO", "VISA", "MASTER", "MASTERCARD", "AMEX", "ELO", "HIPER", "CR", "CD");
+      "CREDITO", "CARTAO CREDITO", "VISA", "MASTER", "MASTERCARD", "AMEX", "ELO", "HIPER")
+      || hasStandaloneToken(normalizedText, "CRED")
+      || hasAbbreviationFollowedByDigits(normalizedText, "CR")
+      || hasAbbreviationFollowedByDigits(normalizedText, "CD");
+  }
+
+  /**
+   * Casa {@code token} apenas quando não está colado a outra letra antes ou depois (ex.: "CRED"
+   * em "PGTO CRED" bate, mas não em "SICREDI" nem em "CREDITO"). Dígitos colados nas pontas são
+   * permitidos, já que abreviações bancárias reais costumam vir seguidas de código/NSU.
+   */
+  private boolean hasStandaloneToken(String normalizedText, String token) {
+    if (normalizedText == null || normalizedText.isBlank()) return false;
+    return Pattern.compile("(?<![A-Z])" + Pattern.quote(token) + "(?![A-Z])").matcher(normalizedText).find();
+  }
+
+  /**
+   * Casa {@code prefix} apenas quando não está colado a outra letra antes e é imediatamente
+   * seguido de um dígito (ex.: "CD0007866470"), reproduzindo o padrão real de abreviação bancária
+   * sem casar a substring solta dentro de palavras como "CONCRETOCOM".
+   */
+  private boolean hasAbbreviationFollowedByDigits(String normalizedText, String prefix) {
+    if (normalizedText == null || normalizedText.isBlank()) return false;
+    return Pattern.compile("(?<![A-Z])" + Pattern.quote(prefix) + "(?=[0-9])").matcher(normalizedText).find();
+  }
+
+  public boolean isPixSignal(String normalizedText) {
+    return containsAny(normalizedText, "PIX");
+  }
+
+  /**
+   * PIX recebido (dinheiro entrando na conta) — usado para resolver a modalidade como
+   * PIX_REC em vez de cair, por coincidência de texto, em "cartão de crédito" (ver
+   * isCreditSignal: o marcador "PIX_CRED" do Sicredi contém um "CRED" isolado válido).
+   */
+  public boolean isPixReceiptSignal(String normalizedText) {
+    return isPixSignal(normalizedText)
+      && (containsAny(normalizedText, "RECEBIMENTO", "RECEBIDO") || hasStandaloneToken(normalizedText, "PIX CRED"));
+  }
+
+  /** PIX enviado/pago (dinheiro saindo da conta) — mesma lógica de isPixReceiptSignal, direção inversa. */
+  public boolean isPixSentSignal(String normalizedText) {
+    return isPixSignal(normalizedText)
+      && (containsAny(normalizedText, "PAGAMENTO", "ENVIADO", "ENVIO") || hasStandaloneToken(normalizedText, "PIX DEB"));
   }
 
   public boolean isRedeSignal(String normalizedText) {
@@ -118,7 +173,11 @@ public class BankTextSignalResolver {
   }
 
   public boolean isEloSignal(String normalizedText) {
-    return containsAny(normalizedText, "ELO", "EL");
+    // "ELO" como substring livre batia dentro de nomes comuns de favorecidos de PIX (ex.:
+    // "ANGELO" contém "ELO" inteiro) — classificando recebimentos PIX como se fossem venda em
+    // cartão Elo. Nos dados reais do Sicredi a bandeira Elo sempre aparece como palavra isolada
+    // ("SICREDI DEBITO ELO"), nunca colada a outra letra, então exigir token isolado é seguro.
+    return hasStandaloneToken(normalizedText, "ELO");
   }
 
   public boolean isCabalSignal(String normalizedText) {
@@ -126,7 +185,10 @@ public class BankTextSignalResolver {
   }
 
   public boolean isAmexSignal(String normalizedText) {
-    return containsAny(normalizedText, "AMEX", "AMERICAN EXPRESS", "AM");
+    // "AM" como substring livre batia dentro de "PAGAMENTO" e "ACQUAMANIA" (nome da própria
+    // empresa) — fazendo praticamente qualquer pagamento PIX (e boa parte dos recebimentos) ser
+    // marcado como venda em cartão American Express. "AMEX"/"AMERICAN EXPRESS" continuam iguais.
+    return containsAny(normalizedText, "AMEX", "AMERICAN EXPRESS") || hasStandaloneToken(normalizedText, "AM");
   }
 
   /** Santander abrevia "Banescard" para "BANESC" no histórico (ex.: "867379REDE-BANESC DEB"). */

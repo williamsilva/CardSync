@@ -14,6 +14,8 @@ public class BankStatementClassifierService {
 
   private static final int MODALITY_BANK_DEBIT = 1;
   private static final int MODALITY_BANK_CREDIT = 2;
+  private static final int MODALITY_PIX_RECEIVED = 3;
+  private static final int MODALITY_PIX_SENT = 5;
 
   private final FlagRepository flagRepository;
   private final AcquirerRepository acquirerRepository;
@@ -174,6 +176,11 @@ public class BankStatementClassifierService {
     if (layout != null && !layout.isUsesDescriptionForModality()) {
       return historicalCode;
     }
+    // PIX precisa ser resolvido antes de débito/crédito de cartão: o marcador do Sicredi para
+    // recebimento PIX ("PIX_CRED") contém um "CRED" isolado válido para isCreditSignal, o que
+    // classificaria todo recebimento PIX como venda em cartão de crédito se checado depois.
+    if (textSignalResolver.isPixReceiptSignal(normalizedText)) return MODALITY_PIX_RECEIVED;
+    if (textSignalResolver.isPixSentSignal(normalizedText)) return MODALITY_PIX_SENT;
     if (textSignalResolver.isDebitSignal(normalizedText)) return MODALITY_BANK_DEBIT;
     if (textSignalResolver.isCreditSignal(normalizedText)) return MODALITY_BANK_CREDIT;
     return historicalCode;
