@@ -28,7 +28,7 @@ class ConciliationAnalysisServiceReassignmentTest {
   private final TransactionErpRepository transactionErpRepository = mock(TransactionErpRepository.class);
 
   private final ConciliationAnalysisService service = new ConciliationAnalysisService(
-    null, null, null, null, null, transactionErpRepository, null, null, null, null, null, null, null, null, null
+    null, transactionErpRepository, null, null, null, null, null, null, null, null
   );
 
   @Test

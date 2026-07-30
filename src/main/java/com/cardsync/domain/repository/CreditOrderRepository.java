@@ -52,9 +52,6 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
       @Param("pendingStatus") Integer pendingStatus,
       @Param("zeroValue") BigDecimal zeroValue);
 
-  @Query("select co from CreditOrderEntity co where co.releaseDate >= :lookback order by co.releaseDate asc")
-  List<CreditOrderEntity> findAllForDashboard(@Param("lookback") LocalDate lookback);
-
   /**
    * Agrupado por empresa e ordenado por data dentro de cada empresa (não por id global) para
    * permitir montar lotes que nunca dividam, entre dois lotes diferentes, ordens de uma mesma

@@ -110,9 +110,6 @@ public abstract class CsPermissions {
   protected static final String PERM_CONCILIATION_WAITING_CONSULT = "PERM_CONCILIATION_WAITING_CONSULT";
   protected static final String PERM_CONCILIATION_WAITING_PROCESS = "PERM_CONCILIATION_WAITING_PROCESS";
 
-  /* Permission for Conciliation Dashboard */
-  protected static final String PERM_CONCILIATION_DASHBOARD_CONSULT = "PERM_CONCILIATION_DASHBOARD_CONSULT";
-
   /* Permission for Manual Bank Reconciliation */
   protected static final String PERM_MANUAL_BANK_RECONCILIATION_PROCESS = "PERM_MANUAL_BANK_RECONCILIATION_PROCESS";
 

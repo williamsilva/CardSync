@@ -355,13 +355,6 @@ public @interface CheckSecurity {
       @interface CanProcess {}
     }
 
-    @interface ConciliationDashboard {
-      @Target(METHOD)
-      @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canConsultConciliationDashboard()")
-      @interface CanConsult {}
-    }
-
     @interface ManualBankReconciliation {
       @Target(METHOD)
       @Retention(RUNTIME)

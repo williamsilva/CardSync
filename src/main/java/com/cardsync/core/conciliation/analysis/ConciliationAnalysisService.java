@@ -42,10 +42,6 @@ public class ConciliationAnalysisService {
   static final Integer EXCLUDED_CARD_RECONCILIATION_MODALITY = ModalityEnum.DIGITAL_WALLET.getCode();
 
   private final EntityManager entityManager;
-  private final AdjustmentRepository adjustmentRepository;
-  private final CreditOrderRepository creditOrderRepository;
-  private final PendingDebtRepository pendingDebtRepository;
-  private final ReleasesBankRepository releasesBankRepository;
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final AcquirerRepository acquirerRepository;
@@ -53,7 +49,6 @@ public class ConciliationAnalysisService {
   private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
   private final ConciliationFeeAnalysisService feeAnalysisService;
-  private final ConciliationDebitChargebackClassifier debitChargebackClassifier;
   private final PlatformTransactionManager transactionManager;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
 
@@ -63,68 +58,6 @@ public class ConciliationAnalysisService {
     int valueDivergences, int acquirerDivergences, int ambiguousMatches,
     int candidatesCount
   ) {}
-
-  @Transactional(readOnly = true)
-  public ConciliationDashboardModel dashboard() {
-    OffsetDateTime lookbackDate = reconciliationLookbackDate();
-    LocalDate lookbackLocalDate = lookbackDate.toLocalDate();
-
-    List<TransactionErpEntity> erpSales = transactionErpRepository.findAllForDashboard(lookbackDate);
-    List<TransactionAcqEntity> acquirerSales = transactionAcqRepository.findAllForDashboard(lookbackDate);
-    List<CreditOrderEntity> creditOrders = creditOrderRepository.findAllForDashboard(lookbackLocalDate);
-    List<ReleasesBankEntity> bankReleases = releasesBankRepository.findAllForDashboard(lookbackLocalDate);
-    List<PendingDebtEntity> pendingDebts = pendingDebtRepository.findAllForDashboard(lookbackLocalDate);
-    List<AdjustmentEntity> adjustments = adjustmentRepository.findAllForDashboard(lookbackLocalDate);
-    List<FeeAnalysisResult> feeAnalyses = feeAnalysisService.analyzeBulk(acquirerSales);
-
-    BigDecimal erpGross = sum(erpSales.stream().map(TransactionErpEntity::getGrossValue));
-    BigDecimal acquirerGross = sum(acquirerSales.stream().map(TransactionAcqEntity::getGrossValue));
-    BigDecimal feeAmount = sum(feeAnalyses.stream().map(FeeAnalysisResult::appliedFeeValue));
-    BigDecimal expectedFeeAmount = sum(feeAnalyses.stream().map(FeeAnalysisResult::expectedFeeValue));
-    BigDecimal feeDifferenceAmount = sum(feeAnalyses.stream().map(FeeAnalysisResult::feeDifference));
-
-    BigDecimal debitPending = sum(pendingDebts.stream()
-      .filter(debt -> !debitChargebackClassifier.isChargeback(debt))
-      .map(PendingDebtEntity::getPendingValue));
-    BigDecimal chargebackOpen = sum(pendingDebts.stream()
-      .filter(debitChargebackClassifier::isChargeback)
-      .map(PendingDebtEntity::getPendingValue))
-      .add(sum(adjustments.stream()
-        .filter(debitChargebackClassifier::isChargeback)
-        .map(debitChargebackClassifier::debitValue)));
-
-    long matchedSales = acquirerSales.stream().filter(this::hasAnyReconciliationSignal).count();
-    BigDecimal matchedAmount = sum(acquirerSales.stream().filter(this::hasAnyReconciliationSignal).map(TransactionAcqEntity::getGrossValue));
-    long pendingSales = Math.max(0, erpSales.size() + acquirerSales.size() - matchedSales);
-    BigDecimal pendingAmount = erpGross.subtract(matchedAmount).abs();
-
-    BigDecimal difference = erpGross.subtract(acquirerGross).abs();
-    long divergenceQuantity = countDivergences(erpGross, acquirerGross, adjustments, pendingDebts, feeAnalyses);
-    BigDecimal divergenceAmount = difference
-      .add(sum(adjustments.stream().map(AdjustmentEntity::getAdjustmentValue).map(this::abs)))
-      .add(debitPending)
-      .add(sum(feeAnalyses.stream().filter(fee -> !"OK".equals(fee.status())).map(FeeAnalysisResult::feeDifference).map(this::abs)));
-
-    ConciliationSummaryModel summary = new ConciliationSummaryModel(
-      erpSales.size(), erpGross,
-      acquirerSales.size(), acquirerGross,
-      matchedSales, matchedAmount,
-      pendingSales, pendingAmount,
-      feeAmount, expectedFeeAmount, feeDifferenceAmount,
-      null, null,
-      debitPending, chargebackOpen,
-      divergenceQuantity, divergenceAmount
-    );
-
-    return new ConciliationDashboardModel(
-      summary,
-      salesByPeriod(erpSales, acquirerSales),
-      new ConciliationComparisonModel(erpGross, acquirerGross, erpGross.subtract(acquirerGross), matchedAmount, pendingAmount),
-      feesByAcquirer(feeAnalyses),
-      divergencesByType(erpGross, acquirerGross, pendingDebts, adjustments, creditOrders, bankReleases, feeAnalyses),
-      aging(erpSales, pendingDebts, adjustments, creditOrders)
-    );
-  }
 
   @Transactional
   public ReconcileErpAcquirerFeesResultModel reconcileRedeErpAcquirerFees() {
@@ -637,79 +570,6 @@ public class ConciliationAnalysisService {
       valueDivergences,
       acquirerDivergences,
       ambiguousMatches
-    );
-  }
-
-  @Transactional(readOnly = true)
-  public List<ConciliationAgingModel> aging() {
-    OffsetDateTime lookbackDate = reconciliationLookbackDate();
-    LocalDate lookbackLocalDate = lookbackDate.toLocalDate();
-    return aging(
-      transactionErpRepository.findAllForDashboard(lookbackDate),
-      pendingDebtRepository.findAllForDashboard(lookbackLocalDate),
-      adjustmentRepository.findAllForDashboard(lookbackLocalDate),
-      creditOrderRepository.findAllForDashboard(lookbackLocalDate)
-    );
-  }
-
-  private List<ConciliationAgingModel> aging(
-    List<TransactionErpEntity> erpSales,
-    List<PendingDebtEntity> pendingDebts,
-    List<AdjustmentEntity> adjustments,
-    List<CreditOrderEntity> creditOrders) {
-    List<ConciliationAgingModel> items = new ArrayList<>();
-    addAging(items, "ERP_PENDENTE_COMERCIAL", erpSales.stream()
-      .filter(t -> t.getCommercialStatus() != null && t.getCommercialStatus() != ErpCommercialStatusEnum.OK)
-      .map(AgingItem::fromErp));
-    addAging(items, "DEBITO_PENDENTE", pendingDebts.stream()
-      .filter(debt -> !debitChargebackClassifier.isChargeback(debt))
-      .map(AgingItem::fromPendingDebt));
-    addAging(items, "CHARGEBACK_ABERTO", Stream.concat(
-      pendingDebts.stream()
-        .filter(debitChargebackClassifier::isChargeback)
-        .map(AgingItem::fromPendingDebt),
-      adjustments.stream()
-        .filter(debitChargebackClassifier::isChargeback)
-        .map(adjustment -> AgingItem.fromAdjustment(adjustment, debitChargebackClassifier.debitValue(adjustment)))
-    ));
-    addAging(items, "ORDEM_CREDITO_SEM_BANCO", creditOrders.stream()
-      .filter(co -> co.getReleaseBank() == null)
-      .map(AgingItem::fromCreditOrder));
-    return items;
-  }
-
-  private List<ConciliationChartPointModel> salesByPeriod(List<TransactionErpEntity> erpSales, List<TransactionAcqEntity> acquirerSales) {
-    Map<String, BigDecimal> totals = new TreeMap<>();
-    erpSales.forEach(s -> totals.merge(periodLabel(s.getSaleDate()), nz(s.getGrossValue()), BigDecimal::add));
-    acquirerSales.forEach(s -> totals.merge(periodLabel(s.getSaleDate()), nz(s.getGrossValue()), BigDecimal::add));
-    return totals.entrySet().stream().map(e -> new ConciliationChartPointModel(e.getKey(), e.getValue(), null)).toList();
-  }
-
-  private List<ConciliationChartPointModel> feesByAcquirer(List<FeeAnalysisResult> fees) {
-    Map<String, BigDecimal> totals = new TreeMap<>();
-    Map<String, Long> counts = new HashMap<>();
-    fees.forEach(fee -> {
-      String label = Optional.ofNullable(fee.acquirer()).orElse("Sem adquirente");
-      totals.merge(label, nz(fee.appliedFeeValue()), BigDecimal::add);
-      counts.merge(label, 1L, Long::sum);
-    });
-    return totals.entrySet().stream().map(e -> new ConciliationChartPointModel(e.getKey(), e.getValue(), counts.get(e.getKey()))).toList();
-  }
-
-  private List<ConciliationChartPointModel> divergencesByType(
-    BigDecimal erpGross, BigDecimal acquirerGross, List<PendingDebtEntity> pendingDebts, List<AdjustmentEntity> adjustments,
-    List<CreditOrderEntity> creditOrders, List<ReleasesBankEntity> bankReleases, List<FeeAnalysisResult> fees) {
-    List<FeeAnalysisResult> feeDivergences = fees.stream().filter(fee -> !"OK".equals(fee.status())).toList();
-    List<PendingDebtEntity> chargebackDebts = pendingDebts.stream().filter(debitChargebackClassifier::isChargeback).toList();
-    List<AdjustmentEntity> chargebackAdjustments = adjustments.stream().filter(debitChargebackClassifier::isChargeback).toList();
-    return List.of(
-      new ConciliationChartPointModel("ERP_X_ADQUIRENTE", erpGross.subtract(acquirerGross).abs(), erpGross.compareTo(acquirerGross) == 0 ? 0L : 1L),
-      new ConciliationChartPointModel("TAXAS_DIVERGENTES", sum(feeDivergences.stream().map(FeeAnalysisResult::feeDifference).map(this::abs)), (long) feeDivergences.size()),
-      new ConciliationChartPointModel("DEBITO_PENDENTE", sum(pendingDebts.stream().filter(debt -> !debitChargebackClassifier.isChargeback(debt)).map(PendingDebtEntity::getPendingValue)), pendingDebts.stream().filter(debt -> !debitChargebackClassifier.isChargeback(debt)).count()),
-      new ConciliationChartPointModel("CHARGEBACK_ABERTO", sum(chargebackDebts.stream().map(PendingDebtEntity::getPendingValue)).add(sum(chargebackAdjustments.stream().map(debitChargebackClassifier::debitValue))), (long) chargebackDebts.size() + chargebackAdjustments.size()),
-      new ConciliationChartPointModel("AJUSTES", sum(adjustments.stream().map(AdjustmentEntity::getAdjustmentValue).map(this::abs)), (long) adjustments.size()),
-      new ConciliationChartPointModel("ORDEM_CREDITO_SEM_BANCO", sum(creditOrders.stream().filter(co -> co.getReleaseBank() == null).map(CreditOrderEntity::getReleaseValue)), creditOrders.stream().filter(co -> co.getReleaseBank() == null).count()),
-      new ConciliationChartPointModel("BANCO_NAO_CONCILIADO", sum(bankReleases.stream().filter(r -> !isReconciled(r)).map(ReleasesBankEntity::getReleaseValue)), bankReleases.stream().filter(r -> !isReconciled(r)).count())
     );
   }
 
@@ -1576,63 +1436,6 @@ public class ConciliationAnalysisService {
 
   record ErpAcquirerApplyResult(boolean changed, boolean flagUpdated, boolean businessContextUpdated) {}
 
-  private void addAging(List<ConciliationAgingModel> target, String type, Stream<AgingItem> source) {
-    Map<String, List<AgingItem>> grouped = new LinkedHashMap<>();
-    grouped.put("0-2 dias", new ArrayList<>());
-    grouped.put("3-7 dias", new ArrayList<>());
-    grouped.put("8-15 dias", new ArrayList<>());
-    grouped.put("16-30 dias", new ArrayList<>());
-    grouped.put("30+ dias", new ArrayList<>());
-    source.forEach(item -> grouped.get(bucket(item.referenceDate())).add(item));
-    grouped.forEach((bucket, items) -> target.add(new ConciliationAgingModel(bucket, items.size(), sum(items.stream().map(AgingItem::amount)), type)));
-  }
-
-  private String bucket(LocalDate date) {
-    if (date == null) return "30+ dias";
-    long days = Math.max(0, ChronoUnit.DAYS.between(date, LocalDate.now()));
-    if (days <= 2) return "0-2 dias";
-    if (days <= 7) return "3-7 dias";
-    if (days <= 15) return "8-15 dias";
-    if (days <= 30) return "16-30 dias";
-    return "30+ dias";
-  }
-
-  private boolean isReconciled(ReleasesBankEntity entity) {
-    return entity.getNumberReconciliations() != null && entity.getNumberReconciliations() > 0;
-  }
-
-  private boolean hasAnyReconciliationSignal(TransactionAcqEntity entity) {
-    return entity.getSaleReconciliationDate() != null || entity.getStatusPaymentBank() != null || entity.getStatusTransaction() != null;
-  }
-
-  private long countDivergences(
-    BigDecimal erpGross, BigDecimal acquirerGross, List<AdjustmentEntity> adjustments,
-    List<PendingDebtEntity> pendingDebts, List<FeeAnalysisResult> fees) {
-    long total = 0;
-    if (erpGross.compareTo(acquirerGross) != 0) total++;
-    total += adjustments.size();
-    total += pendingDebts.size();
-    total += fees.stream().filter(fee -> !"OK".equals(fee.status())).count();
-    return total;
-  }
-
-  private BigDecimal sum(Stream<BigDecimal> values) {
-    return values.filter(Objects::nonNull).reduce(ZERO, BigDecimal::add);
-  }
-
-  private BigDecimal abs(BigDecimal value) {
-    return value == null ? ZERO : value.abs();
-  }
-
-  private BigDecimal nz(BigDecimal value) {
-    return value == null ? ZERO : value;
-  }
-
-  private String periodLabel(OffsetDateTime date) {
-    if (date == null) return "Sem data";
-    return date.toLocalDate().toString();
-  }
-
   private String companyName(CompanyEntity company) {
     return company != null ? firstNonBlank(company.getFantasyName(), company.getSocialReason(), company.getCnpj()) : null;
   }
@@ -1652,26 +1455,4 @@ public class ConciliationAnalysisService {
     return null;
   }
 
-  private record AgingItem(LocalDate referenceDate, BigDecimal amount) {
-    static AgingItem fromErp(TransactionErpEntity entity) {
-      return new AgingItem(entity.getSaleDate() != null ? entity.getSaleDate().toLocalDate() : null, entity.getGrossValue());
-    }
-
-    static AgingItem fromPendingDebt(PendingDebtEntity entity) {
-      return new AgingItem(entity.getDateDebitOrder(), first(entity.getPendingValue(), entity.getValueDebitOrder()));
-    }
-
-    static AgingItem fromCreditOrder(CreditOrderEntity entity) {
-      return new AgingItem(entity.getReleaseDate(), entity.getReleaseValue());
-    }
-
-    static AgingItem fromAdjustment(AdjustmentEntity entity, BigDecimal amount) {
-      LocalDate referenceDate = entity.getAdjustmentDate() != null ? entity.getAdjustmentDate() : entity.getTransactionDate();
-      return new AgingItem(referenceDate, amount);
-    }
-
-    private static BigDecimal first(BigDecimal first, BigDecimal second) {
-      return first != null ? first : second;
-    }
-  }
 }

@@ -26,17 +26,6 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
    * arquivos (o mesmo conjunto de vendas pode chegar em arquivos com bytes
    * diferentes, escapando da guarda por hash de conteúdo).
    */
-  @Query("""
-    select distinct t from TransactionAcqEntity t
-    left join fetch t.acquirer
-    left join fetch t.flag
-    left join fetch t.company
-    left join fetch t.establishment
-    where t.saleDate >= :lookback
-    order by t.saleDate asc
-  """)
-  List<TransactionAcqEntity> findAllForDashboard(@Param("lookback") OffsetDateTime lookback);
-
   @Query("select t from TransactionAcqEntity t where t.nsu in :nsus")
   List<TransactionAcqEntity> findExistingByNsus(@Param("nsus") Collection<Long> nsus);
 

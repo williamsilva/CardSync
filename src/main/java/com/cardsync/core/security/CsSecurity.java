@@ -282,11 +282,6 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return hasAllWriteScope() && hasAuthority(PERM_CONCILIATION_WAITING_PROCESS);
   }
 
-  /* Conciliation Dashboard */
-  public boolean canConsultConciliationDashboard() {
-    return hasAllReadScope() && hasAuthority(PERM_CONCILIATION_DASHBOARD_CONSULT);
-  }
-
   /* Manual Bank Reconciliation */
   public boolean canProcessManualBankReconciliation() {
     return hasAllWriteScope() && hasAuthority(PERM_MANUAL_BANK_RECONCILIATION_PROCESS);
