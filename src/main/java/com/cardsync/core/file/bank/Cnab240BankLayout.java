@@ -36,6 +36,20 @@ public enum Cnab240BankLayout {
     "169-172", "172-176", "176-201", "201-208",
     true,
     Set.of("E")
+  ),
+  SICREDI(
+    "748", "Sicredi", "Sicredi",
+    "52-57", "58-70", "70-71",
+    "108-111", "111-113", "113-133", "133-134",
+    "134-142", "142-150", "150-168", "168-169",
+    // Sicredi: mesmas posições do Santander (documento = resto da linha, 202-240).
+    // O código histórico (172-176) frequentemente traz letras (ex.: "0DV3", "0CX1", "01Y6"
+    // em lançamentos de PIX/convênio/cartão), o que quebra a extração numérica — por isso a
+    // modalidade débito/crédito precisa vir da descrição (usesDescriptionForModality=true),
+    // igual ao Itaú, em vez do código histórico como Santander/Bradesco.
+    "169-172", "172-176", "176-201", "201-240",
+    true,
+    Set.of("E")
   );
 
   private final String bankCode;

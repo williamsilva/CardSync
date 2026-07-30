@@ -70,6 +70,7 @@ public class FileProcessingProperties {
      * file-processing.systems.bank.itau
      * file-processing.systems.bank.santander
      * file-processing.systems.bank.bradesco
+     * file-processing.systems.bank.sicredi
      */
     private Bank bank = new Bank();
 
@@ -139,6 +140,7 @@ public class FileProcessingProperties {
     private FilePaths itau = new FilePaths();
     private FilePaths santander = new FilePaths();
     private FilePaths bradesco = new FilePaths();
+    private FilePaths sicredi = new FilePaths();
 
     /** Retorna apenas os bancos que possuem {@code input} configurado. */
     public Map<String, FilePaths> enabledBanks() {
@@ -146,6 +148,7 @@ public class FileProcessingProperties {
       if (hasInput(itau)) result.put("itau", itau);
       if (hasInput(santander)) result.put("santander", santander);
       if (hasInput(bradesco)) result.put("bradesco", bradesco);
+      if (hasInput(sicredi)) result.put("sicredi", sicredi);
       return result;
     }
 

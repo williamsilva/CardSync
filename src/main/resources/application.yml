@@ -107,6 +107,9 @@ file-processing:
       bradesco:
         input: ${file-processing.base-bank}/BRADESCO/input
 
+      sicredi:
+        input: ${file-processing.base-bank}/SICREDI/input
+
   reconciliation:
     # Limite máximo de candidatos para tentativa de combinação/subset recursivo.
     # Evita explosão combinatória em conciliações bancárias com muitos lançamentos candidatos.
