@@ -174,7 +174,19 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
    * já são tratados como legado por natureza, não por esta análise. Também exige
    * {@code rb.acquirer is not null}: sem adquirente não há como localizar uma CreditOrder
    * candidata (ver findWithoutAcquirerForReclassification, a ferramenta que existe justamente
-   * pra corrigir esses lançamentos antes de entrarem nesta análise).
+   * pra corrigir esses lançamentos antes de entrarem nesta análise). {@code releaseDate <=
+   * :legacyMarkingCutoffDate} (go-live + legacyMarkingMonths, ver
+   * ReconciliationSettingsService#getLegacyMarkingCutoffDate) é o teto simétrico: lançamentos
+   * muito depois do go-live não podem mais ser explicados por "venda anterior à implantação sem
+   * ordem no sistema" — esse gap só faz sentido no período de transição logo após o go-live
+   * (confirmado com dados reais: sem esse teto, um lançamento ~2 anos após o go-live era oferecido
+   * pra vínculo com essa justificativa, quando eram vendas correntes sem relação com implantação).
+   * Sempre um valor concreto (nunca null) — quando não há teto configurado, o chamador
+   * ({@link com.cardsync.core.reconciliation.PendingReceiptReleaseFinder}) já resolve pra
+   * {@code LocalDate.MAX}: "{@code :param is null or ...}" sem coluna nenhuma pro outro lado do
+   * "is null" faz o Postgres falhar com "não foi possível determinar o tipo de dados do parâmetro"
+   * (extended query protocol não consegue inferir o tipo só de "? is null") — confirmado em
+   * produção/dev real, não é hipotético.
    */
   @Query("""
     select rb
@@ -192,13 +204,15 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
       and rb.releaseDate is not null
       and rb.releaseValue is not null
       and rb.releaseDate >= :goLiveDate
+      and rb.releaseDate <= :legacyMarkingCutoffDate
     order by rb.releaseValue asc, rb.releaseDate asc
   """)
   List<ReleasesBankEntity> findPendingForPreImplantationDivergence(
     @Param("pendingStatus") Integer pendingStatus,
     @Param("receiptCategory") Integer receiptCategory,
     @Param("modalityCodes") List<Integer> modalityCodes,
-    @Param("goLiveDate") LocalDate goLiveDate
+    @Param("goLiveDate") LocalDate goLiveDate,
+    @Param("legacyMarkingCutoffDate") LocalDate legacyMarkingCutoffDate
   );
 
 }

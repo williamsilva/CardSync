@@ -118,13 +118,14 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
 
   private static List<ReleaseCategoryEnum> getReleaseCategory() {
     return List.of(
+      ReleaseCategoryEnum.NULL,
       ReleaseCategoryEnum.RECEIPT
     );
   }
 
   private static List<Integer> getHistoricalCodeBank() {
     return List.of(
-      7, 71, 98, 469, 617, 887, 2023, 3212
+      7,62, 65, 71, 98, 101, 158, 357, 469, 617, 887, 2021, 2023, 2573, 3212, 3627
     );
   }
 }

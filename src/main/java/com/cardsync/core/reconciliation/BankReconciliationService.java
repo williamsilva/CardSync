@@ -743,15 +743,12 @@ public class BankReconciliationService {
 
     for (SalesSummaryEntity summary : summaries.values()) {
       List<CreditOrderEntity> siblings = List.copyOf(summary.getCreditOrders());
-      boolean anyPaid = siblings.stream()
-        .anyMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
-      boolean allPaid = !siblings.isEmpty() && siblings.stream()
-        .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+      PaymentAggregate aggregate = aggregateCreditOrderPayment(siblings);
 
-      if (allPaid) {
+      if (aggregate.allPaid()) {
         summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
-      } else if (anyPaid) {
+      } else if (aggregate.anyPaid()) {
         summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
       } else {
@@ -759,6 +756,40 @@ public class BankReconciliationService {
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
       }
     }
+  }
+
+  /** Público para permitir reuso em ManualBankReconciliationService e CreditOrderManualService (pacote irmão). */
+  public record PaymentAggregate(boolean allPaid, boolean anyPaid) {
+  }
+
+  /**
+   * "Todas pagas" só quando o número de parcelas PAGAS bate com o total de parcelas ESPERADO
+   * (CreditOrderEntity#installmentTotal) — não com o número de CreditOrder que já existem. Uma
+   * parcela ainda não gerada (ver SaleSummarySpecs#missingCreditOrdersSpec, que existe
+   * justamente pra achar esse gap) não pode contar como "paga" só porque as parcelas que já
+   * existem estão todas pagas; do contrário o resumo vira "Pago" com uma parcela ainda faltando
+   * ser criada (confirmado com dados reais: RV 8549241 tinha as parcelas 1 e 3 pagas, faltando a
+   * 2, e ainda assim aparecia como "Pago"). Sem candidatas, expectedTotal cai pro tamanho de
+   * siblings (mesmo comportamento de antes). Público para reuso em ManualBankReconciliationService
+   * e CreditOrderManualService (pacote irmão com.cardsync.core.reconciliation.summary) — este
+   * último usava sua própria regra (linhas criadas vs. installmentTotal) só pra creditOrderStatus,
+   * nunca tocando statusPaymentBank; unificado aqui pra ambos os campos sempre refletirem o mesmo
+   * agregado de pagamento, evitando o desalinhamento entre os dois campos (ver RV 44749250).
+   */
+  public static PaymentAggregate aggregateCreditOrderPayment(List<CreditOrderEntity> siblings) {
+    if (siblings.isEmpty()) return new PaymentAggregate(false, false);
+
+    int expectedTotal = siblings.stream()
+      .map(CreditOrderEntity::getInstallmentTotal)
+      .filter(Objects::nonNull)
+      .max(Integer::compareTo)
+      .orElse(siblings.size());
+
+    long paidCount = siblings.stream()
+      .filter(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()))
+      .count();
+
+    return new PaymentAggregate(paidCount == expectedTotal, paidCount > 0);
   }
 
   /**
@@ -1089,15 +1120,12 @@ public class BankReconciliationService {
     if (summary == null || summary.getId() == null) return;
 
     List<CreditOrderEntity> siblings = creditOrderRepository.findBySalesSummary_Id(summary.getId());
-    boolean allPaid = !siblings.isEmpty() && siblings.stream()
-      .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
-    boolean anyPaid = siblings.stream()
-      .anyMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+    PaymentAggregate aggregate = aggregateCreditOrderPayment(siblings);
 
-    if (allPaid) {
+    if (aggregate.allPaid()) {
       summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
       summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
-    } else if (anyPaid) {
+    } else if (aggregate.anyPaid()) {
       summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
       summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
     }
@@ -1122,16 +1150,12 @@ public class BankReconciliationService {
     for (var entry : ordersBySummaryId.entrySet()) {
       List<CreditOrderEntity> siblings = entry.getValue();
       SalesSummaryEntity summary = siblings.getFirst().getSalesSummary();
+      PaymentAggregate aggregate = aggregateCreditOrderPayment(siblings);
 
-      boolean allPaid = siblings.stream()
-        .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
-      boolean anyPaid = siblings.stream()
-        .anyMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
-
-      if (allPaid) {
+      if (aggregate.allPaid()) {
         summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
-      } else if (anyPaid) {
+      } else if (aggregate.anyPaid()) {
         summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
       }
@@ -1155,12 +1179,17 @@ public class BankReconciliationService {
 
   /**
    * Mesma checagem acima, mas ignorando estabelecimento — usada pelo {@link CreditOrderCandidateFinder}
-   * (ferramentas de análise: divergência pré-implantação, legado sem ordem). Confirmado com o
-   * financeiro: alguns bancos (ex.: Santander) consolidam num único lançamento os valores de mais
-   * de um estabelecimento (PV) da mesma empresa — exigir o mesmo PV nessas ferramentas descartava
-   * candidatas legítimas. O matcher automático (Etapa 7) continua estabelecimento-consciente via
-   * {@link #isCreditOrderCandidateCompatible}, para não arriscar vínculos automáticos indevidos
-   * entre PVs diferentes quando a consolidação não se aplica.
+   * (ferramentas de análise: divergência pré-implantação, legado sem ordem) apenas como FALLBACK,
+   * quando o PV do próprio lançamento não tem nenhuma candidata direta via
+   * {@link #isCreditOrderCandidateCompatible}. Confirmado com o financeiro: alguns bancos (ex.:
+   * Santander) consolidam num único lançamento os valores de mais de um estabelecimento (PV) da
+   * mesma empresa — exigir o mesmo PV sempre descartaria candidatas legítimas nesse cenário. Mas
+   * usar isso como caminho ÚNICO (em vez de fallback) quebra o cenário oposto: múltiplos
+   * lançamentos do mesmo banco/adquirente/bandeira no mesmo dia, um por PV (não consolidados) —
+   * o pool ignorando estabelecimento somaria candidatas de todos os PVs pra cada lançamento,
+   * mascarando uma divergência real como falso excesso. O matcher automático (Etapa 7) continua
+   * estabelecimento-consciente via {@link #isCreditOrderCandidateCompatible}, para não arriscar
+   * vínculos automáticos indevidos entre PVs diferentes quando a consolidação não se aplica.
    */
   boolean isCreditOrderCandidateCompatibleIgnoringEstablishment(
     ReleasesBankEntity release, ReconciliationMatchContext releaseContext, UUID releaseBank,

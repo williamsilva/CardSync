@@ -185,10 +185,10 @@ public class ManualBankReconciliationService {
         }
 
         for (SalesSummaryEntity summary : summaries.values()) {
-            boolean allPaid = summary.getCreditOrders().stream()
-                    .allMatch(co -> StatusPaymentBankEnum.PAID.equals(co.getStatusPaymentBank()));
+            BankReconciliationService.PaymentAggregate aggregate =
+                    BankReconciliationService.aggregateCreditOrderPayment(List.copyOf(summary.getCreditOrders()));
 
-            if (allPaid) {
+            if (aggregate.allPaid()) {
                 summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
                 summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
             } else {

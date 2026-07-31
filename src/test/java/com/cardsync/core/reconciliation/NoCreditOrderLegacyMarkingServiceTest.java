@@ -48,12 +48,12 @@ class NoCreditOrderLegacyMarkingServiceTest {
   private final BankReconciliationService bankReconciliationService =
     new BankReconciliationService(null, null, null, null, null, null, null, null, null, null);
   private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder =
-    new PendingReceiptReleaseFinder(releasesBankRepository, implantationDateProvider);
+    new PendingReceiptReleaseFinder(releasesBankRepository, implantationDateProvider, settingsService);
   private final CreditOrderCandidateFinder creditOrderCandidateFinder =
     new CreditOrderCandidateFinder(creditOrderRepository, bankReconciliationService);
 
   private final NoCreditOrderLegacyMarkingService service = new NoCreditOrderLegacyMarkingService(
-    pendingReceiptReleaseFinder, creditOrderCandidateFinder, manualBankReconciliationService, settingsService
+    creditOrderCandidateFinder, pendingReceiptReleaseFinder, manualBankReconciliationService, settingsService
   );
 
   private CompanyEntity company;
@@ -120,7 +120,7 @@ class NoCreditOrderLegacyMarkingServiceTest {
 
   private void stubPendingReleases(ReleasesBankEntity... releases) {
     when(releasesBankRepository.findPendingForPreImplantationDivergence(
-      eq(StatusPaymentBankEnum.PENDING.getCode()), eq(ReleaseCategoryEnum.RECEIPT.getCode()), any(), any()
+      eq(StatusPaymentBankEnum.PENDING.getCode()), eq(ReleaseCategoryEnum.RECEIPT.getCode()), any(), any(), any()
     )).thenReturn(List.of(releases));
   }
 

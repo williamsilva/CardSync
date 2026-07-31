@@ -14,13 +14,20 @@ import java.util.UUID;
 
 /**
  * Acha as ordens de crédito candidatas de um lançamento bancário, reaproveitando a mesma
- * definição de "candidata compatível" do matcher automático — exceto por estabelecimento, que
- * aqui é ignorado (ver
- * {@link BankReconciliationService#isCreditOrderCandidateCompatibleIgnoringEstablishment}):
- * algumas empresas têm um único lançamento bancário consolidando valores de mais de um
- * estabelecimento (PV), então exigir o mesmo PV descartaria candidatas legítimas nestas
- * ferramentas de análise que não passam pelo subset-sum do matcher (divergência
- * pré-implantação, legado sem ordem).
+ * definição de "candidata compatível" do matcher automático. Tenta primeiro
+ * estabelecimento-consciente (ver {@link BankReconciliationService#isCreditOrderCandidateCompatible});
+ * só cai para a variante que ignora estabelecimento (ver
+ * {@link BankReconciliationService#isCreditOrderCandidateCompatibleIgnoringEstablishment}) quando o
+ * PV do próprio lançamento não tem NENHUMA candidata direta — cobrindo o caso de consolidação
+ * (algumas empresas têm um único lançamento bancário consolidando valores de mais de um
+ * estabelecimento/PV, então exigir o mesmo PV nesse caso descartaria candidatas legítimas).
+ *
+ * Sem esse fallback em duas etapas, um dia com múltiplos lançamentos do mesmo
+ * banco/adquirente/bandeira mas em PVs diferentes (não consolidados) faz o pool ignorando
+ * estabelecimento somar candidatas de TODOS esses PVs pra cada lançamento — inflando a soma
+ * disponível além do valor de cada lançamento individual e mascarando uma divergência real
+ * (falta de ordem) como um falso excesso (SKIPPED_NEGATIVE em
+ * PreImplantationDivergenceReconciliationService).
  */
 @Component
 @RequiredArgsConstructor
@@ -49,8 +56,22 @@ class CreditOrderCandidateFinder {
       windowFrom, windowTo
     );
 
-    return candidatesInWindow.stream()
+    List<CreditOrderEntity> ordersWithData = candidatesInWindow.stream()
       .filter(order -> order.getReleaseValue() != null && order.getReleaseDate() != null)
+      .toList();
+
+    List<CreditOrderEntity> sameEstablishment = ordersWithData.stream()
+      .filter(order -> bankReconciliationService.isCreditOrderCandidateCompatible(
+        release, releaseContext, releaseBankId, order, orderMatchDataOf(order),
+        settings.toleranceDaysBefore(), settings.toleranceDaysAfter(), settings.strictness()
+      ))
+      .toList();
+
+    if (!sameEstablishment.isEmpty()) {
+      return sameEstablishment;
+    }
+
+    return ordersWithData.stream()
       .filter(order -> bankReconciliationService.isCreditOrderCandidateCompatibleIgnoringEstablishment(
         release, releaseContext, releaseBankId, order, orderMatchDataOf(order),
         settings.toleranceDaysBefore(), settings.toleranceDaysAfter(), settings.strictness()

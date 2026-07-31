@@ -177,7 +177,14 @@ public class BankTextSignalResolver {
     // "ANGELO" contém "ELO" inteiro) — classificando recebimentos PIX como se fossem venda em
     // cartão Elo. Nos dados reais do Sicredi a bandeira Elo sempre aparece como palavra isolada
     // ("SICREDI DEBITO ELO"), nunca colada a outra letra, então exigir token isolado é seguro.
-    return hasStandaloneToken(normalizedText, "ELO");
+    // "EL" (abreviação real usada pela Rede no Itaú, ex.: "REDE EL 074705318") precisa do MESMO
+    // tratamento — token isolado, não substring livre — pra não reintroduzir o falso positivo
+    // acima: em "ANGELO"/"MICHELE"/"GISELE"/"CELIA"/"FELICIANO" o "EL" também está colado a outra
+    // letra dos dois lados, então hasStandaloneToken rejeita esses nomes exatamente como "ELO"
+    // rejeita. Removida sem querer ao corrigir o falso positivo de "ELO" (seria pra virar
+    // hasStandaloneToken(..., "EL"), não sumir) — sem ela, lançamentos com a bandeira abreviada
+    // (Itaú/Rede) nunca resolvem Bandeira nenhuma.
+    return hasStandaloneToken(normalizedText, "ELO") || hasStandaloneToken(normalizedText, "EL");
   }
 
   public boolean isCabalSignal(String normalizedText) {

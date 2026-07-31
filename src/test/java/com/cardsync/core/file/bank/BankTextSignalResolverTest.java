@@ -103,6 +103,16 @@ class BankTextSignalResolverTest {
   }
 
   @Test
+  void resolvesEloFromRealAbbreviatedItauRedeDescription() {
+    // Caso real reportado direto na tela de Extrato Bancário: Itaú/Rede abrevia a bandeira Elo
+    // para "EL" (não ELO) no histórico do CNAB240 — mesmo padrão de abreviação já coberto pro
+    // Mastercard ("MC" em isMasterSignal) e pro Amex ("AM" em isAmexSignal), mas que tinha sido
+    // removido do isEloSignal ao corrigir o falso positivo de "ANGELO"/"MICHELE"/etc. (deveria
+    // ter virado hasStandaloneToken(..., "EL"), não sumido).
+    assertThat(resolver.isEloSignal(resolver.normalize("93 - REDE EL 074705318"))).isTrue();
+  }
+
+  @Test
   void resolvesPixReceiptSignalFromRealSicrediMarker() {
     String normalized = resolver.normalize("RECEBIMENTO PIX PIX_CRED 10424623722 LUANA ALVES CARVA");
 

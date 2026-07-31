@@ -11,6 +11,7 @@ import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportCsvReader;
 import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportRow;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.HolidayRepository;
@@ -68,19 +69,66 @@ class CreditOrderManualServiceTest {
     when(transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId)).thenReturn(3);
     // Só a parcela 1 existe — faltam 2 e 3.
     when(creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId)).thenReturn(Set.of(1));
+
+    List<CreditOrderEntity> savedOrders = new java.util.ArrayList<>();
     when(creditOrderRepository.save(any(CreditOrderEntity.class)))
       .thenAnswer(invocation -> {
         CreditOrderEntity co = invocation.getArgument(0);
         co.setId(UUID.randomUUID());
+        savedOrders.add(co);
         return co;
       });
+    // updateSummaryCreditOrderStatus recalcula a partir de TODAS as ordens do resumo (ver
+    // BankReconciliationService#aggregateCreditOrderPayment) — reflete aqui o que teria sido
+    // persistido nesta chamada.
+    when(creditOrderRepository.findBySalesSummary_Id(summaryId)).thenAnswer(invocation -> List.copyOf(savedOrders));
 
     CreditOrderManualResult result = service.create(new CreditOrderManualInput(List.of(summaryId)));
 
     assertThat(result.created()).isEqualTo(2);
     assertThat(result.createdIds()).hasSize(2);
     assertThat(result.skippedReasons()).isEmpty();
-    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.RECONCILED);
+    // As 2 parcelas recém-criadas começam PENDING (ninguém pagou ainda) — creditOrderStatus agora
+    // reflete o agregado de PAGAMENTO (unificado com BankReconciliationService), não mais "todas as
+    // linhas existem". RECONCILED só quando as parcelas existentes estiverem de fato pagas.
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PENDING);
+    assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING);
+  }
+
+  @Test
+  void marksSummaryReconciledWhenAllInstallmentsEndUpPaid() {
+    UUID summaryId = UUID.randomUUID();
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(summaryId);
+    summary.setRvDate(LocalDate.now().minusMonths(6));
+
+    when(salesSummaryRepository.findById(summaryId)).thenReturn(java.util.Optional.of(summary));
+    when(transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId)).thenReturn(2);
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId)).thenReturn(Set.of(1));
+
+    // Parcela 1 já existe e já foi paga pelo banco.
+    CreditOrderEntity paidInstallment1 = new CreditOrderEntity();
+    paidInstallment1.setId(UUID.randomUUID());
+    paidInstallment1.setInstallmentNumber(1);
+    paidInstallment1.setInstallmentTotal(2);
+    paidInstallment1.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+
+    List<CreditOrderEntity> savedOrders = new java.util.ArrayList<>(List.of(paidInstallment1));
+    when(creditOrderRepository.save(any(CreditOrderEntity.class)))
+      .thenAnswer(invocation -> {
+        CreditOrderEntity co = invocation.getArgument(0);
+        co.setId(UUID.randomUUID());
+        savedOrders.add(co);
+        return co;
+      });
+    when(creditOrderRepository.findBySalesSummary_Id(summaryId)).thenAnswer(invocation -> List.copyOf(savedOrders));
+
+    service.create(new CreditOrderManualInput(List.of(summaryId)));
+
+    // A parcela 2 recém-criada continua PENDING (ver buildCreditOrder) — com a 1 paga e a 2 não,
+    // o resumo deve ficar parcial, não reconciliado.
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PARTIALLY_RECONCILED);
+    assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PARTIALLY_PAID);
   }
 
   private void stubSpecsAndAssembler(List<SalesSummaryEntity> summaries, List<SaleSummaryModel> models) {

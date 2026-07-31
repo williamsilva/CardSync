@@ -36,7 +36,7 @@ class BankReconciliationServiceSalesSummaryAggregationTest {
   private final TransactionAcqRepository transactionAcqRepository = mock(TransactionAcqRepository.class);
 
   private final BankReconciliationService service = new BankReconciliationService(
-    null, null, null, null, null, null, null, transactionAcqRepository, null
+    null, null, null, null, null, null, null, transactionAcqRepository, null, null
   );
 
   @Test

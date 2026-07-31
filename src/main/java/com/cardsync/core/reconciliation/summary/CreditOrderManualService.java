@@ -19,6 +19,7 @@ import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.HolidayRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
@@ -205,7 +206,7 @@ public class CreditOrderManualService {
         }
 
         if (createdForThisSummary > 0) {
-          updateSummaryCreditOrderStatus(summary, existing.size() + createdForThisSummary, installmentTotal);
+          updateSummaryCreditOrderStatus(summary);
         }
 
       } catch (IllegalStateException e) {
@@ -370,9 +371,7 @@ public class CreditOrderManualService {
 
     if (persist) {
       for (SalesSummaryEntity summary : affectedSummaries) {
-        int installmentTotal = installmentTotalBySummaryId.getOrDefault(summary.getId(), 1);
-        int newCount = existingInstallmentsBySummaryId.getOrDefault(summary.getId(), Set.of()).size();
-        updateSummaryCreditOrderStatus(summary, newCount, installmentTotal);
+        updateSummaryCreditOrderStatus(summary);
       }
     }
 
@@ -496,15 +495,39 @@ public class CreditOrderManualService {
     return co;
   }
 
-  private void updateSummaryCreditOrderStatus(SalesSummaryEntity summary, int newCount, int installmentTotal) {
-    StatusReconciliationEnum newStatus = newCount >= installmentTotal
-      ? StatusReconciliationEnum.RECONCILED
-      : StatusReconciliationEnum.PARTIALLY_RECONCILED;
+  /**
+   * Recalcula creditOrderStatus/statusPaymentBank a partir de TODAS as ordens de crédito do
+   * resumo (não só as recém-criadas nesta chamada) — mesmo agregado de pagamento usado por
+   * BankReconciliationService/ManualBankReconciliationService (ver
+   * {@link BankReconciliationService#aggregateCreditOrderPayment}). Antes, este método usava sua
+   * própria regra (linhas criadas vs. installmentTotal) só pra creditOrderStatus e nunca tocava
+   * statusPaymentBank — quando a última parcela faltante era criada e paga em seguida,
+   * statusPaymentBank ficava "preso" no valor de antes, porque nada recalculava os dois campos
+   * juntos (confirmado com dados reais: RV 44749250, 2 parcelas pagas, ficou "Reconciled"/"Parcial"
+   * em vez de "Reconciled"/"Pago").
+   */
+  private void updateSummaryCreditOrderStatus(SalesSummaryEntity summary) {
+    List<CreditOrderEntity> siblings = creditOrderRepository.findBySalesSummary_Id(summary.getId());
+    BankReconciliationService.PaymentAggregate aggregate = BankReconciliationService.aggregateCreditOrderPayment(siblings);
 
-    if (summary.getCreditOrderStatus() != newStatus) {
-      summary.setCreditOrderStatus(newStatus);
-      log.info("📊 creditOrderStatus {} → {}", summary.getId(), newStatus);
+    StatusReconciliationEnum newCoStatus;
+    StatusPaymentBankEnum newPaymentStatus;
+    if (aggregate.allPaid()) {
+      newCoStatus = StatusReconciliationEnum.RECONCILED;
+      newPaymentStatus = StatusPaymentBankEnum.PAID;
+    } else if (aggregate.anyPaid()) {
+      newCoStatus = StatusReconciliationEnum.PARTIALLY_RECONCILED;
+      newPaymentStatus = StatusPaymentBankEnum.PARTIALLY_PAID;
+    } else {
+      newCoStatus = StatusReconciliationEnum.PENDING;
+      newPaymentStatus = StatusPaymentBankEnum.PENDING;
     }
+
+    if (summary.getCreditOrderStatus() != newCoStatus) {
+      summary.setCreditOrderStatus(newCoStatus);
+      log.info("📊 creditOrderStatus {} → {}", summary.getId(), newCoStatus);
+    }
+    summary.setStatusPaymentBank(newPaymentStatus);
   }
 
   /**
