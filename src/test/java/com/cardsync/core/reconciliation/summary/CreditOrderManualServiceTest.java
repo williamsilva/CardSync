@@ -391,6 +391,42 @@ class CreditOrderManualServiceTest {
     assertThat(saved.getValue().getInstallmentNumber()).isEqualTo(2);
   }
 
+  /**
+   * O relatório de "pagamentos" traz o valor líquido só de MDR — tarifas/débitos cobrados à
+   * parte (relatório separado de "ajustes") não entram nele. Antes esse caminho era o único dos
+   * três de geração de ordem deixado de fora do desconto de ajustes de débito, por presumir que
+   * o relatório da adquirente já vinha líquido de tudo (confirmado errado com dados reais: RV
+   * 82730892, valor do relatório R$9,77, ajuste de aluguel de maquininha R$9,77 — valor real
+   * repassado é R$0,00).
+   */
+  @Test
+  void createsOrderFromImportRowDeductingDebitAdjustments() throws Exception {
+    UUID summaryId = UUID.randomUUID();
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(summaryId);
+    summary.setRvNumber(82730892);
+    summary.setPvNumber(74705318);
+
+    AcquirerPaymentReportRow row = importRow(2, 82730892, 74705318, 1, 1, LocalDate.of(2026, 6, 3), new BigDecimal("9.77"));
+
+    when(acquirerPaymentReportCsvReader.read(any())).thenReturn(List.of(row));
+    when(salesSummaryRepository.findByRvNumberIn(Set.of(82730892))).thenReturn(List.of(summary));
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryIdIn(List.of(summaryId))).thenReturn(List.of());
+    when(adjustmentRepository.sumDebitAdjustmentsBySalesSummaryIdIn(List.of(summaryId)))
+      .thenReturn(List.<Object[]>of(new Object[] { summaryId, new BigDecimal("9.77") }));
+    when(creditOrderRepository.save(any(CreditOrderEntity.class))).thenAnswer(invocation -> {
+      CreditOrderEntity co = invocation.getArgument(0);
+      co.setId(UUID.randomUUID());
+      return co;
+    });
+
+    service.importFromAcquirerReport(new MultipartFile[] { mock(MultipartFile.class) });
+
+    var saved = org.mockito.ArgumentCaptor.forClass(CreditOrderEntity.class);
+    org.mockito.Mockito.verify(creditOrderRepository).save(saved.capture());
+    assertThat(saved.getValue().getReleaseValue()).isEqualByComparingTo("0.00");
+  }
+
   @Test
   void skipsImportRowWhenSummaryNotFound() throws Exception {
     AcquirerPaymentReportRow row = importRow(2, 99999999, 12345, 1, 1, LocalDate.now(), BigDecimal.TEN);

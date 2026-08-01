@@ -7,16 +7,24 @@ import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.domain.model.FlagEntity;
+import com.cardsync.domain.exception.BusinessException;
+import com.cardsync.domain.exception.ErrorCode;
+import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CompanyRepository;
+import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -30,9 +38,18 @@ public class AdjustmentManualService {
   private final CompanyRepository companyRepository;
   private final SalesSummaryRepository salesSummaryRepository;
   private final AdjustmentRepository adjustmentRepository;
+  private final CreditOrderRepository creditOrderRepository;
 
   @Transactional
   public AdjustmentEntity create(AdjustmentManualInput input) {
+    if (input.rawAdjustmentCode() != null && !input.rawAdjustmentCode().isBlank()
+      && adjustmentRepository.existsByRawAdjustmentCodeAndRvNumberOriginal(input.rawAdjustmentCode(), input.rvNumberOriginal())) {
+      throw BusinessException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        "Ajuste já importado anteriormente: " + input.rawAdjustmentCode()
+      );
+    }
+
     AcquirerEntity acquirer = acquirerRepository.findById(UUID.fromString(input.acquirerId()))
       .orElseThrow(() -> new IllegalStateException("Adquirente não encontrada: " + input.acquirerId()));
     EstablishmentEntity establishment = safeEstablishment(input.pvNumber());
@@ -61,6 +78,10 @@ public class AdjustmentManualService {
 
     AdjustmentEntity saved = adjustmentRepository.save(adjustment);
 
+    if (salesSummary != null && "D".equals(saved.getDebitType()) && saved.getAdjustmentValue() != null) {
+      recomputeEligibleCreditOrders(salesSummary, saved.getAdjustmentValue());
+    }
+
     log.info(
       "✅ Ajuste manual criado: id={}, pv={}, rvOriginal={}, adjustmentDate={}, adjustmentValue={}, salesSummaryVinculado={}",
       saved.getId(), saved.getPvNumber(), saved.getRvNumberOriginal(), saved.getAdjustmentDate(),
@@ -68,6 +89,42 @@ public class AdjustmentManualService {
     );
 
     return saved;
+  }
+
+  /**
+   * Um ajuste importado depois que a ordem de crédito já existe nunca reduzia releaseValue —
+   * o desconto só acontecia no momento da geração (ver CreditOrderManualService/
+   * SalesSummaryCreditOrderReconciliationService). Recalcula aqui as ordens ainda pendentes e
+   * sem lançamento bancário vinculado (nunca as já pagas/conciliadas, pra não desfazer uma
+   * conciliação real já feita) — dividindo o valor do ajuste igualmente entre as parcelas do
+   * resumo (mesmo tratamento usado na geração), já que ele se refere ao resumo inteiro, não a
+   * uma parcela específica.
+   */
+  private void recomputeEligibleCreditOrders(SalesSummaryEntity salesSummary, BigDecimal adjustmentValue) {
+    List<CreditOrderEntity> eligibleOrders = creditOrderRepository.findBySalesSummary_Id(salesSummary.getId()).stream()
+      .filter(order -> StatusPaymentBankEnum.PENDING.equals(order.getStatusPaymentBank()) && order.getReleaseBank() == null)
+      .toList();
+
+    if (eligibleOrders.isEmpty()) {
+      return;
+    }
+
+    for (CreditOrderEntity order : eligibleOrders) {
+      int installmentTotal = order.getInstallmentTotal() != null && order.getInstallmentTotal() > 0
+        ? order.getInstallmentTotal()
+        : 1;
+      BigDecimal share = installmentTotal > 1
+        ? adjustmentValue.divide(BigDecimal.valueOf(installmentTotal), 2, RoundingMode.DOWN)
+        : adjustmentValue;
+      BigDecimal current = order.getReleaseValue() != null ? order.getReleaseValue() : BigDecimal.ZERO;
+      order.setReleaseValue(current.subtract(share));
+    }
+    creditOrderRepository.saveAll(eligibleOrders);
+
+    log.info(
+      "🔄 Ordem(ns) de crédito recalculada(s) após ajuste manual: salesSummary={}, ordens={}, ajuste={}",
+      salesSummary.getId(), eligibleOrders.size(), adjustmentValue
+    );
   }
 
   private EstablishmentEntity safeEstablishment(Integer pvNumber) {

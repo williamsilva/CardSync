@@ -322,6 +322,17 @@ public class CreditOrderManualService {
         .add((Integer) row[1]);
     }
 
+    // Desconta ajustes de débito também na importação do relatório real da adquirente — o
+    // relatório de "pagamentos" traz o valor líquido só de MDR, mas tarifas/débitos cobrados à
+    // parte (relatório separado de "ajustes") não entram nele (confirmado com dados reais: RV
+    // 82730892, valor líquido do relatório R$9,77, ajuste de aluguel de maquininha R$9,77 — o
+    // valor real repassado é R$0,00). Antes esse caminho era deixado de fora por presumir que o
+    // relatório de pagamentos já vinha líquido de tudo — presunção errada.
+    Map<UUID, BigDecimal> debitAdjustmentsBySummaryId = new HashMap<>();
+    for (Object[] row : adjustmentRepository.sumDebitAdjustmentsBySalesSummaryIdIn(summaryIds)) {
+      debitAdjustmentsBySummaryId.put((UUID) row[0], (BigDecimal) row[1]);
+    }
+
     List<UUID> createdIds = new ArrayList<>();
     List<CreditOrderImportSkipReason> skippedReasons = new ArrayList<>();
     Set<SalesSummaryEntity> affectedSummaries = new LinkedHashSet<>();
@@ -366,7 +377,8 @@ public class CreditOrderManualService {
       totalValue = totalValue.add(row.releaseValue());
 
       if (persist) {
-        CreditOrderEntity co = buildCreditOrderFromImportRow(summary, row);
+        BigDecimal debitAdjustments = debitAdjustmentsBySummaryId.getOrDefault(summary.getId(), BigDecimal.ZERO);
+        CreditOrderEntity co = buildCreditOrderFromImportRow(summary, row, debitAdjustments);
         co = creditOrderRepository.save(co);
         createdIds.add(co.getId());
 
@@ -431,13 +443,19 @@ public class CreditOrderManualService {
     return (a != null ? a : BigDecimal.ZERO).add(b != null ? b : BigDecimal.ZERO);
   }
 
-  private CreditOrderEntity buildCreditOrderFromImportRow(SalesSummaryEntity summary, AcquirerPaymentReportRow row) {
+  private CreditOrderEntity buildCreditOrderFromImportRow(
+    SalesSummaryEntity summary, AcquirerPaymentReportRow row, BigDecimal debitAdjustments
+  ) {
     BigDecimal grossPer = row.grossValue() != null
       ? row.grossValue()
       : computeInstallmentValue(summary.getGrossValue(), row.installmentTotal());
     BigDecimal discountPer = row.discountValue() != null
       ? row.discountValue()
       : computeInstallmentValue(summary.getDiscountValue(), row.installmentTotal());
+    // Ajustes de débito são do resumo inteiro; dividido igualmente entre as parcelas do arquivo,
+    // mesmo tratamento de buildCreditOrder — não importa em qual dia cada parcela liquida.
+    BigDecimal debitShare = computeInstallmentValue(orZero(debitAdjustments), row.installmentTotal());
+    BigDecimal netReleaseValue = orZero(row.releaseValue()).subtract(debitShare);
 
     LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
       ? summary.getFirstInstallmentCreditDate()
@@ -457,7 +475,7 @@ public class CreditOrderManualService {
     co.setInstallmentTotal(row.installmentTotal());
     co.setGrossRvValue(grossPer);
     co.setDiscountRateValue(discountPer);
-    co.setReleaseValue(row.releaseValue());
+    co.setReleaseValue(netReleaseValue);
     co.setReleaseDate(row.releaseDate());
     co.setCreditOrderDate(baseDate);
     co.setRecordType("MANUAL_GENERATED");

@@ -71,6 +71,14 @@ public interface AdjustmentRepository extends JpaRepository<AdjustmentEntity, UU
   """)
   BigDecimal sumDebitAdjustmentsBySalesSummaryId(@Param("summaryId") UUID summaryId);
 
+  /**
+   * Detecta reimportação do mesmo ajuste manual (mesmo "ID ajuste" do arquivo da adquirente +
+   * RV) — confirmado com dados reais: o mesmo CSV importado duas vezes (uma por SQL de correção,
+   * outra pela tela) duplicou o ajuste e a ordem de crédito ficou com releaseValue negativo, já
+   * que cada importação desconta de novo (ver AdjustmentManualService#recomputeEligibleCreditOrders).
+   */
+  boolean existsByRawAdjustmentCodeAndRvNumberOriginal(String rawAdjustmentCode, Integer rvNumberOriginal);
+
   /** Mesma soma acima, em lote para uma página inteira de resumos (ver CreditOrderManualService#fillNextInstallmentPreview). */
   @Query("""
     select adj.salesSummary.id, sum(adj.adjustmentValue)
