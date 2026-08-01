@@ -50,7 +50,7 @@ class PreImplantationDivergenceReconciliationServiceTest {
   // usado em BankReconciliationServiceReassignmentTest/NetAdjustmentTest para testar esses
   // métodos isoladamente sem contexto Spring.
   private final BankReconciliationService bankReconciliationService =
-    new BankReconciliationService(null, null, null, null, null, null, null, null, null, null);
+    new BankReconciliationService(null, null, null, null, null, null, null, null, null);
   private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder =
     new PendingReceiptReleaseFinder(releasesBankRepository, implantationDateProvider, settingsService);
   private final CreditOrderCandidateFinder creditOrderCandidateFinder =

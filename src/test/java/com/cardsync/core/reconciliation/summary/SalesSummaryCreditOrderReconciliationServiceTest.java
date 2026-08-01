@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SalesSummaryCreditOrderReconciliationServiceTest {
 
   private final SalesSummaryCreditOrderReconciliationService service =
-    new SalesSummaryCreditOrderReconciliationService(null, null, null, null, null);
+    new SalesSummaryCreditOrderReconciliationService(null, null, null, null, null, null);
 
   @Test
   void generateSyntheticCreditOrderFromAnticipationCopiesReleaseValueAndInstallment() {
@@ -80,6 +80,51 @@ class SalesSummaryCreditOrderReconciliationServiceTest {
     assertThat(order.getLaunchType()).hasSizeLessThanOrEqualTo(30);
     assertThat(order.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING);
     assertThat(order.getSalesSummaryStatus()).isEqualTo(StatusReconciliationEnum.RECONCILED);
+  }
+
+  /**
+   * Caso real reportado direto na tela: RV 338015830, modalidade Débito, liquidValue=52,29, com 2
+   * ajustes de débito vinculados (tarifa de POS + cancelamento de venda débito) somando
+   * exatamente 52,29 — o valor real devido é R$0,00, mas a ordem sintética gerada saía com o
+   * valor cheio (firstPositive ignora adjustedValue=0 e cai pro liquidValue), sem descontar nada.
+   */
+  @Test
+  void generateSyntheticCreditOrderFromSalesSummaryDeductsDebitAdjustments() {
+    SalesSummaryEntity summary = withId(new SalesSummaryEntity());
+    summary.setRvNumber(338015830);
+    summary.setRvDate(LocalDate.of(2025, 12, 4));
+    summary.setLiquidValue(new BigDecimal("52.29"));
+    summary.setGrossValue(new BigDecimal("52.80"));
+    summary.setDiscountValue(new BigDecimal("0.51"));
+    summary.setAdjustedValue(BigDecimal.ZERO);
+
+    CreditOrderEntity order = service.generateSyntheticCreditOrder(summary, new BigDecimal("52.29"));
+
+    assertThat(order.getReleaseValue()).isEqualByComparingTo("0.00");
+  }
+
+  /** Sem ajustes vinculados (caso comum), o comportamento não muda. */
+  @Test
+  void generateSyntheticCreditOrderFromSalesSummaryKeepsFullValueWithoutDebitAdjustments() {
+    SalesSummaryEntity summary = withId(new SalesSummaryEntity());
+    summary.setLiquidValue(new BigDecimal("100.00"));
+    summary.setAdjustedValue(BigDecimal.ZERO);
+
+    CreditOrderEntity order = service.generateSyntheticCreditOrder(summary, BigDecimal.ZERO);
+
+    assertThat(order.getReleaseValue()).isEqualByComparingTo("100.00");
+  }
+
+  /** debitAdjustments nulo (nenhum ajuste encontrado no lote) não pode derrubar com NPE. */
+  @Test
+  void generateSyntheticCreditOrderFromSalesSummaryToleratesNullDebitAdjustments() {
+    SalesSummaryEntity summary = withId(new SalesSummaryEntity());
+    summary.setLiquidValue(new BigDecimal("100.00"));
+    summary.setAdjustedValue(BigDecimal.ZERO);
+
+    CreditOrderEntity order = service.generateSyntheticCreditOrder(summary, null);
+
+    assertThat(order.getReleaseValue()).isEqualByComparingTo("100.00");
   }
 
   private <T extends com.cardsync.domain.model.AuditableEntityBase> T withId(T entity) {

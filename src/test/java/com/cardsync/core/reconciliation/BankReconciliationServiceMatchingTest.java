@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BankReconciliationServiceMatchingTest {
 
   private final BankReconciliationService service =
-    new BankReconciliationService(null, null, null, null, null, null, null, null, null, null);
+    new BankReconciliationService(null, null, null, null, null, null, null, null, null);
 
   // ── paymentKindFromModality — base da Fase 4 (DIGITAL_WALLET/OUTROS → CREDIT) ──
 

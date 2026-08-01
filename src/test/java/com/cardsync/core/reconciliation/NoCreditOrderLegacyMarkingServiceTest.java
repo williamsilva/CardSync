@@ -46,7 +46,7 @@ class NoCreditOrderLegacyMarkingServiceTest {
   private final ReconciliationSettingsService settingsService = mock(ReconciliationSettingsService.class);
   private final ImplantationDateProvider implantationDateProvider = mock(ImplantationDateProvider.class);
   private final BankReconciliationService bankReconciliationService =
-    new BankReconciliationService(null, null, null, null, null, null, null, null, null, null);
+    new BankReconciliationService(null, null, null, null, null, null, null, null, null);
   private final PendingReceiptReleaseFinder pendingReceiptReleaseFinder =
     new PendingReceiptReleaseFinder(releasesBankRepository, implantationDateProvider, settingsService);
   private final CreditOrderCandidateFinder creditOrderCandidateFinder =

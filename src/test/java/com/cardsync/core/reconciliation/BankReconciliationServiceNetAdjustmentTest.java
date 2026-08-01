@@ -11,7 +11,6 @@ import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
-import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
@@ -22,7 +21,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,11 +28,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Cobre a correção do bug de conciliação bancária nunca fechando quando há tarifa de POS/pinpad
- * (Rede EEVD identificador "011", ver ProcessRedeEeVdService.buildAdjustment011): o valor do
- * release bancário já vem líquido da tarifa, mas CreditOrderEntity.releaseValue continua bruto —
- * sem descontar a tarifa antes do match, nenhum subconjunto de valores brutos bate com o valor do
- * release, e o lançamento fica PENDING para sempre mesmo com o ajuste corretamente vinculado à RV.
+ * Cobre o matching bancário quando a RV tem tarifa de POS (Rede EEVD identificador "011", ver
+ * ProcessRedeEeVdService.buildAdjustment011) vinculada como ajuste de débito. Havia aqui uma
+ * compensação em memória (computeNetCreditOrderValues) que descontava a tarifa do releaseValue
+ * só para fins de matching, sem nunca persistir o desconto — porque, até então,
+ * CreditOrderManualService/SalesSummaryCreditOrderReconciliationService geravam a ordem com o
+ * valor bruto, sem descontar ajuste de débito nenhum (ver RV 338015830). Agora que os dois
+ * geradores já descontam TODO ajuste de débito (não só POS_FEE) na hora de persistir
+ * releaseValue, aquela compensação em memória foi removida — repeti-la aqui contaria a tarifa
+ * de POS duas vezes e derrubava o match (confirmado com dados reais: RV 60012393, 121364678 e
+ * outras pararam de conciliar automaticamente depois do backfill, até essa compensação
+ * duplicada ser removida). O matcher agora usa CreditOrderEntity.releaseValue diretamente.
  */
 class BankReconciliationServiceNetAdjustmentTest {
 
@@ -43,7 +47,6 @@ class BankReconciliationServiceNetAdjustmentTest {
   private final InstallmentAcqRepository installmentAcqRepository = mock(InstallmentAcqRepository.class);
   private final ReconciliationSettingsService settingsService = mock(ReconciliationSettingsService.class);
   private final EntityManager entityManager = mock(EntityManager.class);
-  private final AdjustmentRepository adjustmentRepository = mock(AdjustmentRepository.class);
   private final BankReconciliationMatcher matcher = new BankReconciliationMatcher();
 
   private final BankReconciliationService service = new BankReconciliationService(
@@ -55,12 +58,11 @@ class BankReconciliationServiceNetAdjustmentTest {
     installmentAcqRepository,
     null,
     null,
-    settingsService,
-    adjustmentRepository
+    settingsService
   );
 
   @Test
-  void releaseNetOfPosFeeMatchesCreditOrderOnceFeeIsDiscounted() {
+  void releaseMatchesCreditOrderDirectlyWhenReleaseValueIsAlreadyNetOfDebitAdjustments() {
     when(settingsService.isReprocessBankAcquirer()).thenReturn(false);
     when(settingsService.getValueTolerance()).thenReturn(new BigDecimal("0.05"));
     when(settingsService.getDateToleranceDaysBefore()).thenReturn(0);
@@ -75,10 +77,10 @@ class BankReconciliationServiceNetAdjustmentTest {
     LocalDate releaseDate = LocalDate.of(2026, 3, 2);
 
     SalesSummaryEntity summary = new SalesSummaryEntity();
-    UUID summaryId = UUID.randomUUID();
-    summary.setId(summaryId);
+    summary.setId(UUID.randomUUID());
 
-    // RV bruta = 13421,29; tarifa de POS (motivos 20/28) = 299,42; depósito líquido = 13121,87.
+    // RV 60012393: releaseValue já sai líquido da tarifa de POS (299,42) na geração/backfill —
+    // o lançamento bancário (também líquido) bate direto, sem nenhum desconto em memória.
     ReleasesBankEntity release = new ReleasesBankEntity();
     release.setId(UUID.randomUUID());
     release.setCompany(company);
@@ -93,11 +95,8 @@ class BankReconciliationServiceNetAdjustmentTest {
     order.setAcquirer(acquirer);
     order.setBankingDomicile(domicile);
     order.setReleaseDate(releaseDate);
-    order.setReleaseValue(new BigDecimal("13421.29"));
+    order.setReleaseValue(new BigDecimal("13121.87"));
     order.setSalesSummary(summary);
-
-    when(adjustmentRepository.sumPosFeeBySalesSummaryAndCreditDate(Set.of(summaryId)))
-      .thenReturn(List.<Object[]>of(new Object[] { summaryId, releaseDate, new BigDecimal("299.42") }));
 
     var reconciledOrderIds = new HashSet<UUID>();
     var counter = BankReconciliationResult.counter(BankReconciliationTriggerType.MANUAL, BankReconciliationMode.CREDIT_ORDER_ONLY);
@@ -120,7 +119,7 @@ class BankReconciliationServiceNetAdjustmentTest {
   }
 
   @Test
-  void releaseStaysPendingWhenCreditOrderValueIsNotNettedOfFee() {
+  void releaseStaysPendingWhenCreditOrderValueDoesNotMatchRelease() {
     when(settingsService.isReprocessBankAcquirer()).thenReturn(false);
     when(settingsService.getValueTolerance()).thenReturn(new BigDecimal("0.05"));
     when(settingsService.getDateToleranceDaysBefore()).thenReturn(0);
@@ -134,8 +133,6 @@ class BankReconciliationServiceNetAdjustmentTest {
 
     LocalDate releaseDate = LocalDate.of(2026, 3, 2);
 
-    // Sem nenhum ajuste POS_FEE vinculado (adjustmentRepository não é sequer chamado, pois a
-    // ordem não tem salesSummary) — o release líquido nunca bate com o valor bruto da ordem.
     ReleasesBankEntity release = new ReleasesBankEntity();
     release.setId(UUID.randomUUID());
     release.setCompany(company);

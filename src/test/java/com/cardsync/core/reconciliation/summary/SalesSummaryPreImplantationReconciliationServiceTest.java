@@ -41,7 +41,7 @@ class SalesSummaryPreImplantationReconciliationServiceTest {
   // shouldGenerateSyntheticCreditOrder, igual ao teste existente de
   // SalesSummaryCreditOrderReconciliationServiceTest.
   private final SalesSummaryCreditOrderReconciliationService realReconciliationService =
-    new SalesSummaryCreditOrderReconciliationService(null, null, null, null, null);
+    new SalesSummaryCreditOrderReconciliationService(null, null, null, null, null, null);
 
   private final SalesSummaryPreImplantationReconciliationService service = new SalesSummaryPreImplantationReconciliationService(
     implantationDateProvider, reconciliationSettingsService, salesSummaryRepository, realReconciliationService

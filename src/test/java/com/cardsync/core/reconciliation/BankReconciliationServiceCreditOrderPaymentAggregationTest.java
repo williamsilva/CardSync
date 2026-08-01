@@ -30,7 +30,7 @@ class BankReconciliationServiceCreditOrderPaymentAggregationTest {
   private final CreditOrderRepository creditOrderRepository = mock(CreditOrderRepository.class);
 
   private final BankReconciliationService service = new BankReconciliationService(
-    null, null, null, creditOrderRepository, null, null, null, null, null, null
+    null, null, null, creditOrderRepository, null, null, null, null, null
   );
 
   private CreditOrderEntity order(Integer installmentNumber, Integer installmentTotal, StatusPaymentBankEnum status) {

@@ -13,6 +13,7 @@ import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.HolidayRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
@@ -48,13 +49,14 @@ class CreditOrderManualServiceTest {
   private final TransactionAcqRepository transactionAcqRepository = mock(TransactionAcqRepository.class);
   private final CreditOrderRepository creditOrderRepository = mock(CreditOrderRepository.class);
   private final SaleSummarySpecs saleSummarySpecs = mock(SaleSummarySpecs.class);
+  private final AdjustmentRepository adjustmentRepository = mock(AdjustmentRepository.class);
   private final SaleSummaryModelAssembler saleSummaryModelAssembler = mock(SaleSummaryModelAssembler.class);
   private final ReconciliationSettingsService reconciliationSettingsService = mock(ReconciliationSettingsService.class);
   private final HolidayRepository holidayRepository = mock(HolidayRepository.class);
   private final AcquirerPaymentReportCsvReader acquirerPaymentReportCsvReader = mock(AcquirerPaymentReportCsvReader.class);
 
   private final CreditOrderManualService service = new CreditOrderManualService(
-    saleSummarySpecs, creditOrderRepository, salesSummaryRepository, transactionAcqRepository,
+    saleSummarySpecs, adjustmentRepository, creditOrderRepository, salesSummaryRepository, transactionAcqRepository,
     saleSummaryModelAssembler, reconciliationSettingsService, holidayRepository, acquirerPaymentReportCsvReader
   );
 
@@ -131,6 +133,77 @@ class CreditOrderManualServiceTest {
     assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PARTIALLY_PAID);
   }
 
+  /**
+   * Caso real reportado direto na tela: RV 338015830, liquidValue=52,29, com 2 ajustes de débito
+   * vinculados (tarifa de POS + cancelamento de venda débito) somando exatamente 52,29 — o valor
+   * real devido é R$0,00, mas a ordem de crédito gerada saía com o valor cheio (52,29), sem
+   * descontar nada. buildCreditOrder agora desconta a soma de AdjustmentEntity.debitType='D' do
+   * liquidValue antes de dividir pelas parcelas.
+   */
+  @Test
+  void deductsDebitAdjustmentsFromCreditOrderReleaseValue() {
+    UUID summaryId = UUID.randomUUID();
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(summaryId);
+    summary.setRvDate(LocalDate.now().minusMonths(6));
+    summary.setLiquidValue(new BigDecimal("52.29"));
+
+    when(salesSummaryRepository.findById(summaryId)).thenReturn(java.util.Optional.of(summary));
+    when(transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId)).thenReturn(1);
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId)).thenReturn(Set.of());
+    when(adjustmentRepository.sumDebitAdjustmentsBySalesSummaryId(summaryId))
+      .thenReturn(new BigDecimal("52.29"));
+
+    List<CreditOrderEntity> savedOrders = new java.util.ArrayList<>();
+    when(creditOrderRepository.save(any(CreditOrderEntity.class)))
+      .thenAnswer(invocation -> {
+        CreditOrderEntity co = invocation.getArgument(0);
+        co.setId(UUID.randomUUID());
+        savedOrders.add(co);
+        return co;
+      });
+    when(creditOrderRepository.findBySalesSummary_Id(summaryId)).thenAnswer(invocation -> List.copyOf(savedOrders));
+
+    service.create(new CreditOrderManualInput(List.of(summaryId)));
+
+    assertThat(savedOrders).hasSize(1);
+    assertThat(savedOrders.getFirst().getReleaseValue()).isEqualByComparingTo("0.00");
+  }
+
+  /**
+   * Sem ajustes vinculados (caso comum), o comportamento não muda — releaseValue continua sendo
+   * o liquidValue cheio dividido pelas parcelas.
+   */
+  @Test
+  void keepsFullReleaseValueWhenSummaryHasNoDebitAdjustments() {
+    UUID summaryId = UUID.randomUUID();
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(summaryId);
+    summary.setRvDate(LocalDate.now().minusMonths(6));
+    summary.setLiquidValue(new BigDecimal("100.00"));
+
+    when(salesSummaryRepository.findById(summaryId)).thenReturn(java.util.Optional.of(summary));
+    when(transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId)).thenReturn(1);
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId)).thenReturn(Set.of());
+    // adjustmentRepository não estubado de propósito — simula summary sem nenhum ajuste vinculado
+    // (retorno default do Mockito pra BigDecimal é null; buildCreditOrder trata isso via orZero).
+
+    List<CreditOrderEntity> savedOrders = new java.util.ArrayList<>();
+    when(creditOrderRepository.save(any(CreditOrderEntity.class)))
+      .thenAnswer(invocation -> {
+        CreditOrderEntity co = invocation.getArgument(0);
+        co.setId(UUID.randomUUID());
+        savedOrders.add(co);
+        return co;
+      });
+    when(creditOrderRepository.findBySalesSummary_Id(summaryId)).thenAnswer(invocation -> List.copyOf(savedOrders));
+
+    service.create(new CreditOrderManualInput(List.of(summaryId)));
+
+    assertThat(savedOrders).hasSize(1);
+    assertThat(savedOrders.getFirst().getReleaseValue()).isEqualByComparingTo("100.00");
+  }
+
   private void stubSpecsAndAssembler(List<SalesSummaryEntity> summaries, List<SaleSummaryModel> models) {
     Specification<SalesSummaryEntity> spec = mock(Specification.class);
     when(saleSummarySpecs.fromQueryForPendingCreditOrdersTotals(any(), any(), any())).thenReturn(spec);
@@ -165,6 +238,30 @@ class CreditOrderManualServiceTest {
 
     assertThat(page.getContent()).hasSize(1);
     assertThat(page.getContent().getFirst().getNextInstallmentValue()).isEqualByComparingTo("100.00");
+  }
+
+  /**
+   * Mesmo ajuste de {@link #deductsDebitAdjustmentsFromCreditOrderReleaseValue}, mas na prévia da
+   * listagem (fillNextInstallmentPreview) — a prévia mostrada antes de gerar a ordem precisa
+   * refletir o mesmo valor líquido de ajustes, senão o usuário vê um valor na lista e a ordem
+   * gerada sai com outro.
+   */
+  @Test
+  void previewsNextInstallmentValueNetOfDebitAdjustments() {
+    UUID summaryId = UUID.randomUUID();
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(summaryId);
+    SaleSummaryModel model = modelWithLiquidValue(summaryId, new BigDecimal("52.29"));
+    stubSpecsAndAssembler(List.of(summary), List.of(model));
+
+    when(transactionAcqRepository.findMaxInstallmentBySalesSummaryIdIn(List.of(summaryId)))
+      .thenReturn(List.<Object[]>of(new Object[] { summaryId, 1 }));
+    when(adjustmentRepository.sumDebitAdjustmentsBySalesSummaryIdIn(List.of(summaryId)))
+      .thenReturn(List.<Object[]>of(new Object[] { summaryId, new BigDecimal("52.29") }));
+
+    var page = service.searchPendingSummaries(Pageable.unpaged(), null);
+
+    assertThat(page.getContent().getFirst().getNextInstallmentValue()).isEqualByComparingTo("0.00");
   }
 
   /**

@@ -6,6 +6,7 @@ import com.cardsync.domain.model.AnticipationEntity;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.*;
+import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.AnticipationRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
@@ -63,6 +64,7 @@ public class SalesSummaryCreditOrderReconciliationService {
   private final SalesSummaryRepository salesSummaryRepository;
   private final CreditOrderRepository creditOrderRepository;
   private final AnticipationRepository anticipationRepository;
+  private final AdjustmentRepository adjustmentRepository;
 
   @Transactional
   public SalesSummaryCreditOrderReconciliationResult reconcilePending(FinancialReconciliationTriggerType trigger) {
@@ -310,9 +312,15 @@ public class SalesSummaryCreditOrderReconciliationService {
       List<SalesSummaryEntity> summaries = salesSummaryRepository.findBatchForSalesSummaryCreditOrderReconciliation(batchIds);
       List<CreditOrderEntity> ordersToGenerate = new ArrayList<>();
 
+      Map<UUID, BigDecimal> debitAdjustmentsBySummaryId = new java.util.HashMap<>();
+      for (Object[] row : adjustmentRepository.sumDebitAdjustmentsBySalesSummaryIdIn(batchIds)) {
+        debitAdjustmentsBySummaryId.put((UUID) row[0], (BigDecimal) row[1]);
+      }
+
       for (SalesSummaryEntity summary : summaries) {
         if (shouldGenerateSyntheticCreditOrder(summary)) {
-          ordersToGenerate.add(generateSyntheticCreditOrder(summary));
+          BigDecimal debitAdjustments = debitAdjustmentsBySummaryId.getOrDefault(summary.getId(), BigDecimal.ZERO);
+          ordersToGenerate.add(generateSyntheticCreditOrder(summary, debitAdjustments));
           generatedSummaryIds.add(summary.getId());
         } else {
           notGeneratedSummaryIds.add(summary.getId());
@@ -686,7 +694,8 @@ public class SalesSummaryCreditOrderReconciliationService {
       || recordType.contains("DEBIT");
   }
 
-  private CreditOrderEntity generateSyntheticCreditOrder(SalesSummaryEntity summary) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  CreditOrderEntity generateSyntheticCreditOrder(SalesSummaryEntity summary, BigDecimal debitAdjustments) {
     CreditOrderEntity order = new CreditOrderEntity();
     order.setSalesSummary(summary);
     order.setAcquirer(summary.getAcquirer());
@@ -709,7 +718,15 @@ public class SalesSummaryCreditOrderReconciliationService {
 
     order.setGrossRvValue(nvl(summary.getGrossValue()));
     order.setDiscountRateValue(nvl(summary.getDiscountValue()));
-    order.setReleaseValue(firstPositive(summary.getAdjustedValue(), summary.getLiquidValue(), summary.getGrossValue()));
+    // Desconta ajustes de débito (tarifa de POS, cancelamento de venda, etc. — qualquer
+    // adjustmentType/motivo com debitType='D', ver AdjustmentRepository#sumDebitAdjustmentsBySalesSummaryIdIn)
+    // do valor sintético, mesmo tratamento aplicado em CreditOrderManualService#buildCreditOrder pro
+    // mesmo defeito. Sem isso a ordem saía com o valor cheio mesmo quando o resumo tinha ajustes que
+    // já reduziam o valor real devido (confirmado com dados reais: RV 338015830, modalidade Débito,
+    // liquidValue=52,29, ajustes de débito somando exatamente 52,29 — valor real devido é R$0,00,
+    // mas a ordem sintética saía com R$52,29 via firstPositive(adjustedValue=0, liquidValue, gross)).
+    BigDecimal baseValue = firstPositive(summary.getAdjustedValue(), summary.getLiquidValue(), summary.getGrossValue());
+    order.setReleaseValue(baseValue.subtract(nvl(debitAdjustments)));
 
     order.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     order.setCreditStatus(StatusPaymentBankEnum.PENDING.getCode());

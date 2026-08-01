@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -53,19 +54,30 @@ public interface AdjustmentRepository extends JpaRepository<AdjustmentEntity, UU
   List<AdjustmentEntity> findBatchForAcquirerSaleCancellationReconciliation(@Param("ids") Collection<UUID> ids);
 
   /**
-   * Soma de tarifas (ex.: aluguel/inatividade de POS — Rede EEVD identificador "011", ver
-   * ProcessRedeEeVdService.buildAdjustment011) descontadas do lançamento bancário do dia mas que
-   * nunca reduzem CreditOrderEntity.releaseValue em si. Agrupado por RV + data do crédito para
-   * permitir descontar o valor certo por dia de repasse em BankReconciliationService — uma RV
-   * parcelada pode ter tarifas lançadas em dias diferentes.
+   * Soma de ajustes de débito de UM resumo — qualquer adjustmentType/motivo, não só POS_FEE.
+   * Usada por CreditOrderManualService e SalesSummaryCreditOrderReconciliationService pra
+   * descontar do valor da ordem de crédito gerada (releaseValue) — confirmado com dados reais:
+   * RV 338015830 tinha liquidValue=52,29 e 2 ajustes de débito somando exatamente 52,29 (tarifa
+   * de POS + cancelamento de venda débito), mas a ordem gerada saiu com o valor cheio, sem
+   * descontar nada. Como releaseValue já sai líquido de TODO ajuste de débito na geração, o
+   * matcher bancário (BankReconciliationService) usa releaseValue diretamente, sem nenhum
+   * desconto adicional em memória — descontar de novo aqui contaria a tarifa de POS duas vezes.
    */
   @Query("""
-    select adj.salesSummary.id, adj.creditDate, sum(adj.adjustmentValue)
+    select coalesce(sum(adj.adjustmentValue), 0)
+      from AdjustmentEntity adj
+     where adj.salesSummary.id = :summaryId
+       and adj.debitType = 'D'
+  """)
+  BigDecimal sumDebitAdjustmentsBySalesSummaryId(@Param("summaryId") UUID summaryId);
+
+  /** Mesma soma acima, em lote para uma página inteira de resumos (ver CreditOrderManualService#fillNextInstallmentPreview). */
+  @Query("""
+    select adj.salesSummary.id, sum(adj.adjustmentValue)
       from AdjustmentEntity adj
      where adj.salesSummary.id in :summaryIds
-       and adj.adjustmentType = 'POS_FEE'
        and adj.debitType = 'D'
-     group by adj.salesSummary.id, adj.creditDate
+     group by adj.salesSummary.id
   """)
-  List<Object[]> sumPosFeeBySalesSummaryAndCreditDate(@Param("summaryIds") Collection<UUID> summaryIds);
+  List<Object[]> sumDebitAdjustmentsBySalesSummaryIdIn(@Param("summaryIds") Collection<UUID> summaryIds);
 }

@@ -20,6 +20,7 @@ import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.core.reconciliation.BankReconciliationService;
+import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.HolidayRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
@@ -59,6 +60,7 @@ public class CreditOrderManualService {
   private static final int RECONCILIATION_STATUS_PENDING = 1;
 
   private final SaleSummarySpecs saleSummarySpecs;
+  private final AdjustmentRepository adjustmentRepository;
   private final CreditOrderRepository creditOrderRepository;
   private final SalesSummaryRepository salesSummaryRepository;
   private final TransactionAcqRepository transactionAcqRepository;
@@ -101,8 +103,8 @@ public class CreditOrderManualService {
   /**
    * Prévia (sem gravar nada) do valor e da data de vencimento que a próxima ordem de crédito
    * teria se {@link #create} fosse chamado agora para cada resumo da página — mesma fórmula de
-   * {@link #buildCreditOrder}, buscando installmentTotal e as parcelas já existentes em lote
-   * (uma consulta pra página inteira, não uma por linha).
+   * {@link #buildCreditOrder}, buscando installmentTotal, as parcelas já existentes e os ajustes
+   * de débito em lote (uma consulta pra página inteira, não uma por linha).
    */
   private void fillNextInstallmentPreview(List<SalesSummaryEntity> entities, List<SaleSummaryModel> content) {
     if (entities.isEmpty()) return;
@@ -121,6 +123,11 @@ public class CreditOrderManualService {
         .add((Integer) row[1]);
     }
 
+    Map<UUID, BigDecimal> debitAdjustmentsBySummaryId = new HashMap<>();
+    for (Object[] row : adjustmentRepository.sumDebitAdjustmentsBySalesSummaryIdIn(summaryIds)) {
+      debitAdjustmentsBySummaryId.put((UUID) row[0], (BigDecimal) row[1]);
+    }
+
     Map<UUID, SalesSummaryEntity> entitiesById = entities.stream()
       .collect(Collectors.toMap(SalesSummaryEntity::getId, e -> e));
 
@@ -128,8 +135,10 @@ public class CreditOrderManualService {
       SalesSummaryEntity summary = entitiesById.get(model.getId());
       int installmentTotal = installmentTotalsBySummaryId.getOrDefault(model.getId(), 1);
       Set<Integer> existing = existingInstallmentsBySummaryId.getOrDefault(model.getId(), Set.of());
+      BigDecimal debitAdjustments = debitAdjustmentsBySummaryId.getOrDefault(model.getId(), BigDecimal.ZERO);
+      BigDecimal netLiquidValue = orZero(model.getLiquidValue()).subtract(debitAdjustments);
 
-      model.setNextInstallmentValue(computeInstallmentValue(model.getLiquidValue(), installmentTotal));
+      model.setNextInstallmentValue(computeInstallmentValue(netLiquidValue, installmentTotal));
 
       int nextInstallmentNumber = firstMissingInstallmentNumber(existing, installmentTotal);
       LocalDate baseDate = summary != null
@@ -167,6 +176,7 @@ public class CreditOrderManualService {
       try {
         int installmentTotal = transactionAcqRepository.findMaxInstallmentBySalesSummaryId(summaryId);
         Set<Integer> existing = creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summaryId);
+        BigDecimal debitAdjustments = adjustmentRepository.sumDebitAdjustmentsBySalesSummaryId(summaryId);
 
         List<Integer> missingInstallments = new ArrayList<>();
         for (int i = 1; i <= installmentTotal; i++) {
@@ -196,7 +206,7 @@ public class CreditOrderManualService {
             break;
           }
 
-          CreditOrderEntity co = buildCreditOrder(summary, installmentNumber, installmentTotal);
+          CreditOrderEntity co = buildCreditOrder(summary, installmentNumber, installmentTotal, debitAdjustments);
           co = creditOrderRepository.save(co);
           createdIds.add(co.getId());
           createdForThisSummary++;
@@ -458,10 +468,20 @@ public class CreditOrderManualService {
     return co;
   }
 
-  private CreditOrderEntity buildCreditOrder(SalesSummaryEntity summary, int installmentNumber, int installmentTotal) {
+  private CreditOrderEntity buildCreditOrder(
+    SalesSummaryEntity summary, int installmentNumber, int installmentTotal, BigDecimal debitAdjustments
+  ) {
     BigDecimal grossPer = computeInstallmentValue(summary.getGrossValue(), installmentTotal);
     BigDecimal discountPer = computeInstallmentValue(summary.getDiscountValue(), installmentTotal);
-    BigDecimal releaseValue = computeInstallmentValue(summary.getLiquidValue(), installmentTotal);
+    // Desconta ajustes de débito (tarifa de POS, cancelamento de venda, etc. — qualquer
+    // adjustmentType/motivo com debitType='D', ver AdjustmentRepository#sumDebitAdjustmentsBySalesSummaryId)
+    // do valor líquido ANTES de dividir pelas parcelas, mesmo tratamento já dado a
+    // gross/discount acima. Sem isso a ordem saía com o valor cheio mesmo quando o resumo tinha
+    // ajustes vinculados que já reduziam o valor real devido (confirmado com dados reais: RV
+    // 338015830, liquidValue=52,29, ajustes de débito somando exatamente 52,29 — valor real
+    // devido é R$0,00, mas a ordem saía com R$52,29).
+    BigDecimal netLiquidValue = orZero(summary.getLiquidValue()).subtract(orZero(debitAdjustments));
+    BigDecimal releaseValue = computeInstallmentValue(netLiquidValue, installmentTotal);
 
     LocalDate baseDate = summary.getFirstInstallmentCreditDate() != null
       ? summary.getFirstInstallmentCreditDate()
