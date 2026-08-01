@@ -93,13 +93,16 @@ public class CreditOrderSpecs extends BaseSpecificationSupport<CreditOrderEntity
   }
 
   private Specification<CreditOrderEntity> orderByTableSort(List<SortDto> sort) {
-    return tableSort(sort, "rvDate", Map.of(
-      "conciliationDate",  sortField("saleReconciliationDate"),
-      "company",           sortJoin("company", "fantasyName"),
-      "establishment",     sortJoin("establishment", "pvNumber"),
-      "acquirer",          sortJoin("acquirer", "fantasyName"),
-      "flag",              sortJoin("flag", "name"),
-      "adjustmentValue",   sortJoin("adjustment", "adjustmentValue")
+    return tableSort(sort, "rvDate", Map.ofEntries(
+      Map.entry("conciliationDate",  sortField("saleReconciliationDate")),
+
+      Map.entry("flag",              sortJoin("flag", "name")),
+      Map.entry("company",           sortJoin("company", "fantasyName")),
+      Map.entry("acquirer",          sortJoin("acquirer", "fantasyName")),
+      Map.entry("establishment",     sortJoin("establishment", "pvNumber")),
+      Map.entry("adjustmentValue",   sortJoin("adjustment", "adjustmentValue")),
+
+      Map.entry("bank",              sortJoin("bankingDomicile", "bank", "name"))
     ));
   }
 }

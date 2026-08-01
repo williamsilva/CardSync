@@ -12,6 +12,7 @@ import com.cardsync.infrastructure.repository.spec.CreditOrderSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -35,9 +36,21 @@ public class CreditOrderService {
 
     long total = creditOrderRepository.count(filterSpec);
 
+    // Pageable só de page/size (sem sort): dataSpec já monta o ORDER BY completo via
+    // orderByTableSort/tableSort (com os aliases de colunas ligadas por join, ex. "bank" ->
+    // bankingDomicile.bank.name). SimpleJpaRepository#findAll(Specification, Pageable) reaplica
+    // pageable.getSort() por cima, resolvendo o nome bruto direto contra CreditOrderEntity (sem
+    // conhecer os aliases) — sort por qualquer coluna que não seja campo direto da entidade
+    // (ex.: "bank", que só existe via bankingDomicile.bank) quebra com "No property 'X' found for
+    // type 'CreditOrderEntity'". O pageable original (com sort) continua sendo usado só pro
+    // metadado da resposta (PageImpl abaixo).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<CreditOrderModel> content = total == 0
       ? List.of()
-      : creditOrderRepository.findAll(dataSpec, pageable)
+      : creditOrderRepository.findAll(dataSpec, pageableWithoutSort)
       .stream()
       .map(transactionsAcqModelAssembler::toModel)
       .toList();

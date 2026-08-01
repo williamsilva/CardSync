@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 @Component
 public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEntity> {
@@ -96,8 +95,10 @@ public class ReleasesBankSpecs extends BaseSpecificationSupport<ReleasesBankEnti
   private Specification<ReleasesBankEntity> orderByTableSort(List<SortDto> sort) {
     return tableSort(sort, "releaseDate", Map.of(
       "flag",             sortJoin("flag", "name"),
+      "bank",             sortJoin("bank", "name"),
       "company",          sortJoin("company", "fantasyName"),
-      "acquirer",         sortJoin("acquirer", "fantasyName")
+      "acquirer",         sortJoin("acquirer", "fantasyName"),
+      "establishment",    sortJoin("establishment", "pvNumber")
     ));
   }
 
