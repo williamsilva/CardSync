@@ -128,6 +128,7 @@ public class SaleSummaryModelAssembler extends RepresentationModelAssemblerSuppo
       .installmentTotal(entity.getInstallmentTotal())
       .installmentNumber(entity.getInstallmentNumber())
       .adjustmentReason(entity.getAdjustmentReason().getCode())
+      .adjustmentDescription(entity.getAdjustmentDescription())
       .build();
   }
 

@@ -26,4 +26,12 @@ public class AdjustmentMinimalModel extends RepresentationModel<@NonNull Adjustm
   private BigDecimal adjustmentValue;
 
   private LocalDate creditDate;
+
+  /**
+   * Motivo em texto livre — só preenchido em ajustes criados manualmente (ver
+   * AdjustmentManualService), que não têm adjustmentReason (código do arquivo automático da
+   * adquirente). Frontend cai pra este campo quando adjustmentReason vem NULL/0 (confirmado com
+   * dados reais: RV 82730892, ajuste manual "aluguel de maquininha" aparecia como "N/A").
+   */
+  private String adjustmentDescription;
 }
