@@ -13,6 +13,8 @@ import com.cardsync.core.file.bank.ReclassifyBankStatementEstablishmentResult;
 import com.cardsync.core.file.bank.ReclassifyBankStatementFlagsResult;
 import com.cardsync.core.file.bank.ReclassifyBankStatementModalityResult;
 import com.cardsync.core.reconciliation.BankReconciliationService;
+import com.cardsync.core.reconciliation.BankingDomicileDivergencePreviewResult;
+import com.cardsync.core.reconciliation.BankingDomicileDivergenceService;
 import com.cardsync.core.reconciliation.ManualBankReconciliationResult;
 import com.cardsync.core.reconciliation.ManualBankReconciliationService;
 import com.cardsync.core.reconciliation.MarkLegacyResult;
@@ -47,6 +49,7 @@ public class ManualBankReconciliationController {
     private final BankStatementAcquirerReclassificationService bankStatementAcquirerReclassificationService;
     private final PreImplantationDivergenceReconciliationService preImplantationDivergenceReconciliationService;
     private final BankStatementEstablishmentReclassificationService bankStatementEstablishmentReclassificationService;
+    private final BankingDomicileDivergenceService bankingDomicileDivergenceService;
 
     @PostMapping("/manual")
     @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
@@ -164,5 +167,18 @@ public class ManualBankReconciliationController {
         return noCreditOrderLegacyMarkingService.apply(
             request != null ? request.releaseBankIds() : null
         );
+    }
+
+    /**
+     * Análise (não grava nada, nem vincula): lista lançamentos pendentes cujo valor só fecha
+     * quando se ignora o banco de uma ou mais ordens de crédito candidatas — indício de
+     * banking_domicile apontando pro banco errado (ver RV 86015456, arquivo da adquirente
+     * declarou um banco, o repasse caiu em outro). Requer confirmação humana antes de qualquer
+     * correção: não existe endpoint de "apply" aqui de propósito.
+     */
+    @PostMapping("/banking-domicile-divergence/preview")
+    @CheckSecurity.Reconciliation.ManualBankReconciliation.CanProcess
+    public BankingDomicileDivergencePreviewResult previewBankingDomicileDivergence() {
+        return bankingDomicileDivergenceService.preview();
     }
 }

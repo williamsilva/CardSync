@@ -1191,6 +1191,28 @@ public class BankReconciliationService {
     return releaseContext.compatibleIgnoringEstablishment(orderData.context(), strictness);
   }
 
+  /**
+   * Checagem de data + contexto normal (empresa/adquirente/bandeira/modalidade), SEM exigir
+   * banco — usada só pelo diagnóstico de domicílio bancário divergente (ver
+   * BankingDomicileDivergenceService), nunca pelo matcher automático nem para vincular sozinha:
+   * o arquivo da adquirente pode legitimamente apontar o banco errado numa RV específica (visto
+   * com dados reais: RV 86015456, Rede declarou Santander, mas o repasse caiu no Sicredi), então
+   * o resultado deste método serve só para apontar candidatas pra revisão humana, nunca para
+   * vínculo automático.
+   */
+  boolean isCreditOrderCandidateCompatibleIgnoringBank(
+    ReleasesBankEntity release, ReconciliationMatchContext releaseContext,
+    CreditOrderEntity order, OrderMatchData orderData,
+    int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
+  ) {
+    if (order == null || order.getReleaseValue() == null || order.getReleaseDate() == null || orderData == null) return false;
+    long daysDiff = ChronoUnit.DAYS.between(order.getReleaseDate(), release.getReleaseDate());
+    if (daysDiff > toleranceDaysAfter) return false;
+    if (daysDiff < -toleranceDaysBefore) return false;
+    return releaseContext.compatible(orderData.context(), strictness)
+      || releaseContext.compatibleIgnoringEstablishment(orderData.context(), strictness);
+  }
+
   private boolean passesDateAndBankChecks(
     ReleasesBankEntity release, UUID releaseBank, CreditOrderEntity order, OrderMatchData orderData,
     int toleranceDaysBefore, int toleranceDaysAfter

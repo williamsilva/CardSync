@@ -215,4 +215,33 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     @Param("legacyMarkingCutoffDate") LocalDate legacyMarkingCutoffDate
   );
 
+  /**
+   * Mesmo escopo de categoria/modalidade de {@link #findPendingForPreImplantationDivergence}, mas
+   * SEM o corte de go-live/legado — usada por BankingDomicileDivergenceService (diagnóstico de
+   * ordem de crédito com banking_domicile apontando pro banco errado, ver RV 86015456): esse
+   * cenário não é exclusivo do período de transição pós-implantação, pode acontecer a qualquer
+   * momento (arquivo da adquirente declara um banco diferente do de costume pra aquela RV).
+   */
+  @Query("""
+    select rb
+    from ReleasesBankEntity rb
+    left join fetch rb.company
+    left join fetch rb.acquirer
+    left join fetch rb.establishment
+    left join fetch rb.flag
+    left join fetch rb.bank
+    where (rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
+      and rb.releaseCategory = :receiptCategory
+      and rb.modalityPaymentBank in :modalityCodes
+      and rb.acquirer is not null
+      and rb.releaseDate is not null
+      and rb.releaseValue is not null
+    order by rb.releaseValue asc, rb.releaseDate asc
+  """)
+  List<ReleasesBankEntity> findPendingForBankingDomicileDivergence(
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("receiptCategory") Integer receiptCategory,
+    @Param("modalityCodes") List<Integer> modalityCodes
+  );
+
 }

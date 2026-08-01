@@ -116,4 +116,13 @@ public interface BankingDomicileRepository extends JpaRepository<BankingDomicile
     UUID companyId
   );
 
+  /**
+   * Domicílio já cadastrado da empresa no banco X — usado por BankingDomicileDivergenceService
+   * pra sugerir o alvo de correção quando uma ordem de crédito ficou presa por apontar pro banco
+   * errado (ver RV 86015456): a empresa já tinha um domicílio Sicredi ativo, só a ordem estava
+   * ligada ao Santander por engano do próprio arquivo da adquirente.
+   */
+  @EntityGraph(attributePaths = {"bank"})
+  List<BankingDomicileEntity> findByCompany_IdAndBank_Id(UUID companyId, UUID bankId);
+
 }
