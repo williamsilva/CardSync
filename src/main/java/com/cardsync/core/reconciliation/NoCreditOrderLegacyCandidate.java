@@ -9,6 +9,7 @@ public record NoCreditOrderLegacyCandidate(
   UUID releaseBankId,
   String companyName,
   String acquirerName,
+  String bankName,
   LocalDate releaseDate,
   BigDecimal releaseValue
 ) {}

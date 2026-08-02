@@ -142,6 +142,7 @@ public class NoCreditOrderLegacyMarkingService {
         release.getId(),
         release.getCompany() != null ? release.getCompany().getFantasyName() : null,
         release.getAcquirer() != null ? release.getAcquirer().getFantasyName() : null,
+        release.getBank() != null ? release.getBank().getName() : null,
         release.getReleaseDate(), release.getReleaseValue()
       );
     }
