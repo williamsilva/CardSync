@@ -9,6 +9,7 @@ public record PreImplantationDivergenceCandidate(
   UUID releaseBankId,
   String companyName,
   String acquirerName,
+  String bankName,
   LocalDate releaseDate,
   BigDecimal releaseValue,
   int matchedOrders,
