@@ -81,6 +81,26 @@ public class ReleasesBankService {
     var bankingDomicile = bankingDomicileRepository.findById(input.bankingDomicileId())
       .orElseThrow(() -> BusinessException.notFound(ErrorCode.BANKING_DOMICILE_NOT_FOUND, "Banking domicile not found: " + input.bankingDomicileId()));
 
+    // Contra QUALQUER lançamento já existente, inclusive os importados automaticamente por
+    // arquivo (CNAB) — não só outros lançamentos manuais. Casa pelos campos classificados, não
+    // pelo histórico em texto (ver ReleasesBankRepository#existsBy...): a mesma modalidade
+    // resolvida pra cartão de débito ainda pode coexistir com uma de crédito idêntica em
+    // domicílio/data/valor/adquirente/bandeira/estabelecimento, então modalidade entra na chave.
+    if (releasesBankRepository.existsByBankingDomicile_IdAndReleaseDateAndReleaseValueAndModalityPaymentBankAndAcquirer_IdAndFlag_IdAndEstablishment_Id(
+      input.bankingDomicileId(),
+      input.releaseDate(),
+      input.releaseValue(),
+      input.modalityPaymentBank() != null ? input.modalityPaymentBank().getCode() : null,
+      input.acquirerId(),
+      input.flagId(),
+      input.establishmentId()
+    )) {
+      throw BusinessException.conflict(
+        ErrorCode.RELEASE_BANK_ALREADY_EXISTS,
+        "Já existe um lançamento com o mesmo domicílio bancário, data, valor, modalidade, adquirente, bandeira e estabelecimento."
+      );
+    }
+
     var entity = new ReleasesBankEntity();
     entity.setCompany(company);
     entity.setBankingDomicile(bankingDomicile);

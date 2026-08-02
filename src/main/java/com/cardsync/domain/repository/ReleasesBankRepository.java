@@ -7,12 +7,35 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity, UUID>, JpaSpecificationExecutor<ReleasesBankEntity> {
+
+  /**
+   * Duplicidade de lançamento manual (form ou importação de texto) contra QUALQUER lançamento já
+   * existente — inclusive os importados automaticamente por arquivo (CNAB). Casa pelos campos já
+   * classificados (domicílio, data, valor, modalidade, adquirente, bandeira, estabelecimento), não
+   * pelo histórico em texto: o mesmo lançamento real chega com descrições DIFERENTES dependendo da
+   * origem (ex.: CNAB gera "93 - REDE AMEX CD0071...", o mesmo lançamento digitado a partir do
+   * extrato em texto livre gera "RECEBIMENTO REDE AMEX CD0071...") — comparar a descrição nunca
+   * pegaria esse caso (confirmado com dados reais: duplicou 7 lançamentos já importados por CNAB
+   * ao reimportar o mesmo extrato manualmente). Adquirente/bandeira/estabelecimento nulos também
+   * são levados em conta pelo Spring Data (parâmetro nulo em consulta derivada por igualdade vira
+   * "IS NULL").
+   */
+  boolean existsByBankingDomicile_IdAndReleaseDateAndReleaseValueAndModalityPaymentBankAndAcquirer_IdAndFlag_IdAndEstablishment_Id(
+    UUID bankingDomicileId,
+    LocalDate releaseDate,
+    BigDecimal releaseValue,
+    Integer modalityPaymentBank,
+    UUID acquirerId,
+    UUID flagId,
+    UUID establishmentId
+  );
 
   /**
    * Retorna os pares arquivo processado x domicílio bancário identificados durante

@@ -1,12 +1,15 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankManualImportResult;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankManualResult;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
+import com.cardsync.core.file.bank.ManualBankStatementTextImportService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.ReleasesBankManualInput;
+import com.cardsync.domain.filter.ReleasesBankManualTextImportInput;
 import com.cardsync.domain.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.support.PageableMapper;
 import com.cardsync.domain.service.ReleasesBankService;
@@ -30,6 +33,7 @@ import java.util.UUID;
 public class ReleasesBanksController {
 
   private final ReleasesBankService releasesBankService;
+  private final ManualBankStatementTextImportService manualBankStatementTextImportService;
 
   @PostMapping("/search")
   @CheckSecurity.Documents.BankStatement.CanConsult
@@ -59,6 +63,12 @@ public class ReleasesBanksController {
   @CheckSecurity.FileProcessing.CanProcess
   public ReleasesBankManualResult createManual(@RequestBody ReleasesBankManualInput body) {
     return releasesBankService.createManual(body);
+  }
+
+  @PostMapping("/manual/import-text")
+  @CheckSecurity.FileProcessing.CanProcess
+  public ReleasesBankManualImportResult importText(@RequestBody ReleasesBankManualTextImportInput body) {
+    return manualBankStatementTextImportService.classifyAndCreate(body);
   }
 
   @DeleteMapping("/manual/{id}")
