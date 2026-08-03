@@ -6,6 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
@@ -47,11 +48,13 @@ public class AcquirerPaymentReportCsvReader {
 
   public List<AcquirerPaymentReportRow> read(MultipartFile file) throws IOException {
     List<String> lines;
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), FILE_CHARSET))) {
+    try (InputStream in = file.getInputStream();
+         BufferedReader reader = new BufferedReader(new InputStreamReader(in, FILE_CHARSET))) {
       lines = reader.lines().toList();
     }
 
     String delimiter = lines.isEmpty() ? ";" : detectDelimiter(lines.get(0));
+    String fileName = file.getOriginalFilename();
 
     List<AcquirerPaymentReportRow> rows = new ArrayList<>();
     for (int i = 0; i < lines.size(); i++) {
@@ -67,7 +70,7 @@ public class AcquirerPaymentReportCsvReader {
       }
 
       rows.add(new AcquirerPaymentReportRow(
-        file.getOriginalFilename(),
+        fileName,
         i + 1,
         rvNumber,
         parseInteger(valueAt(values, COL_PV_NUMBER)),
@@ -83,7 +86,7 @@ public class AcquirerPaymentReportCsvReader {
     }
 
     log.info("📘 Relatório de pagamentos da adquirente lido: arquivo={}, linhasDados={}",
-      file.getOriginalFilename(), rows.size());
+      fileName, rows.size());
 
     return rows;
   }
