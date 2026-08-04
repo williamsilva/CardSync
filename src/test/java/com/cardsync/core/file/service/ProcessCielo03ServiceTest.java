@@ -1,7 +1,11 @@
 package com.cardsync.core.file.service;
 
+import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.ModalityEnum;
+import com.cardsync.domain.model.enums.StatusInstallmentEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -34,7 +38,7 @@ class ProcessCielo03ServiceTest {
     "E105158311700200201024503590301027058000191360338010001092026-04-06002720021051583117360338010001090000000000000000000           2603060310490056302       012NNN3NNN5346968665010002000000000010515831175GGU4BSSRE         CLOUD108024003150000000315+0000000016225+0000000008113+0000000007857-0000000000256+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+00000000000001009450136033801000109002606570505039259606570505039259               0071170183003003000000036060320260603202606032026060320264260306                         06042026105158311700NNN03418639000000000000000024515155502596065549573060532N8100000000000000";
 
   private final FileLookupService lookupService = mock(FileLookupService.class);
-  private final ProcessCielo03Service service = new ProcessCielo03Service(lookupService, null, null, null);
+  private final ProcessCielo03Service service = new ProcessCielo03Service(lookupService, null, null, null, null, null);
 
   @Test
   void mapsDebitSaleFields() {
@@ -54,6 +58,7 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getSaleDate().toLocalDate()).isEqualTo(LocalDate.of(2026, 3, 7));
     assertThat(tx.getInstallment()).isEqualTo(1);
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.CASH_DEBIT.getCode());
+    assertThat(tx.getRvNumber()).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR(DETAIL_DEBITO)));
   }
 
   @Test
@@ -74,6 +79,7 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getSaleDate().toLocalDate()).isEqualTo(LocalDate.of(2026, 3, 1));
     assertThat(tx.getInstallment()).isEqualTo(1);
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.CASH_CREDIT.getCode());
+    assertThat(tx.getRvNumber()).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR(DETAIL_CREDITO)));
   }
 
   @Test
@@ -86,8 +92,59 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getGrossValue()).isEqualByComparingTo(new BigDecimal("81.13"));
     assertThat(tx.getLiquidValue()).isEqualByComparingTo(new BigDecimal("78.57"));
     assertThat(tx.getDiscountValue()).isEqualByComparingTo(new BigDecimal("2.56"));
-    assertThat(tx.getInstallment()).isEqualTo(2);
+    // installment = parcela ATUAL (01), não o total de parcelas (02) — é o que precisa bater com o
+    // installmentNumber que o CIELO04 vai reportar quando essa parcela específica for paga.
+    assertThat(tx.getInstallment()).isEqualTo(1);
+    // modality usa o TOTAL de parcelas (02) pra escalonar — 2-6 parcelas.
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode());
+  }
+
+  @Test
+  void rvNumberDiffersAcrossDistinctSales() {
+    stubLookups(1018802468, "007", "Sorocred");
+    stubLookups(1051583117, "001", "Visa");
+    TransactionAcqEntity debito = service.buildTransaction(DETAIL_DEBITO, 1, new ProcessedFileEntity(), "01");
+    TransactionAcqEntity credito = service.buildTransaction(DETAIL_CREDITO, 1, new ProcessedFileEntity(), "02");
+
+    assertThat(debito.getRvNumber()).isNotNull().isNotEqualTo(credito.getRvNumber());
+  }
+
+  @Test
+  void buildsInstallmentMirroringTransactionValues() {
+    stubLookups(1051583117, "001", "Visa");
+    TransactionAcqEntity tx = service.buildTransaction(DETAIL_CREDITO, 1, new ProcessedFileEntity(), "02");
+
+    InstallmentAcqEntity installment = service.buildInstallment(tx);
+
+    assertThat(installment.getTransaction()).isSameAs(tx);
+    assertThat(installment.getInstallment()).isEqualTo(tx.getInstallment());
+    assertThat(installment.getGrossValue()).isEqualByComparingTo(tx.getGrossValue());
+    assertThat(installment.getLiquidValue()).isEqualByComparingTo(tx.getLiquidValue());
+    assertThat(installment.getDiscountValue()).isEqualByComparingTo(tx.getDiscountValue());
+    assertThat(installment.getAdjustmentValue()).isEqualByComparingTo(BigDecimal.ZERO);
+    assertThat(installment.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING.getCode());
+    assertThat(installment.getInstallmentStatus()).isEqualTo(StatusInstallmentEnum.SCHEDULED.getCode());
+  }
+
+  @Test
+  void buildsSalesSummaryMirroringTransactionValues() {
+    stubLookups(1051583117, "001", "Visa");
+    TransactionAcqEntity tx = service.buildTransaction(DETAIL_CREDITO, 1, new ProcessedFileEntity(), "02");
+
+    SalesSummaryEntity summary = service.buildSalesSummary(tx);
+
+    assertThat(summary.getPvNumber()).isEqualTo(tx.getEstablishment().getPvNumber());
+    assertThat(summary.getRvNumber()).isEqualTo(tx.getRvNumber());
+    assertThat(summary.getGrossValue()).isEqualByComparingTo(tx.getGrossValue());
+    assertThat(summary.getLiquidValue()).isEqualByComparingTo(tx.getLiquidValue());
+    assertThat(summary.getDiscountValue()).isEqualByComparingTo(tx.getDiscountValue());
+    assertThat(summary.getAcquirer()).isSameAs(tx.getAcquirer());
+    assertThat(summary.getCompany()).isSameAs(tx.getCompany());
+    assertThat(summary.getFlag()).isSameAs(tx.getFlag());
+    assertThat(summary.getProcessedFile()).isSameAs(tx.getProcessedFile());
+    assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING);
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PENDING);
+    assertThat(summary.getTransactionsStatus()).isEqualTo(StatusReconciliationEnum.PENDING);
   }
 
   @Test
@@ -120,6 +177,11 @@ class ProcessCielo03ServiceTest {
     when(lookupService.acquirerByIdentifier("CIELO")).thenReturn(acquirer);
     when(lookupService.establishmentByPvNumber(pvNumber)).thenReturn(establishment);
     when(lookupService.flagByAcquirerCode(acquirer, flagAcquirerCode)).thenReturn(flag);
+  }
+
+  /** Extrai a "Chave UR" (posição 30-129 do manual, 1-based) igual ao que buildTransaction faz internamente. */
+  private String chaveUR(String line) {
+    return line.substring(29, 129).trim();
   }
 
   private AcquirerEntity acquirer() {

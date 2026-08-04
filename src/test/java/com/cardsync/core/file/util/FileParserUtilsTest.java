@@ -51,4 +51,34 @@ class FileParserUtilsTest {
     // Regressão: extractBigDecimalLine (Rede/CNAB240, sem campo de sinal separado) continua igual.
     assertThat(FileParserUtils.extractBigDecimalLine("0000012345", "0-10", 1)).isEqualByComparingTo(new BigDecimal("123.45"));
   }
+
+  @Test
+  void deriveConciliationKeyIsDeterministic() {
+    String chaveUR = "360338010001092026-08-0300100072000021051583117360338010001090000000000000000000";
+    assertThat(FileParserUtils.deriveConciliationKey(chaveUR)).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR));
+  }
+
+  @Test
+  void deriveConciliationKeyIsAlwaysNonNegative() {
+    for (String value : new String[]{"a", "abc", "360338010001092026-08-03", "!@#$%^&*()"}) {
+      assertThat(FileParserUtils.deriveConciliationKey(value)).isNotNull().isGreaterThanOrEqualTo(0);
+    }
+  }
+
+  @Test
+  void deriveConciliationKeyDiffersForDifferentValues() {
+    assertThat(FileParserUtils.deriveConciliationKey("chave-ur-1"))
+      .isNotEqualTo(FileParserUtils.deriveConciliationKey("chave-ur-2"));
+  }
+
+  @Test
+  void deriveConciliationKeyIgnoresSurroundingWhitespace() {
+    assertThat(FileParserUtils.deriveConciliationKey("  abc  ")).isEqualTo(FileParserUtils.deriveConciliationKey("abc"));
+  }
+
+  @Test
+  void deriveConciliationKeyReturnsNullForBlank() {
+    assertThat(FileParserUtils.deriveConciliationKey(null)).isNull();
+    assertThat(FileParserUtils.deriveConciliationKey("   ")).isNull();
+  }
 }

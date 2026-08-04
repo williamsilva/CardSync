@@ -43,6 +43,8 @@ public class ProcessCielo03Service {
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
   private final TransactionAcqRepository transactionAcqRepository;
+  private final InstallmentAcqRepository installmentAcqRepository;
+  private final SalesSummaryRepository salesSummaryRepository;
   private final ProcessedFileRepository processedFileRepository;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
@@ -55,6 +57,8 @@ public class ProcessCielo03Service {
       processedFile.setContentHash(contentHash);
 
       List<TransactionAcqEntity> transactions = new ArrayList<>();
+      List<InstallmentAcqEntity> installments = new ArrayList<>();
+      List<SalesSummaryEntity> summaries = new ArrayList<>();
       Map<String, Integer> launchTypeCounts = new TreeMap<>();
       int recognized = 0;
       int ignored = 0;
@@ -86,7 +90,12 @@ public class ProcessCielo03Service {
                 "CIELO03_UNSUPPORTED_LAUNCH_TYPE", "Tipo de lançamento Cielo ainda não suportado: " + launchType, line));
               continue;
             }
-            transactions.add(buildTransaction(line, lineNumber, processedFile, launchType));
+            TransactionAcqEntity tx = buildTransaction(line, lineNumber, processedFile, launchType);
+            SalesSummaryEntity summary = buildSalesSummary(tx);
+            tx.setSalesSummary(summary);
+            transactions.add(tx);
+            installments.add(buildInstallment(tx));
+            summaries.add(summary);
           }
           default -> {
             ignored++;
@@ -116,7 +125,9 @@ public class ProcessCielo03Service {
       collectPvNumbers(processedFile, transactions);
 
       processedFileRepository.save(processedFile);
+      salesSummaryRepository.saveAll(summaries);
       transactionAcqRepository.saveAll(transactions);
+      installmentAcqRepository.saveAll(installments);
 
       moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
       log.info("✅ CIELO03 {} finalizado: status={}, {}", file.getFileName(), processedFile.getStatus(), processedFile.getStatusMessage());
@@ -160,7 +171,9 @@ public class ProcessCielo03Service {
     BigDecimal grossValue = FileParserUtils.extractSignedMoneyLine(line, "260-274", lineNumber);
     BigDecimal liquidValue = FileParserUtils.extractSignedMoneyLine(line, "274-288", lineNumber);
     BigDecimal discountValue = FileParserUtils.extractSignedMoneyLine(line, "288-302", lineNumber).abs();
+    Integer parcela = FileParserUtils.extractIntegerLine(line, "17-19", lineNumber);
     Integer totalInstallments = FileParserUtils.extractIntegerLine(line, "19-21", lineNumber);
+    String chaveUR = trim(FileParserUtils.extractStringLine(line, "29-129", lineNumber));
 
     TransactionAcqEntity tx = new TransactionAcqEntity();
     tx.setLineNumber(lineNumber);
@@ -170,6 +183,7 @@ public class ProcessCielo03Service {
     tx.setEstablishment(establishment);
     tx.setCompany(establishment != null ? establishment.getCompany() : null);
     tx.setFlag(safeFlag(acquirer, flagCode));
+    tx.setRvNumber(FileParserUtils.deriveConciliationKey(chaveUR));
     tx.setAuthorization(FileParserUtils.extractStringLine(line, "21-27", lineNumber));
     tx.setCardNumber(maskedCardNumber(line, lineNumber));
     tx.setNsu(FileParserUtils.extractLongLine(line, "175-181", lineNumber));
@@ -181,7 +195,7 @@ public class ProcessCielo03Service {
     tx.setMdrRate(calculateRate(grossValue, discountValue));
     tx.setMachine(FileParserUtils.extractStringLine(line, "543-551", lineNumber));
     tx.setSaleDate(FileParserUtils.extractOffsetDateTimeLine(line, lineNumber, "565-573", "470-476"));
-    tx.setInstallment(resolveInstallment(launchType, totalInstallments));
+    tx.setInstallment(resolveCurrentInstallment(launchType, parcela));
     tx.setModality(resolveModality(launchType, totalInstallments));
     tx.setFirstInstallmentValue(BigDecimal.ZERO);
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);
@@ -191,6 +205,66 @@ public class ProcessCielo03Service {
     return tx;
   }
 
+  /**
+   * Uma parcela por transação, espelhando ProcessRedeEeVdService.addTransactionWithInstallment —
+   * é o que permite BankReconciliationService.propagateCreditOrdersToInstallments casar, por valor
+   * (acquirer + rvNumber + installment), um CreditOrderEntity (criado pelo CIELO04) com esta venda.
+   * expectedPaymentDate fica null: a Cielo não informa a data prevista de pagamento na captura
+   * (isso só aparece no Registro D do CIELO04, na liquidação).
+   * Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring.
+   */
+  InstallmentAcqEntity buildInstallment(TransactionAcqEntity tx) {
+    InstallmentAcqEntity installment = new InstallmentAcqEntity();
+    installment.setTransaction(tx);
+    installment.setInstallment(tx.getInstallment());
+    installment.setGrossValue(zero(tx.getGrossValue()));
+    installment.setDiscountValue(zero(tx.getDiscountValue()));
+    installment.setLiquidValue(zero(tx.getLiquidValue()));
+    installment.setAdjustmentValue(BigDecimal.ZERO);
+    installment.setStatusPaymentBank(StatusPaymentBankEnum.PENDING.getCode());
+    installment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
+    return installment;
+  }
+
+  /**
+   * Um resumo por transação — a Cielo não tem uma linha de "resumo" separada como o Rede (Registro
+   * "006"/"010" da EEVC); cada Registro E de venda já é seu próprio resumo. Necessário pra
+   * ProcessCielo04Service.safeSalesSummary conseguir achar e vincular, e a Etapa 6 da esteira
+   * financeira (SalesSummaryCreditOrderReconciliationService/CreditOrderOrphanLinkingService)
+   * marcar salesSummaryStatus como RECONCILED — sem isso a ordem de crédito do CIELO04 nunca fica
+   * elegível pra conciliação bancária (BankReconciliationService só considera
+   * salesSummaryStatus=RECONCILED).
+   * Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring.
+   */
+  SalesSummaryEntity buildSalesSummary(TransactionAcqEntity tx) {
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setRecordType(tx.getRecordType());
+    summary.setLineNumber(tx.getLineNumber());
+    summary.setPvNumber(tx.getEstablishment() != null ? tx.getEstablishment().getPvNumber() : null);
+    summary.setRvNumber(tx.getRvNumber());
+    summary.setGrossValue(zero(tx.getGrossValue()));
+    summary.setDiscountValue(zero(tx.getDiscountValue()));
+    summary.setLiquidValue(zero(tx.getLiquidValue()));
+    summary.setTipValue(BigDecimal.ZERO);
+    summary.setRejectedValue(BigDecimal.ZERO);
+    summary.setAdjustedValue(BigDecimal.ZERO);
+    summary.setManualGenerated(false);
+    summary.setRvDate(tx.getSaleDate() != null ? tx.getSaleDate().toLocalDate() : null);
+    summary.setModality(tx.getModality());
+    summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+    summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
+    summary.setTransactionsStatus(StatusReconciliationEnum.PENDING);
+    summary.setAcquirer(tx.getAcquirer());
+    summary.setCompany(tx.getCompany());
+    summary.setFlag(tx.getFlag());
+    summary.setProcessedFile(tx.getProcessedFile());
+    return summary;
+  }
+
+  private BigDecimal zero(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
+  }
+
   private String maskedCardNumber(String line, int lineNumber) {
     String bin = FileParserUtils.extractStringLine(line, "165-171", lineNumber);
     String lastFour = FileParserUtils.extractStringLine(line, "171-175", lineNumber);
@@ -198,16 +272,18 @@ public class ProcessCielo03Service {
     return (bin == null ? "" : bin) + "******" + (lastFour == null ? "" : lastFour);
   }
 
-  private Integer resolveInstallment(String launchType, Integer totalInstallments) {
+  /** Número da parcela ATUAL (campo "Parcela") — o que efetivamente identifica esta linha entre as N parcelas de uma venda "03". */
+  private Integer resolveCurrentInstallment(String launchType, Integer parcela) {
     if (!"03".equals(launchType)) return 1;
-    return totalInstallments == null || totalInstallments <= 0 ? 1 : totalInstallments;
+    return parcela == null || parcela <= 0 ? 1 : parcela;
   }
 
+  /** Número TOTAL de parcelas (campo "Número total de parcelas") — só usado pra escalonar a modalidade. */
   private Integer resolveModality(String launchType, Integer totalInstallments) {
     if ("01".equals(launchType)) return ModalityEnum.CASH_DEBIT.getCode();
     if (!"03".equals(launchType)) return ModalityEnum.CASH_CREDIT.getCode();
 
-    int total = resolveInstallment(launchType, totalInstallments);
+    int total = totalInstallments == null || totalInstallments <= 0 ? 1 : totalInstallments;
     if (total <= 1) return ModalityEnum.CASH_CREDIT.getCode();
     if (total <= 6) return ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode();
     if (total <= 12) return ModalityEnum.INSTALLMENT_CREDIT_7_12.getCode();

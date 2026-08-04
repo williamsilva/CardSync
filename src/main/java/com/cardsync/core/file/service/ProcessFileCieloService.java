@@ -22,8 +22,9 @@ import java.util.stream.Stream;
  * Ponto de entrada para arquivos "Extrato Eletrônico" da Cielo. Lê a primeira linha (registro
  * "0" — Header) e roteia pelo campo "Tipo de arquivo" (posição 48-49 do manual) — ver Tabela I:
  * "03" Captura/Previsão, "04" Liquidação/Pagamento, "09" Saldo em aberto, "15" Negociação de
- * Recebíveis, "16" Pix. Só "03" está implementado por ora (ver ProcessCielo03Service); os demais
- * são movidos para invalid_file com um log claro (não é erro, é escopo futuro).
+ * Recebíveis, "16" Pix. "03" e "04" estão implementados (ver ProcessCielo03Service/
+ * ProcessCielo04Service); os demais são movidos para invalid_file com um log claro (não é erro,
+ * é escopo futuro).
  */
 @Slf4j
 @Service
@@ -35,6 +36,7 @@ public class ProcessFileCieloService {
   private final MoveFileService moveFileService;
   private final FileHashService fileHashService;
   private final ProcessCielo03Service processCielo03Service;
+  private final ProcessCielo04Service processCielo04Service;
   private final ProcessedFileRepository processedFileRepository;
   private final FileProcessingProperties fileProcessingProperties;
 
@@ -113,6 +115,11 @@ public class ProcessFileCieloService {
 
       if ("0".equals(recordType) && "03".equals(fileType)) {
         processCielo03Service.processFile(file, paths, contentHash);
+        return true;
+      }
+
+      if ("0".equals(recordType) && "04".equals(fileType)) {
+        processCielo04Service.processFile(file, paths, contentHash);
         return true;
       }
 

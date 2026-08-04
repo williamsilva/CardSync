@@ -49,6 +49,19 @@ public final class FileParserUtils {
     return value == null ? BigDecimal.ZERO : value;
   }
 
+  /**
+   * Deriva uma chave de conciliação inteira e determinística a partir de um valor opaco de
+   * agrupamento (ex.: a "Chave UR" de 100 caracteres da Cielo) para reaproveitar o mesmo campo
+   * rvNumber/matching por valor que já existe no pipeline de conciliação (BankReconciliationService),
+   * quando o layout de origem não tem um número de RV/relatório de venda real como o do Rede.
+   * Mesma entrada produz sempre a mesma saída — chamadores diferentes (ex.: captura e liquidação)
+   * concordam sem nenhuma referência cruzada. Retorna null se o valor for nulo/branco.
+   */
+  public static Integer deriveConciliationKey(String value) {
+    if (value == null || value.isBlank()) return null;
+    return value.trim().hashCode() & Integer.MAX_VALUE;
+  }
+
   public static OffsetDateTime extractOffsetDateTimeLine(String line, int lineNumber, String rangeDate, String rangeTime) {
     String date = extractStringLine(line, rangeDate, lineNumber);
     String time = extractStringLine(line, rangeTime, lineNumber);
