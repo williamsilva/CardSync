@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 public enum FileProcessingSystemType {
   ERP("ERP", "Arquivos ERP"),
   REDE("REDE", "Arquivos Rede"),
+  CIELO("CIELO", "Arquivos Cielo"),
   BANK("BANK", "Arquivos bancários");
 
   private final String code;

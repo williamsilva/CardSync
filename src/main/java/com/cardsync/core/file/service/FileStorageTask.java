@@ -30,15 +30,18 @@ public class FileStorageTask {
 
   private final ProcessFileErpService processFileErpService;
   private final ProcessFileRedeService processFileRedeService;
+  private final ProcessFileCieloService processFileCieloService;
   private final ProcessFileBankService processFileBankService;
   private final FileProcessingExecutionStateRepository executionStateRepository;
 
   private final AtomicBoolean erpRunning = new AtomicBoolean(false);
   private final AtomicBoolean redeRunning = new AtomicBoolean(false);
+  private final AtomicBoolean cieloRunning = new AtomicBoolean(false);
   private final AtomicBoolean bankRunning = new AtomicBoolean(false);
 
   private final AtomicReference<ExecutionState> erpState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.ERP));
   private final AtomicReference<ExecutionState> redeState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.REDE));
+  private final AtomicReference<ExecutionState> cieloState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.CIELO));
   private final AtomicReference<ExecutionState> bankState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.BANK));
 
   @PostConstruct
@@ -75,6 +78,12 @@ public class FileStorageTask {
     }
   }
 
+  public void processFileCielo() {
+    if (!tryProcessFileCielo(FileProcessingTriggerType.MANUAL)) {
+      throw new IllegalStateException("Processamento Cielo já está em execução.");
+    }
+  }
+
   public void processFileBank() {
     if (!tryProcessFileBank(FileProcessingTriggerType.MANUAL)) {
       throw new IllegalStateException("Processamento bancário já está em execução.");
@@ -89,6 +98,10 @@ public class FileStorageTask {
     return execute(FileProcessingSystemType.REDE, trigger, redeRunning, redeState, processFileRedeService::processFiles);
   }
 
+  public boolean tryProcessFileCielo(FileProcessingTriggerType trigger) {
+    return execute(FileProcessingSystemType.CIELO, trigger, cieloRunning, cieloState, processFileCieloService::processFiles);
+  }
+
   public boolean tryProcessFileBank(FileProcessingTriggerType trigger) {
     return execute(FileProcessingSystemType.BANK, trigger, bankRunning, bankState, processFileBankService::processFiles);
   }
@@ -101,6 +114,10 @@ public class FileStorageTask {
     return redeState.get().toStatus(redeRunning.get());
   }
 
+  public FileProcessingExecutionStatus cieloStatus() {
+    return cieloState.get().toStatus(cieloRunning.get());
+  }
+
   public FileProcessingExecutionStatus bankStatus() {
     return bankState.get().toStatus(bankRunning.get());
   }
@@ -108,6 +125,7 @@ public class FileStorageTask {
   public boolean isAnyManualRunning() {
     return isManualRunning(erpRunning, erpState)
       || isManualRunning(redeRunning, redeState)
+      || isManualRunning(cieloRunning, cieloState)
       || isManualRunning(bankRunning, bankState);
   }
 
@@ -117,9 +135,10 @@ public class FileStorageTask {
 
   private AtomicReference<ExecutionState> stateRefFor(FileProcessingSystemType system) {
     return switch (system) {
-      case ERP  -> erpState;
-      case REDE -> redeState;
-      case BANK -> bankState;
+      case ERP   -> erpState;
+      case REDE  -> redeState;
+      case CIELO -> cieloState;
+      case BANK  -> bankState;
     };
   }
 

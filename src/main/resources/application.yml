@@ -97,6 +97,9 @@ file-processing:
       rede:
         input: ${file-processing.base-acquirer}/REDE/input
 
+      cielo:
+        input: ${file-processing.base-acquirer}/CIELO/input
+
     bank:
       itau:
         input: ${file-processing.base-bank}/ITAU/input

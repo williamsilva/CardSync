@@ -16,6 +16,8 @@ public enum FileProcessingTriggerType {
     "SCHEDULER_SEQUENTIAL_ERP","Job sequencial - processamento ERP"),
   SCHEDULER_SEQUENTIAL_REDE(
     "SCHEDULER_SEQUENTIAL_REDE","Job sequencial - processamento Rede/adquirente"),
+  SCHEDULER_SEQUENTIAL_CIELO(
+    "SCHEDULER_SEQUENTIAL_CIELO","Job sequencial - processamento Cielo/adquirente"),
   SCHEDULER_SEQUENTIAL_BANK(
     "SCHEDULER_SEQUENTIAL_BANK","Job sequencial - processamento Banco/CNAB"),
   SCHEDULER_ERP_ACQUIRER_RECONCILIATION(

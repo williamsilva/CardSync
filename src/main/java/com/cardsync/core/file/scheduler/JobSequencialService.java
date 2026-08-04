@@ -79,12 +79,17 @@ public class JobSequencialService {
         () -> fileStorageTask.tryProcessFileRede(FileProcessingTriggerType.SCHEDULER_SEQUENTIAL_REDE)
       ));
 
-      executeStep("3. Processamento de arquivos Banco/CNAB", () -> runFileStep(
+      executeStep("3. Processamento de arquivos CIELO/adquirente", () -> runFileStep(
+        "CIELO/adquirente",
+        () -> fileStorageTask.tryProcessFileCielo(FileProcessingTriggerType.SCHEDULER_SEQUENTIAL_CIELO)
+      ));
+
+      executeStep("4. Processamento de arquivos Banco/CNAB", () -> runFileStep(
         "Banco/CNAB",
         () -> fileStorageTask.tryProcessFileBank(FileProcessingTriggerType.SCHEDULER_SEQUENTIAL_BANK)
       ));
 
-      executeStep("4. Esteira financeira completa", () -> financialReconciliationPipelineService.run(
+      executeStep("5. Esteira financeira completa", () -> financialReconciliationPipelineService.run(
         FinancialReconciliationTriggerType.SCHEDULER_SEQUENTIAL_JOB
       ));
 

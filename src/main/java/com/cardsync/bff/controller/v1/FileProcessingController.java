@@ -136,6 +136,7 @@ public class FileProcessingController {
     return Map.of(
       "erp", FileProcessingScheduleStatusModel.from(fileStorageTask.erpStatus()),
       "rede", FileProcessingScheduleStatusModel.from(fileStorageTask.redeStatus()),
+      "cielo", FileProcessingScheduleStatusModel.from(fileStorageTask.cieloStatus()),
       "bank", FileProcessingScheduleStatusModel.from(fileStorageTask.bankStatus())
     );
   }
@@ -197,6 +198,13 @@ public class FileProcessingController {
   @CheckSecurity.FileProcessing.CanProcess
   public ResponseEntity<Void> processRede() {
     fileStorageTask.processFileRede();
+    return ResponseEntity.accepted().build();
+  }
+
+  @PostMapping("/cielo/process")
+  @CheckSecurity.FileProcessing.CanProcess
+  public ResponseEntity<Void> processCielo() {
+    fileStorageTask.processFileCielo();
     return ResponseEntity.accepted().build();
   }
 

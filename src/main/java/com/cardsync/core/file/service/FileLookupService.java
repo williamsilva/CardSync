@@ -22,13 +22,21 @@ public class FileLookupService {
   private final EstablishmentRepository establishmentRepository;
   private final RelationFlagAcquirerRepository relationFlagAcquirerRepository;
 
-  @Transactional(readOnly = true)
+  /**
+   * Todos os métodos abaixo sinalizam "não encontrado" via {@link IllegalStateException} para que
+   * os chamadores (padrão {@code safeXxx} nos serviços de import) tratem a ausência sem quebrar o
+   * arquivo. Como participam da transação {@code REQUIRES_NEW} do processamento (propagation
+   * padrão), sem {@code noRollbackFor} o Spring marcaria a transação inteira como rollback-only no
+   * instante em que a exceção escapa daqui — mesmo que o chamador a capture depois — fazendo o
+   * commit falhar silenciosamente no final do arquivo.
+   */
+  @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
   public OriginFileEntity origin(String code) {
     return originFileRepository.findByCodeIgnoreCase(code)
       .orElseThrow(() -> new IllegalStateException("Origem de arquivo não cadastrada: " + code));
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
   public AcquirerEntity acquirerByIdentifier(String identifier) {
     for (String candidate : acquirerCandidates(identifier)) {
       Optional<AcquirerEntity> found = acquirerRepository.findByFileIdentifierIgnoreCase(candidate)
@@ -38,7 +46,7 @@ public class FileLookupService {
     throw new IllegalStateException("Adquirente não cadastrada para identificador: " + identifier);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
   public EstablishmentEntity establishmentByPvNumber(Integer pvNumber) {
     return establishmentRepository.lookupByPvNumber(pvNumber, PageRequest.of(0, 1))
       .stream()
@@ -46,7 +54,7 @@ public class FileLookupService {
       .orElseThrow(() -> new IllegalStateException("Estabelecimento não cadastrado para PV: " + pvNumber));
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
   public FlagEntity flagByName(String name) {
     for (String candidate : flagCandidates(name)) {
       Optional<FlagEntity> found = flagRepository.findByNameIgnoreCase(candidate);
@@ -55,7 +63,7 @@ public class FileLookupService {
     throw new IllegalStateException("Bandeira não cadastrada para nome: " + name);
   }
 
-  @Transactional(readOnly = true)
+  @Transactional(readOnly = true, noRollbackFor = IllegalStateException.class)
   public FlagEntity flagByAcquirerCode(AcquirerEntity acquirer, String acquirerCode) {
     return relationFlagAcquirerRepository.findByAcquirer_IdAndAcquirerCode(acquirer.getId(), acquirerCode)
       .map(RelationFlagAcquirerEntity::getFlag)

@@ -38,6 +38,17 @@ public final class FileParserUtils {
     return value == null ? BigDecimal.ZERO : value;
   }
 
+  /**
+   * Para layouts (ex.: Cielo Extrato Eletrônico) que trazem o sinal num campo de 1 caractere
+   * separado, imediatamente antes dos dígitos do valor (ex.: "+0000000024580"), em vez de um "-"
+   * embutido no próprio número como parseMoneyInCents espera. O range deve cobrir sinal + valor
+   * juntos (o sinal é sempre o primeiro caractere do range).
+   */
+  public static BigDecimal extractSignedMoneyLine(String line, String range, int lineNumber) {
+    BigDecimal value = extractValueLine(line, range, lineNumber, FileParserUtils::parseSignedMoneyInCents);
+    return value == null ? BigDecimal.ZERO : value;
+  }
+
   public static OffsetDateTime extractOffsetDateTimeLine(String line, int lineNumber, String rangeDate, String rangeTime) {
     String date = extractStringLine(line, rangeDate, lineNumber);
     String time = extractStringLine(line, rangeTime, lineNumber);
@@ -89,6 +100,14 @@ public final class FileParserUtils {
     String normalized = raw.trim().replace(",", ".");
     if (normalized.matches("-?\\d+")) return new BigDecimal(normalized).movePointLeft(2);
     return new BigDecimal(normalized);
+  }
+
+  private static BigDecimal parseSignedMoneyInCents(String raw) {
+    if (raw == null || raw.isBlank()) return BigDecimal.ZERO;
+    String trimmed = raw.trim();
+    char sign = trimmed.charAt(0);
+    BigDecimal value = parseMoneyInCents(trimmed.substring(1));
+    return sign == '-' ? value.negate() : value;
   }
 
   private static LocalDate parseDate(String raw) {

@@ -80,13 +80,14 @@ public class FileProcessingProperties {
      */
     private Reconciliation reconciliation;
 
-    /** Retorna os caminhos de um sistema pelo nome (erp, rede). */
+    /** Retorna os caminhos de um sistema pelo nome (erp, rede, cielo). */
     public FilePaths byName(String system) {
       if (system == null) return null;
 
       return switch (system.trim().toLowerCase(Locale.ROOT)) {
         case "erp" -> erp;
         case "rede" -> redePath();
+        case "cielo" -> acquirer != null ? acquirer.getCielo() : null;
         default -> null;
       };
     }
@@ -117,11 +118,13 @@ public class FileProcessingProperties {
   public static class Acquirer {
 
     private FilePaths rede = new FilePaths();
+    private FilePaths cielo = new FilePaths();
 
     /** Retorna apenas os adquirentes que possuem {@code input} configurado. */
     public Map<String, FilePaths> enabledAcquirers() {
       Map<String, FilePaths> result = new LinkedHashMap<>();
       if (hasInput(rede)) result.put("rede", rede);
+      if (hasInput(cielo)) result.put("cielo", cielo);
       return result;
     }
 
