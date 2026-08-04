@@ -2,6 +2,7 @@ package com.cardsync.core.file.service;
 
 import com.cardsync.core.file.bank.BankingDomicileResolver;
 import com.cardsync.core.file.config.FileProcessingProperties;
+import com.cardsync.core.file.util.CieloAdjustmentReasonCatalog;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
 import com.cardsync.domain.model.*;
@@ -45,6 +46,7 @@ public class ProcessCielo04Service {
 
   private static final Charset CIELO_CHARSET = Charset.forName("windows-1252");
   private static final Set<String> SALE_LAUNCH_TYPES = Set.of("01", "02", "03");
+  private static final Set<String> ADJUSTMENT_LAUNCH_TYPES = Set.of("04", "05", "08", "10");
   private static final int STATUS_PENDING = 1;
 
   private final FileLookupService lookupService;
@@ -53,6 +55,8 @@ public class ProcessCielo04Service {
   private final CreditOrderRepository creditOrderRepository;
   private final SalesSummaryRepository salesSummaryRepository;
   private final ProcessedFileRepository processedFileRepository;
+  private final AdjustmentRepository adjustmentRepository;
+  private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
   public void processFile(Path file, FileProcessingProperties.FilePaths paths, String contentHash) {
@@ -66,6 +70,7 @@ public class ProcessCielo04Service {
       Map<String, RegistroD> urByKey = collectUrAgenda(lines);
 
       List<CreditOrderEntity> orders = new ArrayList<>();
+      List<AdjustmentEntity> adjustments = new ArrayList<>();
       Map<String, Integer> launchTypeCounts = new TreeMap<>();
       int recognized = 0;
       int ignored = 0;
@@ -90,6 +95,10 @@ public class ProcessCielo04Service {
             recognized++;
             String launchType = trim(FileParserUtils.extractStringLine(line, "27-29", lineNumber));
             launchTypeCounts.merge(launchType == null ? "?" : launchType, 1, Integer::sum);
+            if (ADJUSTMENT_LAUNCH_TYPES.contains(launchType)) {
+              adjustments.add(buildAdjustment(line, lineNumber, processedFile, launchType));
+              continue;
+            }
             if (!SALE_LAUNCH_TYPES.contains(launchType)) {
               ignored++;
               warnings++;
@@ -137,6 +146,10 @@ public class ProcessCielo04Service {
 
       processedFileRepository.save(processedFile);
       creditOrderRepository.saveAll(orders);
+      if (!adjustments.isEmpty()) {
+        adjustmentRepository.saveAll(adjustments);
+        adjustmentTransactionLinkService.linkSavedAdjustments(adjustments);
+      }
 
       moveFileService.moveAfterCommit(file, paths.getProcessed(), processedFile.getDateFile());
       log.info("✅ CIELO04 {} finalizado: status={}, {}", file.getFileName(), processedFile.getStatus(), processedFile.getStatusMessage());
@@ -246,6 +259,90 @@ public class ProcessCielo04Service {
   private Integer resolveCurrentInstallment(String launchType, Integer parcela) {
     if (!"03".equals(launchType)) return 1;
     return parcela == null || parcela <= 0 ? 1 : parcela;
+  }
+
+  /**
+   * Mesmo Registro E do CIELO03 (ver ProcessCielo03Service.buildAdjustment) — aqui representa o
+   * lado do PAGAMENTO desse ajuste (débito/crédito/contestação/aluguel), não a captura. Layout de
+   * posições idêntico. Visibilidade de pacote (não private) para permitir teste unitário direto
+   * sem contexto Spring.
+   */
+  AdjustmentEntity buildAdjustment(String line, int lineNumber, ProcessedFileEntity processedFile, String launchType) {
+    Integer pvNumber = FileParserUtils.extractIntegerLine(line, "1-11", lineNumber);
+    AcquirerEntity acquirer = safeAcquirer();
+    EstablishmentEntity establishment = safeEstablishment(pvNumber);
+    String chaveUR = trim(FileParserUtils.extractStringLine(line, "29-129", lineNumber));
+    Long nsu = FileParserUtils.extractLongLine(line, "175-181", lineNumber);
+    BigDecimal adjustmentValue = FileParserUtils.extractSignedMoneyLine(line, "260-274", lineNumber);
+    String rawAdjustmentCode = trim(FileParserUtils.extractStringLine(line, "151-155", lineNumber));
+    boolean hasNsu = nsu != null && nsu != 0L;
+
+    AdjustmentEntity adjustment = new AdjustmentEntity();
+    adjustment.setLineNumber(lineNumber);
+    adjustment.setRecordType(launchType);
+    adjustment.setSourceRecordIdentifier(launchType);
+    adjustment.setProcessedFile(processedFile);
+    adjustment.setAdjustmentStatus(AdjustmentStatusEnum.PENDING);
+    adjustment.setAcquirer(acquirer);
+    adjustment.setEstablishment(establishment);
+    adjustment.setCompany(establishment != null ? establishment.getCompany() : null);
+    adjustment.setPvNumber(pvNumber);
+    adjustment.setPvNumberOriginal(pvNumber);
+    adjustment.setRvNumberOriginal(FileParserUtils.deriveConciliationKey(chaveUR));
+    adjustment.setNsu(nsu);
+    adjustment.setAuthorization(nonZeroAuthorization(FileParserUtils.extractStringLine(line, "21-27", lineNumber)));
+    LocalDate lineDate = FileParserUtils.extractDateLine(line, "565-573", lineNumber);
+    adjustment.setTransactionDate(lineDate);
+    adjustment.setAdjustmentDate(lineDate);
+    adjustment.setAdjustmentValue(adjustmentValue);
+    adjustment.setRawAdjustmentCode(rawAdjustmentCode);
+    adjustment.setAdjustmentDescription(resolveAdjustmentDescription(launchType, rawAdjustmentCode));
+    adjustment.setAdjustmentType(resolveAdjustmentType(launchType));
+
+    if (hasNsu && ("04".equals(launchType) || "08".equals(launchType))) {
+      BigDecimal absValue = adjustmentValue.abs();
+      adjustment.setCancellationValueRequested(absValue);
+      adjustment.setTransactionValue(absValue);
+    }
+
+    return adjustment;
+  }
+
+  private String resolveAdjustmentDescription(String launchType, String rawAdjustmentCode) {
+    String fromCatalog = CieloAdjustmentReasonCatalog.get(rawAdjustmentCode);
+    if (fromCatalog != null) {
+      return fromCatalog;
+    }
+    return switch (launchType) {
+      case "04" -> "Ajuste a débito";
+      case "05" -> "Ajuste a crédito";
+      case "08" -> "Contestação do portador do cartão";
+      case "10" -> "Aluguel de máquina";
+      default -> null;
+    };
+  }
+
+  private String resolveAdjustmentType(String launchType) {
+    return switch (launchType) {
+      case "04" -> "CIELO_DEBIT_ADJUSTMENT";
+      case "05" -> "CIELO_CREDIT_ADJUSTMENT";
+      case "08" -> "CIELO_CHARGEBACK";
+      case "10" -> "CIELO_MACHINE_RENTAL";
+      default -> "CIELO_ADJUSTMENT";
+    };
+  }
+
+  /**
+   * "000000" é o preenchimento padrão do campo Autorização quando não se aplica — mesmo padrão
+   * zero-vira-ausente já usado pro NSU (ver hasNsu em buildAdjustment). Sem isso,
+   * AdjustmentTransactionLinkService trataria "000000" como uma autorização real.
+   */
+  private String nonZeroAuthorization(String authorization) {
+    String trimmed = trim(authorization);
+    if (trimmed == null || trimmed.isBlank() || trimmed.chars().allMatch(c -> c == '0')) {
+      return null;
+    }
+    return trimmed;
   }
 
   private AcquirerEntity safeAcquirer() {

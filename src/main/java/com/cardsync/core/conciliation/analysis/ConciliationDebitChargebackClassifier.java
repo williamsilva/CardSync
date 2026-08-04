@@ -274,6 +274,13 @@ public class ConciliationDebitChargebackClassifier {
       "contestacao venda",
       "contestacao de venda",
       "contest vendas",
+      // Vocabulário real da Cielo (Tabela IX/Tabela II do manual, ver ProcessCielo03Service):
+      // "Venda contestada pelo banco a pedido do portador do cartão", "Contestação do portador
+      // do cartão" — não batem nos termos acima, que assumem "contestação [de] venda".
+      "contestada pelo portador",
+      "contestado pelo portador",
+      "contestada pelo banco",
+      "contestacao do portador",
       "chargeback",
       "chbk",
       "cback",

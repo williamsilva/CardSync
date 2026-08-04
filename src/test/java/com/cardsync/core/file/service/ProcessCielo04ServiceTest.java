@@ -5,6 +5,7 @@ import com.cardsync.core.file.config.FileProcessingProperties;
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.core.file.util.MoveFileService;
 import com.cardsync.domain.model.*;
+import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.ProcessedFileRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
@@ -50,6 +51,12 @@ class ProcessCielo04ServiceTest {
   private static final String TRAILER =
     "900000000002+0000000000001288300000000001+00000000000013211-00000000000000000-00000000000000000                                                                                                                                                           ";
 
+  // Segmento E - Contestação do portador do cartão / chargeback (Tipo de lançamento "08"), lado
+  // do PAGAMENTO — mesmo layout e mesma linha real usada em ProcessCielo03ServiceTest (o Registro
+  // E é compartilhado entre CIELO03/04, ver ProcessCielo04Service#buildAdjustment).
+  private static final String CONTESTACAO =
+    "E105158311700200200000364320801027058000191360338010001092025-08-18002720021051583117360338010001090000000000000000000           2508060810410003119   0301010NNNNNNN5536360291351012000000000010515831174N83659MJE       1752716083445002480000000248-0000000001508-0000000001508-0000000001471+0000000000037+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000-0000000001508-0000000001508+0000000000000+0000000000000+0000000000000+00000000000003010136033801000109002000000000000000000000000000000               00711701830080000000000001607202506082025060820251607202502507162507160210360071837      18082025105158311700NNN034186390000000000000000245151                       N8100000000000000";
+
   private static final ProcessCielo04Service.RegistroD REGISTRO_D_PARSED = new ProcessCielo04Service.RegistroD(
     "0341", 86390, 245151, LocalDate.of(2026, 8, 3), 2, 3
   );
@@ -60,7 +67,7 @@ class ProcessCielo04ServiceTest {
   // não precisa de when(...) explícito aqui pra safeSalesSummary funcionar sem NPE.
   private final SalesSummaryRepository salesSummaryRepository = mock(SalesSummaryRepository.class);
   private final ProcessCielo04Service service =
-    new ProcessCielo04Service(lookupService, bankingDomicileResolver, null, null, salesSummaryRepository, null);
+    new ProcessCielo04Service(lookupService, bankingDomicileResolver, null, null, salesSummaryRepository, null, null, null);
 
   @Test
   void mapsCreditOrderFieldsFromRealPaymentLine() {
@@ -124,11 +131,30 @@ class ProcessCielo04ServiceTest {
   }
 
   @Test
+  void mapsChargebackAdjustmentFromPaymentFileView() {
+    stubLookups(1051583117, "001", null);
+
+    AdjustmentEntity adjustment = service.buildAdjustment(CONTESTACAO, 1, new ProcessedFileEntity(), "08");
+
+    assertThat(adjustment.getRecordType()).isEqualTo("08");
+    assertThat(adjustment.getNsu()).isEqualTo(351012L);
+    assertThat(adjustment.getAuthorization()).isEqualTo("036432");
+    assertThat(adjustment.getAdjustmentValue()).isEqualByComparingTo(new BigDecimal("-15.08"));
+    assertThat(adjustment.getRawAdjustmentCode()).isEqualTo("0301");
+    assertThat(adjustment.getAdjustmentDescription()).isEqualTo("Venda contestada pelo banco a pedido do portador do cartão");
+    assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_CHARGEBACK");
+    assertThat(adjustment.getCancellationValueRequested()).isEqualByComparingTo(new BigDecimal("15.08"));
+  }
+
+  @Test
   void endToEndFileLinksSaleLineToItsUrAgendaAndSkipsUnsupportedOrUnmatchedLinesWithoutBreakingTheFile(@TempDir Path tmpDir) throws Exception {
     stubLookups(1051583117, "001", null);
     when(bankingDomicileResolver.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
 
-    String unsupportedLaunchType = REGISTRO_E.substring(0, 27) + "04" + REGISTRO_E.substring(29);
+    // "06" (Cancelamento de venda) — código da Tabela II sem nenhuma ocorrência real no
+    // histórico completo do cliente (ao contrário de "04"/"05"/"08"/"10", que agora são
+    // suportados via buildAdjustment), continua genuinamente fora de escopo.
+    String unsupportedLaunchType = REGISTRO_E.substring(0, 27) + "06" + REGISTRO_E.substring(29);
     String unmatchedUr = REGISTRO_E.substring(0, 29) + "9".repeat(100) + REGISTRO_E.substring(129);
 
     Path file = tmpDir.resolve("CIELO04D_test.TXT.txt");
@@ -140,8 +166,11 @@ class ProcessCielo04ServiceTest {
     SalesSummaryRepository salesSummaryRepository = mock(SalesSummaryRepository.class);
     when(salesSummaryRepository.findFirstByAcquirer_IdAndPvNumberAndRvNumberOrderByRvDateDesc(any(), any(), any()))
       .thenReturn(Optional.empty());
+    AdjustmentRepository adjustmentRepository = mock(AdjustmentRepository.class);
+    AdjustmentTransactionLinkService adjustmentTransactionLinkService = mock(AdjustmentTransactionLinkService.class);
     ProcessCielo04Service fileLevelService = new ProcessCielo04Service(
-      lookupService, bankingDomicileResolver, moveFileService, creditOrderRepository, salesSummaryRepository, processedFileRepository
+      lookupService, bankingDomicileResolver, moveFileService, creditOrderRepository, salesSummaryRepository, processedFileRepository,
+      adjustmentRepository, adjustmentTransactionLinkService
     );
 
     FileProcessingProperties.FilePaths paths = new FileProcessingProperties.FilePaths();

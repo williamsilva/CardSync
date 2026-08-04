@@ -38,8 +38,31 @@ class ProcessCielo03ServiceTest {
   private static final String DETAIL_PARCELADA =
     "E105158311700200201024503590301027058000191360338010001092026-04-06002720021051583117360338010001090000000000000000000           2603060310490056302       012NNN3NNN5346968665010002000000000010515831175GGU4BSSRE         CLOUD108024003150000000315+0000000016225+0000000008113+0000000007857-0000000000256+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+00000000000001009450136033801000109002606570505039259606570505039259               0071170183003003000000036060320260603202606032026060320264260306                         06042026105158311700NNN03418639000000000000000024515155502596065549573060532N8100000000000000";
 
+  // Segmento E - Ajuste a débito (Tipo de lançamento "04"), Código de ajuste 0251 (Tabela IX:
+  // multa da bandeira por retentativa). PV 1051583117, arquivo real 2025-08-29. Sem autorização
+  // (não é uma venda com cartão presente), mas com NSU (626) — vira candidato a cancelamento.
+  private static final String AJUSTE_DEBITO =
+    "E105158311700100200000000000401027058000191360338010001092025-09-01001720021051583117360338010001090000000000000000000           2508280410260019854   0251040NNNNNNN00000000000006260000000000                                        000000000000000-0000000000074-0000000000074-0000000000074+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000-0000000000074-0000000000074+0000000000000+0000000000000+0000000000000+00000000000000002510136033801000109001000000000000000000000000000000               9980626402004000000000000270820252808202528082025280820250250829                         01092025105158311700NNN034186390000000000000000245151                       N0100000000000000";
+
+  // Segmento E - Ajuste a crédito (Tipo de lançamento "05"), Código de ajuste 0177 (Tabela IX:
+  // transferência entre PVs mesma raiz CNPJ). PV 1018802468, arquivo real 2025-10-07.
+  private static final String AJUSTE_CREDITO =
+    "E101880246800100200000000000501027058000191360338010001092025-10-09001020021018802468360338010001090000000000000000000           2510070510260017452   0177040NNNSNNN00000000000007780000000000                                        002000020000000+0000000000192+0000000000192+0000000000192+0000000000000+0000000000000+0000000000000+0000000000000-0000000000003+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+00000000000000000000136033801000109001000000000000000000000000000000               9980778299505000000000000061020250710202507102025071020250251006                         09102025101880246800NNN034186390000000000000000245151                       N0100000000000000";
+
+  // Segmento E - Contestação do portador do cartão / chargeback (Tipo de lançamento "08"),
+  // Código de ajuste 0301 (Tabela IX: "Venda contestada pelo banco a pedido do portador do
+  // cartão"). PV 1051583117, arquivo real 2025-07-16, com autorização e NSU reais (TID presente).
+  private static final String CONTESTACAO =
+    "E105158311700200200000364320801027058000191360338010001092025-08-18002720021051583117360338010001090000000000000000000           2508060810410003119   0301010NNNNNNN5536360291351012000000000010515831174N83659MJE       1752716083445002480000000248-0000000001508-0000000001508-0000000001471+0000000000037+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000-0000000001508-0000000001508+0000000000000+0000000000000+0000000000000+00000000000003010136033801000109002000000000000000000000000000000               00711701830080000000000001607202506082025060820251607202502507162507160210360071837      18082025105158311700NNN034186390000000000000000245151                       N8100000000000000";
+
+  // Segmento E - Aluguel de máquina (Tipo de lançamento "10"). PV 1018802468, arquivo real
+  // 2025-10-07. Sem NSU/autorização (não é ligado a nenhuma venda específica) e sem Código de
+  // ajuste (Tabela IX em branco — cai no fallback do texto da Tabela II).
+  private static final String ALUGUEL_MAQUINA =
+    "E101880246800700200000000001001027058000191360338010001092025-10-07007220021018802468360338010001090000000000000000000           2509301019000079165       040NNNNNNN00000000000000000000000000                                        000000000000000-0000000003190-0000000003190-0000000003190+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000-0000000003190-0000000003190+0000000000000+0000000000000+0000000000000+00000000000000000000036033801000109001000000000000000000000000000000               9984221671710000000000000300920253009202505102025051020250251001                         07102025101880246800NNN034186390000000000000000245151                       N0000000000000000";
+
   private final FileLookupService lookupService = mock(FileLookupService.class);
-  private final ProcessCielo03Service service = new ProcessCielo03Service(lookupService, null, null, null, null, null);
+  private final ProcessCielo03Service service = new ProcessCielo03Service(lookupService, null, null, null, null, null, null, null);
 
   @Test
   void mapsDebitSaleFields() {
@@ -181,6 +204,72 @@ class ProcessCielo03ServiceTest {
     assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING);
     assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PENDING);
     assertThat(summary.getTransactionsStatus()).isEqualTo(StatusReconciliationEnum.PENDING);
+  }
+
+  @Test
+  void mapsDebitAdjustmentAndFlagsItAsCancellationCandidate() {
+    stubLookups(1051583117, "001", "Visa");
+    AdjustmentEntity adjustment = service.buildAdjustment(AJUSTE_DEBITO, 1, new ProcessedFileEntity(), "04");
+
+    assertThat(adjustment.getRecordType()).isEqualTo("04");
+    assertThat(adjustment.getPvNumber()).isEqualTo(1051583117);
+    assertThat(adjustment.getNsu()).isEqualTo(626L);
+    assertThat(adjustment.getAdjustmentValue()).isEqualByComparingTo(new BigDecimal("-0.74"));
+    assertThat(adjustment.getRawAdjustmentCode()).isEqualTo("0251");
+    assertThat(adjustment.getAdjustmentDescription())
+      .isEqualTo("Cobrança/devolução de multa da bandeira por excesso de retentativas de venda no mesmo cartão");
+    assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_DEBIT_ADJUSTMENT");
+    // NSU presente + tipo "04" (débito) => candidato a cancelamento (AcquirerSaleCancellationService).
+    assertThat(adjustment.getCancellationValueRequested()).isEqualByComparingTo(new BigDecimal("0.74"));
+    assertThat(adjustment.getTransactionValue()).isEqualByComparingTo(new BigDecimal("0.74"));
+    assertThat(adjustment.getRvNumberOriginal()).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR(AJUSTE_DEBITO)));
+  }
+
+  @Test
+  void mapsCreditAdjustmentWithoutCancellationCandidacy() {
+    stubLookups(1018802468, "001", "Visa");
+    AdjustmentEntity adjustment = service.buildAdjustment(AJUSTE_CREDITO, 1, new ProcessedFileEntity(), "05");
+
+    assertThat(adjustment.getRecordType()).isEqualTo("05");
+    assertThat(adjustment.getAdjustmentValue()).isEqualByComparingTo(new BigDecimal("1.92"));
+    assertThat(adjustment.getRawAdjustmentCode()).isEqualTo("0177");
+    assertThat(adjustment.getAdjustmentDescription())
+      .isEqualTo("Transferência de valores entre estabelecimentos da mesma raiz de CNPJ para compensação de saldo");
+    assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_CREDIT_ADJUSTMENT");
+    // Crédito ao estabelecimento não é cancelamento, mesmo com NSU presente.
+    assertThat(adjustment.getCancellationValueRequested()).isNull();
+    assertThat(adjustment.getTransactionValue()).isNull();
+  }
+
+  @Test
+  void mapsChargebackAdjustmentAsCancellationCandidateWithStrongTransactionKey() {
+    stubLookups(1051583117, "001", "Visa");
+    AdjustmentEntity adjustment = service.buildAdjustment(CONTESTACAO, 1, new ProcessedFileEntity(), "08");
+
+    assertThat(adjustment.getRecordType()).isEqualTo("08");
+    assertThat(adjustment.getNsu()).isEqualTo(351012L);
+    assertThat(adjustment.getAuthorization()).isEqualTo("036432");
+    assertThat(adjustment.getAdjustmentValue()).isEqualByComparingTo(new BigDecimal("-15.08"));
+    assertThat(adjustment.getRawAdjustmentCode()).isEqualTo("0301");
+    assertThat(adjustment.getAdjustmentDescription()).isEqualTo("Venda contestada pelo banco a pedido do portador do cartão");
+    assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_CHARGEBACK");
+    assertThat(adjustment.getCancellationValueRequested()).isEqualByComparingTo(new BigDecimal("15.08"));
+  }
+
+  @Test
+  void mapsMachineRentalWithoutNsuOrCancellationCandidacyAndFallsBackToTabelaIIDescription() {
+    stubLookups(1018802468, "001", "Visa");
+    AdjustmentEntity adjustment = service.buildAdjustment(ALUGUEL_MAQUINA, 1, new ProcessedFileEntity(), "10");
+
+    assertThat(adjustment.getRecordType()).isEqualTo("10");
+    // Sem NSU (zerado no arquivo) — não é ligado a nenhuma venda específica, mesmo padrão do "011" da Rede/EEVD.
+    assertThat(adjustment.getNsu()).isEqualTo(0L);
+    assertThat(adjustment.getAdjustmentValue()).isEqualByComparingTo(new BigDecimal("-31.90"));
+    // Código de ajuste (Tabela IX) em branco no arquivo real — cai no fallback do texto da Tabela II.
+    assertThat(adjustment.getRawAdjustmentCode()).isBlank();
+    assertThat(adjustment.getAdjustmentDescription()).isEqualTo("Aluguel de máquina");
+    assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_MACHINE_RENTAL");
+    assertThat(adjustment.getCancellationValueRequested()).isNull();
   }
 
   @Test
