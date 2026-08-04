@@ -43,11 +43,13 @@ class ProcessCielo03ServiceTest {
 
   @Test
   void mapsDebitSaleFields() {
-    stubLookups(1018802468, "007", "Sorocred");
+    // Código "007" (Tabela III) = Elo — confirmado pela faixa de BIN real da linha (655015, faixa
+    // conhecida da Elo), não Sorocred.
+    stubLookups(1018802468, "007", "Elo");
     TransactionAcqEntity tx = service.buildTransaction(DETAIL_DEBITO, 1, new ProcessedFileEntity(), "01");
 
     assertThat(tx.getEstablishment().getPvNumber()).isEqualTo(1018802468);
-    assertThat(tx.getFlag().getName()).isEqualTo("Sorocred");
+    assertThat(tx.getFlag().getName()).isEqualTo("Elo");
     assertThat(tx.getAuthorization()).isEqualTo("054706");
     assertThat(tx.getCardNumber()).isEqualTo("655015******8038");
     assertThat(tx.getNsu()).isEqualTo(500002L);
