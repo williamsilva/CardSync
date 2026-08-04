@@ -99,9 +99,10 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getGrossValue()).isEqualByComparingTo(new BigDecimal("81.13"));
     assertThat(tx.getLiquidValue()).isEqualByComparingTo(new BigDecimal("78.57"));
     assertThat(tx.getDiscountValue()).isEqualByComparingTo(new BigDecimal("2.56"));
-    // installment = parcela ATUAL (01), não o total de parcelas (02) — é o que precisa bater com o
-    // installmentNumber que o CIELO04 vai reportar quando essa parcela específica for paga.
-    assertThat(tx.getInstallment()).isEqualTo(1);
+    // installment = TOTAL de parcelas (02), não a parcela atual (01) — mesma convenção do Rede
+    // (ProcessRedeEeVcService: installment do TransactionAcqEntity é o total da venda). A parcela
+    // atual só é usada no InstallmentAcqEntity, ver buildsCurrentInstallmentSeparatelyFromTotal.
+    assertThat(tx.getInstallment()).isEqualTo(2);
     // modality usa o TOTAL de parcelas (02) pra escalonar — 2-6 parcelas.
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode());
   }
@@ -132,16 +133,33 @@ class ProcessCielo03ServiceTest {
     stubLookups(1051583117, "001", "Visa");
     TransactionAcqEntity tx = service.buildTransaction(DETAIL_CREDITO, 1, new ProcessedFileEntity(), "02");
 
-    InstallmentAcqEntity installment = service.buildInstallment(tx);
+    InstallmentAcqEntity installment = service.buildInstallment(tx, DETAIL_CREDITO, 1, "02");
 
     assertThat(installment.getTransaction()).isSameAs(tx);
-    assertThat(installment.getInstallment()).isEqualTo(tx.getInstallment());
+    // Venda não parcelada ("02"): parcela atual e total coincidem em 1, mas por motivos
+    // diferentes — não é mais uma cópia de tx.getInstallment(), ver buildsCurrentInstallmentSeparatelyFromTotal.
+    assertThat(installment.getInstallment()).isEqualTo(1);
     assertThat(installment.getGrossValue()).isEqualByComparingTo(tx.getGrossValue());
     assertThat(installment.getLiquidValue()).isEqualByComparingTo(tx.getLiquidValue());
     assertThat(installment.getDiscountValue()).isEqualByComparingTo(tx.getDiscountValue());
     assertThat(installment.getAdjustmentValue()).isEqualByComparingTo(BigDecimal.ZERO);
     assertThat(installment.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING.getCode());
     assertThat(installment.getInstallmentStatus()).isEqualTo(StatusInstallmentEnum.SCHEDULED.getCode());
+  }
+
+  @Test
+  void buildsCurrentInstallmentSeparatelyFromTotal() {
+    stubLookups(1051583117, "002", "Mastercard");
+    TransactionAcqEntity tx = service.buildTransaction(DETAIL_PARCELADA, 1, new ProcessedFileEntity(), "03");
+
+    InstallmentAcqEntity installment = service.buildInstallment(tx, DETAIL_PARCELADA, 1, "03");
+
+    // Parcela 1 de 2: o InstallmentAcqEntity guarda a parcela ATUAL (1) — é o que precisa bater
+    // com o installmentNumber que o CIELO04 vai reportar quando essa parcela específica for paga —
+    // enquanto o TransactionAcqEntity guarda o TOTAL (2), usado por ContractedAcquirerRateLookupService
+    // e pelas telas de venda ACQ. As duas NÃO devem mais coincidir aqui.
+    assertThat(installment.getInstallment()).isEqualTo(1);
+    assertThat(tx.getInstallment()).isEqualTo(2);
   }
 
   @Test

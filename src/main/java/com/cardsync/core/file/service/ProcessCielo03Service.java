@@ -94,7 +94,7 @@ public class ProcessCielo03Service {
             SalesSummaryEntity summary = buildSalesSummary(tx);
             tx.setSalesSummary(summary);
             transactions.add(tx);
-            installments.add(buildInstallment(tx));
+            installments.add(buildInstallment(tx, line, lineNumber, launchType));
             summaries.add(summary);
           }
           default -> {
@@ -171,7 +171,6 @@ public class ProcessCielo03Service {
     BigDecimal grossValue = FileParserUtils.extractSignedMoneyLine(line, "260-274", lineNumber);
     BigDecimal liquidValue = FileParserUtils.extractSignedMoneyLine(line, "274-288", lineNumber);
     BigDecimal discountValue = FileParserUtils.extractSignedMoneyLine(line, "288-302", lineNumber).abs();
-    Integer parcela = FileParserUtils.extractIntegerLine(line, "17-19", lineNumber);
     Integer totalInstallments = FileParserUtils.extractIntegerLine(line, "19-21", lineNumber);
     String chaveUR = trim(FileParserUtils.extractStringLine(line, "29-129", lineNumber));
 
@@ -195,7 +194,7 @@ public class ProcessCielo03Service {
     tx.setMdrRate(calculateRate(grossValue, discountValue));
     tx.setMachine(FileParserUtils.extractStringLine(line, "543-551", lineNumber));
     tx.setSaleDate(FileParserUtils.extractOffsetDateTimeLine(line, lineNumber, "565-573", "470-476"));
-    tx.setInstallment(resolveCurrentInstallment(launchType, parcela));
+    tx.setInstallment(resolveTotalInstallments(launchType, totalInstallments));
     tx.setModality(resolveModality(launchType, totalInstallments));
     tx.setCapture(resolveCapture(trim(FileParserUtils.extractStringLine(line, "540-543", lineNumber))));
     tx.setFirstInstallmentValue(BigDecimal.ZERO);
@@ -212,12 +211,21 @@ public class ProcessCielo03Service {
    * (acquirer + rvNumber + installment), um CreditOrderEntity (criado pelo CIELO04) com esta venda.
    * expectedPaymentDate fica null: a Cielo não informa a data prevista de pagamento na captura
    * (isso só aparece no Registro D do CIELO04, na liquidação).
+   *
+   * O installment aqui é a parcela ATUAL (campo "Parcela" da linha), deliberadamente diferente de
+   * {@code tx.getInstallment()} — este último guarda o TOTAL de parcelas da venda, na mesma
+   * convenção do Rede (ProcessRedeEeVcService: installment do TransactionAcqEntity = total, só o
+   * InstallmentAcqEntity é por parcela), o que ContractedAcquirerRateLookupService/tela de vendas
+   * ACQ esperam pra bater com a bandeira/modalidade certa. Recalculado a partir da linha em vez de
+   * derivado de tx, pra não reintroduzir o acoplamento que causava essa confusão.
    * Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring.
    */
-  InstallmentAcqEntity buildInstallment(TransactionAcqEntity tx) {
+  InstallmentAcqEntity buildInstallment(TransactionAcqEntity tx, String line, int lineNumber, String launchType) {
+    Integer parcela = FileParserUtils.extractIntegerLine(line, "17-19", lineNumber);
+
     InstallmentAcqEntity installment = new InstallmentAcqEntity();
     installment.setTransaction(tx);
-    installment.setInstallment(tx.getInstallment());
+    installment.setInstallment(resolveCurrentInstallment(launchType, parcela));
     installment.setGrossValue(zero(tx.getGrossValue()));
     installment.setDiscountValue(zero(tx.getDiscountValue()));
     installment.setLiquidValue(zero(tx.getLiquidValue()));
@@ -291,10 +299,16 @@ public class ProcessCielo03Service {
     };
   }
 
-  /** Número da parcela ATUAL (campo "Parcela") — o que efetivamente identifica esta linha entre as N parcelas de uma venda "03". */
+  /** Número da parcela ATUAL (campo "Parcela") — usado só no InstallmentAcqEntity (ver buildInstallment), pra casar por valor com o installmentNumber que o CIELO04 vai reportar quando essa parcela específica for paga. */
   private Integer resolveCurrentInstallment(String launchType, Integer parcela) {
     if (!"03".equals(launchType)) return 1;
     return parcela == null || parcela <= 0 ? 1 : parcela;
+  }
+
+  /** Número TOTAL de parcelas (campo "Número total de parcelas") — vai em tx.installment (convenção do Rede: TransactionAcqEntity.installment = total) e escalona a modalidade. */
+  private Integer resolveTotalInstallments(String launchType, Integer totalInstallments) {
+    if (!"03".equals(launchType)) return 1;
+    return totalInstallments == null || totalInstallments <= 0 ? 1 : totalInstallments;
   }
 
   /** Número TOTAL de parcelas (campo "Número total de parcelas") — só usado pra escalonar a modalidade. */
