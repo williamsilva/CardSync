@@ -3,6 +3,7 @@ package com.cardsync.core.file.util;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -80,5 +81,24 @@ class FileParserUtilsTest {
   void deriveConciliationKeyReturnsNullForBlank() {
     assertThat(FileParserUtils.deriveConciliationKey(null)).isNull();
     assertThat(FileParserUtils.deriveConciliationKey("   ")).isNull();
+  }
+
+  @Test
+  void extractsYearFirstDate() {
+    // AAMMDD (ano primeiro) — usado pela Cielo nos Registros A/B (CIELO15) e 8 (CIELO16),
+    // diferente do DDMMAAAA (dia primeiro) do Registro D/E (CIELO03/04).
+    assertThat(FileParserUtils.extractDateLineYearFirst("260218", "0-6", 1)).isEqualTo(LocalDate.of(2026, 2, 18));
+  }
+
+  @Test
+  void yearFirstDateReturnsNullForAllZeros() {
+    assertThat(FileParserUtils.extractDateLineYearFirst("000000", "0-6", 1)).isNull();
+  }
+
+  @Test
+  void extractsYearFirstDateTimeCombiningDateAndHour() {
+    String line = "260302101803";
+    assertThat(FileParserUtils.extractOffsetDateTimeLineYearFirst(line, 1, "0-6", "6-12").toLocalDate())
+      .isEqualTo(LocalDate.of(2026, 3, 2));
   }
 }

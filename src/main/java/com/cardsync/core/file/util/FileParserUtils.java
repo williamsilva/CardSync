@@ -14,6 +14,7 @@ public final class FileParserUtils {
 
   private static final ZoneId SOURCE_FILE_ZONE = ZoneId.of("America/Sao_Paulo");
   private static final DateTimeFormatter DATE_FORMAT_6 = DateTimeFormatter.ofPattern("ddMMyy");
+  private static final DateTimeFormatter DATE_FORMAT_6_YEAR_FIRST = DateTimeFormatter.ofPattern("yyMMdd");
   private static final DateTimeFormatter DATE_FORMAT_8 = DateTimeFormatter.ofPattern("ddMMyyyy");
   private static final DateTimeFormatter DATE_FORMAT_8_YMD = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -31,6 +32,15 @@ public final class FileParserUtils {
 
   public static LocalDate extractDateLine(String line, String range, int lineNumber) {
     return extractValueLine(line, range, lineNumber, FileParserUtils::parseDate);
+  }
+
+  /**
+   * Para campos "AAMMDD" (ano primeiro) — usado pela Cielo nos Registros A/B (CIELO15) e 8
+   * (CIELO16); diferente do "DDMMAAAA"/"DDMMAA" (dia primeiro) do Registro D/E (CIELO03/04), que
+   * extractDateLine já cobre.
+   */
+  public static LocalDate extractDateLineYearFirst(String line, String range, int lineNumber) {
+    return extractValueLine(line, range, lineNumber, FileParserUtils::parseDateYearFirst);
   }
 
   public static BigDecimal extractBigDecimalLine(String line, String range, int lineNumber) {
@@ -65,10 +75,20 @@ public final class FileParserUtils {
   public static OffsetDateTime extractOffsetDateTimeLine(String line, int lineNumber, String rangeDate, String rangeTime) {
     String date = extractStringLine(line, rangeDate, lineNumber);
     String time = extractStringLine(line, rangeTime, lineNumber);
-    if (date == null || time == null || date.isBlank() || time.isBlank()) return null;
+    if (date == null || date.isBlank()) return null;
+    return combineDateAndTime(parseDate(date), time, lineNumber);
+  }
 
-    LocalDate parsedDate = parseDate(date);
-    if (parsedDate == null) return null;
+  /** Mesma composição data+hora acima, mas pro formato "AAMMDD" (ver extractDateLineYearFirst). */
+  public static OffsetDateTime extractOffsetDateTimeLineYearFirst(String line, int lineNumber, String rangeDate, String rangeTime) {
+    String date = extractStringLine(line, rangeDate, lineNumber);
+    String time = extractStringLine(line, rangeTime, lineNumber);
+    if (date == null || date.isBlank()) return null;
+    return combineDateAndTime(parseDateYearFirst(date), time, lineNumber);
+  }
+
+  private static OffsetDateTime combineDateAndTime(LocalDate parsedDate, String time, int lineNumber) {
+    if (parsedDate == null || time == null || time.isBlank()) return null;
 
     String cleanTime = time.trim();
     if (cleanTime.matches("0+") && cleanTime.length() > 6) return null;
@@ -121,6 +141,18 @@ public final class FileParserUtils {
     char sign = trimmed.charAt(0);
     BigDecimal value = parseMoneyInCents(trimmed.substring(1));
     return sign == '-' ? value.negate() : value;
+  }
+
+  private static LocalDate parseDateYearFirst(String raw) {
+    if (raw == null || raw.isBlank()) return null;
+    String value = raw.trim();
+    if (value.matches("0+")) return null;
+
+    try {
+      return LocalDate.parse(value, DATE_FORMAT_6_YEAR_FIRST);
+    } catch (DateTimeParseException ex) {
+      throw new DateTimeParseException("Data inválida (ano-primeiro)", value, 0, ex);
+    }
   }
 
   private static LocalDate parseDate(String raw) {
