@@ -2,6 +2,7 @@ package com.cardsync.core.file.service;
 
 import com.cardsync.core.file.util.FileParserUtils;
 import com.cardsync.domain.model.*;
+import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusInstallmentEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
@@ -59,6 +60,8 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getInstallment()).isEqualTo(1);
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.CASH_DEBIT.getCode());
     assertThat(tx.getRvNumber()).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR(DETAIL_DEBITO)));
+    // Canal da venda "008" (Tabela VII) = TEF/PDV.
+    assertThat(tx.getCapture()).isEqualTo(CaptureEnum.PDV.getCode());
   }
 
   @Test
@@ -80,6 +83,8 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getInstallment()).isEqualTo(1);
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.CASH_CREDIT.getCode());
     assertThat(tx.getRvNumber()).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR(DETAIL_CREDITO)));
+    // Canal da venda "007" (Tabela VII) = E-commerce.
+    assertThat(tx.getCapture()).isEqualTo(CaptureEnum.ECOMMERCE.getCode());
   }
 
   @Test
@@ -97,6 +102,17 @@ class ProcessCielo03ServiceTest {
     assertThat(tx.getInstallment()).isEqualTo(1);
     // modality usa o TOTAL de parcelas (02) pra escalonar — 2-6 parcelas.
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode());
+  }
+
+  @Test
+  void captureStaysNullForUnmappedOrNotApplicableChannel() {
+    stubLookups(1051583117, "001", "Visa");
+    // "998" (Tabela VII) = Não se aplica — sem equivalente em CaptureEnum, fica null em vez de
+    // forçar um palpite (mesmo padrão conservador do ProcessRedeEeVdService.resolveCapture).
+    String naoAplica = DETAIL_CREDITO.substring(0, 540) + "998" + DETAIL_CREDITO.substring(543);
+    TransactionAcqEntity tx = service.buildTransaction(naoAplica, 1, new ProcessedFileEntity(), "02");
+
+    assertThat(tx.getCapture()).isEqualTo(CaptureEnum.NULL.getCode());
   }
 
   @Test

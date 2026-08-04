@@ -197,6 +197,7 @@ public class ProcessCielo03Service {
     tx.setSaleDate(FileParserUtils.extractOffsetDateTimeLine(line, lineNumber, "565-573", "470-476"));
     tx.setInstallment(resolveCurrentInstallment(launchType, parcela));
     tx.setModality(resolveModality(launchType, totalInstallments));
+    tx.setCapture(resolveCapture(trim(FileParserUtils.extractStringLine(line, "540-543", lineNumber))));
     tx.setFirstInstallmentValue(BigDecimal.ZERO);
     tx.setOtherInstallmentsValue(BigDecimal.ZERO);
     tx.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
@@ -270,6 +271,24 @@ public class ProcessCielo03Service {
     String lastFour = FileParserUtils.extractStringLine(line, "171-175", lineNumber);
     if ((bin == null || bin.isBlank()) && (lastFour == null || lastFour.isBlank())) return null;
     return (bin == null ? "" : bin) + "******" + (lastFour == null ? "" : lastFour);
+  }
+
+  /**
+   * "Canal da venda" (Tabela VII do manual) → CaptureEnum. Só os códigos com equivalente claro são
+   * mapeados (mesmo padrão conservador de ProcessRedeEeVdService.resolveCapture) — o resto (ex.:
+   * "998" Não se aplica, EDI/GDS/central de atendimento) fica null em vez de forçar um palpite.
+   * Amostragem de dados reais (~2000 linhas) só encontrou "007" (E-commerce), "008" (TEF/PDV) e
+   * "998" (Não se aplica) — os demais códigos da tabela são mapeados por completude/robustez.
+   */
+  private Integer resolveCapture(String channelCode) {
+    if (channelCode == null || channelCode.isBlank()) return CaptureEnum.NULL.getCode();
+    return switch (channelCode) {
+      case "000", "001" -> CaptureEnum.POS.getCode();
+      case "008" -> CaptureEnum.PDV.getCode();
+      case "003", "004", "010", "011", "015" -> CaptureEnum.MANUAL.getCode();
+      case "005", "006", "007" -> CaptureEnum.ECOMMERCE.getCode();
+      default -> CaptureEnum.NULL.getCode();
+    };
   }
 
   /** Número da parcela ATUAL (campo "Parcela") — o que efetivamente identifica esta linha entre as N parcelas de uma venda "03". */
