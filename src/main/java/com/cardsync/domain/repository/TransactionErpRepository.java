@@ -41,15 +41,16 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and (e.modality is not null and e.modality <> :excludedModality)
        and e.saleDate >= :implantationDate
        and e.saleDate >= :lookbackDate
-       and upper(e.acquirer.fileIdentifier) = 'REDE'
+       and e.acquirer.id = :acquirerId
      order by e.saleDate asc, e.id asc
   """)
-  List<UUID> findRedeErpIdsForReconciliation(
+  List<UUID> findErpIdsForReconciliation(
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
-    @Param("lookbackDate") OffsetDateTime lookbackDate
+    @Param("lookbackDate") OffsetDateTime lookbackDate,
+    @Param("acquirerId") UUID acquirerId
   );
 
   @Query("""
@@ -62,16 +63,17 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and (e.modality is not null and e.modality <> :excludedModality)
        and e.saleDate >= :implantationDate
        and e.saleDate >= :lookbackDate
-       and upper(e.acquirer.fileIdentifier) = 'REDE'
+       and e.acquirer.id = :acquirerId
      order by e.saleDate asc, e.id asc
   """)
-  List<UUID> findRedeErpIdsForManualSwapReconciliation(
+  List<UUID> findErpIdsForManualSwapReconciliation(
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
     @Param("manualCapture") Integer manualCapture,
     @Param("sourceReasonCodes") Collection<Integer> sourceReasonCodes,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
-    @Param("lookbackDate") OffsetDateTime lookbackDate
+    @Param("lookbackDate") OffsetDateTime lookbackDate,
+    @Param("acquirerId") UUID acquirerId
   );
 
   @Query("""
@@ -125,16 +127,17 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
        and (:includeAlreadyProcessed = true or ta.feeReconciliationStatus is null or ta.feeReconciliationStatus in :pendingFeeStatuses)
        and e.saleDate >= :implantationDate
        and e.saleDate >= :lookbackDate
-       and upper(e.acquirer.fileIdentifier) = 'REDE'
+       and e.acquirer.id in :acquirerIds
      order by e.saleDate asc, e.id asc
   """)
-  List<UUID> findRedeErpIdsForFeeReconciliation(
+  List<UUID> findErpIdsForFeeReconciliation(
     @Param("includeAlreadyProcessed") boolean includeAlreadyProcessed,
     @Param("reconciledStatuses") Collection<Integer> reconciledStatuses,
     @Param("excludedModality") Integer excludedModality,
     @Param("pendingFeeStatuses") Collection<Integer> pendingFeeStatuses,
     @Param("implantationDate") OffsetDateTime implantationDate,
-    @Param("lookbackDate") OffsetDateTime lookbackDate
+    @Param("lookbackDate") OffsetDateTime lookbackDate,
+    @Param("acquirerIds") Collection<UUID> acquirerIds
   );
 
   @Query("""

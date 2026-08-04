@@ -7,6 +7,7 @@ import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.CaptureEnum;
+import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
@@ -57,12 +58,12 @@ public class ConciliationManualSwapReconciliationService {
   private final ConciliationAnalysisService conciliationAnalysisService;
 
   @Transactional
-  public ReconcileErpAcquirerResultModel reconcileRedeManualSwapped() {
-    return reconcileRedeManualSwapped("MANUAL");
+  public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
+    return reconcileManualSwapped("MANUAL");
   }
 
   @Transactional
-  public ReconcileErpAcquirerResultModel reconcileRedeManualSwapped(String trigger) {
+  public ReconcileErpAcquirerResultModel reconcileManualSwapped(String trigger) {
     // Esta etapa nunca reprocessa vendas já conciliadas: ela só atua sobre o que
     // sobrou pendente após a conciliação principal.
     List<Integer> pendingStatuses = conciliationAnalysisService.erpAcquirerPendingStatusCodes();
@@ -72,15 +73,59 @@ public class ConciliationManualSwapReconciliationService {
       .minusMonths(reconciliationSettingsService.getReconciliationLookbackMonths())
       .atStartOfDay().atOffset(ZoneOffset.UTC);
 
-    UUID redeAcquirerId = acquirerRepository.findByFileIdentifierIgnoreCase("REDE")
-      .map(AcquirerEntity::getId)
-      .orElse(null);
-    if (redeAcquirerId == null) {
-      log.warn("⚠️ Adquirente REDE não encontrada na base, conciliação manual swap ignorada.");
+    List<AcquirerEntity> activeAcquirers = acquirerRepository.findAllByStatusOrderByFantasyNameAsc(StatusEnum.toCode(StatusEnum.ACTIVE));
+    if (activeAcquirers.isEmpty()) {
+      log.warn("⚠️ Nenhuma adquirente ativa encontrada na base, conciliação manual swap ignorada.");
       return new ReconcileErpAcquirerResultModel(0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
-    List<UUID> erpIds = transactionErpRepository.findRedeErpIdsForManualSwapReconciliation(
+    int analyzed = 0;
+    int matched = 0;
+    int updated = 0;
+    int notMatched = 0;
+    int valueDivergences = 0;
+    int acquirerDivergences = 0;
+    int ambiguousMatches = 0;
+    int flagUpdated = 0;
+    int businessContextUpdated = 0;
+
+    for (AcquirerEntity acquirer : activeAcquirers) {
+      ReconcileErpAcquirerResultModel r = runManualSwapReconciliation(
+        acquirer, trigger, pendingStatuses, implantationDate, lookbackDate
+      );
+      analyzed += r.analyzed();
+      matched += r.matched();
+      updated += r.updated();
+      notMatched += r.notMatched();
+      valueDivergences += r.valueDivergences();
+      acquirerDivergences += r.acquirerDivergences();
+      ambiguousMatches += r.ambiguousMatches();
+      flagUpdated += r.flagUpdated();
+      businessContextUpdated += r.businessContextUpdated();
+    }
+
+    log.info(
+      "✅ Conciliação ERP x Adquirente (manuais invertidos) finalizada (todas as adquirentes ativas). analisadas={}, conciliadas={}, atualizadas={}, " +
+        "naoConciliadas={}, divergValor={}, divergAdquirente={}, ambiguas={}",
+      analyzed, matched, updated, notMatched, valueDivergences, acquirerDivergences, ambiguousMatches
+    );
+
+    return new ReconcileErpAcquirerResultModel(
+      analyzed, matched, updated, 0, flagUpdated, businessContextUpdated,
+      notMatched, valueDivergences, acquirerDivergences, ambiguousMatches
+    );
+  }
+
+  private ReconcileErpAcquirerResultModel runManualSwapReconciliation(
+    AcquirerEntity acquirer,
+    String trigger,
+    List<Integer> pendingStatuses,
+    OffsetDateTime implantationDate,
+    OffsetDateTime lookbackDate
+  ) {
+    UUID acquirerId = acquirer.getId();
+
+    List<UUID> erpIds = transactionErpRepository.findErpIdsForManualSwapReconciliation(
       pendingStatuses,
       CaptureEnum.MANUAL.getCode(),
       List.of(
@@ -91,7 +136,8 @@ public class ConciliationManualSwapReconciliationService {
       ),
       ConciliationAnalysisService.EXCLUDED_CARD_RECONCILIATION_MODALITY,
       implantationDate,
-      lookbackDate
+      lookbackDate,
+      acquirerId
     );
 
     int analyzed = 0;
@@ -109,8 +155,8 @@ public class ConciliationManualSwapReconciliationService {
     int totalBatches = (int) Math.ceil((double) erpIds.size() / batchSize);
 
     log.info(
-      "📌 Iniciando conciliação ERP Vendas Rede x Adquirente Rede (manuais NSU/autorização invertidos). trigger={}, totalErp={}, batchSize={}, totalBatches={}",
-      trigger, erpIds.size(), batchSize, totalBatches
+      "📌 Iniciando conciliação ERP x Adquirente (manuais NSU/autorização invertidos). trigger={}, adquirente={}, totalErp={}, batchSize={}, totalBatches={}",
+      trigger, acquirer.getFantasyName(), erpIds.size(), batchSize, totalBatches
     );
 
     TransactionTemplate batchTx = new TransactionTemplate(transactionManager);
@@ -148,7 +194,7 @@ public class ConciliationManualSwapReconciliationService {
           false,
           pendingStatuses,
           lookbackDate,
-          redeAcquirerId
+          acquirerId
         );
         Map<ConciliationAnalysisService.ErpAcquirerIdentityKey, List<TransactionAcqEntity>> acquirersByIdentity =
           conciliationAnalysisService.indexAcquirerCandidates(acquirerCandidates);
@@ -267,9 +313,9 @@ public class ConciliationManualSwapReconciliationService {
     }
 
     log.info(
-      "✅ Conciliação ERP Vendas Rede x Adquirente Rede (manuais invertidos) finalizada. analisadas={}, conciliadas={}, atualizadas={}, " +
+      "✅ Conciliação ERP x Adquirente (manuais invertidos) finalizada para {}. analisadas={}, conciliadas={}, atualizadas={}, " +
         "naoConciliadas={}, divergValor={}, divergAdquirente={}, ambiguas={}",
-      analyzed, matched, updated, notMatched, valueDivergences, acquirerDivergences, ambiguousMatches
+      acquirer.getFantasyName(), analyzed, matched, updated, notMatched, valueDivergences, acquirerDivergences, ambiguousMatches
     );
 
     return new ReconcileErpAcquirerResultModel(

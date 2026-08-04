@@ -172,7 +172,7 @@ public class ConciliationWaitingController {
   @PostMapping("/reconcile")
   @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ReconcileErpAcquirerResultModel reconcileErpVsAcquirer() {
-    ReconcileErpAcquirerResultModel result = conciliationAnalysisService.reconcileRedeErpWithAcquirer();
+    ReconcileErpAcquirerResultModel result = conciliationAnalysisService.reconcileErpWithAcquirer();
     salesSummaryTransactionReconciliationService.reconcile(FinancialReconciliationTriggerType.MANUAL);
     return result;
   }
@@ -180,13 +180,13 @@ public class ConciliationWaitingController {
   @PostMapping("/reconcile-manual-swapped")
   @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ReconcileErpAcquirerResultModel reconcileManualSwapped() {
-    return conciliationManualSwapReconciliationService.reconcileRedeManualSwapped();
+    return conciliationManualSwapReconciliationService.reconcileManualSwapped();
   }
 
   @PostMapping("/reconcile-fees")
   @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
   public ReconcileErpAcquirerFeesResultModel reconcileErpAcquirerFees() {
-    return conciliationAnalysisService.reconcileRedeErpAcquirerFees();
+    return conciliationAnalysisService.reconcileErpAcquirerFees();
   }
 
   @PostMapping("/reconcile-manually")

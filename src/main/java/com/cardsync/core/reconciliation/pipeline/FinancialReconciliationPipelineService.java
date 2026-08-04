@@ -200,12 +200,12 @@ public class FinancialReconciliationPipelineService {
   private FinancialReconciliationStepResult runErpAcquirer(FinancialReconciliationTriggerType trigger) {
     OffsetDateTime startedAt = OffsetDateTime.now();
     ReconcileErpAcquirerResultModel erpAcq = conciliationAnalysisService
-      .reconcileRedeErpWithAcquirer(trigger.name());
+      .reconcileErpWithAcquirer(trigger.name());
 
     // Após a conciliação principal, trata as vendas MANUAIS que sobraram pendentes
     // por terem NSU e autorização invertidos.
     ReconcileErpAcquirerResultModel manualSwap = conciliationManualSwapReconciliationService
-      .reconcileRedeManualSwapped(trigger.name());
+      .reconcileManualSwapped(trigger.name());
 
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ERP_ACQUIRER)
@@ -268,7 +268,7 @@ public class FinancialReconciliationPipelineService {
     OffsetDateTime startedAt = OffsetDateTime.now();
 
     ReconcileErpAcquirerFeesResultModel fees = conciliationAnalysisService
-      .reconcileRedeErpAcquirerFees(trigger.name());
+      .reconcileErpAcquirerFees(trigger.name());
 
     return FinancialReconciliationStepResult.builder()
       .step(ReconciliationPipelineStepEnum.ACQUIRER_SALE_ADJUSTMENTS)
