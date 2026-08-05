@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -162,9 +163,23 @@ public class CreditOrderPreImplantationLinkingService {
       return OrphanAnalysis.noMatch(co);
     }
 
-    Optional<SalesSummaryEntity> exact = candidates.stream()
+    List<SalesSummaryEntity> samePv = candidates.stream()
       .filter(ss -> co.getPvCentralizer().equals(ss.getPvNumber()))
-      .max(Comparator.comparing(SalesSummaryEntity::getRvDate, Comparator.nullsFirst(Comparator.naturalOrder())));
+      .toList();
+
+    // Achado real (Cielo): mesmo adquirente+PV+rvNumber pode achar VÁRIOS SalesSummary — a
+    // "Chave UR" (origem do rvNumber) é uma chave de lote de liquidação, não por venda (ver
+    // javadoc de CreditOrderOrphanLinkingService). Escolher só pelo rvDate mais recente colava
+    // a ordem na venda errada do mesmo lote; desambigua por valor (releaseValue↔liquidValue) —
+    // só vira EXACT_MATCH quando exatamente uma bate.
+    if (samePv.size() > 1) {
+      List<SalesSummaryEntity> byValue = samePv.stream()
+        .filter(ss -> valuesMatch(ss.getLiquidValue(), co.getReleaseValue()))
+        .toList();
+      return byValue.size() == 1 ? OrphanAnalysis.exactMatch(co, byValue.getFirst()) : OrphanAnalysis.noMatch(co);
+    }
+
+    Optional<SalesSummaryEntity> exact = samePv.stream().findFirst();
 
     if (exact.isPresent()) {
       return OrphanAnalysis.exactMatch(co, exact.get());
@@ -174,6 +189,12 @@ public class CreditOrderPreImplantationLinkingService {
       .max(Comparator.comparing(SalesSummaryEntity::getRvDate, Comparator.nullsFirst(Comparator.naturalOrder())))
       .orElseThrow();
     return OrphanAnalysis.pvMismatch(co, mostRecentMismatch);
+  }
+
+  private static final BigDecimal VALUE_TOLERANCE = new BigDecimal("0.01");
+
+  private boolean valuesMatch(BigDecimal a, BigDecimal b) {
+    return a != null && b != null && a.subtract(b).abs().compareTo(VALUE_TOLERANCE) <= 0;
   }
 
   private enum Outcome { EXACT_MATCH, PV_MISMATCH, NO_MATCH }

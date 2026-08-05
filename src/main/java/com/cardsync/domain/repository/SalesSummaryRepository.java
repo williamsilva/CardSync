@@ -28,6 +28,18 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
+   * Mesma chave da consulta acima, mas retornando TODAS as candidatas — usada quando o rvNumber
+   * pode legitimamente bater em mais de uma SalesSummary (achado real Cielo: "Chave UR" é uma
+   * chave de lote de liquidação, não por venda — ver ProcessCielo04Service#safeSalesSummary).
+   * "Pegar a primeira por rvDate" nesse caso cola o CreditOrder na venda errada do mesmo lote.
+   */
+  List<SalesSummaryEntity> findByAcquirer_IdAndPvNumberAndRvNumber(
+    UUID acquirerId,
+    Integer pvNumber,
+    Integer rvNumber
+  );
+
+  /**
    * Importação em lote do relatório de pagamentos da adquirente (ver
    * CreditOrderManualService#importFromAcquirerReport) — busca todos os resumos candidatos de
    * uma vez pelo número do RV (chave de match escolhida para essa importação); rvNumber

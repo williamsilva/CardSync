@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -22,6 +23,16 @@ import java.util.*;
  * <p>Órfãs surgem quando o arquivo EEFI é processado antes do arquivo de resumo
  * de vendas: a FK não é estabelecida na ingestão e a Etapa 6 (Resumo x Ordem)
  * não as enxerga via JOIN. Esse passo corrige a vinculação retroativamente.</p>
+ *
+ * <p><b>Achado real (Cielo):</b> acquirer+pvCentralizer+rvNumber NÃO identifica uma única
+ * SalesSummary — a "Chave UR" da Cielo (origem do rvNumber) é uma chave de LOTE de liquidação,
+ * compartilhada por várias vendas distintas do mesmo lote (confirmado com dado real: 7
+ * SalesSummary diferentes, valores completamente diferentes, com o mesmo rvNumber). Vincular
+ * pela chave sozinha (como antes) colava TODAS as CreditOrder órfãs do lote numa única
+ * SalesSummary arbitrária (a de rvDate mais recente), deixando as demais sem ordem nenhuma e a
+ * tela de Resumo de Vendas mostrando ordens de outras vendas. A correção desambigua por VALOR
+ * (releaseValue↔liquidValue) dentro do grupo — só vincula quando exatamente uma candidata bate
+ * dentro da tolerância; múltiplas ou nenhuma batendo fica órfã (mais seguro que adivinhar errado).</p>
  */
 @Slf4j
 @Service
@@ -29,6 +40,7 @@ import java.util.*;
 public class CreditOrderOrphanLinkingService {
 
   private static final int BATCH_SIZE = 1_000;
+  private static final BigDecimal VALUE_TOLERANCE = new BigDecimal("0.01");
 
   private final ImplantationDateProvider implantationDateProvider;
   private final ReconciliationSettingsService reconciliationSettingsService;
@@ -95,36 +107,47 @@ public class CreditOrderOrphanLinkingService {
         acquirerIds, pvNumbers, rvNumbers
       );
 
-      // Para cada combinação (acquirerId:pvNumber:rvNumber) mantém o SalesSummary mais recente,
-      // replicando o comportamento do processamento de arquivo (ORDER BY rvDate DESC).
-      Map<String, SalesSummaryEntity> summaryMap = new HashMap<>();
+      // Agrupa TODAS as candidatas por (acquirerId:pvNumber:rvNumber) — a chave pode ter mais de
+      // uma SalesSummary (lote de liquidação da Cielo, ver javadoc da classe); desambiguar por
+      // valor é feito por-órfã, abaixo, não aqui.
+      Map<String, List<SalesSummaryEntity>> summaryMap = new HashMap<>();
       for (SalesSummaryEntity ss : candidates) {
         if (ss.getAcquirer() == null || ss.getPvNumber() == null || ss.getRvNumber() == null) continue;
         String key = ss.getAcquirer().getId() + ":" + ss.getPvNumber() + ":" + ss.getRvNumber();
-        summaryMap.merge(key, ss, (existing, candidate) ->
-          candidate.getRvDate() != null
-            && (existing.getRvDate() == null || candidate.getRvDate().isAfter(existing.getRvDate()))
-            ? candidate : existing
-        );
+        summaryMap.computeIfAbsent(key, k -> new ArrayList<>()).add(ss);
       }
 
       List<CreditOrderEntity> toSave = new ArrayList<>();
       int batchLinked = 0;
+      int batchAmbiguous = 0;
 
       for (CreditOrderEntity co : orphans) {
         if (co.getAcquirer() == null || co.getPvCentralizer() == null || co.getRvNumber() == null) continue;
         String key = co.getAcquirer().getId() + ":" + co.getPvCentralizer() + ":" + co.getRvNumber();
-        SalesSummaryEntity match = summaryMap.get(key);
-        if (match != null) {
-          co.setSalesSummary(match);
-          // Se o resumo já está conciliado, propaga o status imediatamente para evitar
-          // inconsistência entre SalesSummary.creditOrderStatus e CreditOrder.salesSummaryStatus
-          if (match.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
-            co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
-          }
-          toSave.add(co);
-          batchLinked++;
+        List<SalesSummaryEntity> keyCandidates = summaryMap.get(key);
+        if (keyCandidates == null || keyCandidates.isEmpty()) continue;
+
+        SalesSummaryEntity match = keyCandidates.size() == 1 ? keyCandidates.get(0) : selectByValue(keyCandidates, co);
+        if (match == null) {
+          batchAmbiguous++;
+          continue;
         }
+
+        co.setSalesSummary(match);
+        // Se o resumo já está conciliado, propaga o status imediatamente para evitar
+        // inconsistência entre SalesSummary.creditOrderStatus e CreditOrder.salesSummaryStatus
+        if (match.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
+          co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
+        }
+        toSave.add(co);
+        batchLinked++;
+      }
+
+      if (batchAmbiguous > 0) {
+        log.warn(
+          "⚠️ Pré-vinculação batch {}/{}: {} CreditOrder(s) com acquirer+pv+rv correspondendo a mais de uma SalesSummary do mesmo lote, sem bater por valor com nenhuma (ou batendo com mais de uma) — deixadas órfãs.",
+          batchNumber, totalBatches, batchAmbiguous
+        );
       }
 
       if (!toSave.isEmpty()) {
@@ -172,18 +195,51 @@ public class CreditOrderOrphanLinkingService {
       return 0;
     }
 
-    for (CreditOrderEntity co : orphans) {
+    // Mesmo cuidado do batch acima: pv+rv pode achar órfãs de OUTRAS vendas do mesmo lote —
+    // só vincula as que batem por valor com este summary específico (ver javadoc da classe).
+    List<CreditOrderEntity> matching = orphans.size() == 1
+      ? orphans
+      : orphans.stream().filter(co -> valuesMatch(co.getReleaseValue(), summary.getLiquidValue())).toList();
+
+    if (matching.isEmpty()) {
+      log.info("✅ Vinculação direta: {} CreditOrder(s) órfã(s) por pv+rv, nenhuma bate por valor com summary id={}, pv={}, rv={}, liquidValue={} — deixadas órfãs.",
+        orphans.size(), summary.getId(), summary.getPvNumber(), summary.getRvNumber(), summary.getLiquidValue());
+      return 0;
+    }
+
+    for (CreditOrderEntity co : matching) {
       co.setSalesSummary(summary);
       if (summary.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
         co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
       }
     }
 
-    creditOrderRepository.saveAll(orphans);
+    creditOrderRepository.saveAll(matching);
 
     log.info("🔗 Vinculação direta: {} CreditOrder(s) vinculada(s) ao summary id={}, pv={}, rv={}",
-      orphans.size(), summary.getId(), summary.getPvNumber(), summary.getRvNumber());
+      matching.size(), summary.getId(), summary.getPvNumber(), summary.getRvNumber());
 
-    return orphans.size();
+    return matching.size();
+  }
+
+  /**
+   * Entre as candidatas que batem por acquirer+pv+rv (mesmo lote de liquidação), escolhe a que
+   * bate por valor (releaseValue↔liquidValue) com a ordem órfã. Só retorna um match quando
+   * exatamente UMA candidata bate dentro da tolerância — múltiplas batendo (ambíguo) ou nenhuma
+   * batendo (ex.: parcela isolada de uma venda parcelada, cujo valor não é o total do resumo)
+   * retornam null, deixando a ordem órfã em vez de vincular errado.
+   */
+  private SalesSummaryEntity selectByValue(List<SalesSummaryEntity> candidates, CreditOrderEntity order) {
+    if (order.getReleaseValue() == null) return null;
+
+    List<SalesSummaryEntity> matches = candidates.stream()
+      .filter(ss -> valuesMatch(ss.getLiquidValue(), order.getReleaseValue()))
+      .toList();
+
+    return matches.size() == 1 ? matches.get(0) : null;
+  }
+
+  private boolean valuesMatch(BigDecimal a, BigDecimal b) {
+    return a != null && b != null && a.subtract(b).abs().compareTo(VALUE_TOLERANCE) <= 0;
   }
 }

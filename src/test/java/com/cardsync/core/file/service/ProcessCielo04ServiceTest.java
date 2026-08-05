@@ -84,6 +84,9 @@ class ProcessCielo04ServiceTest {
     assertThat(order.getPvCentralizer()).isEqualTo(1051583117);
     assertThat(order.getRvNumber()).isEqualTo(FileParserUtils.deriveConciliationKey(chaveUR));
     assertThat(order.getInstallmentNumber()).isEqualTo(1);
+    // Achado real: pra venda não parcelada ("02"), o campo "número total de parcelas" da linha
+    // real vem "00", não "01" — sem normalizar, a tela mostrava "1 / 0" (bug real reportado).
+    assertThat(order.getInstallmentTotal()).isEqualTo(1);
     assertThat(order.getReleaseValue()).isEqualByComparingTo(new BigDecimal("128.83"));
     assertThat(order.getGrossRvValue()).isEqualByComparingTo(new BigDecimal("132.11"));
     assertThat(order.getDiscountRateValue()).isEqualByComparingTo(new BigDecimal("3.28"));
@@ -96,6 +99,65 @@ class ProcessCielo04ServiceTest {
 
     OffsetDateTime expectedSaleDate = FileParserUtils.extractOffsetDateTimeLine(REGISTRO_E, 1, "565-573", "470-476");
     assertThat(order.getRvDate()).isEqualTo(expectedSaleDate.toLocalDate());
+  }
+
+  @Test
+  void disambiguatesSalesSummaryByValueWhenSameRvNumberMatchesMultipleSummaries() {
+    // Achado real: acquirer+pv+rvNumber achou 3 SalesSummary diferentes pro mesmo rv (Chave UR é
+    // chave de lote, não por venda) — "pegar a mais recente" (comportamento antigo) colava o
+    // CreditOrder na venda errada. Agora só vincula quando o valor bate com exatamente uma.
+    AcquirerEntity acquirer = new AcquirerEntity();
+    acquirer.setId(UUID.randomUUID());
+    acquirer.setFantasyName("Cielo");
+    EstablishmentEntity establishment = new EstablishmentEntity();
+    establishment.setPvNumber(1051583117);
+    establishment.setCompany(new CompanyEntity());
+    when(lookupService.origin("CIELO")).thenReturn(new OriginFileEntity());
+    when(lookupService.acquirerByIdentifier("CIELO")).thenReturn(acquirer);
+    when(lookupService.establishmentByPvNumber(1051583117)).thenReturn(establishment);
+
+    Integer rvNumber = FileParserUtils.deriveConciliationKey(chaveUR(REGISTRO_E));
+    SalesSummaryEntity wrongSummaryA = new SalesSummaryEntity();
+    wrongSummaryA.setLiquidValue(new BigDecimal("169.76"));
+    SalesSummaryEntity wrongSummaryB = new SalesSummaryEntity();
+    wrongSummaryB.setLiquidValue(new BigDecimal("158.00"));
+    SalesSummaryEntity correctSummary = new SalesSummaryEntity();
+    correctSummary.setLiquidValue(new BigDecimal("128.83")); // mesmo valor de REGISTRO_E, ver mapsCreditOrderFieldsFromRealPaymentLine
+    when(salesSummaryRepository.findByAcquirer_IdAndPvNumberAndRvNumber(acquirer.getId(), 1051583117, rvNumber))
+      .thenReturn(List.of(wrongSummaryA, wrongSummaryB, correctSummary));
+
+    CreditOrderEntity order = service.buildCreditOrder(
+      REGISTRO_E, 1, processedFileWithDate(LocalDate.of(2026, 8, 3)), "02", chaveUR(REGISTRO_E), REGISTRO_D_PARSED
+    );
+
+    assertThat(order.getSalesSummary()).isSameAs(correctSummary);
+  }
+
+  @Test
+  void leavesSalesSummaryNullWhenMultipleCandidatesShareTheSameRvNumberAndNoneMatchesByValue() {
+    AcquirerEntity acquirer = new AcquirerEntity();
+    acquirer.setId(UUID.randomUUID());
+    acquirer.setFantasyName("Cielo");
+    EstablishmentEntity establishment = new EstablishmentEntity();
+    establishment.setPvNumber(1051583117);
+    establishment.setCompany(new CompanyEntity());
+    when(lookupService.origin("CIELO")).thenReturn(new OriginFileEntity());
+    when(lookupService.acquirerByIdentifier("CIELO")).thenReturn(acquirer);
+    when(lookupService.establishmentByPvNumber(1051583117)).thenReturn(establishment);
+
+    Integer rvNumber = FileParserUtils.deriveConciliationKey(chaveUR(REGISTRO_E));
+    SalesSummaryEntity wrongSummaryA = new SalesSummaryEntity();
+    wrongSummaryA.setLiquidValue(new BigDecimal("169.76"));
+    SalesSummaryEntity wrongSummaryB = new SalesSummaryEntity();
+    wrongSummaryB.setLiquidValue(new BigDecimal("158.00"));
+    when(salesSummaryRepository.findByAcquirer_IdAndPvNumberAndRvNumber(acquirer.getId(), 1051583117, rvNumber))
+      .thenReturn(List.of(wrongSummaryA, wrongSummaryB));
+
+    CreditOrderEntity order = service.buildCreditOrder(
+      REGISTRO_E, 1, processedFileWithDate(LocalDate.of(2026, 8, 3)), "02", chaveUR(REGISTRO_E), REGISTRO_D_PARSED
+    );
+
+    assertThat(order.getSalesSummary()).isNull();
   }
 
   @Test

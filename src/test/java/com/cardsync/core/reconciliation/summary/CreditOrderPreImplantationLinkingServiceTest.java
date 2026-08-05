@@ -183,4 +183,57 @@ class CreditOrderPreImplantationLinkingServiceTest {
     assertThat(result.exactMatch()).isZero();
     assertThat(result.pvMismatch()).isZero();
   }
+
+  @Test
+  void disambiguatesByValueWhenSameAcquirerPvAndRvMatchMultipleSummaries() {
+    // Achado real (Cielo): mesmo acquirer+PV+rvNumber pode achar VÁRIAS SalesSummary (rvNumber é
+    // uma chave de lote de liquidação, não por venda). Antes, a mais recente por rvDate "ganhava"
+    // — errado quando não é a dela de fato. Agora só linka quando o valor bate com exatamente uma.
+    UUID acquirerId = UUID.randomUUID();
+    AcquirerEntity acq = acquirer(acquirerId);
+
+    CreditOrderEntity co = orphan(UUID.randomUUID(), acq, 12345, 999);
+    co.setReleaseValue(new BigDecimal("112.98"));
+
+    SalesSummaryEntity older = summary(UUID.randomUUID(), acq, 12345, 999, LocalDate.of(2023, 9, 1));
+    older.setLiquidValue(new BigDecimal("68.19"));
+    SalesSummaryEntity newer = summary(UUID.randomUUID(), acq, 12345, 999, LocalDate.of(2023, 10, 5));
+    newer.setLiquidValue(new BigDecimal("112.98"));
+
+    when(implantationDateProvider.get()).thenReturn(IMPLANTATION_DATE);
+    when(creditOrderRepository.findOrphanedIdsBeforeImplantation(IMPLANTATION_DATE)).thenReturn(List.of(co.getId()));
+    when(creditOrderRepository.findOrphanedByIdsWithCompany(List.of(co.getId()))).thenReturn(List.of(co));
+    when(salesSummaryRepository.findByAcquirerIdInAndRvNumberIn(Set.of(acquirerId), Set.of(999)))
+      .thenReturn(List.of(older, newer));
+
+    CreditOrderPreImplantationLinkingPreviewResult result = service.preview();
+
+    assertThat(result.exactMatch()).isEqualTo(1);
+    assertThat(result.candidates().getFirst().matchedSalesSummaryId()).isEqualTo(newer.getId());
+  }
+
+  @Test
+  void treatsAsNoMatchWhenMultipleSummariesShareKeyAndNoneMatchesByValue() {
+    UUID acquirerId = UUID.randomUUID();
+    AcquirerEntity acq = acquirer(acquirerId);
+
+    CreditOrderEntity co = orphan(UUID.randomUUID(), acq, 12345, 999);
+    co.setReleaseValue(new BigDecimal("25.00"));
+
+    SalesSummaryEntity summaryA = summary(UUID.randomUUID(), acq, 12345, 999, LocalDate.of(2023, 9, 1));
+    summaryA.setLiquidValue(new BigDecimal("68.19"));
+    SalesSummaryEntity summaryB = summary(UUID.randomUUID(), acq, 12345, 999, LocalDate.of(2023, 10, 5));
+    summaryB.setLiquidValue(new BigDecimal("112.98"));
+
+    when(implantationDateProvider.get()).thenReturn(IMPLANTATION_DATE);
+    when(creditOrderRepository.findOrphanedIdsBeforeImplantation(IMPLANTATION_DATE)).thenReturn(List.of(co.getId()));
+    when(creditOrderRepository.findOrphanedByIdsWithCompany(List.of(co.getId()))).thenReturn(List.of(co));
+    when(salesSummaryRepository.findByAcquirerIdInAndRvNumberIn(Set.of(acquirerId), Set.of(999)))
+      .thenReturn(List.of(summaryA, summaryB));
+
+    CreditOrderPreImplantationLinkingPreviewResult result = service.preview();
+
+    assertThat(result.exactMatch()).isZero();
+    assertThat(result.noMatch()).isEqualTo(1);
+  }
 }

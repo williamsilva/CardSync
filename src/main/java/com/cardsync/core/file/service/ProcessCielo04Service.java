@@ -48,6 +48,7 @@ public class ProcessCielo04Service {
   private static final Set<String> SALE_LAUNCH_TYPES = Set.of("01", "02", "03");
   private static final Set<String> ADJUSTMENT_LAUNCH_TYPES = Set.of("04", "05", "08", "10");
   private static final int STATUS_PENDING = 1;
+  private static final BigDecimal VALUE_TOLERANCE = new BigDecimal("0.01");
 
   private final FileLookupService lookupService;
   private final BankingDomicileResolver bankingDomicileResolver;
@@ -228,8 +229,9 @@ public class ProcessCielo04Service {
     order.setPvCentralizer(pvNumber);
     order.setRvNumber(FileParserUtils.deriveConciliationKey(chaveUR));
     Integer parcela = FileParserUtils.extractIntegerLine(line, "17-19", lineNumber);
+    Integer totalInstallments = FileParserUtils.extractIntegerLine(line, "19-21", lineNumber);
     order.setInstallmentNumber(resolveCurrentInstallment(launchType, parcela));
-    order.setInstallmentTotal(FileParserUtils.extractIntegerLine(line, "19-21", lineNumber));
+    order.setInstallmentTotal(resolveTotalInstallments(launchType, totalInstallments));
     order.setReleaseValue(liquidValue);
     order.setGrossRvValue(grossValue);
     order.setDiscountRateValue(discountValue);
@@ -242,7 +244,7 @@ public class ProcessCielo04Service {
     order.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
     order.setSalesSummaryStatus(StatusReconciliationEnum.PENDING);
     order.setReconciliationStatus(STATUS_PENDING);
-    order.setSalesSummary(safeSalesSummary(acquirer, pvNumber, order.getRvNumber()));
+    order.setSalesSummary(safeSalesSummary(acquirer, pvNumber, order.getRvNumber(), order.getReleaseValue()));
     order.setProcessedFile(processedFile);
     order.setAcquirer(acquirer);
     order.setFlag(safeFlag(acquirer, flagCode));
@@ -259,6 +261,18 @@ public class ProcessCielo04Service {
   private Integer resolveCurrentInstallment(String launchType, Integer parcela) {
     if (!"03".equals(launchType)) return 1;
     return parcela == null || parcela <= 0 ? 1 : parcela;
+  }
+
+  /**
+   * Número TOTAL de parcelas (campo "Número total de parcelas") — mesma normalização de
+   * ProcessCielo03Service#resolveTotalInstallments. Achado real: pra venda não parcelada
+   * ("01"/"02"), o arquivo real traz "00" nesse campo (não "01") — sem normalizar, o
+   * installmentTotal salvo virava 0 e a tela de Ordens de Pagamento mostrava "1 / 0" (achado
+   * real, reportado pelo usuário — não fazia sentido nenhuma parcela "de 0").
+   */
+  private Integer resolveTotalInstallments(String launchType, Integer totalInstallments) {
+    if (!"03".equals(launchType)) return 1;
+    return totalInstallments == null || totalInstallments <= 0 ? 1 : totalInstallments;
   }
 
   /**
@@ -364,12 +378,34 @@ public class ProcessCielo04Service {
     }
   }
 
-  /** Espelha ProcessRedeEeFiService.safeSalesSummary — resolve o resumo criado pela venda original no CIELO03. */
-  private SalesSummaryEntity safeSalesSummary(AcquirerEntity acquirer, Integer pvNumber, Integer rvNumber) {
+  /**
+   * Espelha ProcessRedeEeFiService.safeSalesSummary — resolve o resumo criado pela venda original
+   * no CIELO03. Achado real: acquirer+pvNumber+rvNumber pode achar MAIS DE UMA SalesSummary (a
+   * "Chave UR" da Cielo é uma chave de LOTE de liquidação, compartilhada por várias vendas
+   * distintas — mesmo achado de CreditOrderOrphanLinkingService, só que aqui acontece na
+   * importação direta do CIELO04, não num backfill). Pegar "a mais recente por rvDate" (como
+   * antes) colava o CreditOrder na venda errada do mesmo lote — confirmado com dado real: rv
+   * 2135879105 batendo em 3 vendas diferentes (R$169,76/R$158,00/R$480,00), com 4 CreditOrder de
+   * parcelas/totais incompatíveis entre si (1/2, 1/2, 1/4, 2/8) todas coladas numa só. Agora
+   * desambigua por valor (releaseValue↔liquidValue) — só vincula quando exatamente uma bate;
+   * várias ou nenhuma batendo deixa null (fica órfão pra Etapa 6 revisitar depois).
+   */
+  private SalesSummaryEntity safeSalesSummary(AcquirerEntity acquirer, Integer pvNumber, Integer rvNumber, BigDecimal releaseValue) {
     if (acquirer == null || acquirer.getId() == null || pvNumber == null || rvNumber == null) return null;
-    return salesSummaryRepository
-      .findFirstByAcquirer_IdAndPvNumberAndRvNumberOrderByRvDateDesc(acquirer.getId(), pvNumber, rvNumber)
-      .orElse(null);
+
+    List<SalesSummaryEntity> candidates =
+      salesSummaryRepository.findByAcquirer_IdAndPvNumberAndRvNumber(acquirer.getId(), pvNumber, rvNumber);
+    if (candidates.isEmpty()) return null;
+    if (candidates.size() == 1) return candidates.get(0);
+
+    List<SalesSummaryEntity> matches = candidates.stream()
+      .filter(ss -> valuesMatch(ss.getLiquidValue(), releaseValue))
+      .toList();
+    return matches.size() == 1 ? matches.get(0) : null;
+  }
+
+  private boolean valuesMatch(BigDecimal a, BigDecimal b) {
+    return a != null && b != null && a.subtract(b).abs().compareTo(VALUE_TOLERANCE) <= 0;
   }
 
   private FlagEntity safeFlag(AcquirerEntity acquirer, String code) {
