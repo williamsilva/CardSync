@@ -29,19 +29,16 @@ public class FileStorageTask {
   private static final String RUNNING_MESSAGE = "Processamento em execução.";
 
   private final ProcessFileErpService processFileErpService;
-  private final ProcessFileRedeService processFileRedeService;
-  private final ProcessFileCieloService processFileCieloService;
+  private final ProcessFileAcquirerService processFileAcquirerService;
   private final ProcessFileBankService processFileBankService;
   private final FileProcessingExecutionStateRepository executionStateRepository;
 
   private final AtomicBoolean erpRunning = new AtomicBoolean(false);
-  private final AtomicBoolean redeRunning = new AtomicBoolean(false);
-  private final AtomicBoolean cieloRunning = new AtomicBoolean(false);
+  private final AtomicBoolean acquirerRunning = new AtomicBoolean(false);
   private final AtomicBoolean bankRunning = new AtomicBoolean(false);
 
   private final AtomicReference<ExecutionState> erpState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.ERP));
-  private final AtomicReference<ExecutionState> redeState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.REDE));
-  private final AtomicReference<ExecutionState> cieloState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.CIELO));
+  private final AtomicReference<ExecutionState> acquirerState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.ACQUIRER));
   private final AtomicReference<ExecutionState> bankState = new AtomicReference<>(ExecutionState.initial(FileProcessingSystemType.BANK));
 
   @PostConstruct
@@ -72,15 +69,9 @@ public class FileStorageTask {
     }
   }
 
-  public void processFileRede() {
-    if (!tryProcessFileRede(FileProcessingTriggerType.MANUAL)) {
-      throw new IllegalStateException("Processamento Rede já está em execução.");
-    }
-  }
-
-  public void processFileCielo() {
-    if (!tryProcessFileCielo(FileProcessingTriggerType.MANUAL)) {
-      throw new IllegalStateException("Processamento Cielo já está em execução.");
+  public void processFileAcquirer() {
+    if (!tryProcessFileAcquirer(FileProcessingTriggerType.MANUAL)) {
+      throw new IllegalStateException("Processamento de adquirentes já está em execução.");
     }
   }
 
@@ -94,12 +85,8 @@ public class FileStorageTask {
     return execute(FileProcessingSystemType.ERP, trigger, erpRunning, erpState, processFileErpService::processFiles);
   }
 
-  public boolean tryProcessFileRede(FileProcessingTriggerType trigger) {
-    return execute(FileProcessingSystemType.REDE, trigger, redeRunning, redeState, processFileRedeService::processFiles);
-  }
-
-  public boolean tryProcessFileCielo(FileProcessingTriggerType trigger) {
-    return execute(FileProcessingSystemType.CIELO, trigger, cieloRunning, cieloState, processFileCieloService::processFiles);
+  public boolean tryProcessFileAcquirer(FileProcessingTriggerType trigger) {
+    return execute(FileProcessingSystemType.ACQUIRER, trigger, acquirerRunning, acquirerState, processFileAcquirerService::processFiles);
   }
 
   public boolean tryProcessFileBank(FileProcessingTriggerType trigger) {
@@ -110,12 +97,8 @@ public class FileStorageTask {
     return erpState.get().toStatus(erpRunning.get());
   }
 
-  public FileProcessingExecutionStatus redeStatus() {
-    return redeState.get().toStatus(redeRunning.get());
-  }
-
-  public FileProcessingExecutionStatus cieloStatus() {
-    return cieloState.get().toStatus(cieloRunning.get());
+  public FileProcessingExecutionStatus acquirerStatus() {
+    return acquirerState.get().toStatus(acquirerRunning.get());
   }
 
   public FileProcessingExecutionStatus bankStatus() {
@@ -124,8 +107,7 @@ public class FileStorageTask {
 
   public boolean isAnyManualRunning() {
     return isManualRunning(erpRunning, erpState)
-      || isManualRunning(redeRunning, redeState)
-      || isManualRunning(cieloRunning, cieloState)
+      || isManualRunning(acquirerRunning, acquirerState)
       || isManualRunning(bankRunning, bankState);
   }
 
@@ -135,10 +117,9 @@ public class FileStorageTask {
 
   private AtomicReference<ExecutionState> stateRefFor(FileProcessingSystemType system) {
     return switch (system) {
-      case ERP   -> erpState;
-      case REDE  -> redeState;
-      case CIELO -> cieloState;
-      case BANK  -> bankState;
+      case ERP      -> erpState;
+      case ACQUIRER -> acquirerState;
+      case BANK     -> bankState;
     };
   }
 

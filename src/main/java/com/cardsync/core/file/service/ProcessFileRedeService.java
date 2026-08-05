@@ -23,7 +23,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProcessFileRedeService {
+public class ProcessFileRedeService implements AcquirerFileProcessor {
 
   private final MoveFileService moveFileService;
   private final FileHashService fileHashService;

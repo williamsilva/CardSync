@@ -135,8 +135,7 @@ public class FileProcessingController {
   public Map<String, FileProcessingScheduleStatusModel> scheduleStatus() {
     return Map.of(
       "erp", FileProcessingScheduleStatusModel.from(fileStorageTask.erpStatus()),
-      "rede", FileProcessingScheduleStatusModel.from(fileStorageTask.redeStatus()),
-      "cielo", FileProcessingScheduleStatusModel.from(fileStorageTask.cieloStatus()),
+      "acquirer", FileProcessingScheduleStatusModel.from(fileStorageTask.acquirerStatus()),
       "bank", FileProcessingScheduleStatusModel.from(fileStorageTask.bankStatus())
     );
   }
@@ -194,17 +193,10 @@ public class FileProcessingController {
     return erpPendingSaleService.reprocessPending();
   }
 
-  @PostMapping("/rede/process")
+  @PostMapping("/acquirer/process")
   @CheckSecurity.FileProcessing.CanProcess
-  public ResponseEntity<Void> processRede() {
-    fileStorageTask.processFileRede();
-    return ResponseEntity.accepted().build();
-  }
-
-  @PostMapping("/cielo/process")
-  @CheckSecurity.FileProcessing.CanProcess
-  public ResponseEntity<Void> processCielo() {
-    fileStorageTask.processFileCielo();
+  public ResponseEntity<Void> processAcquirer() {
+    fileStorageTask.processFileAcquirer();
     return ResponseEntity.accepted().build();
   }
 

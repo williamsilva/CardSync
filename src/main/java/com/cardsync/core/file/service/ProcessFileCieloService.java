@@ -28,7 +28,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ProcessFileCieloService {
+public class ProcessFileCieloService implements AcquirerFileProcessor {
 
   private static final Charset CIELO_CHARSET = Charset.forName("windows-1252");
 
@@ -69,7 +69,13 @@ public class ProcessFileCieloService {
             continue;
           }
 
-          String contentHash = fileHashService.sha256(file);
+          // Hash do arquivo mascarando, no Header, a data de geração (11-19) e a sequência do
+          // arquivo (35-42) — a Cielo reenvia o mesmo dia com esses 2 campos diferentes mas linhas
+          // de venda idênticas; hash do arquivo inteiro não pega esse reenvio como duplicado
+          // (achado real, ver FileHashService). Mascarar só esses 2 campos (em vez do Header
+          // inteiro) preserva a unicidade de dias sem movimento (Header+Trailer só, trailer
+          // genérico idêntico entre dias — colidiriam se o Header inteiro fosse ignorado).
+          String contentHash = fileHashService.sha256MaskingFirstLineRanges(file, 11, 19, 35, 42);
           var originalProcessedFile = processedFileRepository.findFirstByContentHash(contentHash);
           if (originalProcessedFile.isPresent()) {
             log.warn(
