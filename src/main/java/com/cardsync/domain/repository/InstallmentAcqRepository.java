@@ -22,7 +22,7 @@ public interface InstallmentAcqRepository extends JpaRepository<InstallmentAcqEn
   @Query("""
     select ia from InstallmentAcqEntity ia
     join ia.transaction tx
-    where tx.rvNumber = :rvNumber
+    where coalesce(ia.rvNumber, tx.rvNumber) = :rvNumber
       and tx.acquirer.id = :acquirerId
       and ia.installment = :installmentNumber
       and (:reprocess = true or ia.releaseBank is null)
@@ -40,7 +40,7 @@ public interface InstallmentAcqRepository extends JpaRepository<InstallmentAcqEn
     select ia from InstallmentAcqEntity ia
     join fetch ia.transaction tx
     where tx.acquirer.id = :acquirerId
-      and tx.rvNumber in :rvNumbers
+      and coalesce(ia.rvNumber, tx.rvNumber) in :rvNumbers
       and (:reprocess = true or ia.releaseBank is null)
   """)
   List<InstallmentAcqEntity> findByAcquirerIdAndRvNumbers(

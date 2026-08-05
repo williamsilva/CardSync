@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +38,14 @@ class ProcessCielo03ServiceTest {
   // Segmento E - venda parcelada (Tipo de lançamento "03"), parcela 1 de 2.
   private static final String DETAIL_PARCELADA =
     "E105158311700200201024503590301027058000191360338010001092026-04-06002720021051583117360338010001090000000000000000000           2603060310490056302       012NNN3NNN5346968665010002000000000010515831175GGU4BSSRE         CLOUD108024003150000000315+0000000016225+0000000008113+0000000007857-0000000000256+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+00000000000001009450136033801000109002606570505039259606570505039259               0071170183003003000000036060320260603202606032026060320264260306                         06042026105158311700NNN03418639000000000000000024515155502596065549573060532N8100000000000000";
+
+  // Segmento E - venda parcelada (Tipo de lançamento "03"), MESMA venda acima, parcela 2 de 2 —
+  // mesma Chave UR/NSU/autorização de DETAIL_PARCELADA (confirmado com o arquivo real completo,
+  // CIELO03D_1051583117_20260307_20260307_20260307.TXT.txt), só a parcela (02) e o valor da
+  // parcela (81,12 em vez de 81,13) mudam. É o par real que expôs o bug de duplicidade: antes da
+  // correção, essas 2 linhas geravam 2 TransactionAcqEntity pra uma venda só (ver buildTransaction(List, ...)).
+  private static final String DETAIL_PARCELADA_PARCELA_2 =
+    "E105158311700200202024503590301027058000191360338010001092026-05-06002720021051583117360338010001090000000000000000000           2603060310490056302       012NNN3NNN5346968665010002000000000010515831175GGU4BSSRE         CLOUD108024003150000000315+0000000016225+0000000008112+0000000007856-0000000000256+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+0000000000000+00000000000001009450136033801000109002606570505039259606570505039259               0071170183003003000000036060320260603202606032026060320264260306                         06052026105158311700NNN03418639000000000000000024515155502596065549573060532N8100000000000000";
 
   // Segmento E - Ajuste a débito (Tipo de lançamento "04"), Código de ajuste 0251 (Tabela IX:
   // multa da bandeira por retentativa). PV 1051583117, arquivo real 2025-08-29. Sem autorização
@@ -113,21 +122,62 @@ class ProcessCielo03ServiceTest {
   }
 
   @Test
-  void mapsInstallmentSaleFieldsUsingPerInstallmentGrossValue() {
+  void mapsInstallmentSaleGrossValueFromTheDedicatedTotalSaleField() {
     stubLookups(1051583117, "002", "Mastercard");
     TransactionAcqEntity tx = service.buildTransaction(DETAIL_PARCELADA, 1, new ProcessedFileEntity(), "03");
 
-    // Valor bruto da PARCELA (81,13), não o valor total da venda (162,25, posições 248-260,
-    // que o layout também traz mas não tem setter dedicado nesta fase).
-    assertThat(tx.getGrossValue()).isEqualByComparingTo(new BigDecimal("81.13"));
-    assertThat(tx.getLiquidValue()).isEqualByComparingTo(new BigDecimal("78.57"));
-    assertThat(tx.getDiscountValue()).isEqualByComparingTo(new BigDecimal("2.56"));
+    // grossValue vem do campo dedicado de TOTAL da venda (posição 246-260, 162,25) — não do valor
+    // desta parcela isolada (81,13, posição 260-274, que só entra no InstallmentAcqEntity, ver
+    // buildsInstallmentMirroringTransactionValues). Chamado aqui com 1 linha só (conveniência de
+    // teste); o agrupamento completo das 2 parcelas reais está em
+    // groupsInstallmentLinesOfTheSameSaleIntoOneTransactionWithSummedLiquidAndDiscount.
+    assertThat(tx.getGrossValue()).isEqualByComparingTo(new BigDecimal("162.25"));
     // installment = TOTAL de parcelas (02), não a parcela atual (01) — mesma convenção do Rede
     // (ProcessRedeEeVcService: installment do TransactionAcqEntity é o total da venda). A parcela
     // atual só é usada no InstallmentAcqEntity, ver buildsCurrentInstallmentSeparatelyFromTotal.
     assertThat(tx.getInstallment()).isEqualTo(2);
     // modality usa o TOTAL de parcelas (02) pra escalonar — 2-6 parcelas.
     assertThat(tx.getModality()).isEqualTo(ModalityEnum.INSTALLMENT_CREDIT_2_6.getCode());
+  }
+
+  @Test
+  void groupsInstallmentLinesOfTheSameSaleIntoOneTransactionWithSummedLiquidAndDiscount() {
+    stubLookups(1051583117, "002", "Mastercard");
+    List<ProcessCielo03Service.SaleLine> group = List.of(
+      new ProcessCielo03Service.SaleLine(DETAIL_PARCELADA, 1),
+      new ProcessCielo03Service.SaleLine(DETAIL_PARCELADA_PARCELA_2, 2)
+    );
+
+    TransactionAcqEntity tx = service.buildTransaction(group, new ProcessedFileEntity(), "03");
+
+    // Bug real corrigido: essas 2 linhas (mesmo NSU/autorização/data — parcela 1/2 e 2/2 de uma
+    // venda real de R$162,25, ver processFile#saleGroupsByIdentity) geravam 2 vendas duplicadas na
+    // tela de Vendas adquirente. Agora virem 1 só: grossValue = campo dedicado de total (idêntico
+    // nas 2 linhas); liquid/discount = SOMA das 2 parcelas (não existe campo de total dedicado pra
+    // esses dois).
+    assertThat(tx.getGrossValue()).isEqualByComparingTo(new BigDecimal("162.25"));
+    assertThat(tx.getLiquidValue()).isEqualByComparingTo(new BigDecimal("157.13"));
+    assertThat(tx.getDiscountValue()).isEqualByComparingTo(new BigDecimal("5.12"));
+    assertThat(tx.getInstallment()).isEqualTo(2);
+
+    InstallmentAcqEntity installment1 = service.buildInstallment(tx, DETAIL_PARCELADA, 1, "03");
+    InstallmentAcqEntity installment2 = service.buildInstallment(tx, DETAIL_PARCELADA_PARCELA_2, 2, "03");
+
+    // Cada parcela mantém SEU PRÓPRIO valor (não o total agregado em tx) — é o que
+    // BankReconciliationService casa, por valor, contra a ordem de crédito da parcela específica.
+    assertThat(installment1.getInstallment()).isEqualTo(1);
+    assertThat(installment1.getGrossValue()).isEqualByComparingTo(new BigDecimal("81.13"));
+    assertThat(installment1.getLiquidValue()).isEqualByComparingTo(new BigDecimal("78.57"));
+    assertThat(installment1.getDiscountValue()).isEqualByComparingTo(new BigDecimal("2.56"));
+    assertThat(installment2.getInstallment()).isEqualTo(2);
+    assertThat(installment2.getGrossValue()).isEqualByComparingTo(new BigDecimal("81.12"));
+    assertThat(installment2.getLiquidValue()).isEqualByComparingTo(new BigDecimal("78.56"));
+    assertThat(installment2.getDiscountValue()).isEqualByComparingTo(new BigDecimal("2.56"));
+
+    // Achado real que motivou InstallmentAcqEntity.rvNumber: a Chave UR (rvNumber) É DIFERENTE
+    // entre as 2 parcelas dessa mesma venda (embute a data prevista de liquidação de cada uma) —
+    // por isso cada parcela precisa guardar o PRÓPRIO rvNumber, não pode reusar o de tx.
+    assertThat(installment1.getRvNumber()).isNotNull().isNotEqualTo(installment2.getRvNumber());
   }
 
   @Test

@@ -28,6 +28,16 @@ public class InstallmentAcqEntity extends AuditableEntityBase {
   private Integer installmentStatus;
   private Integer reconciliationBankLine;
 
+  /**
+   * rvNumber DESTA parcela — nulo pra Rede (que não precisa: uma venda Rede tem 1 chave só,
+   * já em {@code transaction.rvNumber}). Cielo seta este campo porque cada parcela de uma venda
+   * parcelada tem sua própria "Chave UR" (achado real: 2 linhas da mesma venda em 2x, mesma
+   * autorização/NSU/data, mas Chave UR diferente por parcela). Usado com prioridade sobre
+   * {@code transaction.getRvNumber()} no matching de conciliação bancária — ver
+   * BankReconciliationService.propagateCreditOrdersToInstallments.
+   */
+  private Integer rvNumber;
+
   private LocalDate paymentDate;
   private LocalDate cancellationDate;
   private LocalDate expectedPaymentDate;

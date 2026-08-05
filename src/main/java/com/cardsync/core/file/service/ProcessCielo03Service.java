@@ -69,6 +69,14 @@ public class ProcessCielo03Service {
       List<SalesSummaryEntity> summaries = new ArrayList<>();
       List<AdjustmentEntity> adjustments = new ArrayList<>();
       Map<String, Integer> launchTypeCounts = new TreeMap<>();
+      // Chave "nsu|autorizacao|dataAutorizacao|launchType" -> todas as linhas E dessa mesma venda.
+      // Uma venda parcelada (launchType "03") aparece como UMA linha por parcela — mas, diferente
+      // do que parecia inicialmente, a "Chave UR" NÃO é estável entre parcelas da mesma venda (achado
+      // real: 2 linhas com mesmo NSU/autorização/data, Chave UR diferente por parcela — a Chave UR é
+      // por PARCELA/UR, não por venda). NSU+autorização+data da autorização É estável (mesmo padrão
+      // que a própria Cielo usa pra identificar "mesma venda" — o swipe do cartão só acontece uma
+      // vez). Ver buildTransaction(List, ...). launchType "01"/"02" sempre forma um grupo de 1 linha.
+      Map<String, List<SaleLine>> saleGroupsByIdentity = new LinkedHashMap<>();
       int recognized = 0;
       int ignored = 0;
       int warnings = 0;
@@ -103,12 +111,13 @@ public class ProcessCielo03Service {
                 "CIELO03_UNSUPPORTED_LAUNCH_TYPE", "Tipo de lançamento Cielo ainda não suportado: " + launchType, line));
               continue;
             }
-            TransactionAcqEntity tx = buildTransaction(line, lineNumber, processedFile, launchType);
-            SalesSummaryEntity summary = buildSalesSummary(tx);
-            tx.setSalesSummary(summary);
-            transactions.add(tx);
-            installments.add(buildInstallment(tx, line, lineNumber, launchType));
-            summaries.add(summary);
+            String saleIdentityKey = trim(FileParserUtils.extractStringLine(line, "175-181", lineNumber))
+              + "|" + trim(FileParserUtils.extractStringLine(line, "21-27", lineNumber))
+              + "|" + trim(FileParserUtils.extractStringLine(line, "565-573", lineNumber))
+              + "|" + launchType;
+            saleGroupsByIdentity
+              .computeIfAbsent(saleIdentityKey, k -> new ArrayList<>())
+              .add(new SaleLine(line, lineNumber));
           }
           default -> {
             ignored++;
@@ -121,6 +130,18 @@ public class ProcessCielo03Service {
 
       if (processedFile.getOriginFile() == null) {
         throw new IllegalStateException("Header (registro 0) não encontrado: " + file.getFileName());
+      }
+
+      for (List<SaleLine> group : saleGroupsByIdentity.values()) {
+        String launchType = trim(FileParserUtils.extractStringLine(group.get(0).line(), "27-29", group.get(0).lineNumber()));
+        TransactionAcqEntity tx = buildTransaction(group, processedFile, launchType);
+        SalesSummaryEntity summary = buildSalesSummary(tx);
+        tx.setSalesSummary(summary);
+        transactions.add(tx);
+        summaries.add(summary);
+        for (SaleLine saleLine : group) {
+          installments.add(buildInstallment(tx, saleLine.line(), saleLine.lineNumber(), launchType));
+        }
       }
 
       processedFile.setProcessedLines(recognized);
@@ -178,16 +199,49 @@ public class ProcessCielo03Service {
     processedFile.setTotalLines(totalLines);
   }
 
-  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  /**
+   * Uma linha de venda ("E") do arquivo, com o número da linha original (pra rastreio/erro).
+   * Visibilidade de pacote pra permitir montar grupos em teste unitário sem contexto Spring.
+   */
+  record SaleLine(String line, int lineNumber) {}
+
+  /** Convenience pra uma venda de 1 linha só (débito/crédito à vista, ou teste unitário direto). */
   TransactionAcqEntity buildTransaction(String line, int lineNumber, ProcessedFileEntity processedFile, String launchType) {
+    return buildTransaction(List.of(new SaleLine(line, lineNumber)), processedFile, launchType);
+  }
+
+  /**
+   * Uma venda parcelada (launchType "03") chega como UMA linha "E" por parcela, todas com o mesmo
+   * NSU/autorização/data da autorização — confirmado com dado real (arquivo
+   * CIELO03D_1051583117_20251123..., venda de autorização 279060 em 6x: 6 linhas, só a parcela e o
+   * valor da parcela variando). A "Chave UR" NÃO serve de chave de agrupamento aqui — é por
+   * PARCELA/UR, não por venda (achado real: 2 linhas de uma venda em 2x com Chave UR diferente por
+   * parcela, embutindo a data prevista de liquidação daquela parcela específica); ver
+   * {@code saleGroupsByIdentity} em processFile e {@link #buildInstallment} (guarda o rvNumber da
+   * PRÓPRIA parcela, não o de {@code tx}).
+   *
+   * Antes desta correção, cada linha virava uma {@link TransactionAcqEntity} independente — N
+   * "vendas" duplicadas pra uma venda parcelada só (bug real reportado pelo usuário na tela de
+   * Vendas adquirente). Agora o grupo inteiro (mesmo NSU+autorização+data) vira UMA transação:
+   * grossValue vem do campo dedicado de TOTAL da venda (posição 246-260, presente e idêntico em
+   * toda linha do grupo — confirmado com dado real: 116000 = R$1.160,00, exatamente a soma das 6
+   * parcelas), liquidValue/discountValue são a SOMA das linhas do grupo (não há campo de total
+   * dedicado pra esses dois). Cada linha do grupo ainda gera seu próprio
+   * {@link InstallmentAcqEntity} via buildInstallment, com o valor DA PARCELA (não o total).
+   * Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring.
+   */
+  TransactionAcqEntity buildTransaction(List<SaleLine> group, ProcessedFileEntity processedFile, String launchType) {
+    String line = group.get(0).line();
+    int lineNumber = group.get(0).lineNumber();
+
     Integer pvNumber = FileParserUtils.extractIntegerLine(line, "1-11", lineNumber);
     AcquirerEntity acquirer = safeAcquirer();
     EstablishmentEntity establishment = safeEstablishment(pvNumber);
     String flagCode = trim(FileParserUtils.extractStringLine(line, "11-14", lineNumber));
 
-    BigDecimal grossValue = FileParserUtils.extractSignedMoneyLine(line, "260-274", lineNumber);
-    BigDecimal liquidValue = FileParserUtils.extractSignedMoneyLine(line, "274-288", lineNumber);
-    BigDecimal discountValue = FileParserUtils.extractSignedMoneyLine(line, "288-302", lineNumber).abs();
+    BigDecimal grossValue = FileParserUtils.extractSignedMoneyLine(line, "246-260", lineNumber);
+    BigDecimal liquidValue = sumSignedMoney(group, "274-288");
+    BigDecimal discountValue = sumSignedMoney(group, "288-302").abs();
     Integer totalInstallments = FileParserUtils.extractIntegerLine(line, "19-21", lineNumber);
     String chaveUR = trim(FileParserUtils.extractStringLine(line, "29-129", lineNumber));
 
@@ -233,23 +287,46 @@ public class ProcessCielo03Service {
    * {@code tx.getInstallment()} — este último guarda o TOTAL de parcelas da venda, na mesma
    * convenção do Rede (ProcessRedeEeVcService: installment do TransactionAcqEntity = total, só o
    * InstallmentAcqEntity é por parcela), o que ContractedAcquirerRateLookupService/tela de vendas
-   * ACQ esperam pra bater com a bandeira/modalidade certa. Recalculado a partir da linha em vez de
-   * derivado de tx, pra não reintroduzir o acoplamento que causava essa confusão.
+   * ACQ esperam pra bater com a bandeira/modalidade certa.
+   *
+   * grossValue/liquidValue/discountValue vêm SEMPRE da própria linha (posições 260-274/274-288/
+   * 288-302, o valor DESTA parcela) — não de {@code tx}, que agora (numa venda parcelada agrupada,
+   * ver buildTransaction(List, ...)) guarda o TOTAL da venda, não o valor de uma parcela específica.
+   *
+   * rvNumber TAMBÉM vem SEMPRE da própria linha (Chave UR desta parcela, posição 29-129) — achado
+   * real: a Chave UR NÃO é igual entre parcelas da mesma venda (é por UR/parcela, não por venda),
+   * então cada parcela precisa guardar o SEU rvNumber pra BankReconciliationService achar a ordem
+   * de crédito certa quando o CIELO04 liquidar essa parcela específica (ver
+   * InstallmentAcqEntity.rvNumber e propagateCreditOrdersToInstallments).
    * Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring.
    */
   InstallmentAcqEntity buildInstallment(TransactionAcqEntity tx, String line, int lineNumber, String launchType) {
     Integer parcela = FileParserUtils.extractIntegerLine(line, "17-19", lineNumber);
+    BigDecimal grossValue = FileParserUtils.extractSignedMoneyLine(line, "260-274", lineNumber);
+    BigDecimal liquidValue = FileParserUtils.extractSignedMoneyLine(line, "274-288", lineNumber);
+    BigDecimal discountValue = FileParserUtils.extractSignedMoneyLine(line, "288-302", lineNumber).abs();
+    String chaveUR = trim(FileParserUtils.extractStringLine(line, "29-129", lineNumber));
 
     InstallmentAcqEntity installment = new InstallmentAcqEntity();
     installment.setTransaction(tx);
     installment.setInstallment(resolveCurrentInstallment(launchType, parcela));
-    installment.setGrossValue(zero(tx.getGrossValue()));
-    installment.setDiscountValue(zero(tx.getDiscountValue()));
-    installment.setLiquidValue(zero(tx.getLiquidValue()));
+    installment.setRvNumber(FileParserUtils.deriveConciliationKey(chaveUR));
+    installment.setGrossValue(grossValue);
+    installment.setDiscountValue(discountValue);
+    installment.setLiquidValue(liquidValue);
     installment.setAdjustmentValue(BigDecimal.ZERO);
     installment.setStatusPaymentBank(StatusPaymentBankEnum.PENDING.getCode());
     installment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
     return installment;
+  }
+
+  /** Soma um campo de dinheiro assinado (mesmo range em toda linha do grupo) através de um grupo de linhas da mesma venda. */
+  private BigDecimal sumSignedMoney(List<SaleLine> group, String range) {
+    BigDecimal sum = BigDecimal.ZERO;
+    for (SaleLine saleLine : group) {
+      sum = sum.add(FileParserUtils.extractSignedMoneyLine(saleLine.line(), range, saleLine.lineNumber()));
+    }
+    return sum;
   }
 
   /**
