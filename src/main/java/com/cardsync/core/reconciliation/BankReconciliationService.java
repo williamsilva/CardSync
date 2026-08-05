@@ -949,7 +949,9 @@ public class BankReconciliationService {
         .findByAcquirerIdAndRvNumbers(acquirerId, rvToInstNum.keySet(), reprocess);
       for (InstallmentAcqEntity ia : batch) {
         if (ia.getTransaction() == null) continue;
-        Integer rv = ia.getTransaction().getRvNumber();
+        // Prioriza o rvNumber DA PARCELA (Cielo: cada parcela tem sua própria Chave UR) —
+        // só cai pro rvNumber da transação quando a parcela não tem o próprio (caso do Rede).
+        Integer rv = ia.getRvNumber() != null ? ia.getRvNumber() : ia.getTransaction().getRvNumber();
         Integer expectedInst = rv != null ? rvToInstNum.get(rv) : null;
         if (expectedInst != null && expectedInst.equals(ia.getInstallment())) {
           allInstallments.add(ia);
@@ -1059,16 +1061,41 @@ public class BankReconciliationService {
   }
 
   /**
-   * Recalcula statusPaymentBank do resumo a partir de TODAS as transações ADQ ligadas a ele —
-   * antes, este método copiava direto o status de UMA única transação (a última processada no
-   * lote) para o resumo inteiro, sem olhar as demais. Num resumo parcelado (várias
+   * Recalcula statusPaymentBank/creditOrderStatus do resumo a partir de TODAS as transações ADQ
+   * ligadas a ele — antes, este método copiava direto o status de UMA única transação (a última
+   * processada no lote) para o resumo inteiro, sem olhar as demais. Num resumo parcelado (várias
    * TransactionAcqEntity, uma por parcela) isso deixava o status do resumo dependente da ordem
    * de processamento, e uma transação com liquidação parcial (DIVERGENT — algumas parcelas já
    * bateram no banco, outras ainda não, o normal enquanto um parcelamento ainda está sendo pago)
    * virava "Divergente" no resumo inteiro mesmo quando as demais transações já estavam PAID.
    * Mesmo padrão de {@link #updateSalesSummaryFromCreditOrder}/{@link #recomputeSalesSummariesFromCreditOrderIds},
    * mas com uma única query para todos os resumos afetados em vez de uma por resumo.
+   *
+   * creditOrderStatus também é setado aqui (achado real, Cielo): este caminho (via
+   * InstallmentAcqEntity → TransactionAcqEntity → SalesSummaryEntity) é o único que sempre roda
+   * quando uma parcela é paga, independente de {@link #recomputeSalesSummariesFromCreditOrderIds}
+   * conseguir vincular a CreditOrderEntity ao SalesSummaryEntity — vínculo que depende de
+   * rvNumber bater exatamente entre os dois lados (Etapa 4), e que falha sistematicamente pra
+   * Cielo porque a "Chave UR" não é única por venda (ver feedback_cielo_chave_ur_not_unique).
+   * Sem isto, "Ordem Crédito" ficava presa em PENDING pra sempre mesmo com o pagamento
+   * (statusPaymentBank) já confirmado — a tela de Resumo de Vendas mostrava as duas colunas
+   * incoerentes entre si.
    */
+  /**
+   * Reparo pontual: recalcula creditOrderStatus/statusPaymentBank de todo SalesSummary com pelo
+   * menos uma transação PAID/DIVERGENT — usado uma vez para corrigir o histórico já processado
+   * antes da correção de {@link #recomputeSalesSummariesFromTransactionIds} (achado real Cielo,
+   * ver classe). Idempotente: rodar de novo sobre dados já corretos não muda nada.
+   */
+  @Transactional
+  public int recomputeAllSalesSummariesFromTransactions() {
+    Set<UUID> summaryIds = transactionAcqRepository.findSalesSummaryIdsByStatusPaymentBankIn(
+      List.of(StatusPaymentBankEnum.PAID.getCode(), StatusPaymentBankEnum.DIVERGENT.getCode())
+    );
+    recomputeSalesSummariesFromTransactionIds(summaryIds);
+    return summaryIds.size();
+  }
+
   void recomputeSalesSummariesFromTransactionIds(Set<UUID> salesSummaryIds) {
     if (salesSummaryIds.isEmpty()) return;
 
@@ -1090,10 +1117,13 @@ public class BankReconciliationService {
 
       if (allPaid) {
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+        summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
       } else if (anyPaid) {
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PARTIALLY_PAID);
+        summary.setCreditOrderStatus(StatusReconciliationEnum.PARTIALLY_RECONCILED);
       } else {
         summary.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+        summary.setCreditOrderStatus(StatusReconciliationEnum.PENDING);
       }
     }
   }

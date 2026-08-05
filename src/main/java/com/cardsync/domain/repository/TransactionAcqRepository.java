@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -62,6 +63,17 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
     where t.salesSummary.id in :salesSummaryIds
   """)
   List<TransactionAcqEntity> findBySalesSummary_IdIn(@Param("salesSummaryIds") Collection<UUID> salesSummaryIds);
+
+  /**
+   * Ids de SalesSummary com pelo menos uma transação PAID/DIVERGENT — candidatos a ter
+   * creditOrderStatus desatualizado (ver BankReconciliationService#recomputeAllSalesSummariesFromTransactions).
+   */
+  @Query("""
+    select distinct t.salesSummary.id from TransactionAcqEntity t
+    where t.salesSummary is not null
+      and t.statusPaymentBank in :statusCodes
+  """)
+  Set<UUID> findSalesSummaryIdsByStatusPaymentBankIn(@Param("statusCodes") Collection<Integer> statusCodes);
 
   Optional<TransactionAcqEntity> findFirstBySalesSummary_IdAndNsuAndAuthorizationOrderBySaleDateDesc(
     UUID salesSummaryId,

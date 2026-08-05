@@ -4,6 +4,7 @@ import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
+import com.cardsync.domain.model.enums.StatusReconciliationEnum;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +31,12 @@ import static org.mockito.Mockito.when;
  * lote em produção, cada uma forçando auto-flush do Hibernate. Agora updateStatusTransactionBatched
  * só coleta o id do resumo; quem agrega (1 única query em lote, ver recomputeSalesSummariesFromTransactionIds)
  * é o chamador, no final do laço inteiro.
+ *
+ * Também cobre o achado real da Cielo: recomputeSalesSummariesFromTransactionIds passou a setar
+ * creditOrderStatus junto com statusPaymentBank — antes só o método irmão (baseado em
+ * CreditOrderEntity vinculada) fazia isso, e esse vínculo falha sistematicamente pra Cielo (Chave
+ * UR não é única por venda), deixando "Ordem Crédito" preso em PENDING mesmo com o pagamento já
+ * confirmado (tela de Resumo de Vendas mostrando as 2 colunas incoerentes entre si).
  */
 class BankReconciliationServiceSalesSummaryAggregationTest {
 
@@ -89,6 +96,7 @@ class BankReconciliationServiceSalesSummaryAggregationTest {
     // Antes da correção, isto seria PAID (copiado direto de paidTransaction) — errado, pois
     // pendingSibling ainda não bateu no banco.
     assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PARTIALLY_PAID);
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PARTIALLY_RECONCILED);
   }
 
   @Test
@@ -117,6 +125,7 @@ class BankReconciliationServiceSalesSummaryAggregationTest {
     // "Divergente" no nível da transação é normal (parcelamento ainda sendo pago aos poucos),
     // não um erro — o resumo deve refletir isso como pagamento parcial, não como divergência.
     assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PARTIALLY_PAID);
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PARTIALLY_RECONCILED);
   }
 
   @Test
@@ -145,5 +154,30 @@ class BankReconciliationServiceSalesSummaryAggregationTest {
     service.recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIdsFromTransactions);
 
     assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PAID);
+    // Achado real Cielo: creditOrderStatus precisa acompanhar statusPaymentBank aqui, já que o
+    // vínculo CreditOrder↔SalesSummary (que faria o método irmão setar isso) falha pra Cielo.
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.RECONCILED);
+  }
+
+  @Test
+  void noSiblingPaidResetsCreditOrderStatusBackToPending() {
+    UUID summaryId = UUID.randomUUID();
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(summaryId);
+    summary.setCreditOrderStatus(StatusReconciliationEnum.RECONCILED);
+    summary.setStatusPaymentBank(StatusPaymentBankEnum.PAID);
+
+    TransactionAcqEntity transaction = new TransactionAcqEntity();
+    transaction.setId(UUID.randomUUID());
+    transaction.setSalesSummary(summary);
+    transaction.setStatusPaymentBank(StatusPaymentBankEnum.PENDING);
+
+    when(transactionAcqRepository.findBySalesSummary_IdIn(Set.of(summaryId)))
+      .thenReturn(List.of(transaction));
+
+    service.recomputeSalesSummariesFromTransactionIds(Set.of(summaryId));
+
+    assertThat(summary.getStatusPaymentBank()).isEqualTo(StatusPaymentBankEnum.PENDING);
+    assertThat(summary.getCreditOrderStatus()).isEqualTo(StatusReconciliationEnum.PENDING);
   }
 }
