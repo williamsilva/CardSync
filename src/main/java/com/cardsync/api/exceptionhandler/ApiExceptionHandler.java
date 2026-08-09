@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -181,6 +182,30 @@ public class ApiExceptionHandler implements EnvironmentAware {
       "ACCESS_DENIED",
       msg("error.ACCESS_DENIED", locale),
       ex.getMessage() != null ? ex.getMessage() : "Access denied",
+      List.of()
+    );
+  }
+
+  /**
+   * BffAccessTokenService.getValidAccessTokenOrRevoke lança isso quando o authorized client
+   * OAuth2 (access/refresh token) da sessão não é mais válido (ex.: sessão sobreviveu a um
+   * restart do backend via spring-session-jdbc, mas o authorized client em si não) - sem esse
+   * handler, cairia no catch-all genérico abaixo como 500 "erro interno", deixando o usuário sem
+   * saber que só precisa logar de novo. Mapeado pra 401 de propósito: authRedirectInterceptor no
+   * frontend já trata qualquer 401 de /bff/**\/api/** disparando um novo login automaticamente.
+   */
+  @ExceptionHandler(OAuth2AuthorizationException.class)
+  public ResponseEntity<ErrorResponse> handleOAuth2AuthorizationRequired(
+    OAuth2AuthorizationException ex, HttpServletRequest req) {
+    Locale locale = req.getLocale();
+
+    return build(
+      req,
+      HttpStatus.UNAUTHORIZED,
+      "SESSION_EXPIRED",
+      "SESSION_EXPIRED",
+      msg("error.SESSION_EXPIRED", locale),
+      ex.getMessage(),
       List.of()
     );
   }
