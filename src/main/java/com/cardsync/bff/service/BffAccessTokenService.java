@@ -97,9 +97,11 @@ public class BffAccessTokenService {
       session.invalidate();
     }
 
-    // Limpa cookies básicos (DEV defaults) - nome do cookie de sessão é "SESSION"
-    // (default do Spring Session com store-type: jdbc), não "JSESSIONID"
-    response.addHeader("Set-Cookie", "SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
-    response.addHeader("Set-Cookie", "XSRF-TOKEN=; Path=/; Max-Age=0; SameSite=Lax");
+    // Limpa cookies básicos (DEV defaults) - nome do cookie de sessão é "CARDSYNC_SESSION" (ver
+    // server.servlet.session.cookie.name em application.yml - renomeado do default "SESSION"
+    // do Spring Session pra não colidir com o cookie de sessão de outros apps Nimbus no mesmo
+    // domínio "localhost"), não "JSESSIONID"
+    response.addHeader("Set-Cookie", "CARDSYNC_SESSION=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax");
+    response.addHeader("Set-Cookie", "CARDSYNC-XSRF-TOKEN=; Path=/; Max-Age=0; SameSite=Lax");
   }
 }

@@ -262,10 +262,12 @@ public class SecurityConfig implements EnvironmentAware {
           // Cookie de sessão antigo/inválido (ex: sessão expirou ou a tabela de sessão foi
           // recriada) - precisa limpar o cookie antes de redirecionar, senão o navegador
           // reenvia o mesmo cookie inválido e cai num loop de redirecionamento em "/bff/login".
-          // O nome do cookie é "SESSION" (default do Spring Session com store-type: jdbc),
-          // não "JSESSIONID" (esse é o nome do cookie de sessão nativo do servlet container,
-          // que não é usado aqui) - limpar o nome errado deixava o cookie real intacto.
-          res.addHeader("Set-Cookie", CookieBuilder.clearCookie("SESSION", cookieProps, true, false));
+          // O nome do cookie é "CARDSYNC_SESSION" (ver server.servlet.session.cookie.name em
+          // application.yml, renomeado do default "SESSION" do Spring Session pra não colidir
+          // com o cookie de sessão de outros apps Nimbus no mesmo domínio "localhost"), não
+          // "JSESSIONID" (esse é o nome do cookie de sessão nativo do servlet container, que
+          // não é usado aqui) - limpar o nome errado deixava o cookie real intacto.
+          res.addHeader("Set-Cookie", CookieBuilder.clearCookie("CARDSYNC_SESSION", cookieProps, true, false));
           res.sendRedirect("/bff/login");
         }
       })
@@ -309,7 +311,9 @@ public class SecurityConfig implements EnvironmentAware {
 
   private CookieCsrfTokenRepository csrfRepo() {
     CookieCsrfTokenRepository repo = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    repo.setCookieName("XSRF-TOKEN");
+    // Nome distinto do padrão "XSRF-TOKEN" - mesma colisão de cookie entre apps Nimbus no
+    // domínio "localhost" explicada em application.yml (server.servlet.session.cookie.name).
+    repo.setCookieName("CARDSYNC-XSRF-TOKEN");
     repo.setHeaderName("X-XSRF-TOKEN");
     repo.setCookiePath("/");
 

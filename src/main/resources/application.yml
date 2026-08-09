@@ -42,6 +42,13 @@ server:
       force: true
       charset: UTF-8
       enabled: true
+    session:
+      cookie:
+        # Nome distinto do padrão "SESSION" - senão colide com o cookie de sessão do
+        # NimbusFlowServer (mesmo nome, mesmo domínio "localhost", só porta diferente - cookies
+        # HTTP não diferenciam por porta) e cada app sobrescreve o cookie do outro no navegador,
+        # deslogando os dois.
+        name: CARDSYNC_SESSION
 
 cardsync:
   app:
