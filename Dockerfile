@@ -14,5 +14,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/*.jar app.jar
-EXPOSE 8080
+# server.port real é 9091 (ver application.yml/application-dev.yml, PORT env var) - 8080 aqui era
+# só o default do Spring Boot, nunca batia com o que a aplicação de fato escuta.
+EXPOSE 9091
 ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /app/app.jar"]
