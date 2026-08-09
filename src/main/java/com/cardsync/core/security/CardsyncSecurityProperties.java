@@ -20,9 +20,23 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "cardsync.security")
 public class CardsyncSecurityProperties {
 
-  /** Issuer do NimbusAuth (usado para validar o JWT e para resolver o JWKS remoto). */
+  /** Issuer do NimbusAuth (usado para validar o JWT e para resolver o JWKS remoto, token-uri,
+   *  user-info-uri - tudo chamada servidor-a-servidor). */
   @NotNull
   private String issuer;
+
+  /**
+   * Issuer visível ao NAVEGADOR, usado só para montar a URL de RP-Initiated Logout
+   * (/connect/logout, ver BffLogoutController) - normalmente igual a `issuer`, mas diverge
+   * rodando em Docker: o container chama o NimbusAuth via host.docker.internal (issuer), só que
+   * isso não resolve no navegador do usuário, que precisa de localhost. Se não configurado, cai
+   * no valor de `issuer` (comportamento de sempre, fora do Docker).
+   */
+  private String browserIssuer;
+
+  public String getBrowserIssuer() {
+    return (browserIssuer != null && !browserIssuer.isBlank()) ? browserIssuer : issuer;
+  }
 
   @NotNull
   private Cookies cookies;

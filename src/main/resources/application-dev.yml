@@ -99,6 +99,10 @@ cardsync:
   security:
     # Issuer do NimbusAuth (não é mais o próprio CardSync).
     issuer: ${CARDSYNC_ISSUER:http://localhost:9090}
+    # Issuer como o NAVEGADOR resolve (RP-Initiated Logout) - só diverge de CARDSYNC_ISSUER
+    # rodando em Docker (ver CardsyncSecurityProperties#getBrowserIssuer). Mesmo default de
+    # CARDSYNC_ISSUER fora do Docker.
+    browser-issuer: ${CARDSYNC_BROWSER_ISSUER:http://localhost:9090}
 
     session-timeout: ${CARDSYNC_SESSION_TIMEOUT:PT2H}
 
