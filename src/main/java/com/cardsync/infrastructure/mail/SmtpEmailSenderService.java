@@ -90,7 +90,10 @@ public class SmtpEmailSenderService implements EmailSenderService {
 
   protected MimeMessage buildMimeMessage(Message message, String body, JavaMailSender mailSender) throws MessagingException {
     MimeMessage mimeMessage = mailSender.createMimeMessage();
-    MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+    // MULTIPART_MODE_RELATED (não o construtor boolean, que força MULTIPART_MODE_MIXED, modo pra
+    // anexos separados) - mesmo fix aplicado no NimbusAuth (SmtpEmailSenderService equivalente).
+    MimeMessageHelper helper =
+        new MimeMessageHelper(mimeMessage, MimeMessageHelper.MULTIPART_MODE_RELATED, "UTF-8");
 
     helper.setText(body, true);
     helper.setSubject(message.getSubject());

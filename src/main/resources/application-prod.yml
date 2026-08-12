@@ -118,6 +118,7 @@ cardsync:
     impl: ${CARDSYNC_EMAIL_IMPL}
     from-name: ${CARDSYNC_EMAIL_FROM_NAME}
     from-email: ${CARDSYNC_EMAIL_FROM_EMAIL}
+    public-base-url: ${CARDSYNC_API_PUBLIC_BASE_URL:https://api.cardsync.com.br}
     brevo:
       base-url: ${BREVO_BASE_URL}
       api-key: ${BREVO_API_KEY}

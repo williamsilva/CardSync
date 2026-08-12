@@ -16,6 +16,11 @@ public class EmailProperties {
   private String fromName;
   private String fromEmail;
 
+  // Base pra montar URLs absolutas de assets referenciados nos e-mails (logo) - não depende de
+  // request HTTP nenhuma (diferente de web.spa-base-url, que é da SPA, não do próprio
+  // CardsyncServer). Mesmo padrão de password.tokens.public-base-url no NimbusAuth.
+  private String publicBaseUrl = "https://api.cardsync.com.br";
+
   private Impl impl = Impl.FAKE;
   private final Brevo brevo = new Brevo();
   private final Smtp smtp = new Smtp();

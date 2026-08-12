@@ -1,33 +1,42 @@
 <!doctype html>
 <html xmlns:th="http://www.thymeleaf.org" lang="pt-BR">
-<body style="margin:0;padding:0;background:#08111f;font-family:Arial,Helvetica,sans-serif;color:#e5eefc;">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0"
-       style="width:100%;background:radial-gradient(circle at top,#152238 0%,#0b1220 38%,#060b14 100%);padding:32px 12px;">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Tema claro de propósito - ver comentário em mail/_layout.html (mesmo motivo, mesmo ajuste,
+       esse template é self-contained e não usa o fragmento _layout). -->
+  <meta name="color-scheme" content="light dark" />
+  <meta name="supported-color-schemes" content="light dark" />
+  <title>CardSync</title>
+</head>
+<body style="margin:0;padding:0;background:#eef2f8;font-family:Arial,Helvetica,sans-serif;color:#334155;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#eef2f8"
+       style="width:100%;background-color:#eef2f8;padding:32px 12px;">
   <tr>
     <td align="center">
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
-             style="max-width:700px;background:rgba(15,23,42,0.96);border:1px solid rgba(148,163,184,0.16);border-radius:26px;overflow:hidden;box-shadow:0 22px 70px rgba(0,0,0,0.50);">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#ffffff"
+             style="max-width:700px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:26px;overflow:hidden;box-shadow:0 22px 70px rgba(15,23,42,0.08);">
 
         <!-- Header -->
         <tr>
-          <td style="padding:30px 34px 22px 34px;background:radial-gradient(circle at top right,rgba(239,68,68,0.20),transparent 34%),radial-gradient(circle at top left,rgba(248,113,113,0.12),transparent 30%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.92));border-bottom:1px solid rgba(148,163,184,0.12);">
+          <td bgcolor="#f8fafc" style="padding:30px 34px 22px 34px;background-color:#f8fafc;background:linear-gradient(180deg,#fef2f2,#ffffff);border-bottom:1px solid #e2e8f0;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
               <tr>
                 <td align="left" valign="middle">
                   <table role="presentation" cellspacing="0" cellpadding="0">
                     <tr>
                       <td valign="middle" style="padding-right:14px;">
-                        <img th:if="${logoCid != null and !#strings.isEmpty(logoCid)}"
-                             th:src="${logoCid}" alt="CardSync"
+                        <img th:if="${logoUrl != null and !#strings.isEmpty(logoUrl)}"
+                             th:src="${logoUrl}" alt="CardSync"
                              style="display:block;max-height:44px;max-width:160px;border:0;" />
-                        <div th:if="${logoCid == null or #strings.isEmpty(logoCid)}"
+                        <div th:if="${logoUrl == null or #strings.isEmpty(logoUrl)}"
                              style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#2563eb,#38bdf8);color:#fff;font-size:18px;font-weight:700;line-height:46px;text-align:center;">
                           CS
                         </div>
                       </td>
                       <td valign="middle">
-                        <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.1;">CardSync</div>
-                        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#93c5fd;margin-top:4px;">
+                        <div style="font-size:18px;font-weight:700;color:#0f172a;line-height:1.1;">CardSync</div>
+                        <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#2563eb;margin-top:4px;">
                           Conciliação simplificada
                         </div>
                       </td>
@@ -35,18 +44,18 @@
                   </table>
                 </td>
                 <td align="right" valign="middle">
-                  <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:rgba(239,68,68,0.16);border:1px solid rgba(248,113,113,0.30);color:#fca5a5;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">
+                  <div style="display:inline-block;padding:7px 11px;border-radius:999px;background-color:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">
                     Alerta de Chargeback
                   </div>
                 </td>
               </tr>
             </table>
 
-            <h1 style="margin:26px 0 8px 0;font-size:26px;line-height:1.2;font-weight:700;color:#ffffff;">
+            <h1 style="margin:26px 0 8px 0;font-size:26px;line-height:1.2;font-weight:700;color:#0f172a;">
               <span th:text="${totalCount}">0</span> chargeback(s) detectado(s)
             </h1>
-            <p style="margin:0;font-size:14px;line-height:1.7;color:#94a3b8;">
-              Arquivo: <strong style="color:#e2e8f0;" th:text="${fileName}">arquivo.txt</strong>
+            <p style="margin:0;font-size:14px;line-height:1.7;color:#64748b;">
+              Arquivo: <strong style="color:#334155;" th:text="${fileName}">arquivo.txt</strong>
             </p>
           </td>
         </tr>
@@ -54,40 +63,40 @@
         <!-- Body -->
         <tr>
           <td style="padding:28px 34px 24px 34px;">
-            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.7;color:#e2e8f0;">
+            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.7;color:#334155;">
               Durante o processamento do arquivo acima, os seguintes registros foram identificados como chargeback:
             </p>
 
             <!-- Table -->
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
-                   style="border-radius:14px;overflow:hidden;border:1px solid rgba(148,163,184,0.14);">
+                   style="border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;">
               <thead>
-                <tr style="background:rgba(37,99,235,0.18);">
-                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;border-bottom:1px solid rgba(148,163,184,0.14);">Tipo</th>
-                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;border-bottom:1px solid rgba(148,163,184,0.14);">PV</th>
-                  <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;border-bottom:1px solid rgba(148,163,184,0.14);">Valor</th>
-                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;border-bottom:1px solid rgba(148,163,184,0.14);">Data</th>
-                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#93c5fd;border-bottom:1px solid rgba(148,163,184,0.14);">Descrição</th>
+                <tr style="background-color:#eff6ff;">
+                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;border-bottom:1px solid #e2e8f0;">Tipo</th>
+                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;border-bottom:1px solid #e2e8f0;">PV</th>
+                  <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;border-bottom:1px solid #e2e8f0;">Valor</th>
+                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;border-bottom:1px solid #e2e8f0;">Data</th>
+                  <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#1d4ed8;border-bottom:1px solid #e2e8f0;">Descrição</th>
                 </tr>
               </thead>
               <tbody>
                 <tr th:each="cb, stat : ${chargebacks}"
-                    th:style="${stat.odd} ? 'background:rgba(15,23,42,0.60)' : 'background:rgba(15,23,42,0.30)'">
-                  <td style="padding:10px 14px;font-size:13px;color:#e2e8f0;border-bottom:1px solid rgba(148,163,184,0.08);">
-                    <span style="display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(239,68,68,0.14);color:#fca5a5;font-size:11px;font-weight:700;"
+                    th:style="${stat.odd} ? 'background-color:#ffffff' : 'background-color:#f8fafc'">
+                  <td style="padding:10px 14px;font-size:13px;color:#334155;border-bottom:1px solid #f1f5f9;">
+                    <span style="display:inline-block;padding:2px 8px;border-radius:6px;background-color:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;"
                           th:text="${cb.tipo}">Tipo</span>
                   </td>
-                  <td style="padding:10px 14px;font-size:13px;color:#e2e8f0;border-bottom:1px solid rgba(148,163,184,0.08);" th:text="${cb.pv}">-</td>
-                  <td style="padding:10px 14px;font-size:13px;color:#e2e8f0;text-align:right;border-bottom:1px solid rgba(148,163,184,0.08);white-space:nowrap;" th:text="${cb.valor}">-</td>
-                  <td style="padding:10px 14px;font-size:13px;color:#e2e8f0;border-bottom:1px solid rgba(148,163,184,0.08);white-space:nowrap;" th:text="${cb.data}">-</td>
-                  <td style="padding:10px 14px;font-size:13px;color:#94a3b8;border-bottom:1px solid rgba(148,163,184,0.08);max-width:180px;word-break:break-word;" th:text="${cb.descricao}">-</td>
+                  <td style="padding:10px 14px;font-size:13px;color:#334155;border-bottom:1px solid #f1f5f9;" th:text="${cb.pv}">-</td>
+                  <td style="padding:10px 14px;font-size:13px;color:#334155;text-align:right;border-bottom:1px solid #f1f5f9;white-space:nowrap;" th:text="${cb.valor}">-</td>
+                  <td style="padding:10px 14px;font-size:13px;color:#334155;border-bottom:1px solid #f1f5f9;white-space:nowrap;" th:text="${cb.data}">-</td>
+                  <td style="padding:10px 14px;font-size:13px;color:#64748b;border-bottom:1px solid #f1f5f9;max-width:180px;word-break:break-word;" th:text="${cb.descricao}">-</td>
                 </tr>
               </tbody>
             </table>
 
-            <div style="margin-top:24px;padding:16px 18px;border-radius:14px;background:rgba(239,68,68,0.08);border:1px solid rgba(248,113,113,0.20);">
-              <div style="font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fca5a5;margin-bottom:6px;">Ação recomendada</div>
-              <div style="font-size:14px;line-height:1.7;color:#fecaca;">
+            <div style="margin-top:24px;padding:16px 18px;border-radius:14px;background-color:#fef2f2;border:1px solid #fecaca;">
+              <div style="font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#b91c1c;margin-bottom:6px;">Ação recomendada</div>
+              <div style="font-size:14px;line-height:1.7;color:#7f1d1d;">
                 Acesse o sistema CardSync para revisar e tomar as devidas providências sobre os chargebacks identificados.
               </div>
             </div>
@@ -96,24 +105,24 @@
 
         <!-- Footer -->
         <tr>
-          <td style="padding:0 34px 30px 34px;background:rgba(2,6,23,0.32);">
+          <td bgcolor="#f8fafc" style="padding:0 34px 30px 34px;background-color:#f8fafc;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
-                   style="border-top:1px solid rgba(148,163,184,0.10);padding-top:20px;">
+                   style="border-top:1px solid #e2e8f0;padding-top:20px;">
               <tr>
                 <td align="left" valign="top" style="padding-right:12px;">
-                  <div style="font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:6px;">CardSync</div>
-                  <div style="font-size:12px;line-height:1.7;color:#64748b;">
+                  <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;">CardSync</div>
+                  <div style="font-size:12px;line-height:1.7;color:#94a3b8;">
                     Plataforma segura para conciliação financeira, gestão de acesso e operações com mais controle.
                   </div>
                 </td>
                 <td align="right" valign="top" style="padding-left:12px;">
-                  <div style="font-size:12px;line-height:1.8;color:#64748b;text-align:right;">
+                  <div style="font-size:12px;line-height:1.8;color:#94a3b8;text-align:right;">
                     Este é um e-mail automático.<br>Não responda esta mensagem.
                   </div>
                 </td>
               </tr>
             </table>
-            <div style="margin-top:18px;text-align:center;font-size:11px;line-height:1.7;color:#475569;">
+            <div style="margin-top:18px;text-align:center;font-size:11px;line-height:1.7;color:#94a3b8;">
               © CardSync · Todos os direitos reservados
             </div>
           </td>

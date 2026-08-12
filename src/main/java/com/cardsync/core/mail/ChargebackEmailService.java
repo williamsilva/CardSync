@@ -1,5 +1,6 @@
 package com.cardsync.core.mail;
 
+import com.cardsync.core.config.EmailProperties;
 import com.cardsync.core.conciliation.analysis.ConciliationDebitChargebackClassifier;
 import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.model.AdjustmentEntity;
@@ -10,7 +11,6 @@ import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
 import com.cardsync.domain.service.EmailSenderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -26,14 +26,16 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class ChargebackEmailService {
 
-  private static final String INLINE_LOGO_CID = "cardsync-logo";
-  private static final String INLINE_LOGO_PATH = "static/assets/cardsync-logo.png";
-  private static final String INLINE_LOGO_CONTENT_TYPE = "image/png";
+  // Logo referenciada por URL HTTPS pública, não mais embutida via cid:/multipart inline (mesmo
+  // ajuste feito no NimbusAuth - com o sender ativo em produção sendo API_KEY/Brevo, o anexo
+  // inline via MimeMessage nem chegava a passar pela API HTTP do Brevo do jeito esperado).
+  private static final String LOGO_ASSET_PATH = "/assets/cardsync-logo.png";
 
   private static final Locale PT_BR = Locale.of("pt", "BR");
   private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
   private final EmailSenderService emailSender;
+  private final EmailProperties emailProperties;
   private final EmailSettingsService emailSettingsService;
   private final ConciliationDebitChargebackClassifier chargebackClassifier;
 
@@ -114,12 +116,7 @@ public class ChargebackEmailService {
         .data("chargebacks", chargebacks)
         .data("fileName", fileName)
         .data("totalCount", chargebacks.size())
-        .data("logoCid", "cid:" + INLINE_LOGO_CID)
-        .inline(EmailSenderService.InlineResource.builder()
-          .contentId(INLINE_LOGO_CID)
-          .resource(new ClassPathResource(INLINE_LOGO_PATH))
-          .contentType(INLINE_LOGO_CONTENT_TYPE)
-          .build());
+        .data("logoUrl", emailProperties.getPublicBaseUrl() + LOGO_ASSET_PATH);
 
       for (String recipient : recipients) {
         try {
