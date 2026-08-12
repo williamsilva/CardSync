@@ -41,7 +41,9 @@ public class EmailProperties {
     private Boolean ssl = false;
   }
 
+  // BREVO -> API_KEY: mesmo rename feito no NimbusAuth (ver com.nimbus.auth.core.config.
+  // EmailProperties) - nome genérico pro modo "chave de API", não acoplado ao fornecedor Brevo.
   public enum Impl {
-    SMTP, FAKE, BREVO
+    SMTP, FAKE, API_KEY
   }
 }

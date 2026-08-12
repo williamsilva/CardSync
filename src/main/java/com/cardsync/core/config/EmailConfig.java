@@ -27,7 +27,7 @@ public class EmailConfig {
     return switch (emailSettingsService.getImpl()) {
       case FAKE -> new FakeEmailSenderService();
       case SMTP -> new SmtpEmailSenderService();
-      case BREVO -> new BrevoEmailSenderService(
+      case API_KEY -> new BrevoEmailSenderService(
         restClientBuilder
           .baseUrl(emailSettingsService.getBrevoBaseUrl())
           .build(),

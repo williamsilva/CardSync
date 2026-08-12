@@ -17,7 +17,7 @@ public class EmailSenderConfig {
   }
 
   @Bean
-  @ConditionalOnProperty(name = "cardsync.email.impl", havingValue = "brevo")
+  @ConditionalOnProperty(name = "cardsync.email.impl", havingValue = "api_key")
   EmailSenderService brevoEmailSenderService(
     RestClient.Builder restClientBuilder,
     EmailSettingsService emailSettingsService,
