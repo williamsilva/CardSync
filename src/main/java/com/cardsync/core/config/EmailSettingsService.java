@@ -7,6 +7,8 @@ import com.cardsync.domain.repository.EmailSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,18 +21,28 @@ public class EmailSettingsService {
 
   private final EmailSettingsRepository repository;
   private final EmailProperties emailProperties;
+  private final Environment environment;
 
   @Transactional(readOnly = true)
   public EmailSettingsModel getSettings() {
+    boolean allowFake = allowFakeImpl();
     return repository.findFirstBy()
       .map(e -> new EmailSettingsModel(
-        e.getImpl(), e.getFromName(), e.getFromEmail(),
+        e.getImpl(), allowFake, e.getFromName(), e.getFromEmail(),
         mask(e.getBrevoApiKey()), e.getBrevoBaseUrl(), e.getBrevoPort(), e.getBrevoUsername(),
         e.getChargebackRecipients(),
         e.getSmtpHost(), e.getSmtpPort(), e.getSmtpUsername(), mask(e.getSmtpPassword()),
         e.getSmtpAuth(), e.getSmtpStarttls(), e.getSmtpSsl()
       ))
-      .orElse(new EmailSettingsModel(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+      .orElse(new EmailSettingsModel(null, allowFake, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+  }
+
+  /** true fora do perfil "prod" (dev/test/local/sem perfil) - usado só pra tela esconder a opção
+   *  FAKE do seletor em produção (ver EmailSettingsModel.allowFakeImpl). Não bloqueia nada no
+   *  backend - EmailSenderServiceRouter continua aceitando FAKE mesmo em prod se alguém já tiver
+   *  esse valor salvo no banco de antes, só a tela nova esconde a opção de escolher de novo. */
+  private boolean allowFakeImpl() {
+    return !environment.acceptsProfiles(Profiles.of("prod"));
   }
 
   /**
@@ -198,7 +210,7 @@ public class EmailSettingsService {
     settings.setSmtpSsl(request.smtpSsl());
     settings = repository.save(settings);
     return new EmailSettingsModel(
-      settings.getImpl(), settings.getFromName(), settings.getFromEmail(),
+      settings.getImpl(), allowFakeImpl(), settings.getFromName(), settings.getFromEmail(),
       mask(settings.getBrevoApiKey()), settings.getBrevoBaseUrl(), settings.getBrevoPort(), settings.getBrevoUsername(),
       settings.getChargebackRecipients(),
       settings.getSmtpHost(), settings.getSmtpPort(), settings.getSmtpUsername(), mask(settings.getSmtpPassword()),

@@ -1,14 +1,14 @@
 package com.cardsync.infrastructure.mail;
 
 import com.cardsync.domain.service.EmailSenderService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Slf4j
+@RequiredArgsConstructor
 public class FakeEmailSenderService implements EmailSenderService {
 
-  @Autowired
-  private EmailTemplateProcessor emailTemplateProcessor;
+  private final EmailTemplateProcessor emailTemplateProcessor;
 
   @Override
   public void sendFreemarker(Message message) {

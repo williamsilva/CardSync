@@ -7,7 +7,7 @@ import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -16,16 +16,12 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import java.util.Properties;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 public class SmtpEmailSenderService implements EmailSenderService {
 
-  @Autowired
-  private EmailSettingsService emailSettingsService;
-
-  @Autowired
-  private EmailTemplateProcessor emailTemplateProcessor;
-
-  @Autowired
-  private EmailLogService emailLogService;
+  private final EmailSettingsService emailSettingsService;
+  private final EmailTemplateProcessor emailTemplateProcessor;
+  private final EmailLogService emailLogService;
 
   @Override
   public void sendFreemarker(Message message) {
@@ -74,6 +70,13 @@ public class SmtpEmailSenderService implements EmailSenderService {
     props.put("mail.smtp.auth", String.valueOf(Boolean.TRUE.equals(emailSettingsService.getSmtpAuth())));
     props.put("mail.smtp.starttls.enable", String.valueOf(Boolean.TRUE.equals(emailSettingsService.getSmtpStarttls())));
     props.put("mail.smtp.ssl.enable", String.valueOf(Boolean.TRUE.equals(emailSettingsService.getSmtpSsl())));
+    // Sem isto, um host/porta bloqueado (ex.: provedor de hospedagem bloqueando a porta 587 de
+    // saida) trava a conexao ate o timeout default do SO (pode levar minutos) - sendThymeleaf()/
+    // sendFreemarker() sao sempre chamados de dentro da mesma transacao/requisicao HTTP que salva
+    // a entidade de negocio, entao travar aqui trava a requisicao inteira.
+    props.put("mail.smtp.connectiontimeout", "5000");
+    props.put("mail.smtp.timeout", "5000");
+    props.put("mail.smtp.writetimeout", "5000");
 
     return sender;
   }
