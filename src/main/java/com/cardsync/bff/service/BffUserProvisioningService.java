@@ -159,59 +159,34 @@ public class BffUserProvisioningService {
   }
 
   /**
-   * POST /bff/v1/users/search - o NimbusAuth não tem filtro de app_key pra usuário (só grupo tem
-   * app_key), então deixamos ele resolver filtro/ordenação/paginação normalmente e só removemos,
-   * da página devolvida, quem não tem grupo do Cardsync - approximação aceitável (o "total"
-   * reportado é ajustado pelo tanto removido desta página, mas uma página parcialmente filtrada
-   * pode voltar com menos itens que o "size" pedido; volume esperado de usuários é pequeno, mesma
-   * premissa já assumida em outros pontos deste módulo).
+   * POST /bff/v1/users/search - injeta "advanced.groupAppKey=cardsync" no corpo antes de repassar,
+   * pra o próprio NimbusAuth filtrar por app_key na specification (ver UserSpecs.groupAppKeyEquals)
+   * e paginar/ordenar já só sobre os usuários do Cardsync. Antes disso a paginação vinha do
+   * NimbusAuth sem esse recorte (base compartilhada por todos os apps Nimbus) e o filtro por app
+   * era aplicado depois, na página já pronta - com poucos usuários do Cardsync frente ao total
+   * global, a página filtrada podia vir vazia mesmo havendo usuários do Cardsync fora dela.
    */
   public ResponseEntity<byte[]> searchScopedToCardsync(
       Authentication auth, HttpServletRequest req, HttpServletResponse res) {
     String token = accessTokenService.getValidAccessTokenOrRevoke(auth, req, res);
     byte[] requestBody = readBody(req);
-    ResponseEntity<byte[]> upstream = sendJson(HttpMethod.POST, "/api/v1/users/search", token, requestBody);
-    return filterSearchResponseToCardsync(upstream);
+    byte[] scopedBody = withGroupAppKeyFilter(requestBody);
+    return sendJson(HttpMethod.POST, "/api/v1/users/search", token, scopedBody);
   }
 
-  private ResponseEntity<byte[]> filterSearchResponseToCardsync(ResponseEntity<byte[]> upstream) {
-    if (!upstream.getStatusCode().is2xxSuccessful() || upstream.getBody() == null) {
-      return upstream;
-    }
+  private byte[] withGroupAppKeyFilter(byte[] requestBody) {
+    JsonNode requestJson = parse(requestBody);
+    ObjectNode root = requestJson.isObject() ? (ObjectNode) requestJson : objectMapper.createObjectNode();
 
-    JsonNode root = parse(upstream.getBody());
-    if (!(root instanceof ObjectNode result)) {
-      return upstream;
-    }
-
-    JsonNode embeddedNode = result.path("_embedded");
-    JsonNode contentNode = embeddedNode.path("content");
-    if (!(embeddedNode instanceof ObjectNode embedded) || !contentNode.isArray()) {
-      return upstream;
-    }
-
-    ArrayNode filtered = objectMapper.createArrayNode();
-    int removed = 0;
-    for (JsonNode user : contentNode) {
-      if (belongsToCardsync(user)) {
-        filtered.add(user);
-      } else {
-        removed++;
-      }
-    }
-    embedded.set("content", filtered);
-
-    if (removed > 0 && result.path("page") instanceof ObjectNode pageInfo) {
-      long total = pageInfo.path("totalElements").asLong(0) - removed;
-      pageInfo.put("totalElements", Math.max(0, total));
-    }
+    JsonNode advancedNode = root.path("advanced");
+    ObjectNode advanced = advancedNode.isObject() ? (ObjectNode) advancedNode : objectMapper.createObjectNode();
+    advanced.put("groupAppKey", CARDSYNC_APP_KEY);
+    root.set("advanced", advanced);
 
     try {
-      byte[] body = objectMapper.writeValueAsBytes(result);
-      return ResponseEntity.status(upstream.getStatusCode()).contentType(MediaType.APPLICATION_JSON).body(body);
+      return objectMapper.writeValueAsBytes(root);
     } catch (Exception e) {
-      log.warn("Falha ao filtrar resultado de busca de usuários por app: {}", e.getMessage());
-      return upstream;
+      throw new IllegalStateException("Falha ao montar corpo de busca escopada ao Cardsync", e);
     }
   }
 
