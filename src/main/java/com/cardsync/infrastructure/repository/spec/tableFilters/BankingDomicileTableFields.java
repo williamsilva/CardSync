@@ -24,23 +24,11 @@ public class BankingDomicileTableFields {
       Map.entry("currentAccount",
         FieldSpec.integer("currentAccount", (root, query) -> root.get("currentAccount"))),
 
-      Map.entry("holderDocument",
-        FieldSpec.string("holderDocument", (root, query) -> root.get("holderDocument"))),
+      Map.entry("bank",
+        FieldSpec.joinedUuid("bank", (root, query) -> root.get("bank").get("id"))),
 
-      Map.entry("holderName",
-        FieldSpec.string("holderName", (root, query) -> root.get("holderName"))),
-
-      Map.entry("active",
-        FieldSpec.bool("active", (root, query) -> root.get("active"))),
-
-      Map.entry("bankId",
-        FieldSpec.joinedUuid("bankId", (root, query) -> root.get("bank").get("id"))),
-
-      Map.entry("companyId",
-        FieldSpec.joinedUuid("companyId", (root, query) -> root.get("company").get("id"))),
-
-      Map.entry("establishmentId",
-        FieldSpec.joinedUuid("establishmentId", (root, query) -> root.get("establishment").get("id")))
+      Map.entry("company",
+        FieldSpec.joinedUuid("company", (root, query) -> root.get("company").get("id")))
     );
   }
 }

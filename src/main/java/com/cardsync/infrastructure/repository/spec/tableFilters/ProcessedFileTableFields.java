@@ -23,9 +23,9 @@ public class ProcessedFileTableFields {
     return Map.ofEntries(
 
       // Texto
-      Map.entry("fileName",
+      Map.entry("file",
         FieldSpec.string(
-          "fileName",
+          "file",
           (root, query) -> root.get("file"))),
 
       Map.entry("typeFile",

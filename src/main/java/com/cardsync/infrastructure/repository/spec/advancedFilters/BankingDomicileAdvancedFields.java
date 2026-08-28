@@ -2,6 +2,7 @@ package com.cardsync.infrastructure.repository.spec.advancedFilters;
 
 import com.cardsync.domain.filter.BankingDomicileFilter;
 import com.cardsync.domain.model.BankingDomicileEntity;
+import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.Specs;
@@ -22,24 +23,13 @@ public class BankingDomicileAdvancedFields extends BaseSpecificationSupport<Bank
 
     Specification<BankingDomicileEntity> spec = Specs.all();
 
-    // Buscas por texto (startsWith para aproveitar índices)
-    /*
-    spec = spec.and(equalsTo("agency", a.agency()));
-      spec = spec.and(equalsTo("currentAccount", a.currentAccount()));
-      spec = spec.and(contains("holderDocument", a.holderDocument()));
-      spec = spec.and(contains("holderName", a.holderName()));
-      spec = spec.and(equalsTo("active", a.active()));
+    spec = spec.and(inPath(filter.banks(), BankingDomicileAdvancedFields::parseUuidOrNull, "bank", "id"));
+    spec = spec.and(inPath(filter.companies(), BankingDomicileAdvancedFields::parseUuidOrNull, "company", "id"));
 
-      if (a.bankId() != null) {
-        spec = spec.and(equalsPath(a.bankId(), "bank", "id"));
-      }
-      if (a.companyId() != null) {
-        spec = spec.and(equalsPath(a.companyId(), "company", "id"));
-      }
-      if (a.establishmentId() != null) {
-        spec = spec.and(equalsPath(a.establishmentId(), "establishment", "id"));
-      }
-     */
+    if (filter.active() != null) {
+      Integer code = filter.active() ? StatusEnum.ACTIVE.getCode() : StatusEnum.INACTIVE.getCode();
+      spec = spec.and(equalsTo("status", code));
+    }
 
     return spec;
   }

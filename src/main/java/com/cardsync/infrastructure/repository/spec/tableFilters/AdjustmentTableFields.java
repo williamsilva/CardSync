@@ -108,7 +108,51 @@ public class AdjustmentTableFields {
       Map.entry("establishment",
         FieldSpec.joinedUuid(
           "establishment",
-          (root, query) -> root.join("establishment", JoinType.LEFT).get("id")))
+          (root, query) -> root.join("establishment", JoinType.LEFT).get("id"))),
+
+      // Aliases abaixo: cancellation-list e tariffs-list usam nomes de field= diferentes entre
+      // si (e diferentes dos já cadastrados acima) pro mesmo dado — mantidos os dois pra não
+      // precisar tocar nos dois componentes Angular por uma diferença só de nome.
+      Map.entry("cvNsu",
+        FieldSpec.longNumber(
+          "cvNsu",
+          (root, query) -> root.get("nsu"))),
+
+      // cancellation-list usa field="rvNumber", tariffs-list usa field="rvNumberAdjustment" —
+      // ambos são o mesmo AdjustmentEntity.rvNumberAdjustment (já cadastrado acima como
+      // "rvAdjustment", que nenhuma das duas telas usa de fato).
+      Map.entry("rvNumber",
+        FieldSpec.integer(
+          "rvNumber",
+          (root, query) -> root.get("rvNumberAdjustment"))),
+
+      Map.entry("rvNumberAdjustment",
+        FieldSpec.integer(
+          "rvNumberAdjustment",
+          (root, query) -> root.get("rvNumberAdjustment"))),
+
+      Map.entry("reason",
+        FieldSpec.integer(
+          "reason",
+          (root, query) -> root.get("adjustmentReason"))),
+
+      Map.entry("status",
+        FieldSpec.integer(
+          "status",
+          (root, query) -> root.get("adjustmentStatus"))),
+
+      // Só em cancellation-list: dados da venda original cancelada, não do próprio ajuste
+      // (ver row.transaction?.saleDate / row.transaction?.grossValue no template).
+      Map.entry("saleDate",
+        FieldSpec.offsetDateTime(
+          "saleDate",
+          (root, query) -> root.join("transaction", JoinType.LEFT).get("saleDate"),
+          dateFilterService)),
+
+      Map.entry("saleValue",
+        FieldSpec.bigDecimal(
+          "saleValue",
+          (root, query) -> root.join("transaction", JoinType.LEFT).get("grossValue")))
     );
   }
 }
