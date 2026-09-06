@@ -10,7 +10,6 @@ import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,22 +19,30 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * Estratégia: cache local (cs_user_directory) + busca sob demanda no NimbusAuth quando
  * o id não está (ou está velho) no cache local, sem fila/evento - "lazy fetch + upsert".
+ *
+ * <p>SEM {@code @Cacheable} de propósito (removido em 2026-09-02, mesmo ajuste feito no
+ * NimbusFlowServer/NimbusNovaxServer) - havia um cache em memória (ConcurrentMapCacheManager
+ * default do Spring Boot, sem TTL/eviction, já que este projeto só tem {@code @EnableCaching}
+ * sem nenhum CacheManager customizado) por cima da checagem de staleness abaixo; como nunca
+ * expirava dentro da vida do processo, a 1ª resolução de cada usuário ficava congelada pro
+ * resto do uptime do container - uma troca de nome no NimbusAuth só refletia depois do
+ * próximo restart/deploy. A tabela {@code cs_user_directory} (STALE_AFTER abaixo) já é o
+ * único cache que resta.
  */
 @Service
 @RequiredArgsConstructor
 public class UserDirectoryService {
 
-  private static final Duration STALE_AFTER = Duration.ofHours(24);
+  // Curto de propósito (era 24h) - só pra evitar 1 chamada HTTP por item repetido dentro da
+  // MESMA renderização de lista (ex.: 20 registros do mesmo createdBy numa página), não pra
+  // servir de cache de longo prazo - 24h fazia uma troca de nome no NimbusAuth demorar até 24h
+  // pra aparecer.
+  private static final Duration STALE_AFTER = Duration.ofMinutes(1);
 
   private final UserDirectoryRepository repository;
   private final NimbusAuthInternalClient client;
   private final Clock clock;
 
-  // condition evita o cache tentar usar uma chave nula quando userId é null (comum em
-  // registros de seed, cujo createdBy/updatedBy é intencionalmente null) - o @Cacheable
-  // calcula a chave antes de entrar no método, então o null-check abaixo sozinho não evita
-  // o erro "Null key returned for cache operation".
-  @Cacheable(value = "user-directory", key = "#userId", condition = "#userId != null")
   @Transactional
   public Optional<UserMinimalModel> summaryFor(UUID userId) {
     if (userId == null) {
