@@ -1,0 +1,67 @@
+# Sobe o backend do CardSync sozinho (Postgres nativo do host, não dockerizado - ver comentário
+# abaixo). Uso normal é via ../docker-compose.yml (na raiz do produto, "include:" deste arquivo +
+# do CardSyncWeb/docker-compose.yml) - rode daqui direto só se quiser testar isoladamente. As
+# variáveis (${...}) são resolvidas contra o .env adjacente ao arquivo TOP-LEVEL realmente
+# executado: se subir por aqui, crie um .env nesta pasta; se subir via include a partir da raiz,
+# use o .env de lá (é o que os outros devs fazem no dia a dia).
+services:
+  # Postgres do CardSync roda nativamente no host (não dockerizado aqui) - mesmo padrão do
+  # NimbusAuth/NimbusFlow: preserva os dados/migrations já aplicados no banco "cardsync" local,
+  # em vez de começar do zero num volume novo.
+  backend:
+    build:
+      context: .
+      # GITHUB_ACTOR/GITHUB_TOKEN: build args, não "environment" (variável de serviço só chega ao
+      # CONTAINER em runtime, nunca ao processo de build do Dockerfile - mesmo achado feito com o
+      # Railway, ver Dockerfile do CardsyncServer). Necessário pro Maven baixar o
+      # com.nimbussystems:nimbus-commons-legacy do GitHub Packages - sem isto, `docker compose
+      # build` falha resolvendo a dependência (achado real 2026-09-07). Sete estas 2 vars num
+      # .env (não commitado) - mesmo GITHUB_ACTOR/GITHUB_TOKEN já usados em
+      # ~/.gradle/gradle.properties ou ~/.m2/settings.xml.
+      args:
+        GITHUB_ACTOR: ${GITHUB_ACTOR}
+        GITHUB_TOKEN: ${GITHUB_TOKEN}
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DB_HOST: ${DB_HOST:-host.docker.internal}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-cardsync}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      # NimbusAuth também roda no host (nativo ou no próprio docker compose dele, publicado em
+      # 127.0.0.1:9090) - container não resolve "localhost" do host, precisa do DNS especial do
+      # Docker Desktop. Vale pras chamadas servidor-a-servidor (token/jwks/userinfo, todas
+      # derivadas de cardsync.security.issuer) e pra API interna do NimbusAuth.
+      CARDSYNC_ISSUER: ${CARDSYNC_ISSUER:-http://host.docker.internal:9090}
+      NIMBUS_AUTH_BASE_URL: ${NIMBUS_AUTH_BASE_URL:-http://host.docker.internal:9090}
+      NIMBUS_INTERNAL_API_SECRET: ${NIMBUS_INTERNAL_API_SECRET:-dev-internal-secret-change-me}
+      # Excessão: authorization-uri é pra ONDE O NAVEGADOR é redirecionado (302), não uma chamada
+      # do backend - o navegador não resolve host.docker.internal (isso só existe de dentro de
+      # containers), precisa ser a URL de fora (localhost:9090) mesmo. Sobrescreve só esta, via
+      # a env var padrão do Spring Boot (relaxed binding) pra
+      # spring.security.oauth2.client.provider.cardsync-as.authorization-uri, sem tocar em
+      # código/YAML - as outras 3 URIs desse provider continuam vindo de CARDSYNC_ISSUER acima.
+      SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_CARDSYNC_AS_AUTHORIZATION_URI: ${CARDSYNC_AUTHORIZATION_URI:-http://localhost:9090/oauth2/authorize}
+      # Mesma exceção, pro RP-Initiated Logout (/connect/logout) montado em BffLogoutController -
+      # também é redirect de navegador, não chamada servidor-a-servidor (ver
+      # CardsyncSecurityProperties#browserIssuer).
+      CARDSYNC_BROWSER_ISSUER: ${CARDSYNC_BROWSER_ISSUER:-http://localhost:9090}
+      # Overrides opcionais - "cardsync-bff" é um dos 4 clients legados migrados direto pra
+      # nb_apps em 2026-08-26 com o secret fixo "changeit-dev" (mesmo default do
+      # application-dev.yml), então normalmente não precisa setar nada aqui. Só sete no .env se o
+      # secret real desse client no NimbusAuth tiver sido rotacionado (padronizado com o mesmo
+      # mecanismo do NimbusDeskServer, que registrou seu client pela tela e por isso exige isto).
+      CARDSYNC_BFF_CLIENT_ID: ${CARDSYNC_BFF_CLIENT_ID:-cardsync-bff}
+      CARDSYNC_BFF_CLIENT_SECRET: ${CARDSYNC_BFF_CLIENT_SECRET:-changeit-dev}
+    ports:
+      # Só 127.0.0.1: publicar em todas as interfaces faz o navegador tentar o loopback IPv6
+      # (::1) primeiro (preferência do Windows pra "localhost"), e o encaminhamento IPv6 do
+      # Docker Desktop/WSL2 pra containers está quebrado nesta máquina (trava/reseta a conexão).
+      # Mesma porta 9091 de sempre - o redirect-uri do client "cardsync-bff" já registrado no
+      # NimbusAuth é http://localhost:9091/login/oauth2/code/cardsync-bff, não pode mudar sem
+      # atualizar os dois lados.
+      - "127.0.0.1:9091:9091"
+    extra_hosts:
+      # host.docker.internal já funciona por padrão no Docker Desktop (Windows/Mac); no Linux
+      # precisa desta entrada explícita.
+      - "host.docker.internal:host-gateway"
