@@ -1,6 +1,7 @@
 package com.cardsync.core.backup;
 
 import com.cardsync.infrastructure.nimbusauth.NimbusAuthInternalClient;
+import com.nimbussystems.commons.legacy.backup.PgDumpRunner;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
