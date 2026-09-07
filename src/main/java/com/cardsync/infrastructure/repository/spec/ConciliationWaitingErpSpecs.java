@@ -2,8 +2,8 @@ package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
@@ -13,7 +13,7 @@ import com.cardsync.infrastructure.repository.spec.advancedFilters.ConciliationW
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.ConciliationWaitingErpTableFields;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;

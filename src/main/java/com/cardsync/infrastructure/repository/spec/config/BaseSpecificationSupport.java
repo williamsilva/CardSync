@@ -1,7 +1,9 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
+
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import com.cardsync.domain.model.enums.PeriodEnum;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;

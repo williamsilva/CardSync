@@ -1,8 +1,8 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.AdjustmentFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.AdjustmentAdvancedFields;

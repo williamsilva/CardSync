@@ -5,7 +5,7 @@ import com.cardsync.bff.controller.v1.representation.model.management.AuditUnrec
 import com.cardsync.core.management.dashboard.DashboardAuditService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

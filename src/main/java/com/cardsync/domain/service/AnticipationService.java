@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.AnticipationModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.AnticipationModel;
 import com.cardsync.domain.filter.AnticipationFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.AnticipationEntity;
 import com.cardsync.domain.repository.AnticipationRepository;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;

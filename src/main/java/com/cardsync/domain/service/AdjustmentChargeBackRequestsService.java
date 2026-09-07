@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.AdjustmentChargeBackRequestsM
 import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentChargeBackRequestsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.domain.filter.AdjustmentChargeBackRequestsFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.RequestNoticeEntity;
 import com.cardsync.domain.repository.RequestNoticeRepository;
 import com.cardsync.domain.service.support.ValueTotalsQueryService;

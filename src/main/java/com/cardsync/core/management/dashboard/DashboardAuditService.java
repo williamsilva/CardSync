@@ -8,7 +8,7 @@ import com.cardsync.bff.controller.v1.representation.model.management.AuditUnrec
 import com.cardsync.bff.controller.v1.representation.model.management.AuditUnreconciledModel.DayDetail;
 import com.cardsync.core.config.ImplantationDateProvider;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;

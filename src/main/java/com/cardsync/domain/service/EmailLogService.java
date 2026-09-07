@@ -1,7 +1,7 @@
 package com.cardsync.domain.service;
 
 import com.cardsync.domain.filter.EmailLogFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.EmailLogEntity;
 import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
 import com.cardsync.domain.model.enums.EmailLogStatusEnum;

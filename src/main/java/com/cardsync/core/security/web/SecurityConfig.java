@@ -1,10 +1,20 @@
 package com.cardsync.core.security.web;
 
+
+
+
+
+
+import com.nimbussystems.commons.legacy.security.web.CsrfCookieFilter;
+import com.nimbussystems.commons.legacy.security.web.SpaCsrfTokenRequestHandler;
+import com.nimbussystems.commons.legacy.security.web.SpaRequestMatcher;
+import com.nimbussystems.commons.legacy.security.web.Spa403AccessDeniedHandler;
+import com.nimbussystems.commons.legacy.security.web.Spa401EntryPoint;
 import com.cardsync.core.security.CardsyncSecurityProperties;
 import com.cardsync.core.security.resourceserver.ResourceServerJwtBeans;
-import com.cardsync.core.security.web.headers.ConditionalHstsHeaderWriter;
-import com.cardsync.core.security.web.headers.CspHeaderWriter;
-import com.cardsync.core.web.CorrelationIdFilter;
+import com.nimbussystems.commons.legacy.security.web.headers.ConditionalHstsHeaderWriter;
+import com.nimbussystems.commons.legacy.security.web.headers.CspHeaderWriter;
+import com.nimbussystems.commons.legacy.web.CorrelationIdFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.Bean;

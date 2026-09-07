@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.SaleSummaryModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSummaryModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.filter.SaleSummaryFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;

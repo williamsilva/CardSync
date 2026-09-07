@@ -20,8 +20,8 @@ import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconcili
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.model.enums.FinancialReconciliationTriggerType;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.service.ConciliationWaitingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

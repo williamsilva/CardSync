@@ -1,7 +1,7 @@
 package com.cardsync.core.config;
 
 import com.cardsync.bff.controller.v1.representation.model.EmailSettingsModel;
-import com.cardsync.bff.controller.v1.representation.model.EmailSettingsRequest;
+import com.nimbussystems.commons.legacy.mail.EmailSettingsRequest;
 import com.cardsync.domain.model.EmailSettingsEntity;
 import com.cardsync.domain.repository.EmailSettingsRepository;
 import lombok.RequiredArgsConstructor;

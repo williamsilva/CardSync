@@ -1,7 +1,7 @@
 package com.cardsync.domain.service.support;
 
-import com.cardsync.domain.filter.query.CursorDto;
-import com.cardsync.domain.filter.query.CursorPageResponse;
+import com.nimbussystems.commons.legacy.filter.query.CursorDto;
+import com.nimbussystems.commons.legacy.filter.query.CursorPageResponse;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;

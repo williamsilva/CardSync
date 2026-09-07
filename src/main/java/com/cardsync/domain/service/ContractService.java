@@ -6,7 +6,7 @@ import com.cardsync.bff.controller.v1.representation.input.ContractRateInput;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ContractFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.ContractEntity;

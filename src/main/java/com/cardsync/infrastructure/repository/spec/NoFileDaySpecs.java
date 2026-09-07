@@ -1,15 +1,15 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.NoFileDayFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 import com.cardsync.domain.model.NoFileDayEntity;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.NoFileDayAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.tableFilters.NoFileDayTableFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 

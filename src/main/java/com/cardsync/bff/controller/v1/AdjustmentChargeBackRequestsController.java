@@ -4,8 +4,8 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.Adjustme
 import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.AdjustmentChargeBackRequestsFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.service.AdjustmentChargeBackRequestsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

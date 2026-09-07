@@ -1,14 +1,14 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.ContractFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.infrastructure.repository.spec.tableFilters.ContractTableFields;
 import com.cardsync.domain.model.ContractEntity;
 import com.cardsync.domain.model.enums.ContractEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 

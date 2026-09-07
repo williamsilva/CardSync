@@ -13,8 +13,8 @@ import com.cardsync.core.reconciliation.summary.CreditOrderPreImplantationLinkin
 import com.cardsync.core.reconciliation.summary.CreditOrderPreImplantationLinkingService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.CreditOrderFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.service.CreditOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

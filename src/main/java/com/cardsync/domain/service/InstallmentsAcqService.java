@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.InstallmentsAcqModelAssembler
 import com.cardsync.bff.controller.v1.representation.model.transactions.InstallmentAcqModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.filter.InstallmentsAcqFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.InstallmentAcqEntity;
 import com.cardsync.domain.repository.InstallmentAcqRepository;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;

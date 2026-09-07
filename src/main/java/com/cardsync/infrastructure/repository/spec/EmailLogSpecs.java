@@ -1,7 +1,7 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.EmailLogFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.EmailLogAllowedFields;
 import com.cardsync.domain.model.EmailLogEntity;
 import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
@@ -9,7 +9,7 @@ import com.cardsync.domain.model.enums.EmailLogStatusEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import java.util.UUID;
 
 import org.springframework.data.jpa.domain.Specification;

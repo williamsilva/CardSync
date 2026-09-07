@@ -1,15 +1,15 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.BankingDomicileFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 import com.cardsync.domain.model.BankingDomicileEntity;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.BankingDomicileAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.tableFilters.BankingDomicileTableFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 

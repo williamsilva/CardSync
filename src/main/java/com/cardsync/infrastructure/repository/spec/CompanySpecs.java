@@ -1,7 +1,7 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.CompanyFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.CompanyAllowedFields;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
@@ -9,7 +9,7 @@ import com.cardsync.domain.model.enums.TypeCompanyEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 

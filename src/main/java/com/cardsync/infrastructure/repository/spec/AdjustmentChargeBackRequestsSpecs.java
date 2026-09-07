@@ -1,17 +1,17 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.AdjustmentChargeBackRequestsFilter;
-import com.cardsync.domain.filter.query.ColumnFilterDto;
-import com.cardsync.domain.filter.query.FilterRuleDto;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.ColumnFilterDto;
+import com.nimbussystems.commons.legacy.filter.query.FilterRuleDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 import com.cardsync.domain.model.RequestNoticeEntity;
 import com.cardsync.domain.model.enums.ChargebackRequestReasonEnum;
 import com.cardsync.infrastructure.repository.spec.advancedFilters.ChargeBackRequestsAdvancedFields;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.ChargeBackRequestsTableFields;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;

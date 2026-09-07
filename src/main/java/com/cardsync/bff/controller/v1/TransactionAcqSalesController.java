@@ -5,10 +5,10 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.Transact
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsAcqModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.TransactionAcqSalesFilter;
-import com.cardsync.domain.filter.query.CursorDto;
-import com.cardsync.domain.filter.query.CursorPageResponse;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.CursorDto;
+import com.nimbussystems.commons.legacy.filter.query.CursorPageResponse;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.service.TransactionAcqSalesService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

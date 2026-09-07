@@ -3,7 +3,7 @@ package com.cardsync.domain.service;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.BankFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.repository.BankRepository;

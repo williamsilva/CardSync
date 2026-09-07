@@ -14,7 +14,7 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Proces
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ProcessedFileFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.AcquirerFileTypeEnum;
 import com.cardsync.domain.model.enums.FileGroupEnum;
