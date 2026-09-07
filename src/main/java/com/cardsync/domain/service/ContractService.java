@@ -3,7 +3,7 @@ package com.cardsync.domain.service;
 import com.cardsync.bff.controller.v1.representation.input.ContractFlagInput;
 import com.cardsync.bff.controller.v1.representation.input.ContractInput;
 import com.cardsync.bff.controller.v1.representation.input.ContractRateInput;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ContractFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;

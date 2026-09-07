@@ -16,7 +16,7 @@ import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingAcqSpecs;
 import com.cardsync.infrastructure.repository.spec.ConciliationWaitingErpSpecs;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.criteria.*;

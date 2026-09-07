@@ -1,7 +1,7 @@
 package com.cardsync.domain.filter;
 
 import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.cardsync.domain.model.enums.ReleaseCategoryEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;

@@ -6,8 +6,8 @@ import com.cardsync.infrastructure.repository.spec.tableFilters.ContractTableFie
 import com.cardsync.domain.model.ContractEntity;
 import com.cardsync.domain.model.enums.ContractEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
-import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.SpecificationFactory;
 import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;

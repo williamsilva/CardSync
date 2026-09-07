@@ -3,7 +3,7 @@ package com.cardsync.domain.filter;
 import com.cardsync.domain.model.enums.ChargebackRequestReasonEnum;
 import com.cardsync.domain.model.enums.ChargebackRequestStatusEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.util.List;

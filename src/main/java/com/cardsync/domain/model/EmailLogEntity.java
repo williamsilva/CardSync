@@ -1,7 +1,7 @@
 package com.cardsync.domain.model;
 
-import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
-import com.cardsync.domain.model.enums.EmailLogStatusEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogStatusEnum;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.UUID;

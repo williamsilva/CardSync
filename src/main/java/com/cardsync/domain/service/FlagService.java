@@ -2,7 +2,7 @@ package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.representation.input.FlagAcquirerRelationItemInput;
 import com.cardsync.bff.controller.v1.representation.input.FlagInput;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.FlagFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;

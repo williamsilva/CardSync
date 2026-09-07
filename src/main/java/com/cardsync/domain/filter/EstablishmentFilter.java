@@ -1,6 +1,6 @@
 package com.cardsync.domain.filter;
 
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.domain.model.enums.TypeCompanyEnum;
 import com.cardsync.domain.model.enums.TypeEstablishmentEnum;

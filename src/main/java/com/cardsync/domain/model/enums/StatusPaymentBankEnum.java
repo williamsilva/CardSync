@@ -1,6 +1,6 @@
 package com.cardsync.domain.model.enums;
 
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import lombok.Getter;
 

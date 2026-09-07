@@ -6,7 +6,7 @@ import com.cardsync.bff.controller.v1.mapper.model.ConciliationWaitingOtherDiver
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ConciliationWaitingOtherDivergencePair;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;

@@ -1,6 +1,8 @@
 package com.cardsync.domain.exception;
 
-public enum ErrorCode {
+import com.nimbussystems.commons.legacy.exceptionhandler.ErrorCodeSupport;
+
+public enum ErrorCode implements ErrorCodeSupport {
   BUSINESS_ERROR("error.business"),
   VALIDATION_ERROR("error.validation"),
   INTERNAL_ERROR("error.internal"),

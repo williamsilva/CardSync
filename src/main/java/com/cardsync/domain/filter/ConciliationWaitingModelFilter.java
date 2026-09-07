@@ -1,5 +1,7 @@
 package com.cardsync.domain.filter;
 
+
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.cardsync.domain.model.enums.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 

@@ -2,6 +2,7 @@ package com.cardsync.core.config;
 
 import java.time.ZoneId;
 
+import com.nimbussystems.commons.legacy.filter.spec.BusinessZoneProvider;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -12,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @Component
 @ConfigurationProperties(prefix = "cardsync.app")
-public class CardsyncAppProperties {
+public class CardsyncAppProperties implements BusinessZoneProvider {
 
   @NotNull
   private ZoneId businessZone = ZoneId.of("America/Sao_Paulo");

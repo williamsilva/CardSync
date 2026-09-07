@@ -2,7 +2,7 @@ package com.cardsync.domain.filter;
 
 import com.cardsync.domain.model.enums.CaptureEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;
 

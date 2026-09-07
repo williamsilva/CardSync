@@ -1,7 +1,7 @@
 package com.cardsync.infrastructure.mail;
 
 import com.cardsync.core.config.EmailSettingsService;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.service.EmailLogService;
 import com.cardsync.domain.service.EmailSenderService;

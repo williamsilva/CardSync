@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.ErpAcqui
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ErpAcquirerFieldDiffModel;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ErpAcquirerResolutionResultModel;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ErpAcquirerTruthSource;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.AuditableEntityBase;

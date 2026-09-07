@@ -68,6 +68,11 @@ springdoc:
   swagger-ui:
     enabled: true
 
+# Título exibido no Swagger UI (com.nimbussystems.commons.legacy.config.OpenApiConfig, extraído em
+# Fase 2 da extração de código compartilhado - só o título divergia entre CardSync/NimbusAuth).
+openapi:
+  title: CardSync API
+
 management:
   endpoints:
     web:

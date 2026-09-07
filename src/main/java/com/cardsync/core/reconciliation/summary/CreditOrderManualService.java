@@ -11,7 +11,7 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.SaleSumm
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportCsvReader;
 import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportRow;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.SaleSummaryFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
