@@ -7,7 +7,7 @@ import com.nimbussystems.commons.legacy.exceptionhandler.FieldErrorResponse;
 import com.nimbussystems.commons.legacy.exceptionhandler.ApiBusinessException;
 import com.nimbussystems.commons.legacy.exceptionhandler.ErrorResponse;
 import com.nimbussystems.commons.legacy.web.CorrelationIdFilter;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.OffsetDateTime;

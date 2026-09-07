@@ -2,7 +2,7 @@ package com.cardsync.core.file.service;
 
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.FileBrowserItemModel;
 import com.cardsync.core.file.config.FileProcessingProperties;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;

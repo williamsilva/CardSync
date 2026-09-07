@@ -6,7 +6,7 @@ import com.cardsync.domain.model.enums.ModalityPaymentBankEnum;
 import com.cardsync.domain.model.enums.ReleaseCategoryEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
 import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;

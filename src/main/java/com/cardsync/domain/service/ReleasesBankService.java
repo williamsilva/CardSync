@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.ReleasesBankModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankManualResult;
 import com.cardsync.bff.controller.v1.representation.model.bank.ReleasesBankModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ReleasesBankFilter;
 import com.cardsync.domain.filter.ReleasesBankManualInput;

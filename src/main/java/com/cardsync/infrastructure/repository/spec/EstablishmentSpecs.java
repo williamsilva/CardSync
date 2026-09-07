@@ -7,8 +7,8 @@ import com.cardsync.infrastructure.repository.spec.advancedFilters.Establishment
 import com.cardsync.infrastructure.repository.spec.tableFilters.EstablishmentTableFields;
 import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
-import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.SpecificationFactory;
 import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Path;

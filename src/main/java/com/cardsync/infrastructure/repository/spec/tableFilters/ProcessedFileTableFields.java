@@ -3,8 +3,8 @@ package com.cardsync.infrastructure.repository.spec.tableFilters;
 import com.cardsync.domain.model.ProcessedFileEntity;
 import com.cardsync.domain.model.enums.FileGroupEnum;
 import com.cardsync.domain.model.enums.FileStatusEnum;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
-import com.cardsync.infrastructure.repository.spec.config.FieldSpec;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.FieldSpec;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.stereotype.Component;
 

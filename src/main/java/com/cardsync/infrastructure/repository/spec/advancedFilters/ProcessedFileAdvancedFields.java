@@ -3,7 +3,7 @@ package com.cardsync.infrastructure.repository.spec.advancedFilters;
 import com.cardsync.domain.filter.ProcessedFileFilter;
 import com.cardsync.domain.model.ProcessedFileEntity;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
 import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;

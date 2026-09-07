@@ -1,7 +1,7 @@
 package com.cardsync.core.reconciliation;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.repository.CreditOrderRepository;

@@ -7,7 +7,7 @@ import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.domain.model.FlagEntity;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;

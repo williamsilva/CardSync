@@ -11,7 +11,7 @@ import com.cardsync.bff.controller.v1.representation.model.fileprocessing.Proces
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileSummaryModel;
 import com.cardsync.bff.controller.v1.representation.model.fileprocessing.ProcessedFileTotalsModel;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ProcessedFileFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;

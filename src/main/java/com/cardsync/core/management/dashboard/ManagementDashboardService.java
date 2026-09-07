@@ -10,7 +10,7 @@ import com.cardsync.bff.controller.v1.representation.model.management.Management
 import com.cardsync.bff.controller.v1.representation.model.management.ManagementDashboardRequest;
 import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
 import com.cardsync.domain.model.enums.ModalityEnum;
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +47,7 @@ import java.util.UUID;
 public class ManagementDashboardService {
 
   private final EntityManager entityManager;
-  private final com.cardsync.infrastructure.repository.spec.config.DateFilterService dateFilterService;
+  private final com.nimbussystems.commons.legacy.filter.spec.DateFilterService dateFilterService;
 
   private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
   private static final int MONEY_SCALE = 2;

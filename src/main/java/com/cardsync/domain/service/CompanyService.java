@@ -2,7 +2,7 @@ package com.cardsync.domain.service;
 
 import com.cardsync.bff.controller.v1.representation.input.CompanyInput;
 import com.cardsync.bff.controller.v1.representation.model.CompanyMinimalModel;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.CompanyFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;

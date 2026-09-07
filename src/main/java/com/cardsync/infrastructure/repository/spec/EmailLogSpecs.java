@@ -4,11 +4,11 @@ import com.cardsync.domain.filter.EmailLogFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.filter.spec.EmailLogAllowedFields;
 import com.cardsync.domain.model.EmailLogEntity;
-import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
-import com.cardsync.domain.model.enums.EmailLogStatusEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogStatusEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
-import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.SpecificationFactory;
 import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import java.util.UUID;
 

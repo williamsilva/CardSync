@@ -2,8 +2,8 @@ package com.cardsync.domain.filter.spec;
 
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
-import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
-import com.cardsync.infrastructure.repository.spec.config.FieldSpec;
+import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
+import com.nimbussystems.commons.legacy.filter.spec.FieldSpec;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;

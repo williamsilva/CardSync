@@ -7,7 +7,7 @@ import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.InstallmentUnschedulingEntity;
 import com.cardsync.domain.model.PendingDebtEntity;
 import com.cardsync.domain.model.SettledDebtEntity;
-import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
 import com.cardsync.domain.service.EmailSenderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

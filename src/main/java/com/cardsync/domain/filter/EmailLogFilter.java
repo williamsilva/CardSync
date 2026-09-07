@@ -1,7 +1,7 @@
 package com.cardsync.domain.filter;
 
-import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
-import com.cardsync.domain.model.enums.EmailLogStatusEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogStatusEnum;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;

@@ -142,7 +142,7 @@ class AdjustmentManualServiceTest {
 
     org.assertj.core.api.Assertions.assertThatThrownBy(
       () -> service.create(input(acquirerId, 82730892, 74705318, "D", new BigDecimal("9.77")))
-    ).isInstanceOf(com.cardsync.domain.exception.BusinessException.class);
+    ).isInstanceOf(com.nimbussystems.commons.legacy.exceptionhandler.BusinessException.class);
 
     verify(adjustmentRepository, never()).save(any());
   }

@@ -1,7 +1,7 @@
 package com.cardsync.domain.filter;
 
 import com.cardsync.domain.model.enums.AdjustmentReasonEnum;
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.math.BigDecimal;

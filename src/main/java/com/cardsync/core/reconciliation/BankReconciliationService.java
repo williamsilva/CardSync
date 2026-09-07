@@ -2,7 +2,7 @@ package com.cardsync.core.reconciliation;
 
 import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.config.FileProcessingProperties;
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.EstablishmentEntity;

@@ -1,6 +1,6 @@
 package com.cardsync.domain.service;
 
-import com.cardsync.domain.model.enums.EmailLogEventTypeEnum;
+import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;

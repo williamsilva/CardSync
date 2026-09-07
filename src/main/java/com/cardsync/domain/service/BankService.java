@@ -1,6 +1,6 @@
 package com.cardsync.domain.service;
 
-import com.cardsync.domain.exception.BusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.BankFilter;
 import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;

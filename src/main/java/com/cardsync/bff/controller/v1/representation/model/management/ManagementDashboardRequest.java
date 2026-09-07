@@ -1,6 +1,6 @@
 package com.cardsync.bff.controller.v1.representation.model.management;
 
-import com.cardsync.domain.model.enums.PeriodEnum;
+import com.nimbussystems.commons.legacy.model.enums.PeriodEnum;
 import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.util.List;
