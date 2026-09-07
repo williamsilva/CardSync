@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.AdjustmentTariffsModelAssembl
 import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentTariffsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.ValueTotalsModel;
 import com.cardsync.domain.filter.AdjustmentFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.service.support.ValueTotalsQueryService;

@@ -1,6 +1,12 @@
 package com.cardsync.api.exceptionhandler;
 
-import com.cardsync.core.web.CorrelationIdFilter;
+
+
+
+import com.nimbussystems.commons.legacy.exceptionhandler.FieldErrorResponse;
+import com.nimbussystems.commons.legacy.exceptionhandler.ApiBusinessException;
+import com.nimbussystems.commons.legacy.exceptionhandler.ErrorResponse;
+import com.nimbussystems.commons.legacy.web.CorrelationIdFilter;
 import com.cardsync.domain.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;

@@ -9,7 +9,7 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.Transact
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.ConciliationWaitingModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.*;
 import com.cardsync.domain.repository.TransactionAcqRepository;

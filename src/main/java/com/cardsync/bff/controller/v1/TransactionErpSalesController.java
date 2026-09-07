@@ -5,8 +5,8 @@ import com.cardsync.bff.controller.v1.representation.model.transactions.Transact
 import com.cardsync.domain.service.TransactionErpSalesService;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.TransactionErpSalesFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.hateoas.PagedModel;

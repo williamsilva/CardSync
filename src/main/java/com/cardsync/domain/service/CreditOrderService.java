@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.mapper.model.CreditOrderModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.transactions.CreditOrderModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.domain.filter.CreditOrderFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.service.support.TransactionTotalsQueryService;

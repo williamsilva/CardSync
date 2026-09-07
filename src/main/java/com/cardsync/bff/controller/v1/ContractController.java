@@ -2,12 +2,12 @@ package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.mapper.model.ContractModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.ContractInput;
-import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.nimbussystems.commons.legacy.web.ListIdsInput;
 import com.cardsync.bff.controller.v1.representation.model.ContractModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ContractFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.model.ContractEntity;
 import com.cardsync.domain.service.ContractService;
 import jakarta.validation.Valid;

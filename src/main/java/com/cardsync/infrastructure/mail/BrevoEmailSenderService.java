@@ -1,5 +1,7 @@
 package com.cardsync.infrastructure.mail;
 
+
+import com.nimbussystems.commons.legacy.mail.BrevoSendEmailRequest;
 import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;

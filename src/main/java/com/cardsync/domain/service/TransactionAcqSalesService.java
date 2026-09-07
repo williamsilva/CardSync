@@ -4,9 +4,9 @@ import com.cardsync.bff.controller.v1.mapper.model.TransactionsAcqModelAssembler
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionsAcqModel;
 import com.cardsync.domain.filter.TransactionAcqSalesFilter;
-import com.cardsync.domain.filter.query.CursorDto;
-import com.cardsync.domain.filter.query.CursorPageResponse;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.CursorDto;
+import com.nimbussystems.commons.legacy.filter.query.CursorPageResponse;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.service.support.KeysetQueryService;

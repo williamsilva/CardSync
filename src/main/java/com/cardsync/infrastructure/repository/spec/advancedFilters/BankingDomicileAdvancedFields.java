@@ -5,7 +5,7 @@ import com.cardsync.domain.model.BankingDomicileEntity;
 import com.cardsync.domain.model.enums.StatusEnum;
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 

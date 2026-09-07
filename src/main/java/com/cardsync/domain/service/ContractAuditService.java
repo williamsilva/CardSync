@@ -3,7 +3,7 @@ package com.cardsync.domain.service;
 import com.cardsync.bff.controller.v1.mapper.model.ContractAuditModelAssembler;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.domain.filter.ContractAuditModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.repository.ContractAuditRepository;
 import com.cardsync.infrastructure.repository.spec.ContractAuditSpecs;

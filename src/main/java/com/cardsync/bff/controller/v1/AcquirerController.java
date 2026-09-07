@@ -4,14 +4,14 @@ import com.cardsync.bff.controller.v1.mapper.model.AcquirerMinimalModelAssembler
 import com.cardsync.bff.controller.v1.mapper.model.AcquirerModelAssembler;
 import com.cardsync.bff.controller.v1.representation.input.AcquirerInput;
 import com.cardsync.bff.controller.v1.representation.input.RelationsCompanyInput;
-import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.nimbussystems.commons.legacy.web.ListIdsInput;
 import com.cardsync.bff.controller.v1.representation.input.RelationsEstablishmentInput;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerMinimalModel;
 import com.cardsync.bff.controller.v1.representation.model.AcquirerModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.AcquirerFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.service.AcquirerService;
 import jakarta.validation.Valid;

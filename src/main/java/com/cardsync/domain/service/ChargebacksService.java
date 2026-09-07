@@ -6,7 +6,7 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.Chargeba
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ChargebackTimelineEventModel;
 import com.cardsync.core.conciliation.analysis.ConciliationDebitChargebackClassifier;
 import com.cardsync.domain.filter.ChargebackAnalysisFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.ChargebackAnalysisStatus;
 import com.cardsync.domain.model.enums.AdjustmentReasonEnum;

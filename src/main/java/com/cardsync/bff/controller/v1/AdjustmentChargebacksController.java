@@ -4,8 +4,8 @@ import com.cardsync.bff.controller.v1.representation.model.conciliation.Chargeba
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ChargebackLifecycleModel;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.ChargebackAnalysisFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.service.ChargebacksService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

@@ -4,7 +4,7 @@ import com.cardsync.bff.controller.v1.representation.input.EstablishmentInput;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.EstablishmentFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.AcquirerEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.EstablishmentEntity;

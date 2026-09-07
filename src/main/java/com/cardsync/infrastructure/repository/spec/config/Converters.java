@@ -1,6 +1,6 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
-import com.cardsync.domain.filter.query.RangeValue;
+import com.nimbussystems.commons.legacy.filter.query.RangeValue;
 
 import java.lang.reflect.Array;
 import java.math.BigDecimal;

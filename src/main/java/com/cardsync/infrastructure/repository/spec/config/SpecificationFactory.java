@@ -1,8 +1,10 @@
 package com.cardsync.infrastructure.repository.spec.config;
 
-import com.cardsync.domain.filter.query.ColumnFilterDto;
-import com.cardsync.domain.filter.query.FilterRuleDto;
-import com.cardsync.domain.filter.query.RangeValue;
+
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
+import com.nimbussystems.commons.legacy.filter.query.ColumnFilterDto;
+import com.nimbussystems.commons.legacy.filter.query.FilterRuleDto;
+import com.nimbussystems.commons.legacy.filter.query.RangeValue;
 import com.cardsync.domain.model.enums.PeriodEnum;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;

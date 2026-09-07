@@ -1,7 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.model.EmailSettingsModel;
-import com.cardsync.bff.controller.v1.representation.model.EmailSettingsRequest;
+import com.nimbussystems.commons.legacy.mail.EmailSettingsRequest;
 import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.core.security.CheckSecurity;
 import jakarta.validation.Valid;

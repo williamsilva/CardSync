@@ -1,5 +1,15 @@
+# Nota (2026-09-07): variáveis de serviço do Railway só chegam ao container em runtime, nunca ao
+# processo de build do Dockerfile, a menos que sejam declaradas com ARG no stage que precisa delas
+# (Railway então injeta como --build-arg automaticamente) - mesmo achado feito no NimbusFlowServer/
+# NimbusNovaxServer (Gradle) ao consumir o NimbusCommonsServer pela primeira vez. Aqui (Maven) o
+# equivalente ao gradle.properties é o ~/.m2/settings.xml - gerado abaixo a partir dos ARGs, nunca
+# hardcoded na imagem final (só existe no stage de build, descartado no stage runtime).
 FROM maven:3.9.9-eclipse-temurin-21 AS build
 WORKDIR /app
+ARG GITHUB_ACTOR
+ARG GITHUB_TOKEN
+RUN mkdir -p /root/.m2 && \
+    echo "<settings><servers><server><id>github</id><username>${GITHUB_ACTOR}</username><password>${GITHUB_TOKEN}</password></server></servers></settings>" > /root/.m2/settings.xml
 
 COPY pom.xml ./
 RUN mvn -DskipTests dependency:go-offline --no-transfer-progress

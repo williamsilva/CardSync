@@ -1,8 +1,8 @@
 package com.cardsync.infrastructure.repository.spec;
 
 import com.cardsync.domain.filter.ContractAuditModelFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.query.SortDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.SortDto;
 import com.cardsync.domain.model.ContractAuditEntity;
 import com.cardsync.domain.model.enums.ModalityEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
@@ -10,7 +10,7 @@ import com.cardsync.infrastructure.repository.spec.advancedFilters.ContractAudit
 import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.cardsync.infrastructure.repository.spec.config.DateFilterService;
 import com.cardsync.infrastructure.repository.spec.config.SpecificationFactory;
-import com.cardsync.infrastructure.repository.spec.config.Specs;
+import com.nimbussystems.commons.legacy.filter.spec.Specs;
 import com.cardsync.infrastructure.repository.spec.tableFilters.ContractAuditTableFields;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;

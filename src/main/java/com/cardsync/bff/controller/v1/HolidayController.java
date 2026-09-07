@@ -1,13 +1,13 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.mapper.model.HolidayModelAssembler;
-import com.cardsync.bff.controller.v1.representation.input.ListIdsInput;
+import com.nimbussystems.commons.legacy.web.ListIdsInput;
 import com.cardsync.bff.controller.v1.representation.model.holiday.HolidayModel;
 import com.cardsync.bff.controller.v1.representation.input.HolidayInput;
 import com.cardsync.core.security.CheckSecurity;
 import com.cardsync.domain.filter.HolidayFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
-import com.cardsync.domain.filter.support.PageableMapper;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.support.PageableMapper;
 import com.cardsync.domain.model.HolidayEntity;
 import com.cardsync.domain.service.HolidayService;
 import jakarta.validation.Valid;

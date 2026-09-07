@@ -25,7 +25,22 @@
     <relativePath/>
   </parent>
 
+  <repositories>
+    <repository>
+      <id>github</id>
+      <url>https://maven.pkg.github.com/williamsilva/nimbuscommonslegacy</url>
+    </repository>
+  </repositories>
+
   <dependencies>
+    <!-- Código idêntico entre CardsyncServer/NimbusAuthServer, extraído em 2026-09-07 - ver README
+         de github.com/williamsilva/nimbuscommonslegacy pro que está aqui e o que ficou de fora. -->
+    <dependency>
+      <groupId>com.nimbussystems</groupId>
+      <artifactId>nimbus-commons-legacy</artifactId>
+      <version>0.1.0</version>
+    </dependency>
+
     <!-- Starters (preferenciais) -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

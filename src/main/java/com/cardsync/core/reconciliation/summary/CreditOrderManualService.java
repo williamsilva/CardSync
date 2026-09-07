@@ -14,7 +14,7 @@ import com.cardsync.core.file.acquirerreport.dto.AcquirerPaymentReportRow;
 import com.cardsync.domain.exception.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.filter.SaleSummaryFilter;
-import com.cardsync.domain.filter.query.ListQueryDto;
+import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
