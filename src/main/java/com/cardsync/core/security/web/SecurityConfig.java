@@ -10,6 +10,7 @@ import com.nimbussystems.commons.legacy.security.web.SpaCsrfTokenRequestHandler;
 import com.nimbussystems.commons.legacy.security.web.SpaRequestMatcher;
 import com.nimbussystems.commons.legacy.security.web.Spa403AccessDeniedHandler;
 import com.nimbussystems.commons.legacy.security.web.Spa401EntryPoint;
+import com.cardsync.core.config.NimbusAuthClientProperties;
 import com.cardsync.core.security.CardsyncSecurityProperties;
 import com.cardsync.core.security.resourceserver.ResourceServerJwtBeans;
 import com.nimbussystems.commons.legacy.security.web.headers.ConditionalHstsHeaderWriter;
@@ -197,6 +198,32 @@ public class SecurityConfig implements EnvironmentAware {
         "username"
       );
     };
+  }
+
+  // ---------------------------
+  // 0) INTERNAL BACKUP CHAIN (/internal/backup/**) - machine-to-machine, chamada pelo NimbusAuth
+  // pra puxar o backup deste servidor (banco + arquivos), autenticado por secret compartilhado
+  // (ver InternalBackupSecretFilter), não por sessão/JWT. Reaproveita o MESMO secret já
+  // configurado em NimbusAuthClientProperties (NIMBUS_INTERNAL_API_SECRET) - nenhuma env var
+  // nova. @Order menor que apiChain (10) e bffChain (20) pra ser avaliada primeiro - o
+  // securityMatcher restrito a /internal/backup/** garante que ela nunca interfere nas outras.
+  // ---------------------------
+  @Bean
+  @Order(5)
+  public SecurityFilterChain internalBackupChain(
+    HttpSecurity http, NimbusAuthClientProperties nimbusAuthClientProperties
+  ) throws Exception {
+
+    http.securityMatcher("/internal/backup/**");
+    http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    http.csrf(AbstractHttpConfigurer::disable);
+    http.cors(AbstractHttpConfigurer::disable);
+    http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+    http.addFilterBefore(
+      new InternalBackupSecretFilter(nimbusAuthClientProperties.getInternalApiSecret()),
+      HeaderWriterFilter.class
+    );
+    return http.build();
   }
 
   // ---------------------------
