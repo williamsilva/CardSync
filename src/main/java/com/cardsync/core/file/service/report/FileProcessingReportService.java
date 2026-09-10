@@ -377,8 +377,13 @@ public class FileProcessingReportService {
           missing.addAll(missingEstEntries);
           missingFiles = missing;
 
+          // "attention": os arquivos-envelope (EEFI/EEVC/EEVD) chegaram todos, mas algum PV
+          // ativo do adquirente não aparece em nenhum deles - situação bem diferente de um
+          // envelope inteiro faltando (isso continua "partial"/"missing" via resolveStatus).
+          // Sinalizado no calendário como "completo com pendência" (verde + alerta), não como
+          // incompleto (laranja) - ver ImportedFilesCalendarComponent.STATUS_STYLES.
           String fileStatus = resolveStatus(filesReceived, expectedFiles);
-          status = "complete".equals(fileStatus) && !missingEstEntries.isEmpty() ? "partial" : fileStatus;
+          status = "complete".equals(fileStatus) && !missingEstEntries.isEmpty() ? "attention" : fileStatus;
 
         } else {
           missingFiles = resolveMissingAcquirerFiles(adqFiles, acquirer, expectedTypes);
@@ -410,7 +415,15 @@ public class FileProcessingReportService {
       })
       .sum();
 
-    return new ImportedFileGroupStatusModel(resolveStatus(received, expected), received, expected, entities);
+    // O agregado received/expected só enxerga arquivos-envelope, não PVs - por isso pode
+    // fechar "complete" mesmo com uma entity individual em "attention" (PV faltando dentro de
+    // um envelope completo). Promove o status do grupo do dia pra "attention" nesse caso, pra
+    // o badge ADQ do calendário não mostrar 100% verde sem alertar a pendência.
+    String aggregateStatus = resolveStatus(received, expected);
+    boolean anyAttention = entities.stream().anyMatch(e -> "attention".equals(e.status()));
+    String groupStatus = "complete".equals(aggregateStatus) && anyAttention ? "attention" : aggregateStatus;
+
+    return new ImportedFileGroupStatusModel(groupStatus, received, expected, entities);
   }
 
   private ImportedFileGroupStatusModel buildBankStatus(

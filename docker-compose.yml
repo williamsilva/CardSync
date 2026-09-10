@@ -53,6 +53,14 @@ services:
       # mecanismo do NimbusDeskServer, que registrou seu client pela tela e por isso exige isto).
       CARDSYNC_BFF_CLIENT_ID: ${CARDSYNC_BFF_CLIENT_ID:-cardsync-bff}
       CARDSYNC_BFF_CLIENT_SECRET: ${CARDSYNC_BFF_CLIENT_SECRET:-changeit-dev}
+      # file-processing.base-path: sem isto, cai no default local do application.yml
+      # (C:/cardsync/files) - dentro do container (Linux) "C:" não é drive nenhum, vira nome de
+      # pasta literal, e o processador varre um diretório vazio "/app/C:/cardsync/..." que nunca
+      # tem relação com os arquivos que a gente coloca no Windows. Por isso "Processar ERP"
+      # sempre finalizava em 0s como se a pasta estivesse vazia (achado real 2026-09-09). Aponta
+      # pro mesmo mount path usado em produção/Railway (/data/cardsync, ver README) - o volume
+      # abaixo é quem faz esse caminho existir de fato dentro do container.
+      FILE_PROCESSING_BASE_PATH: ${FILE_PROCESSING_BASE_PATH:-/data/cardsync}
     ports:
       # Só 127.0.0.1: publicar em todas as interfaces faz o navegador tentar o loopback IPv6
       # (::1) primeiro (preferência do Windows pra "localhost"), e o encaminhamento IPv6 do
@@ -65,3 +73,10 @@ services:
       # host.docker.internal já funciona por padrão no Docker Desktop (Windows/Mac); no Linux
       # precisa desta entrada explícita.
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Bind mount da pasta de arquivos ERP/adquirente/banco pro mesmo path que
+      # FILE_PROCESSING_BASE_PATH usa dentro do container. Default aponta pra pasta que já era
+      # usada em dev antes de existir Docker aqui (C:/cardsync/files) - se você já tem arquivo
+      # de teste lá, continua funcionando sem mudar nada. Sobrescreva FILE_PROCESSING_HOST_PATH
+      # no .env se quiser apontar pra outro lugar no host.
+      - ${FILE_PROCESSING_HOST_PATH:-C:/cardsync/files}:/data/cardsync
