@@ -85,13 +85,26 @@ public class AnticipationSpecs extends BaseSpecificationSupport<AnticipationEnti
   }
 
   private Specification<AnticipationEntity> orderByTableSort(List<SortDto> sort) {
-    return tableSort(sort, "pvNumber", Map.of(
-      "conciliationDate",  sortField("saleReconciliationDate"),
-      "company",           sortJoin("company", "fantasyName"),
-      "establishment",     sortJoin("establishment", "pvNumber"),
-      "acquirer",          sortJoin("acquirer", "fantasyName"),
-      "flag",              sortJoin("flag", "name"),
-      "adjustmentValue",   sortJoin("adjustment", "adjustmentValue")
+    return tableSort(sort, "pvNumber", Map.ofEntries(
+      Map.entry("conciliationDate",  sortField("saleReconciliationDate")),
+      Map.entry("company",           sortJoin("company", "fantasyName")),
+      Map.entry("establishment",     sortJoin("establishment", "pvNumber")),
+      Map.entry("acquirer",          sortJoin("acquirer", "fantasyName")),
+      Map.entry("flag",              sortJoin("flag", "name")),
+      Map.entry("adjustmentValue",   sortJoin("adjustment", "adjustmentValue")),
+
+      // Mesmas 4 colunas que só existem via associação em AnticipationTableFields (filtro) —
+      // sem alias aqui, o sort cai no fallback direto no root (directRootPathOrNull): silencioso
+      // (sem ordenar) pras 3 de salesSummary, ou ordena pelo texto cru errado no caso de "bank"
+      // (AnticipationEntity.bank é só o texto importado, sem FK — ver comentário em
+      // AnticipationTableFields). Achado real 2026-09-10: sort por "transactionsStatus" batia
+      // direto em AnticipationEntity via Sort.by() do Spring Data (não pelo tableSort aqui, que
+      // já é seguro) e quebrava com "No property 'transactionsStatus' found" — ver o fix em
+      // AnticipationService#search (pageableWithoutSort).
+      Map.entry("bank",               sortJoin("bankingDomicile", "bank", "name")),
+      Map.entry("numberCvNsu",        sortJoin("salesSummary", "numberCvNsu")),
+      Map.entry("transactionsStatus", sortJoin("salesSummary", "transactionsStatus")),
+      Map.entry("statusPaymentBank",  sortJoin("salesSummary", "statusPaymentBank"))
     ));
   }
 }

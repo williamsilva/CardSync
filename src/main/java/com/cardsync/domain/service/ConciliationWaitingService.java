@@ -64,9 +64,21 @@ public class ConciliationWaitingService {
 
     long total = transactionErpRepository.count(filterSpec);
 
+    // Pageable só de page/size (sem sort): dataSpec já monta o ORDER BY completo via
+    // orderByTableSort/tableSort (com os aliases de colunas ligadas por join).
+    // SimpleJpaRepository#findAll(Specification, Pageable) reaplica pageable.getSort() por
+    // cima, resolvendo o nome bruto direto contra TransactionErpEntity (sem conhecer os
+    // aliases) — sort por qualquer coluna que não seja campo direto da entidade quebra com "No
+    // property 'X' found for type 'TransactionErpEntity'" (mesmo padrão de CreditOrderService/
+    // AnticipationService, achado real 2026-09-10). O pageable original (com sort) continua
+    // sendo usado só pro metadado da resposta (PageImpl abaixo).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<ConciliationWaitingModel> content = total == 0
       ? List.of()
-      : transactionErpRepository.findAll(dataSpec, pageable)
+      : transactionErpRepository.findAll(dataSpec, pageableWithoutSort)
       .stream()
       .map(conciliationWaitingErpModelAssembler::toModel)
       .toList();
@@ -81,9 +93,14 @@ public class ConciliationWaitingService {
 
     long total = transactionAcqRepository.count(filterSpec);
 
+    // Ver comentário equivalente em missingAcquirer() acima (mesmo padrão, TransactionAcqEntity).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<ConciliationWaitingModel> content = total == 0
       ? List.of()
-      : transactionAcqRepository.findAll(dataSpec, pageable)
+      : transactionAcqRepository.findAll(dataSpec, pageableWithoutSort)
       .stream()
       .map(conciliationWaitingAcqModelAssembler::toModel)
       .toList();
@@ -98,12 +115,17 @@ public class ConciliationWaitingService {
 
     long total = transactionErpRepository.count(filterSpec);
 
+    // Ver comentário equivalente em missingAcquirer() acima (mesmo padrão, TransactionErpEntity).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<ConciliationWaitingModel> content;
 
     if (total == 0) {
       content = List.of();
     } else {
-      List<TransactionErpEntity> erps = transactionErpRepository.findAll(dataSpec, pageable).getContent();
+      List<TransactionErpEntity> erps = transactionErpRepository.findAll(dataSpec, pageableWithoutSort).getContent();
       Map<Long, List<TransactionAcqEntity>> candidatesByNsu = loadOtherDivergenceAcquirerCandidates(erps);
 
       content = erps.stream()

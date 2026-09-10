@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -34,9 +35,21 @@ public class ContractAuditService {
 
     long total = contractAuditRepository.count(filterSpec);
 
+    // Pageable só de page/size (sem sort): dataSpec já monta o ORDER BY completo via
+    // orderByTableSort/tableSort (com os aliases de colunas ligadas por join).
+    // SimpleJpaRepository#findAll(Specification, Pageable) reaplica pageable.getSort() por
+    // cima, resolvendo o nome bruto direto contra ContractAuditEntity (sem conhecer os
+    // aliases) — sort por qualquer coluna que não seja campo direto da entidade quebra com "No
+    // property 'X' found for type 'ContractAuditEntity'" (mesmo padrão de CreditOrderService/
+    // AnticipationService, achado real 2026-09-10). O pageable original (com sort) continua
+    // sendo usado só pro metadado da resposta (PageImpl abaixo).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<ContractAuditModel> content = total == 0
       ? List.of()
-      : contractAuditRepository.findAll(dataSpec, pageable)
+      : contractAuditRepository.findAll(dataSpec, pageableWithoutSort)
       .stream()
       .map(contractAuditModelAssembler::toModel)
       .toList();

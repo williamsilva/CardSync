@@ -12,6 +12,7 @@ import com.cardsync.infrastructure.repository.spec.AnticipationSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -35,9 +36,22 @@ public class AnticipationService {
 
     long total = anticipationRepository.count(filterSpec);
 
+    // Pageable só de page/size (sem sort): dataSpec já monta o ORDER BY completo via
+    // orderByTableSort/tableSort (com os aliases de colunas ligadas por join, ex. "transactionsStatus"
+    // -> salesSummary.transactionsStatus). SimpleJpaRepository#findAll(Specification, Pageable)
+    // reaplica pageable.getSort() por cima, resolvendo o nome bruto direto contra AnticipationEntity
+    // (sem conhecer os aliases) — sort por qualquer coluna que não seja campo direto da entidade
+    // (ex.: "transactionsStatus", que só existe via salesSummary) quebra com "No property 'X' found
+    // for type 'AnticipationEntity'" (achado real 2026-09-10, mesmo padrão já resolvido em
+    // CreditOrderService). O pageable original (com sort) continua sendo usado só pro metadado da
+    // resposta (PageImpl abaixo).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<AnticipationModel> content = total == 0
       ? List.of()
-      : anticipationRepository.findAll(dataSpec, pageable)
+      : anticipationRepository.findAll(dataSpec, pageableWithoutSort)
       .stream()
       .map(transactionsAcqModelAssembler::toModel)
       .toList();

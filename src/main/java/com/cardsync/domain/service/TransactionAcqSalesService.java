@@ -15,6 +15,7 @@ import com.cardsync.infrastructure.repository.spec.TransactionAcqSpecs;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -43,9 +44,21 @@ public class TransactionAcqSalesService {
 
     long total = transactionAcqRepository.count(filterSpec);
 
+    // Pageable só de page/size (sem sort): dataSpec já monta o ORDER BY completo via
+    // orderByTableSort/tableSort (com os aliases de colunas ligadas por join).
+    // SimpleJpaRepository#findAll(Specification, Pageable) reaplica pageable.getSort() por
+    // cima, resolvendo o nome bruto direto contra TransactionAcqEntity (sem conhecer os
+    // aliases) — sort por qualquer coluna que não seja campo direto da entidade quebra com "No
+    // property 'X' found for type 'TransactionAcqEntity'" (mesmo padrão de CreditOrderService/
+    // AnticipationService, achado real 2026-09-10). O pageable original (com sort) continua
+    // sendo usado só pro metadado da resposta (PageImpl abaixo).
+    Pageable pageableWithoutSort = pageable.isPaged()
+      ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())
+      : Pageable.unpaged();
+
     List<TransactionsAcqModel> content = total == 0
       ? List.of()
-      : transactionAcqRepository.findAll(dataSpec, pageable)
+      : transactionAcqRepository.findAll(dataSpec, pageableWithoutSort)
       .stream()
       .map(transactionsAcqModelAssembler::toModel)
       .toList();
