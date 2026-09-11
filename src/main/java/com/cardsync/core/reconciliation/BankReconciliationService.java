@@ -1152,29 +1152,39 @@ public class BankReconciliationService {
   }
 
   private void propagateCreditOrdersToInstallments(List<CreditOrderEntity> orders, ReleasesBankEntity release, boolean reprocess) {
-    // Agrupa por acquirerId → { rvNumber → installmentNumber } para busca em lote
-    Map<UUID, Map<Integer, Integer>> acquirerRvToInstNum = new java.util.LinkedHashMap<>();
+    // Agrupa por acquirerId → { rvNumber → installmentNumbers } para busca em lote. Usa Set (não
+    // um único Integer) porque uma mesma venda parcelada pode ter MAIS DE UMA CreditOrder com o
+    // MESMO rvNumber processada no mesmo lote — uma por parcela/installmentNumber, ex.: duas
+    // parcelas da mesma venda antecipadas (Anticipation) e conciliadas no mesmo lançamento
+    // bancário. Achado real 2026-09-11: com Map<Integer,Integer> (1 installmentNumber só por
+    // rvNumber), a 2ª ordem do mesmo rvNumber processada SOBRESCREVIA a 1ª no mapa, deixando a
+    // parcela real (InstallmentAcqEntity) correspondente à 1ª ordem para trás — nunca marcada
+    // como paga mesmo com a CreditOrder já PAID, causando o resumo de vendas (SalesSummary)
+    // ficar preso em "Parcialmente Pago" mesmo com todas as ordens de crédito conciliadas (visto
+    // em ~27% dos resumos com Anticipation numa base de teste real).
+    Map<UUID, Map<Integer, Set<Integer>>> acquirerRvToInstNums = new java.util.LinkedHashMap<>();
     for (CreditOrderEntity order : orders) {
       if (order.getAcquirer() == null || order.getRvNumber() == null || order.getInstallmentNumber() == null) continue;
-      acquirerRvToInstNum
+      acquirerRvToInstNums
         .computeIfAbsent(order.getAcquirer().getId(), k -> new java.util.LinkedHashMap<>())
-        .put(order.getRvNumber(), order.getInstallmentNumber());
+        .computeIfAbsent(order.getRvNumber(), k -> new java.util.LinkedHashSet<>())
+        .add(order.getInstallmentNumber());
     }
-    if (acquirerRvToInstNum.isEmpty()) return;
+    if (acquirerRvToInstNums.isEmpty()) return;
 
     List<InstallmentAcqEntity> allInstallments = new java.util.ArrayList<>();
-    for (var entry : acquirerRvToInstNum.entrySet()) {
+    for (var entry : acquirerRvToInstNums.entrySet()) {
       UUID acquirerId = entry.getKey();
-      Map<Integer, Integer> rvToInstNum = entry.getValue();
+      Map<Integer, Set<Integer>> rvToInstNums = entry.getValue();
       List<InstallmentAcqEntity> batch = installmentAcqRepository
-        .findByAcquirerIdAndRvNumbers(acquirerId, rvToInstNum.keySet(), reprocess);
+        .findByAcquirerIdAndRvNumbers(acquirerId, rvToInstNums.keySet(), reprocess);
       for (InstallmentAcqEntity ia : batch) {
         if (ia.getTransaction() == null) continue;
         // Prioriza o rvNumber DA PARCELA (Cielo: cada parcela tem sua própria Chave UR) —
         // só cai pro rvNumber da transação quando a parcela não tem o próprio (caso do Rede).
         Integer rv = ia.getRvNumber() != null ? ia.getRvNumber() : ia.getTransaction().getRvNumber();
-        Integer expectedInst = rv != null ? rvToInstNum.get(rv) : null;
-        if (expectedInst != null && expectedInst.equals(ia.getInstallment())) {
+        Set<Integer> expectedInsts = rv != null ? rvToInstNums.get(rv) : null;
+        if (expectedInsts != null && expectedInsts.contains(ia.getInstallment())) {
           allInstallments.add(ia);
         }
       }
@@ -1315,6 +1325,109 @@ public class BankReconciliationService {
     );
     recomputeSalesSummariesFromTransactionIds(summaryIds);
     return summaryIds.size();
+  }
+
+  /**
+   * Reparo pontual (idempotente): corrige InstallmentAcqEntity que ficaram pendentes mesmo com
+   * a CreditOrder correspondente (mesmo acquirer+rvNumber+installmentNumber) já paga, por causa
+   * de um bug em {@link #propagateCreditOrdersToInstallments} — o Map usado lá só guardava 1
+   * installmentNumber por rvNumber, perdendo parcelas irmãs da mesma venda processadas no mesmo
+   * lote (ex.: duas parcelas antecipadas via Anticipation, cada uma virando uma CreditOrder
+   * sintética, conciliadas no mesmo lançamento bancário — achado real 2026-09-11, causava ~27%
+   * dos resumos de vendas com Anticipation ficarem presos em "Parcialmente Pago" mesmo com todas
+   * as ordens de crédito já conciliadas). Rodar de novo sobre dados já corrigidos não repete
+   * nada (só encontra installments com releaseBank ainda nulo).
+   *
+   * @return quantas InstallmentAcqEntity foram corrigidas.
+   */
+  @Transactional
+  public int repairInstallmentsMissingCreditOrderPropagation() {
+    List<UUID> eligibleIds = creditOrderRepository.findPaidIdsWithReleaseBankForInstallmentPropagationRepair(
+      StatusPaymentBankEnum.PAID.getCode()
+    );
+    if (eligibleIds.isEmpty()) {
+      log.info("🔧 Reparo de propagação CreditOrder→Parcela: nenhuma CreditOrder paga elegível encontrada.");
+      return 0;
+    }
+
+    int batchSize = 2000;
+    int totalRepaired = 0;
+    Set<UUID> affectedSalesSummaryIds = new HashSet<>();
+    Set<UUID> touchedReleaseIds = new java.util.LinkedHashSet<>();
+
+    log.info("🔧 Iniciando reparo de propagação CreditOrder→Parcela: creditOrdersElegiveis={}", eligibleIds.size());
+
+    for (int start = 0; start < eligibleIds.size(); start += batchSize) {
+      List<UUID> batchIds = eligibleIds.subList(start, Math.min(start + batchSize, eligibleIds.size()));
+      List<CreditOrderEntity> orders = creditOrderRepository.findByIdsForInstallmentPropagationRepair(batchIds);
+
+      // Agrupa por (acquirerId, rvNumber, installmentNumber) -> releaseBank DA PRÓPRIA ordem —
+      // diferente de propagateCreditOrdersToInstallments (1 release compartilhado por chamada,
+      // porque ali todas as ordens do lote casaram com o MESMO release), aqui cada CreditOrder
+      // pode ter sido paga num lançamento bancário diferente.
+      Map<UUID, Map<Integer, Map<Integer, ReleasesBankEntity>>> acquirerRvInstToRelease = new HashMap<>();
+      for (CreditOrderEntity order : orders) {
+        if (order.getAcquirer() == null || order.getAcquirer().getId() == null
+          || order.getRvNumber() == null || order.getInstallmentNumber() == null
+          || order.getReleaseBank() == null) continue;
+        acquirerRvInstToRelease
+          .computeIfAbsent(order.getAcquirer().getId(), k -> new HashMap<>())
+          .computeIfAbsent(order.getRvNumber(), k -> new HashMap<>())
+          .put(order.getInstallmentNumber(), order.getReleaseBank());
+      }
+
+      int repairedInBatch = 0;
+      for (var acquirerEntry : acquirerRvInstToRelease.entrySet()) {
+        UUID acquirerId = acquirerEntry.getKey();
+        Map<Integer, Map<Integer, ReleasesBankEntity>> rvToInstToRelease = acquirerEntry.getValue();
+
+        List<InstallmentAcqEntity> candidates = installmentAcqRepository
+          .findByAcquirerIdAndRvNumbers(acquirerId, rvToInstToRelease.keySet(), false);
+
+        for (InstallmentAcqEntity ia : candidates) {
+          if (ia.getTransaction() == null || ia.getReleaseBank() != null) continue;
+          Integer rv = ia.getRvNumber() != null ? ia.getRvNumber() : ia.getTransaction().getRvNumber();
+          Map<Integer, ReleasesBankEntity> instToRelease = rv != null ? rvToInstToRelease.get(rv) : null;
+          ReleasesBankEntity release = instToRelease != null ? instToRelease.get(ia.getInstallment()) : null;
+          if (release == null) continue;
+
+          applyReleaseToInstallments(List.of(ia), release);
+          installmentAcqRepository.save(ia);
+          repairedInBatch++;
+          if (release.getId() != null) touchedReleaseIds.add(release.getId());
+        }
+      }
+
+      totalRepaired += repairedInBatch;
+      entityManager.flush();
+      entityManager.clear();
+      log.info(
+        "🔧 Lote de reparo concluído: creditOrdersNoLote={}, parcelasCorrigidasNoLote={}",
+        orders.size(), repairedInBatch
+      );
+    }
+
+    // Reaproveita propagateReleaseStatusTransactions (mesma lógica de recomputar o status da
+    // TransactionAcqEntity/TransactionErpEntity a partir das installments) para cada release
+    // bancário tocado pelo reparo, em vez de duplicar essa lógica aqui.
+    if (!touchedReleaseIds.isEmpty()) {
+      for (ReleasesBankEntity release : releasesBankRepository.findAllById(touchedReleaseIds)) {
+        propagateReleaseStatusTransactions(release, affectedSalesSummaryIds);
+      }
+      entityManager.flush();
+      entityManager.clear();
+    }
+
+    if (!affectedSalesSummaryIds.isEmpty()) {
+      recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIds);
+      entityManager.flush();
+    }
+
+    log.info(
+      "✅ Reparo de propagação CreditOrder→Parcela concluído: parcelasCorrigidas={}, releasesAfetados={}, resumosRecalculados={}",
+      totalRepaired, touchedReleaseIds.size(), affectedSalesSummaryIds.size()
+    );
+    return totalRepaired;
   }
 
   void recomputeSalesSummariesFromTransactionIds(Set<UUID> salesSummaryIds) {

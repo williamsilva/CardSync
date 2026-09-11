@@ -435,4 +435,35 @@ public interface CreditOrderRepository extends JpaRepository<CreditOrderEntity, 
     @Param("paymentPendingStatus") Integer paymentPendingStatus,
     @Param("paymentPartialStatus") Integer paymentPartialStatus
   );
+
+  /**
+   * Reparo (ver BankReconciliationService#repairInstallmentsMissingCreditOrderPropagation):
+   * ids de CreditOrders já pagas (com releaseBank vinculado) que servem de base para propagar o
+   * pagamento para a InstallmentAcqEntity correspondente (mesmo acquirer+rvNumber+
+   * installmentNumber) — achado real 2026-09-11: um bug em propagateCreditOrdersToInstallments
+   * (Map<rv,installment> só guardava 1 installmentNumber por rvNumber) perdia parcelas irmãs da
+   * mesma venda processadas no mesmo lote (ex.: duas parcelas antecipadas via Anticipation e
+   * conciliadas no mesmo lançamento bancário), deixando a InstallmentAcqEntity de uma delas
+   * pendente para sempre mesmo com a CreditOrder já paga.
+   */
+  @Query("""
+    select co.id from CreditOrderEntity co
+    where co.statusPaymentBank = :paidStatus
+      and co.releaseBank is not null
+      and co.acquirer is not null
+      and co.rvNumber is not null
+      and co.installmentNumber is not null
+    order by co.id asc
+  """)
+  List<UUID> findPaidIdsWithReleaseBankForInstallmentPropagationRepair(@Param("paidStatus") Integer paidStatus);
+
+  /** Carrega em lote os ids acima, com releaseBank/acquirer/salesSummary em fetch join. */
+  @Query("""
+    select co from CreditOrderEntity co
+    left join fetch co.releaseBank
+    left join fetch co.acquirer
+    left join fetch co.salesSummary
+    where co.id in :ids
+  """)
+  List<CreditOrderEntity> findByIdsForInstallmentPropagationRepair(@Param("ids") Collection<UUID> ids);
 }

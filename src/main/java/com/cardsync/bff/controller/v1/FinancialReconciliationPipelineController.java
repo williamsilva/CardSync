@@ -63,4 +63,17 @@ public class FinancialReconciliationPipelineController {
   public BankReconciliationResult reconcileCreditOrderBankRelease() {
     return bankReconciliationService.reconcilePending();
   }
+
+  /**
+   * Reparo pontual (idempotente) — ver {@link BankReconciliationService#repairInstallmentsMissingCreditOrderPropagation}.
+   * Sem endpoint prévio para esse tipo de reparo pontual no controller (mesmo padrão do já
+   * existente {@code recomputeAllSalesSummariesFromTransactions}, que nunca teve endpoint
+   * dedicado) — adicionado aqui para poder rodar sob demanda sem precisar de acesso direto ao
+   * banco/console.
+   */
+  @PostMapping("/repair/installments-missing-credit-order-propagation")
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanProcess
+  public int repairInstallmentsMissingCreditOrderPropagation() {
+    return bankReconciliationService.repairInstallmentsMissingCreditOrderPropagation();
+  }
 }
