@@ -214,12 +214,25 @@ public class BankReconciliationService {
       }
     }
 
-    if (mode.shouldTryInstallmentsAfterCreditOrders() || mode.shouldTryInstallmentsFirst()) {
-      reconcilePendingReleasesByInstallments(config, strictness, analyzedReleaseIds, result);
+    boolean installmentsStepRuns = mode.shouldTryInstallmentsAfterCreditOrders() || mode.shouldTryInstallmentsFirst();
+    if (installmentsStepRuns) {
+      reconcilePendingReleasesByInstallments(config, strictness, analyzedReleaseIds, result, batchSize, safeDateGapDays);
     }
 
-    BankReconciliationResult partialResult = result.toResult();
-    result.setReleasesWithoutMatch(Math.max(0, eligibleOrderCount - partialResult.getCreditOrdersReconciled()));
+    // Só aproxima releasesWithoutMatch por "ordens elegíveis - ordens conciliadas" quando a etapa
+    // de parcelas NÃO roda (ex.: modo CREDIT_ORDER_ONLY) — nesse caso reconcilePendingReleasesByInstallments
+    // nunca é chamado, então releaseWithoutMatch() nunca é incrementado, e essa é a melhor
+    // aproximação disponível. Quando a etapa de parcelas roda, ela já preenche releasesWithoutMatch
+    // com a contagem REAL de releases reavaliados sem nenhuma correspondência (unidade correta:
+    // releases, não ordens) — sobrescrever isso aqui com uma contagem de ORDENS (achado real
+    // 2026-09-11: "Analisados: 24, Sem correspondência: 5704" na tela de histórico, porque
+    // eligibleOrderCount contava ordens de crédito, não releases, e é um universo bem maior e
+    // não comparável ao nº de releases de fato analisados pela etapa de parcelas) mistura duas
+    // unidades diferentes e produz um número sem sentido para quem olha o histórico.
+    if (!installmentsStepRuns) {
+      BankReconciliationResult partialResult = result.toResult();
+      result.setReleasesWithoutMatch(Math.max(0, eligibleOrderCount - partialResult.getCreditOrdersReconciled()));
+    }
 
     BankReconciliationResult built = result.toResult();
     BigDecimal reconciledDifference = built.getTotalReleaseValueReconciled()
@@ -602,34 +615,119 @@ public class BankReconciliationService {
     FileProcessingProperties.Reconciliation config,
     ReconciliationMatchContext.MatchStrictness strictness,
     Set<UUID> analyzedReleaseIds,
-    BankReconciliationResult.Counter result
+    BankReconciliationResult.Counter result,
+    int batchSize,
+    int safeDateGapDays
   ) {
-    List<ReleasesBankEntity> releases = releasesBankRepository.findForBankReconciliation(
-      STATUS_PENDING,
-      reconciliationSettingsService.isReprocessBankAcquirer()
+    boolean reprocess = reconciliationSettingsService.isReprocessBankAcquirer();
+    int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
+    int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
+
+    // Versão em lote (por empresa, com flush/clear ao final de cada lote) de
+    // reconcilePendingReleasesByInstallments — antes carregava TODOS os releases pendentes numa
+    // única sessão do Hibernate sem nenhuma pausa (~50 mil no banco de dev), travando o processo
+    // (achado real 2026-09-11: esse caminho nunca tinha rodado de verdade em nenhum ambiente até
+    // agora, só ativo em modos != CREDIT_ORDER_ONLY). Mesmo padrão já usado e comprovado em
+    // reconcileEligibleCreditOrders/packIdsByCompanyIntoBatches, reaproveitado aqui.
+    List<Object[]> eligibleRows = releasesBankRepository.findEligibleIdsGroupedByCompanyForInstallmentReconciliation(
+      STATUS_PENDING, reprocess
+    );
+    List<List<UUID>> idBatches = packIdsByCompanyIntoBatches(eligibleRows, batchSize, safeDateGapDays);
+    int totalBatches = idBatches.size();
+
+    log.info(
+      "📌 Iniciando conciliação Banco x Adquirente por parcelas: releasesElegiveis={}, tamanhoLote={}, totalLotes={}",
+      eligibleRows.size(), batchSize, totalBatches
     );
 
     // Acumulado pelo laço inteiro e recomputado uma única vez no final — mesmo motivo de
     // reconcileEligibleCreditOrders/applyCreditOrderMatch.
     Set<UUID> affectedSalesSummaryIdsFromTransactions = new HashSet<>();
+    // Rastreia parcelas já casadas NESTA execução — necessário porque o pool de parcelas agora é
+    // carregado uma única vez por empresa (não mais uma query por release, que antes se
+    // beneficiava do auto-flush do Hibernate antes de cada nova query pra "esconder" parcelas já
+    // casadas). Mesmo papel de reconciledOrderIds em reconcileEligibleCreditOrders.
+    Set<UUID> reconciledInstallmentIds = new HashSet<>();
+    // Flush/clear a cada N matches (não só ao final do lote de até 2000 releases) — mesmo padrão
+    // e mesmo motivo de matchFlushInterval em reconcileEligibleCreditOrders: cada match aciona
+    // propagateReleaseStatusTransactions, que dispara consultas (autoflush do Hibernate cresce
+    // O(n) com o nº de entidades geridas na sessão). Sem isto, lotes com muitos matches ficavam
+    // progressivamente mais lentos dentro do próprio lote (achado real 2026-09-11: lote com 179
+    // matches levou 90s, contra <1s de um lote de mesmo tamanho com poucos matches).
+    int matchesSinceFlush = 0;
+    int matchFlushInterval = 5;
 
-    for (ReleasesBankEntity release : releases) {
-      if (release.getId() != null && analyzedReleaseIds.add(release.getId())) {
-        result.releaseAnalyzed();
-      }
-      if (!hasRequiredContext(release)) {
-        markReleaseNotReconciledWhenExpired(release, config, "contexto bancário obrigatório ausente", result);
-        result.releaseSkippedMissingContext();
-        continue;
+    for (int batchNumber = 1; batchNumber <= idBatches.size(); batchNumber++) {
+      List<UUID> batchIds = idBatches.get(batchNumber - 1);
+
+      List<ReleasesBankEntity> batchReleases = releasesBankRepository.findEligibleByIdsForInstallmentReconciliation(
+        batchIds, STATUS_PENDING, reprocess
+      );
+
+      // Um lote pode conter releases de mais de uma empresa (packIdsByCompanyIntoBatches
+      // empacota "chunks" por empresa dentro do mesmo lote quando cabem no batchSize) — agrupa
+      // por empresa aqui pra poder carregar o pool de parcelas candidatas 1x por empresa
+      // presente no lote, nunca 1x por release.
+      Map<UUID, List<ReleasesBankEntity>> releasesByCompany = new LinkedHashMap<>();
+      int reconciledInBatch = 0;
+
+      for (ReleasesBankEntity release : batchReleases) {
+        if (release.getId() != null && analyzedReleaseIds.add(release.getId())) {
+          result.releaseAnalyzed();
+        }
+        if (!hasRequiredContext(release)) {
+          markReleaseNotReconciledWhenExpired(release, config, "contexto bancário obrigatório ausente", result);
+          result.releaseSkippedMissingContext();
+          continue;
+        }
+        releasesByCompany.computeIfAbsent(release.getCompany().getId(), ignored -> new java.util.ArrayList<>()).add(release);
       }
 
-      BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallmentsWithStats(release, config, strictness, result);
-      if (installmentResult.matched()) {
-        result.releaseReconciled(release.getReleaseValue());
-        result.transactionsUpdated(propagateReleaseStatusTransactions(release, affectedSalesSummaryIdsFromTransactions));
-      } else {
-        markReleaseNotReconciledWhenExpired(release, config, "nenhuma parcela compatível encontrada", result);
+      for (var companyEntry : releasesByCompany.entrySet()) {
+        List<ReleasesBankEntity> companyReleases = companyEntry.getValue();
+        LocalDate minReleaseDate = companyReleases.stream().map(ReleasesBankEntity::getReleaseDate)
+          .min(LocalDate::compareTo).orElse(null);
+        LocalDate maxReleaseDate = companyReleases.stream().map(ReleasesBankEntity::getReleaseDate)
+          .max(LocalDate::compareTo).orElse(null);
+        if (minReleaseDate == null || maxReleaseDate == null) continue;
+
+        InstallmentPool pool = loadInstallmentPoolForCompany(
+          companyEntry.getKey(),
+          minReleaseDate.minusDays(toleranceDaysAfter),
+          maxReleaseDate.plusDays(toleranceDaysBefore),
+          reprocess
+        );
+
+        for (ReleasesBankEntity release : companyReleases) {
+          BankReconciliationMatcher.MatchResult installmentResult =
+            reconcileByInstallmentsWithStats(release, config, strictness, pool, reconciledInstallmentIds, result);
+          if (installmentResult.matched()) {
+            result.releaseReconciled(release.getReleaseValue());
+            result.transactionsUpdated(propagateReleaseStatusTransactions(release, affectedSalesSummaryIdsFromTransactions));
+            reconciledInBatch++;
+
+            matchesSinceFlush++;
+            if (matchesSinceFlush >= matchFlushInterval) {
+              entityManager.flush();
+              entityManager.clear();
+              matchesSinceFlush = 0;
+            }
+          } else {
+            markReleaseNotReconciledWhenExpired(release, config, "nenhuma parcela compatível encontrada", result);
+          }
+        }
       }
+
+      // Flush/clear ao final de cada lote (tamanho limitado por batchSize): dispersa o custo
+      // O(n) do dirty-check/auto-flush do Hibernate por lote, em vez de acumular TODOS os
+      // releases pendentes numa sessão só.
+      entityManager.flush();
+      entityManager.clear();
+
+      log.info(
+        "📦 Lote {}/{} de parcelas concluído: releasesNoLote={}, conciliadosNoLote={}",
+        batchNumber, totalBatches, batchReleases.size(), reconciledInBatch
+      );
     }
 
     if (!affectedSalesSummaryIdsFromTransactions.isEmpty()) {
@@ -637,6 +735,57 @@ public class BankReconciliationService {
       recomputeSalesSummariesFromTransactionIds(affectedSalesSummaryIdsFromTransactions);
     }
   }
+
+  /**
+   * Carrega, numa única query, todas as parcelas pendentes de uma empresa dentro da janela de
+   * datas de um lote — substitui a antiga findPendingForBankRelease chamada uma vez por release
+   * (~50 mil vezes numa execução completa). O contexto de matching (empresa/adquirente/
+   * estabelecimento/bandeira/modalidade) e os domicílios bancários (via ordem de crédito e via
+   * resumo de vendas) são pré-computados uma única vez por parcela aqui, para não recalculá-los
+   * a cada par release×parcela (mesmo raciocínio de orderMatchDataById em
+   * reconcileEligibleCreditOrders).
+   */
+  private InstallmentPool loadInstallmentPoolForCompany(UUID companyId, LocalDate dateFrom, LocalDate dateTo, boolean reprocess) {
+    List<InstallmentAcqEntity> installments = installmentAcqRepository
+      .findPendingForCompanyAndDateRangeForInstallmentReconciliation(STATUS_PENDING, companyId, dateFrom, dateTo, reprocess);
+
+    java.util.TreeMap<LocalDate, List<InstallmentAcqEntity>> byExpectedPaymentDate = new java.util.TreeMap<>();
+    Map<UUID, InstallmentMatchData> matchDataById = new HashMap<>();
+    for (InstallmentAcqEntity installment : installments) {
+      if (installment.getId() == null || installment.getExpectedPaymentDate() == null) continue;
+      UUID bankingDomicileIdViaCreditOrder = installment.getCreditOrder() != null
+        ? idOrNull(installment.getCreditOrder().getBankingDomicile()) : null;
+      SalesSummaryEntity salesSummary = installment.getTransaction() != null
+        ? installment.getTransaction().getSalesSummary() : null;
+      UUID bankingDomicileIdViaSalesSummary = salesSummary != null ? idOrNull(salesSummary.getBankingDomicile()) : null;
+      matchDataById.put(
+        installment.getId(),
+        new InstallmentMatchData(contextOf(installment), bankingDomicileIdViaCreditOrder, bankingDomicileIdViaSalesSummary)
+      );
+      byExpectedPaymentDate
+        .computeIfAbsent(installment.getExpectedPaymentDate(), ignored -> new java.util.ArrayList<>())
+        .add(installment);
+    }
+    return new InstallmentPool(byExpectedPaymentDate, matchDataById);
+  }
+
+  /**
+   * Contexto/banco de uma parcela candidata, pré-computados uma única vez por parcela (ver
+   * {@link #loadInstallmentPoolForCompany}). bankingDomicileIdViaCreditOrder/ViaSalesSummary
+   * refletem os dois caminhos que a query original aceitava como equivalentes para o filtro
+   * (opcional) de domicílio bancário.
+   */
+  private record InstallmentMatchData(
+    ReconciliationMatchContext context,
+    UUID bankingDomicileIdViaCreditOrder,
+    UUID bankingDomicileIdViaSalesSummary
+  ) {}
+
+  /** Pool de parcelas candidatas de uma empresa, pré-carregado uma única vez por lote. */
+  private record InstallmentPool(
+    java.util.TreeMap<LocalDate, List<InstallmentAcqEntity>> byExpectedPaymentDate,
+    Map<UUID, InstallmentMatchData> matchDataById
+  ) {}
 
   private int reconcileZeroValueOrders() {
     List<CreditOrderEntity> orders = creditOrderRepository
@@ -806,6 +955,20 @@ public class BankReconciliationService {
       rowsByCompany.computeIfAbsent(companyId, ignored -> new java.util.ArrayList<>()).add(row);
     }
 
+    // Teto rígido de tamanho de chunk, mesmo sem gap de data "seguro" pra cortar — sem isso, uma
+    // empresa com um volume grande de registros consecutivos (nenhum gap > safeDateGapDays entre
+    // eles) nunca aciona o corte abaixo e forma 1 único chunk sem limite de tamanho (achado real
+    // 2026-09-11: 50.742 releases elegíveis viraram só 5 lotes — uma empresa concentrou dezenas
+    // de milhares de releases num único chunk). Isso faz o pool de candidatos carregado pra esse
+    // lote — ver loadInstallmentPoolForCompany/reconcileEligibleCreditOrders — crescer sem
+    // limite, estourando o heap (768MB nesta máquina, 1/4 do mem_limit de 3g do container) com um
+    // OutOfMemoryError que nem é pego pelo catch(Exception) da esteira: propaga como Throwable até
+    // o finally externo (reseta o gate de execução em andamento) sem nenhum log de erro,
+    // aparentando "não registrar nada" no histórico enquanto na real a execução morreu em
+    // silêncio. Prioriza cortar em gaps seguros (preserva candidatos próximos por data no mesmo
+    // lote — comentário original), mas nunca deixa um chunk passar de hardMaxChunkSize.
+    int hardMaxChunkSize = Math.max(batchSize, 1) * 4;
+
     List<List<UUID>> chunks = new java.util.ArrayList<>();
     for (List<Object[]> companyRows : rowsByCompany.values()) {
       List<UUID> currentChunk = new java.util.ArrayList<>();
@@ -815,7 +978,8 @@ public class BankReconciliationService {
         LocalDate releaseDate = (LocalDate) row[2];
         boolean safeToCut = previousDate != null
           && ChronoUnit.DAYS.between(previousDate, releaseDate) > safeDateGapDays;
-        if (safeToCut && currentChunk.size() >= batchSize) {
+        boolean mustCut = currentChunk.size() >= hardMaxChunkSize;
+        if ((safeToCut && currentChunk.size() >= batchSize) || mustCut) {
           chunks.add(currentChunk);
           currentChunk = new java.util.ArrayList<>();
         }
@@ -860,9 +1024,12 @@ public class BankReconciliationService {
     ReleasesBankEntity release,
     FileProcessingProperties.Reconciliation config,
     ReconciliationMatchContext.MatchStrictness strictness,
+    InstallmentPool pool,
+    Set<UUID> reconciledInstallmentIds,
     BankReconciliationResult.Counter result
   ) {
-    BankReconciliationMatcher.MatchResult installmentResult = reconcileByInstallments(release, config, strictness);
+    BankReconciliationMatcher.MatchResult installmentResult =
+      reconcileByInstallments(release, config, strictness, pool, reconciledInstallmentIds);
     if (installmentResult.skippedBySafetyCap()) {
       result.candidateGroupSkippedBySafetyCap();
     }
@@ -875,7 +1042,9 @@ public class BankReconciliationService {
   private BankReconciliationMatcher.MatchResult reconcileByInstallments(
     ReleasesBankEntity release,
     FileProcessingProperties.Reconciliation config,
-    ReconciliationMatchContext.MatchStrictness strictness
+    ReconciliationMatchContext.MatchStrictness strictness,
+    InstallmentPool pool,
+    Set<UUID> reconciledInstallmentIds
   ) {
     int toleranceDaysBefore = reconciliationSettingsService.getDateToleranceDaysBefore();
     int toleranceDaysAfter  = reconciliationSettingsService.getDateToleranceDaysAfter();
@@ -886,19 +1055,30 @@ public class BankReconciliationService {
     LocalDate dateTo = release.getReleaseDate().plusDays(toleranceDaysBefore);
 
     ReconciliationMatchContext releaseContext = contextOf(release);
-    List<InstallmentAcqEntity> candidates = installmentAcqRepository.findPendingForBankRelease(
-        STATUS_PENDING,
-        release.getCompany().getId(),
-        idOrNull(release.getAcquirer()),
-        idOrNull(release.getEstablishment()),
-        idOrNull(release.getBankingDomicile()),
-        idOrNull(release.getFlag()),
-        dateFrom,
-        dateTo
-      ).stream()
-      .filter(installment -> isInstallmentCandidateCompatible(release, installment, toleranceDaysBefore, toleranceDaysAfter, strictness))
+    // Mesmos filtros que a query original (findPendingForBankRelease) aplicava no banco de forma
+    // opcional (coringa quando o lado do release é nulo) — replicados aqui em memória porque o
+    // pool agora é carregado uma única vez por empresa/lote, sem esses filtros na query (ver
+    // loadInstallmentPoolForCompany). isInstallmentCandidateCompatible/compatible() já faz uma
+    // checagem adicional (e não idêntica) de empresa/adquirente/estabelecimento/bandeira — este
+    // método só reproduz o que a query fazia, para não mudar o resultado final.
+    UUID acquirerId = idOrNull(release.getAcquirer());
+    UUID establishmentId = idOrNull(release.getEstablishment());
+    UUID flagId = idOrNull(release.getFlag());
+    UUID bankingDomicileId = idOrNull(release.getBankingDomicile());
+
+    List<InstallmentAcqEntity> candidates = pool.byExpectedPaymentDate().subMap(dateFrom, true, dateTo, true)
+      .values().stream()
+      .flatMap(List::stream)
+      .filter(installment -> installment.getId() == null || !reconciledInstallmentIds.contains(installment.getId()))
+      .filter(installment -> {
+        InstallmentMatchData matchData = pool.matchDataById().get(installment.getId());
+        return matchData != null
+          && passesInstallmentDbEquivalentFilters(acquirerId, establishmentId, flagId, bankingDomicileId, matchData)
+          && isInstallmentCandidateCompatible(
+              release, releaseContext, installment, matchData.context(), toleranceDaysBefore, toleranceDaysAfter, strictness);
+      })
       .sorted(Comparator.comparingInt(
-        (InstallmentAcqEntity installment) -> releaseContext.strength(contextOf(installment), strictness)).reversed())
+        (InstallmentAcqEntity installment) -> releaseContext.strength(pool.matchDataById().get(installment.getId()).context(), strictness)).reversed())
       .toList();
 
     BankReconciliationMatcher.MatchResult selected = matcher.selectByValue(
@@ -922,12 +1102,53 @@ public class BankReconciliationService {
 
     installmentAcqRepository.saveAll(installments);
     releasesBankRepository.save(release);
+    // creditOrder é @ManyToOne(fetch=LAZY) SEM cascade em InstallmentAcqEntity — enquanto o
+    // installment continua managed (mesma sessão do pool), o Hibernate detecta a mudança do
+    // creditOrder aninhado (feita em applyReleaseToInstallments) sozinho, via dirty-checking, sem
+    // precisar de save/cascade. Mas o pool agora sobrevive a flush/clear intermediários dentro do
+    // mesmo lote (ver reconcilePendingReleasesByInstallments) — depois de um clear(), o installment
+    // (e o creditOrder aninhado) reaproveitados do pool ficam detached, e installmentAcqRepository
+    // .saveAll() acima faz apenas merge() do installment em si, sem cascade pro creditOrder. Sem
+    // este save explícito, um match que ocorra depois do primeiro clear() do lote perderia
+    // silenciosamente a atualização do creditOrder (releaseBank/statusPaymentBank/...) — nem
+    // exception, nem log, só o CreditOrder ficando parado (achado ao adicionar o flush/clear
+    // intermediário abaixo).
+    List<CreditOrderEntity> touchedCreditOrders = installments.stream()
+      .map(InstallmentAcqEntity::getCreditOrder)
+      .filter(Objects::nonNull)
+      .distinct()
+      .toList();
+    if (!touchedCreditOrders.isEmpty()) {
+      creditOrderRepository.saveAll(touchedCreditOrders);
+    }
+    for (InstallmentAcqEntity installment : installments) {
+      if (installment.getId() != null) reconciledInstallmentIds.add(installment.getId());
+    }
 
     log.info(
       "✅ Release bancário conciliado por parcelas. releaseBank={}, tipoMatch={}, parcelas={}, valorRelease={}, valorParcelas={}",
       release.getId(), matchType, installments.size(), release.getReleaseValue(), selected.matchedValue()
     );
     return selected;
+  }
+
+  /**
+   * Reproduz em memória os filtros opcionais (coringa quando o lado do release é nulo) que
+   * {@code findPendingForBankRelease} aplicava no banco por acquirer/establishment/flag/
+   * bankingDomicile — necessário porque o pool agora vem de
+   * {@link #loadInstallmentPoolForCompany}, que não filtra por esses campos (ver comentário lá).
+   */
+  private boolean passesInstallmentDbEquivalentFilters(
+    UUID acquirerId, UUID establishmentId, UUID flagId, UUID bankingDomicileId, InstallmentMatchData matchData
+  ) {
+    ReconciliationMatchContext context = matchData.context();
+    if (acquirerId != null && !acquirerId.equals(context.acquirerId())) return false;
+    if (establishmentId != null && !establishmentId.equals(context.establishmentId())) return false;
+    if (flagId != null && !flagId.equals(context.flagId())) return false;
+    if (bankingDomicileId != null
+      && !bankingDomicileId.equals(matchData.bankingDomicileIdViaCreditOrder())
+      && !bankingDomicileId.equals(matchData.bankingDomicileIdViaSalesSummary())) return false;
+    return true;
   }
 
   private void propagateCreditOrdersToInstallments(List<CreditOrderEntity> orders, ReleasesBankEntity release, boolean reprocess) {
@@ -1264,7 +1485,8 @@ public class BankReconciliationService {
   record OrderMatchData(ReconciliationMatchContext context, UUID bankId) {}
 
   private boolean isInstallmentCandidateCompatible(
-    ReleasesBankEntity release, InstallmentAcqEntity installment,
+    ReleasesBankEntity release, ReconciliationMatchContext releaseContext, InstallmentAcqEntity installment,
+    ReconciliationMatchContext installmentContext,
     int toleranceDaysBefore, int toleranceDaysAfter, ReconciliationMatchContext.MatchStrictness strictness
   ) {
     if (installment == null || installment.getExpectedPaymentDate() == null) return false;
@@ -1276,7 +1498,7 @@ public class BankReconciliationService {
     long daysDiff = ChronoUnit.DAYS.between(installment.getExpectedPaymentDate(), release.getReleaseDate());
     if (daysDiff > toleranceDaysAfter) return false;
     if (daysDiff < -toleranceDaysBefore) return false;
-    return contextOf(release).compatible(contextOf(installment), strictness);
+    return releaseContext.compatible(installmentContext, strictness);
   }
 
   /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */

@@ -72,6 +72,9 @@ public class AnticipationSpecs extends BaseSpecificationSupport<AnticipationEnti
         fetchIfNotFetched(root, "establishment");
         fetchIfNotFetched(root, "processedFile");
         fetchIfNotFetched(root, "salesSummary");
+        // statusPaymentBank exibido na tela (ver AnticipationModelAssembler) vem daqui - sem o
+        // fetch, cada linha da página dispararia uma query lazy extra pra buscar a CreditOrder.
+        fetchIfNotFetched(root, "creditOrder");
 
         var bankingDomicile = fetchIfNotFetched(root, "bankingDomicile");
         fetchIfNotFetched(bankingDomicile, "bank");

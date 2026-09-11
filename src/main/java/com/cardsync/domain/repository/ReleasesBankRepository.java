@@ -72,6 +72,54 @@ public interface ReleasesBankRepository extends JpaRepository<ReleasesBankEntity
     @Param("reprocessAlreadyReconciled") boolean reprocessAlreadyReconciled
   );
 
+  /**
+   * Versão leve (só ids) e agrupada por empresa de {@link #findForBankReconciliation}, no mesmo
+   * formato de {@link com.cardsync.domain.repository.CreditOrderRepository#findEligibleIdsGroupedByCompanyForBankReconciliation}
+   * — permite reusar {@code BankReconciliationService#packIdsByCompanyIntoBatches} pra processar
+   * em lotes por empresa, com flush/clear periódico, em vez de carregar TODOS os releases
+   * pendentes de uma vez na sessão do Hibernate. Achado real 2026-09-11: sem batching aqui,
+   * reconcilePendingReleasesByInstallments carregava ~50 mil releases de uma vez (nenhum limite,
+   * nenhuma pausa pro Hibernate) e travou o computador do usuário ao rodar a esteira completa
+   * (primeira vez que este caminho rodou de verdade — só ativo em modos != CREDIT_ORDER_ONLY).
+   * {@code company is not null} é exigido porque o agrupamento por empresa não faz sentido sem
+   * ele (releases sem empresa continuam de fora deste caminho, igual já acontecia antes via
+   * hasRequiredContext).
+   */
+  @Query("""
+    select rb.company.id, rb.id, rb.releaseDate
+    from ReleasesBankEntity rb
+    where (:reprocessAlreadyReconciled = true or rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
+      and rb.releaseDate is not null
+      and rb.releaseValue is not null
+      and rb.company is not null
+    order by rb.company.id asc, rb.releaseDate asc, rb.id asc
+  """)
+  List<Object[]> findEligibleIdsGroupedByCompanyForInstallmentReconciliation(
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("reprocessAlreadyReconciled") boolean reprocessAlreadyReconciled
+  );
+
+  /** Busca em lote (por ids) para o mesmo escopo de {@link #findEligibleIdsGroupedByCompanyForInstallmentReconciliation}. */
+  @Query("""
+    select rb
+    from ReleasesBankEntity rb
+    left join fetch rb.company
+    left join fetch rb.acquirer
+    left join fetch rb.establishment
+    left join fetch rb.bankingDomicile
+    left join fetch rb.flag
+    left join fetch rb.bank
+    left join fetch rb.processedFile
+    where rb.id in :ids
+      and (:reprocessAlreadyReconciled = true or rb.reconciliationStatus is null or rb.reconciliationStatus = :pendingStatus)
+    order by rb.releaseValue asc, rb.releaseDate asc
+  """)
+  List<ReleasesBankEntity> findEligibleByIdsForInstallmentReconciliation(
+    @Param("ids") List<UUID> ids,
+    @Param("pendingStatus") Integer pendingStatus,
+    @Param("reprocessAlreadyReconciled") boolean reprocessAlreadyReconciled
+  );
+
   @Query("""
     select rb
     from ReleasesBankEntity rb

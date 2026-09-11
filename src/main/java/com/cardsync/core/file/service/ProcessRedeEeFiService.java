@@ -347,7 +347,21 @@ public class ProcessRedeEeFiService {
     anticipation.setFlag(safeFlag(acquirer, acquirerCode));
     anticipation.setEstablishment(establishment);
     anticipation.setCompany(establishment != null ? establishment.getCompany() : null);
-    anticipation.setBankingDomicile(safeDomicile(agency, currentAccount, anticipation.getCompany()));
+
+    BankingDomicileEntity domicile = safeDomicile(agency, currentAccount, anticipation.getCompany());
+    if (domicile == null) {
+      // Sem domicílio, a CreditOrder sintética gerada depois (Etapa 4) nasce sem bankingDomicile
+      // e nunca passa em hasRequiredContext() na conciliação bancária (Etapa 7) — a antecipação
+      // fica travada pra sempre sem nenhum alerta visível, só este log (achado real 2026-09-10).
+      log.warn(
+        "⚠ Antecipação sem domicílio bancário resolvido (agência/conta não cadastrados pra esta empresa) "
+          + "- a ordem sintética gerada a partir dela nunca vai conciliar com o banco. "
+          + "linha={}, pvNumber={}, agencia={}, contaCorrente={}, empresa={}",
+        lineNumber, pvNumber, agency, currentAccount,
+        anticipation.getCompany() != null ? anticipation.getCompany().getId() : null
+      );
+    }
+    anticipation.setBankingDomicile(domicile);
     anticipation.setSalesSummary(safeSalesSummary(acquirer, pvNumber, anticipation.getNumberRvCorresponding()));
     return anticipation;
   }

@@ -396,8 +396,14 @@ public class SalesSummaryCreditOrderReconciliationService {
       List<CreditOrderEntity> ordersToGenerate = new ArrayList<>(anticipations.size());
 
       for (AnticipationEntity anticipation : anticipations) {
-        ordersToGenerate.add(generateSyntheticCreditOrder(anticipation));
+        CreditOrderEntity order = generateSyntheticCreditOrder(anticipation);
+        ordersToGenerate.add(order);
         anticipation.setGeneratedOrders(true);
+        // Vínculo de volta pra Antecipação poder expor o status de pagamento na tela (statusPaymentBank
+        // só existe na CreditOrder) - ver AnticipationEntity.creditOrder e AnticipationModelAssembler.
+        // Seguro popular antes do save: GenerationType.UUID gera o id em memória, e as ordens são
+        // persistidas (linha abaixo) antes das antecipações que referenciam essa FK.
+        anticipation.setCreditOrder(order);
       }
 
       if (!ordersToGenerate.isEmpty()) {

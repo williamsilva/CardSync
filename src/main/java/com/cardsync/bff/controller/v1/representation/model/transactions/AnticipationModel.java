@@ -34,6 +34,14 @@ public class AnticipationModel extends RepresentationModel<@NonNull Anticipation
   private BigDecimal discountRateValue;
   private BigDecimal originalCreditValue;
 
+  // Status de pagamento da CreditOrder sintética gerada a partir DESTA Antecipação (Etapa 4) -
+  // não confundir com salesSummary.statusPaymentBank (status do resumo de vendas inteiro, que
+  // pode ter várias parcelas/antecipações com situações diferentes). Null enquanto a ordem ainda
+  // não foi gerada (generatedOrders=false) ou, mais raramente, se a geração falhou por falta de
+  // domicílio bancário (ver ProcessRedeEeFiService.buildAnticipation). A Antecipação em si não
+  // tem status de pagamento próprio, só o que a CreditOrder carrega.
+  private String anticipationStatusPaymentBank;
+
   private FlagMinimalModel flag;
   private CompanyMinimalModel company;
   private AcquirerMinimalModel acquirer;

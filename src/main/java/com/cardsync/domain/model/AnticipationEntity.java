@@ -62,4 +62,12 @@ public class AnticipationEntity extends AuditableEntityBase {
 
   @ManyToOne(fetch = FetchType.LAZY)
   private BankingDomicileEntity bankingDomicile;
+
+  // Setado por SalesSummaryCreditOrderReconciliationService#generateSyntheticOrdersFromAnticipations
+  // no momento em que a ordem sintética é gerada (junto com generatedOrders=true) - é o único jeito
+  // de saber, a partir da Antecipação, se/quando o valor foi de fato confirmado no banco
+  // (CreditOrderEntity.statusPaymentBank), já que a Antecipação em si não tem status de pagamento
+  // próprio (achado real 2026-09-10, ver AnticipationModelAssembler).
+  @ManyToOne(fetch = FetchType.LAZY)
+  private CreditOrderEntity creditOrder;
 }

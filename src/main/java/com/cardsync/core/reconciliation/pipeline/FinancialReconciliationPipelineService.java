@@ -83,6 +83,14 @@ public class FinancialReconciliationPipelineService {
       // no banco. Sem isso, uma exceção aqui propagava direto pro finally, pulando o save()
       // abaixo — o histórico de execução (usado pelo dashboard de conciliação) ficava com um
       // buraco silencioso: nem "sucesso parcial", nem "falhou na etapa N", nada persistido.
+      //
+      // catch(Throwable), não catch(Exception): um OutOfMemoryError (Error, não Exception) — ex.:
+      // um lote sem teto de tamanho carregando candidatos demais em memória, achado real
+      // 2026-09-11 — antes escapava direto pro finally sem cair aqui, sem logar "FALHOU" e sem
+      // chamar o save() abaixo. Resultado observado: a execução simplesmente "sumia" (a thread
+      // encerrava, o gate de execução manual era liberado — permitindo uma nova tentativa idêntica
+      // logo em seguida — mas nada aparecia no histórico), dando a falsa impressão de que a esteira
+      // "não estava registrando nada" quando na real tinha morrido em silêncio.
       try {
         result.addStep(reconciliationSettingsService.isEnabledErpAcquirer()
           ? executePipelineStep("1. ADQ x ERP", () -> runErpAcquirer(trigger))
@@ -105,7 +113,7 @@ public class FinancialReconciliationPipelineService {
         result.addStep(reconciliationSettingsService.isEnabledBankAcquirer()
           ? executePipelineStep("7. Ordem de pagamento x lançamento bancário", () -> runCreditOrderBankRelease(trigger))
           : skippedStep(ReconciliationPipelineStepEnum.CREDIT_ORDER_BANK_RELEASE, "7. Ordem de pagamento x lançamento bancário"));
-      } catch (Exception ex) {
+      } catch (Throwable ex) {
         OffsetDateTime failedAt = OffsetDateTime.now();
         result.setFinishedAt(failedAt);
 
@@ -114,9 +122,14 @@ public class FinancialReconciliationPipelineService {
           trigger,
           result.getSteps().size(),
           Duration.between(startedAt, failedAt).toSeconds(),
-          ex.getMessage()
+          ex.getMessage(),
+          ex
         );
 
+        // save() aqui pode, em tese, também falhar por falta de memória (mesma causa raiz do
+        // Error original) — mas nesse ponto já logamos o erro real acima (log.error com stack
+        // trace completo), então mesmo que o save() falhe, a causa fica visível no log do
+        // container, não some por completo como antes.
         reconciliationExecutionLogService.save(result);
         throw ex;
       }

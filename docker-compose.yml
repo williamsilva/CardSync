@@ -61,6 +61,20 @@ services:
       # pro mesmo mount path usado em produção/Railway (/data/cardsync, ver README) - o volume
       # abaixo é quem faz esse caminho existir de fato dentro do container.
       FILE_PROCESSING_BASE_PATH: ${FILE_PROCESSING_BASE_PATH:-/data/cardsync}
+      # file-processing.reconciliation.bank-mode: reativado pra CREDIT_ORDER_FIRST em 2026-09-11,
+      # depois de corrigir a causa raiz do travamento anterior (batching ausente em
+      # reconcilePendingReleasesByInstallments, ver BankReconciliationService/
+      # ReleasesBankRepository - agora processa em lotes por empresa com flush/clear periódico,
+      # igual ao caminho de CreditOrder). mem_limit/cpus abaixo continuam como rede de segurança
+      # caso o volume real ainda pese mais do que o esperado.
+      BANK_RECONCILIATION_MODE: ${BANK_RECONCILIATION_MODE:-CREDIT_ORDER_FIRST}
+    # Teto de recursos do container - proteção adicionada em 2026-09-11 depois que rodar a esteira
+    # completa consumiu recursos o suficiente pra travar o computador inteiro do usuário. Com o
+    # teto, o pior caso vira o container ficando lento/sendo OOM-killed pelo Docker, nunca o SO
+    # host travando. Ajuste pra cima se a maquina tiver folga e o processamento normal (fora de
+    # bugs) precisar de mais.
+    mem_limit: 3g
+    cpus: 2
     ports:
       # Só 127.0.0.1: publicar em todas as interfaces faz o navegador tentar o loopback IPv6
       # (::1) primeiro (preferência do Windows pra "localhost"), e o encaminhamento IPv6 do

@@ -46,6 +46,11 @@ public class AnticipationModelAssembler extends RepresentationModelAssemblerSupp
     model.setProcessedFile(toProcessedFile(entity.getProcessedFile()));
     model.setEstablishment(toEstablishment(entity.getEstablishment()));
     model.setBankingDomicile(toBankingDomicile(entity.getBankingDomicile()));
+    model.setAnticipationStatusPaymentBank(
+      entity.getCreditOrder() != null && entity.getCreditOrder().getStatusPaymentBank() != null
+        ? entity.getCreditOrder().getStatusPaymentBank().name()
+        : null
+    );
 
     return model;
   }
