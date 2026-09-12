@@ -272,6 +272,11 @@ public class FinancialReconciliationPipelineService {
         + erpReprocess.erpSalesCancelled() + erpReprocess.erpInstallmentsCancelled())
       .blocked(cancellations.getSkippedWithoutTransaction())
       .pending(cancellations.getSkippedPartialCancellations())
+      // Vendas que estavam MANUALLY_RECONCILED e foram canceladas por um ajuste da
+      // adquirente - não é bloqueado (a informação da adquirente deve prevalecer), mas conta
+      // como "divergent" pra aparecer destacado no dashboard (ver análise profunda 2026-09-12,
+      // completedWithoutBlocking() já considera divergent>0 como "não limpo").
+      .divergent(cancellations.getManuallyReconciledOverridden())
       .startedAt(startedAt)
       .finishedAt(OffsetDateTime.now())
       .build();

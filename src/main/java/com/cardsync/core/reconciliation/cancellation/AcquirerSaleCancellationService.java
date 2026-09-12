@@ -123,7 +123,7 @@ public class AcquirerSaleCancellationService {
     log.info(
       "✅ Etapa de cancelamentos da adquirente finalizada. trigger={}, ajustesAnalisados={}, cancelamentosTotais={}, " +
         "vendasAdqCanceladas={}, vendasErpCanceladas={}, parcelasAdqCanceladas={}, parcelasErpCanceladas={}, " +
-        "parciaisIgnorados={}, semVenda={}, jaCanceladasIgnoradas={}, duraçãoTotal={}s",
+        "parciaisIgnorados={}, semVenda={}, jaCanceladasIgnoradas={}, resolvidasManualmenteSobrescritas={}, duraçãoTotal={}s",
       trigger,
       result.getAdjustmentsAnalyzed(),
       result.getFullCancellationsIdentified(),
@@ -134,6 +134,7 @@ public class AcquirerSaleCancellationService {
       result.getSkippedPartialCancellations(),
       result.getSkippedWithoutTransaction(),
       result.getSkippedAlreadyCanceled(),
+      result.getManuallyReconciledOverridden(),
       Duration.between(startedAt, finishedAt).toSeconds()
     );
 
@@ -180,6 +181,12 @@ public class AcquirerSaleCancellationService {
       StatusTransactionReasonEnum cancellationReason = resolveCancellationReason(adjustment);
       OffsetDateTime now = OffsetDateTime.now();
 
+      // Detectado ANTES de cancelAcquirerSale/cancelErpSale sobrescreverem o status - é a
+      // única forma de saber se a venda tinha sido resolvida manualmente antes do cancelamento
+      // chegar (ver comentário de manuallyReconciledOverridden em AcquirerSaleCancellationResult).
+      boolean acqWasManuallyReconciled = isManuallyReconciled(acq.getStatusTransaction().getCode());
+      boolean erpWasManuallyReconciled = erp != null && isManuallyReconciled(StatusTransactionEnum.toCode(erp.getStatusTransaction()));
+
       if (cancelAcquirerSale(acq, adjustment, cancellationReason, cancellationDate, now, reprocess)) {
         result.acquirerSalesCanceled++;
         result.acquirerInstallmentsCanceled += cancelAcquirerInstallments(acq, cancellationDate);
@@ -188,12 +195,34 @@ public class AcquirerSaleCancellationService {
         if (acq.getSalesSummary() != null && acq.getSalesSummary().getId() != null) {
           result.affectedSalesSummaryIds.add(acq.getSalesSummary().getId());
         }
+
+        if (acqWasManuallyReconciled) {
+          result.manuallyReconciledOverridden++;
+          log.warn(
+            "⚠️ Cancelamento da adquirente sobrescreveu uma venda ADQ resolvida MANUALMENTE. acqId={}, adjustmentId={}, motivo={}",
+            acq.getId(), adjustment.getId(), cancellationReason
+          );
+        }
       }
 
       if (erp != null && cancelErpSale(erp, adjustment, cancellationReason, cancellationDate, now, reprocess)) {
         result.erpSalesCanceled++;
         result.erpInstallmentsCanceled += cancelErpInstallments(erp, cancellationDate);
         erpSalesToSave.put(erp.getId(), erp);
+
+        if (erpWasManuallyReconciled) {
+          if (!acqWasManuallyReconciled) {
+            result.manuallyReconciledOverridden++;
+          }
+          erp.setObservations(appendObservation(
+            erp.getObservations(),
+            "Cancelado pela adquirente (" + cancellationReason + ") - estava resolvido manualmente antes do cancelamento chegar."
+          ));
+          log.warn(
+            "⚠️ Cancelamento da adquirente sobrescreveu uma venda ERP resolvida MANUALMENTE. erpId={}, adjustmentId={}, motivo={}",
+            erp.getId(), adjustment.getId(), cancellationReason
+          );
+        }
       }
     }
 
@@ -443,6 +472,20 @@ public class AcquirerSaleCancellationService {
     return Objects.equals(status, StatusTransactionEnum.CANCELED.getCode());
   }
 
+  private boolean isManuallyReconciled(Integer status) {
+    return Objects.equals(status, StatusTransactionEnum.MANUALLY_RECONCILED.getCode());
+  }
+
+  private String appendObservation(String current, String message) {
+    if (message == null || message.isBlank()) {
+      return current;
+    }
+    if (current == null || current.isBlank()) {
+      return message;
+    }
+    return current + " | " + message;
+  }
+
   private boolean isZeroOrNull(BigDecimal value) {
     return value == null || BigDecimal.ZERO.compareTo(value) == 0;
   }
@@ -488,6 +531,7 @@ public class AcquirerSaleCancellationService {
     private int skippedPartialCancellations;
     private int skippedWithoutTransaction;
     private int skippedAlreadyCanceled;
+    private int manuallyReconciledOverridden;
 
     private Counter(FinancialReconciliationTriggerType trigger, OffsetDateTime startedAt) {
       this.trigger = trigger;
@@ -504,6 +548,7 @@ public class AcquirerSaleCancellationService {
       skippedPartialCancellations += batch.skippedPartialCancellations;
       skippedWithoutTransaction += batch.skippedWithoutTransaction;
       skippedAlreadyCanceled += batch.skippedAlreadyCanceled;
+      manuallyReconciledOverridden += batch.manuallyReconciledOverridden;
     }
 
     private AcquirerSaleCancellationResult toResult(OffsetDateTime finishedAt) {
@@ -518,6 +563,7 @@ public class AcquirerSaleCancellationService {
         .skippedPartialCancellations(skippedPartialCancellations)
         .skippedWithoutTransaction(skippedWithoutTransaction)
         .skippedAlreadyCanceled(skippedAlreadyCanceled)
+        .manuallyReconciledOverridden(manuallyReconciledOverridden)
         .startedAt(startedAt)
         .finishedAt(finishedAt)
         .build();
@@ -534,6 +580,7 @@ public class AcquirerSaleCancellationService {
     private int skippedPartialCancellations;
     private int skippedWithoutTransaction;
     private int skippedAlreadyCanceled;
+    private int manuallyReconciledOverridden;
     private final Set<UUID> affectedSalesSummaryIds = new HashSet<>();
   }
 }
