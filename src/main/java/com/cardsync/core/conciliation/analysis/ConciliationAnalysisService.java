@@ -41,6 +41,17 @@ public class ConciliationAnalysisService {
   static final int ERP_ACQUIRER_RECONCILIATION_BATCH_SIZE = 5_000;
   static final Integer EXCLUDED_CARD_RECONCILIATION_MODALITY = ModalityEnum.DIGITAL_WALLET.getCode();
 
+  // MANUALLY_RECONCILED nunca deve ser reavaliado pela conciliação automática, mesmo com
+  // reconcileAlreadyReconciled=true ("reprocessar vendas já conciliadas") - esse flag existe
+  // pra reavaliar vendas PENDENTES ou conciliadas AUTOMATICAMENTE que podem ter ficado
+  // desatualizadas (ex: nova venda ADQ chegou depois), não pra desfazer uma decisão humana
+  // feita na tela "Aguardando conciliação" (ver ErpAcquirerResolutionService). Sem esta
+  // guarda (nas queries de busca E aqui, em memória, como defesa em profundidade), o
+  // reprocessamento podia (a) sobrescrever o status pra AUTOMATICALLY_RECONCILED, apagando o
+  // rastro de que foi resolvido manualmente, ou (b) pior, desfazer o pareamento manual se um
+  // registro novo tornasse o match ambíguo/divergente.
+  private static final Integer MANUALLY_RECONCILED_STATUS_CODE = StatusTransactionEnum.MANUALLY_RECONCILED.getCode();
+
   private final EntityManager entityManager;
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
@@ -300,6 +311,7 @@ public class ConciliationAnalysisService {
     List<UUID> erpIds = transactionErpRepository.findErpIdsForReconciliation(
       reconcileAlreadyReconciled,
       pendingStatuses,
+      MANUALLY_RECONCILED_STATUS_CODE,
       EXCLUDED_CARD_RECONCILIATION_MODALITY,
       implantationDate,
       lookbackDate,
@@ -392,6 +404,15 @@ public class ConciliationAnalysisService {
           // podia ser recasada com uma venda ADQ já vinculada a outra venda ERP, violando a
           // constraint única de transaction_acq_id.
           if (isFinalStatusTransaction(erp.getStatusTransaction())) {
+            continue;
+          }
+
+          // MANUALLY_RECONCILED nunca deve ser reavaliado pela conciliação automática, mesmo
+          // com reconcileAlreadyReconciled=true - ver comentário de MANUALLY_RECONCILED_STATUS_CODE
+          // no topo da classe. Defesa em profundidade: a query já filtra isso (ver
+          // findErpIdsForReconciliation), esta guarda cobre o caso de o batch fetch
+          // (findRedeErpBatchForReconciliation) trazer o registro por outro caminho.
+          if (isManuallyReconciledErpStatusTransaction(erp)) {
             continue;
           }
 
@@ -743,7 +764,7 @@ public class ConciliationAnalysisService {
     StatusTransactionReasonEnum normalizedReason = normalizeReasonForStatus(status, reason);
 
     boolean changed = false;
-    changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, StatusTransactionEnum.fromCode(status.getCode()));
+    changed |= setIfDifferent(erp::getStatusTransaction, erp::setStatusTransaction, toStatusTransaction(status));
     changed |= setIfDifferent(erp::getStatusTransactionReason, erp::setStatusTransactionReason, reasonCode(normalizedReason));
     return changed;
   }
@@ -757,9 +778,31 @@ public class ConciliationAnalysisService {
     StatusTransactionReasonEnum normalizedReason = normalizeReasonForStatus(status, reason);
 
     boolean changed = false;
-    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, StatusTransactionEnum.fromCode(status.getCode()));
+    changed |= setIfDifferent(acq::getStatusTransaction, acq::setStatusTransaction, toStatusTransaction(status));
     changed |= setIfDifferent(acq::getStatusTransactionReason, acq::setStatusTransactionReason, reasonCode(normalizedReason));
     return changed;
+  }
+
+  /**
+   * Mapeamento EXPLÍCITO de StatusReconciliationEnum pra StatusTransactionEnum - nunca usar
+   * StatusTransactionEnum.fromCode(status.getCode()) aqui, porque os códigos numéricos dos dois
+   * enums NÃO são intercambiáveis por design: coincidem em alguns casos (RECONCILED=2 ~
+   * AUTOMATICALLY_RECONCILED=2, PENDING=1 em ambos) mas colidem perigosamente em outros
+   * (StatusReconciliationEnum.DIVERGENT=4 caía em StatusTransactionEnum.DELETED=4, que é uma
+   * coisa completamente diferente - achado de análise profunda 2026-09-12, nunca chegou a ser
+   * usado em produção mas era uma armadilha pronta pra qualquer código novo). Só os status que
+   * esta etapa realmente usa (PENDING/RECONCILED) têm mapeamento - qualquer outro falha alto e
+   * claro em vez de gravar um status errado silenciosamente.
+   */
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  StatusTransactionEnum toStatusTransaction(StatusReconciliationEnum status) {
+    return switch (status) {
+      case PENDING -> StatusTransactionEnum.PENDING;
+      case RECONCILED -> StatusTransactionEnum.AUTOMATICALLY_RECONCILED;
+      default -> throw new IllegalStateException(
+        "StatusReconciliationEnum sem mapeamento explícito pra StatusTransactionEnum na conciliação ERP x Adquirente: " + status
+      );
+    };
   }
 
   private int applyAcquirerReconciliationStatusToCandidates(
@@ -807,6 +850,16 @@ public class ConciliationAnalysisService {
 
   private boolean isFinalStatusTransaction(StatusTransactionEnum status) {
     return status == StatusTransactionEnum.CANCELED || status == StatusTransactionEnum.DELETED;
+  }
+
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  boolean isManuallyReconciledErpStatusTransaction(TransactionErpEntity erp) {
+    return erp.getStatusTransaction() == StatusTransactionEnum.MANUALLY_RECONCILED;
+  }
+
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  boolean isManuallyReconciledAcquirerStatusTransaction(TransactionAcqEntity acq) {
+    return acq.getStatusTransaction() == StatusTransactionEnum.MANUALLY_RECONCILED;
   }
 
   private int classifyAcquirerSalesMissingInErp(boolean reconcileAlreadyReconciled, List<Integer> pendingStatuses, OffsetDateTime implantationDate, OffsetDateTime lookbackDate, UUID acquirerId, TransactionTemplate batchTx) {
@@ -1018,6 +1071,7 @@ public class ConciliationAnalysisService {
         nsus,
         reconcileAlreadyReconciled,
         pendingStatuses,
+        MANUALLY_RECONCILED_STATUS_CODE,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDate,
         lookbackDate,
@@ -1030,6 +1084,7 @@ public class ConciliationAnalysisService {
         authorizations,
         reconcileAlreadyReconciled,
         pendingStatuses,
+        MANUALLY_RECONCILED_STATUS_CODE,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDate,
         lookbackDate,
@@ -1039,9 +1094,12 @@ public class ConciliationAnalysisService {
 
     // Mesmo motivo do guard de status terminal no lado ERP: uma venda ADQ DELETED/CANCELED
     // não deve ser oferecida como candidata de match, mesmo com reconcileAlreadyReconciled=true.
+    // MANUALLY_RECONCILED também é excluído aqui como defesa em profundidade (a query já
+    // filtra, ver findRedeAcqCandidatesForReconciliationByNsus/ByAuthorizations).
     List<TransactionAcqEntity> filteredCandidates = candidates.values().stream()
       .filter(acq -> !isExcludedFromCardReconciliation(acq))
       .filter(acq -> !isFinalAcquirerStatusTransaction(acq))
+      .filter(acq -> !isManuallyReconciledAcquirerStatusTransaction(acq))
       .toList();
 
     return excludeAcquirerSalesClaimedOutsideBatch(filteredCandidates, erpBatch, reconcileAlreadyReconciled);
@@ -1135,6 +1193,7 @@ public class ConciliationAnalysisService {
         swappedNsus,
         reconcileAlreadyReconciled,
         pendingStatuses,
+        MANUALLY_RECONCILED_STATUS_CODE,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDateSwapped,
         lookbackDate,
@@ -1147,6 +1206,7 @@ public class ConciliationAnalysisService {
         swappedAuthorizations,
         reconcileAlreadyReconciled,
         pendingStatuses,
+        MANUALLY_RECONCILED_STATUS_CODE,
         EXCLUDED_CARD_RECONCILIATION_MODALITY,
         implantationDateSwapped,
         lookbackDate,
@@ -1154,13 +1214,15 @@ public class ConciliationAnalysisService {
       ).forEach(acq -> candidates.put(acq.getId(), acq));
     }
 
-    // Mesmos dois guards do fluxo padrão (findAcquirerCandidatesForBatch): status terminal
-    // nunca deve ser oferecido como candidato, e uma venda ADQ já vinculada a um ERP de OUTRO
-    // lote não pode ser roubada por um ERP deste lote (mesmo risco de violar
-    // uq_cs_transaction_erp_transaction_acq, só que pelo caminho NSU/autorização invertidos).
+    // Mesmos guards do fluxo padrão (findAcquirerCandidatesForBatch): status terminal e
+    // MANUALLY_RECONCILED nunca devem ser oferecidos como candidato, e uma venda ADQ já
+    // vinculada a um ERP de OUTRO lote não pode ser roubada por um ERP deste lote (mesmo
+    // risco de violar uq_cs_transaction_erp_transaction_acq, só que pelo caminho NSU/
+    // autorização invertidos).
     List<TransactionAcqEntity> swappedCandidates = candidates.values().stream()
       .filter(acq -> !isExcludedFromCardReconciliation(acq))
       .filter(acq -> !isFinalAcquirerStatusTransaction(acq))
+      .filter(acq -> !isManuallyReconciledAcquirerStatusTransaction(acq))
       .toList();
 
     return excludeAcquirerSalesClaimedOutsideBatch(swappedCandidates, erpBatch, reconcileAlreadyReconciled);

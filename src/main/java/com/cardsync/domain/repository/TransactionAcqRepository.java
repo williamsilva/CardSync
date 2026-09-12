@@ -168,11 +168,16 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
+       and (a.statusTransaction is null or a.statusTransaction <> :manuallyReconciledStatus)
   """)
+  // manuallyReconciledStatus: mesma guarda do lado ERP (ver findErpIdsForReconciliation) -
+  // uma venda ADQ já vinculada manualmente não deve ser oferecida de volta como candidata
+  // pra um ERP diferente só porque o reprocessamento neutralizou o filtro de pendência.
   List<TransactionAcqEntity> findRedeAcqCandidatesForReconciliationByNsus(
     @Param("nsus") Collection<Long> nsus,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("manuallyReconciledStatus") Integer manuallyReconciledStatus,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
     @Param("lookbackDate") OffsetDateTime lookbackDate,
@@ -198,11 +203,14 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
        and (:includeAlreadyReconciled = true
             or (a.saleReconciliationDate is null
                 and (a.statusTransaction is null or a.statusTransaction in :pendingStatuses)))
+       and (a.statusTransaction is null or a.statusTransaction <> :manuallyReconciledStatus)
   """)
+  // manuallyReconciledStatus: mesma guarda de findRedeAcqCandidatesForReconciliationByNsus.
   List<TransactionAcqEntity> findRedeAcqCandidatesForReconciliationByAuthorizations(
     @Param("authorizations") Collection<String> authorizations,
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("manuallyReconciledStatus") Integer manuallyReconciledStatus,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
     @Param("lookbackDate") OffsetDateTime lookbackDate,

@@ -38,15 +38,24 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
      where (:includeAlreadyReconciled = true
             or (e.saleReconciliationDate is null
                 and (e.statusTransaction is null or e.statusTransaction in :pendingStatuses)))
+       and (e.statusTransaction is null or e.statusTransaction <> :manuallyReconciledStatus)
        and (e.modality is not null and e.modality <> :excludedModality)
        and e.saleDate >= :implantationDate
        and e.saleDate >= :lookbackDate
        and e.acquirer.id = :acquirerId
      order by e.saleDate asc, e.id asc
   """)
+  // manuallyReconciledStatus: mesmo com includeAlreadyReconciled=true ("reprocessar"), uma
+  // venda ERP resolvida manualmente (MANUALLY_RECONCILED, ver ErpAcquirerResolutionService)
+  // nunca deve voltar a ser candidata da conciliação AUTOMÁTICA - reprocessar serve pra
+  // reavaliar vendas pendentes ou conciliadas automaticamente que podem ter ficado
+  // desatualizadas, não pra desfazer uma decisão humana (ver achado de análise profunda:
+  // sem este filtro, o algoritmo podia sobrescrever o status pra AUTOMATICALLY_RECONCILED,
+  // apagando o rastro de que foi resolvido manualmente, ou pior, desfazer o pareamento).
   List<UUID> findErpIdsForReconciliation(
     @Param("includeAlreadyReconciled") boolean includeAlreadyReconciled,
     @Param("pendingStatuses") Collection<Integer> pendingStatuses,
+    @Param("manuallyReconciledStatus") Integer manuallyReconciledStatus,
     @Param("excludedModality") Integer excludedModality,
     @Param("implantationDate") OffsetDateTime implantationDate,
     @Param("lookbackDate") OffsetDateTime lookbackDate,
