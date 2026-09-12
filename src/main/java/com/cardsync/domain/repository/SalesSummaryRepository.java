@@ -217,9 +217,10 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
-   * Etapa 3 - Marca como conciliados os SalesSummary que não possuem nenhuma TransactionAcqEntity
-   * vinculada. Esses registros são invisíveis à query principal (INNER JOIN pelo lado da transação)
-   * e ficariam com transactionsStatus nulo para sempre, bloqueando as etapas seguintes.
+   * Etapa 2 ("1b") - Marca como conciliados os SalesSummary que não possuem nenhuma
+   * TransactionAcqEntity vinculada. Esses registros são invisíveis à query principal (INNER JOIN
+   * pelo lado da transação) e ficariam com transactionsStatus nulo para sempre, bloqueando as
+   * etapas seguintes.
    */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("""

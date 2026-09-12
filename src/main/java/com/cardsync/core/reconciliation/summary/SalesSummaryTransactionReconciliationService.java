@@ -17,7 +17,9 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Etapa 1b — Resumo de vendas x TransactionAcq.
@@ -205,6 +207,17 @@ public class SalesSummaryTransactionReconciliationService {
         pendingIds.add(row.getSalesSummaryId());
       }
     }
+
+    // Resumos passados que não têm NENHUMA transação vinculada nunca aparecem em "stats" (a
+    // query é um INNER JOIN a partir de TransactionAcqEntity) - mesmo tratamento do batch
+    // principal (ver markSummariesWithoutTransactionsAsReconciled): nada a conciliar, RECONCILED.
+    // Nenhum chamador atual passa um id nessa situação (o resumo sempre tem pelo menos a
+    // transação que disparou o recálculo), mas sem esta guarda um chamador futuro deixaria esse
+    // id silenciosamente sem nenhuma atualização.
+    Set<UUID> idsWithStats = stats.stream()
+      .map(SalesSummaryTransactionStats::getSalesSummaryId)
+      .collect(Collectors.toSet());
+    ids.stream().filter(id -> !idsWithStats.contains(id)).forEach(reconciledIds::add);
 
     bulkUpdate(reconciledIds, StatusReconciliationEnum.RECONCILED.getCode(), "conciliado (recálculo pontual)", FinancialReconciliationTriggerType.MANUAL);
     bulkUpdate(partialIds, StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode(), "conciliado parcial (recálculo pontual)", FinancialReconciliationTriggerType.MANUAL);
