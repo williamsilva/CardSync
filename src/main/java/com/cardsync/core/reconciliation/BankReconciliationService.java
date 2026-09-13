@@ -56,7 +56,7 @@ public class BankReconciliationService {
   private static final int STATUS_INSTALLMENT_RECONCILED = BankReconciliationStatus.INSTALLMENT_RECONCILED.getCode();
 
   /**
-   * Gate da etapa 6: só ordens cujo resumo já foi conciliado com a ordem (etapa 5)
+   * Gate da etapa 6: só ordens cujo resumo já foi conciliado com a ordem (etapa 6)
    * participam da conciliação com o extrato bancário.
    */
   private static final int SUMMARY_RECONCILED_STATUS = StatusReconciliationEnum.RECONCILED.getCode();

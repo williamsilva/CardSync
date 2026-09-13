@@ -14,6 +14,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -27,6 +29,10 @@ import static org.mockito.Mockito.when;
  * é uma chave de lote de liquidação, não por venda) — antes, a mais recente "ganhava" todas as
  * CreditOrder órfãs do lote, coladas na venda errada. Agora desambigua por valor
  * (releaseValue↔liquidValue), só vinculando quando exatamente uma candidata bate.
+ *
+ * Também cobre o achado da Etapa 6 (2026-09-13): uma CreditOrder órfã não deve ser vinculada por
+ * cima de uma CreditOrder (real ou sintética) que o resumo candidato já tenha para o mesmo
+ * installmentNumber - isso duplicaria a ordem daquela parcela.
  */
 class CreditOrderOrphanLinkingServiceTest {
 
@@ -138,6 +144,47 @@ class CreditOrderOrphanLinkingServiceTest {
     assertThat(matchingOrder.getSalesSummary()).isSameAs(summary);
     assertThat(foreignOrder.getSalesSummary()).isNull();
     verify(creditOrderRepository, never()).saveAll(List.of(foreignOrder));
+  }
+
+  @Test
+  void doesNotLinkOrphanWhenCandidateSummaryAlreadyHasCreditOrderForTheSameInstallment() {
+    // Achado real (Etapa 6): a Etapa 6 pode gerar uma CreditOrder SINTÉTICA (installmentNumber=1)
+    // para um resumo sem nenhuma ordem, e o arquivo EEFI real chega atrasado depois. Vincular a
+    // órfã real por cima duplicaria a CreditOrder da mesma parcela.
+    AcquirerEntity acquirer = acquirer();
+    SalesSummaryEntity summary = summary(acquirer, 1051583117, 361022950, "110.18");
+    CreditOrderEntity order = orphanOrder(acquirer, 1051583117, 361022950, "110.18");
+    order.setInstallmentNumber(1);
+
+    stubImplantationAndLookback();
+    when(creditOrderRepository.findOrphanedIdsWithinDateRange(any(), any())).thenReturn(List.of(order.getId()));
+    when(creditOrderRepository.findOrphanedByIds(anyList())).thenReturn(List.of(order));
+    when(salesSummaryRepository.findCandidatesForCreditOrderLinking(any(), any(), any())).thenReturn(List.of(summary));
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryIdIn(anyList()))
+      .thenReturn(List.<Object[]>of(new Object[]{summary.getId(), 1}));
+
+    int linked = service.linkOrphanedCreditOrders();
+
+    assertThat(linked).isZero();
+    assertThat(order.getSalesSummary()).isNull();
+  }
+
+  @Test
+  void directLinkingSkipsOrderWhenSummaryAlreadyHasCreditOrderForTheSameInstallment() {
+    AcquirerEntity acquirer = acquirer();
+    SalesSummaryEntity summary = summary(acquirer, 1051583117, 361022950, "112.98");
+    CreditOrderEntity order = orphanOrder(acquirer, 1051583117, 361022950, "112.98");
+    order.setInstallmentNumber(1);
+
+    when(creditOrderRepository.findOrphanedForSummary(acquirer.getId(), 1051583117, 361022950))
+      .thenReturn(List.of(order));
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summary.getId()))
+      .thenReturn(Set.of(1));
+
+    int linked = service.linkOrphanedCreditOrdersForSummary(summary);
+
+    assertThat(linked).isZero();
+    assertThat(order.getSalesSummary()).isNull();
   }
 
   private void stubImplantationAndLookback() {

@@ -33,6 +33,14 @@ import java.util.*;
  * tela de Resumo de Vendas mostrando ordens de outras vendas. A correção desambigua por VALOR
  * (releaseValue↔liquidValue) dentro do grupo — só vincula quando exatamente uma candidata bate
  * dentro da tolerância; múltiplas ou nenhuma batendo fica órfã (mais seguro que adivinhar errado).</p>
+ *
+ * <p><b>Achado real (Etapa 6, 2026-09-13):</b> um SalesSummary sem nenhuma CreditOrder pode
+ * receber uma ordem SINTÉTICA (ver SalesSummaryCreditOrderReconciliationService, installmentNumber=1)
+ * antes de o arquivo EEFI real chegar atrasado. Sem checar o installmentNumber já existente no
+ * resumo, esta classe vinculava a órfã real por cima da sintética, duplicando a CreditOrder para
+ * a mesma parcela — ambas elegíveis para a Etapa 7, com risco de conciliação bancária em
+ * duplicidade (ou uma delas nunca ser paga, mascarando o resumo como parcialmente pago). Agora só
+ * vincula quando o resumo candidato ainda não tem nenhuma CreditOrder para aquele installmentNumber.</p>
  */
 @Slf4j
 @Service
@@ -117,9 +125,12 @@ public class CreditOrderOrphanLinkingService {
         summaryMap.computeIfAbsent(key, k -> new ArrayList<>()).add(ss);
       }
 
+      Map<UUID, Set<Integer>> existingInstallmentsBySummaryId = existingInstallmentNumbersFor(candidates);
+
       List<CreditOrderEntity> toSave = new ArrayList<>();
       int batchLinked = 0;
       int batchAmbiguous = 0;
+      int batchSkippedDuplicateInstallment = 0;
 
       for (CreditOrderEntity co : orphans) {
         if (co.getAcquirer() == null || co.getPvCentralizer() == null || co.getRvNumber() == null) continue;
@@ -130,6 +141,15 @@ public class CreditOrderOrphanLinkingService {
         SalesSummaryEntity match = keyCandidates.size() == 1 ? keyCandidates.get(0) : selectByValue(keyCandidates, co);
         if (match == null) {
           batchAmbiguous++;
+          continue;
+        }
+
+        // Resumo pode já ter uma CreditOrder (real ou sintética) para essa mesma parcela — ex.:
+        // a Etapa 6 gera uma ordem sintética quando o resumo não tem nenhuma, e o arquivo EEFI
+        // real chega atrasado depois. Vincular por cima duplicaria a CreditOrder da parcela.
+        if (co.getInstallmentNumber() != null
+          && existingInstallmentsBySummaryId.getOrDefault(match.getId(), Set.of()).contains(co.getInstallmentNumber())) {
+          batchSkippedDuplicateInstallment++;
           continue;
         }
 
@@ -150,6 +170,13 @@ public class CreditOrderOrphanLinkingService {
         );
       }
 
+      if (batchSkippedDuplicateInstallment > 0) {
+        log.warn(
+          "⚠️ Pré-vinculação batch {}/{}: {} CreditOrder(s) órfã(s) ignorada(s) — o SalesSummary candidato já tem uma CreditOrder para o mesmo installmentNumber (provável ordem sintética gerada antes do arquivo real chegar). Deixadas órfãs para revisão manual.",
+          batchNumber, totalBatches, batchSkippedDuplicateInstallment
+        );
+      }
+
       if (!toSave.isEmpty()) {
         creditOrderRepository.saveAll(toSave);
       }
@@ -157,8 +184,8 @@ public class CreditOrderOrphanLinkingService {
       totalLinked += batchLinked;
 
       log.info(
-        "🔄 Pré-vinculação batch {}/{}: orfas={}, candidatas={}, vinculadas={}, totalVinculadas={}",
-        batchNumber, totalBatches, orphans.size(), candidates.size(), batchLinked, totalLinked
+        "🔄 Pré-vinculação batch {}/{}: orfas={}, candidatas={}, vinculadas={}, duplicadasIgnoradas={}, totalVinculadas={}",
+        batchNumber, totalBatches, orphans.size(), candidates.size(), batchLinked, batchSkippedDuplicateInstallment, totalLinked
       );
     }
 
@@ -207,19 +234,55 @@ public class CreditOrderOrphanLinkingService {
       return 0;
     }
 
+    // Mesma proteção do batch acima: não duplica CreditOrder para uma parcela que o resumo já tem
+    // (ex.: ordem sintética gerada pela Etapa 6 antes desta órfã aparecer).
+    Set<Integer> existingInstallments = creditOrderRepository.findInstallmentNumbersBySalesSummaryId(summary.getId());
+    List<CreditOrderEntity> toLink = new ArrayList<>();
+    int skippedDuplicateInstallment = 0;
     for (CreditOrderEntity co : matching) {
+      if (co.getInstallmentNumber() != null && existingInstallments.contains(co.getInstallmentNumber())) {
+        skippedDuplicateInstallment++;
+        continue;
+      }
       co.setSalesSummary(summary);
       if (summary.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
         co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
       }
+      toLink.add(co);
     }
 
-    creditOrderRepository.saveAll(matching);
+    if (skippedDuplicateInstallment > 0) {
+      log.warn("⚠️ Vinculação direta: {} CreditOrder(s) ignorada(s) — summary id={} já tem CreditOrder para o mesmo installmentNumber.",
+        skippedDuplicateInstallment, summary.getId());
+    }
+
+    if (toLink.isEmpty()) {
+      return 0;
+    }
+
+    creditOrderRepository.saveAll(toLink);
 
     log.info("🔗 Vinculação direta: {} CreditOrder(s) vinculada(s) ao summary id={}, pv={}, rv={}",
-      matching.size(), summary.getId(), summary.getPvNumber(), summary.getRvNumber());
+      toLink.size(), summary.getId(), summary.getPvNumber(), summary.getRvNumber());
 
-    return matching.size();
+    return toLink.size();
+  }
+
+  private Map<UUID, Set<Integer>> existingInstallmentNumbersFor(List<SalesSummaryEntity> candidates) {
+    List<UUID> candidateIds = candidates.stream().map(SalesSummaryEntity::getId).toList();
+    if (candidateIds.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<UUID, Set<Integer>> result = new HashMap<>();
+    for (Object[] row : creditOrderRepository.findInstallmentNumbersBySalesSummaryIdIn(candidateIds)) {
+      UUID summaryId = (UUID) row[0];
+      Integer installmentNumber = (Integer) row[1];
+      if (summaryId != null && installmentNumber != null) {
+        result.computeIfAbsent(summaryId, ignored -> new HashSet<>()).add(installmentNumber);
+      }
+    }
+    return result;
   }
 
   /**

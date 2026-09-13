@@ -127,6 +127,60 @@ class SalesSummaryCreditOrderReconciliationServiceTest {
     assertThat(order.getReleaseValue()).isEqualByComparingTo("100.00");
   }
 
+  /**
+   * shouldGenerateSyntheticCreditOrder é o gate de negócio que decide se um SalesSummary sem
+   * nenhuma CreditOrder ganha uma sintética - não tinha nenhum teste (achado da Etapa 6,
+   * 2026-09-13), apesar de já ser package-private especificamente para reuso/teste.
+   */
+  @Test
+  void generatesSyntheticOrderForCashDebitModality() {
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setModality(1); // ModalityEnum.CASH_DEBIT
+
+    assertThat(service.shouldGenerateSyntheticCreditOrder(summary)).isTrue();
+  }
+
+  @Test
+  void generatesSyntheticOrderWhenSummaryTypeIndicatesAnticipation() {
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setModality(2);
+    summary.setSummaryType("ANTECIPACAO");
+
+    assertThat(service.shouldGenerateSyntheticCreditOrder(summary)).isTrue();
+  }
+
+  @Test
+  void generatesSyntheticOrderWhenRecordTypeIndicatesAnticipation() {
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setModality(2);
+    summary.setRecordType("anticipation");
+
+    assertThat(service.shouldGenerateSyntheticCreditOrder(summary)).isTrue();
+  }
+
+  @Test
+  void doesNotGenerateSyntheticOrderForOrdinaryCreditSummary() {
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setModality(2);
+    summary.setSummaryType("NORMAL");
+    summary.setRecordType("RESUMO");
+
+    assertThat(service.shouldGenerateSyntheticCreditOrder(summary)).isFalse();
+  }
+
+  @Test
+  void doesNotGenerateSyntheticOrderWhenSummaryTypeAndRecordTypeAreNull() {
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setModality(2);
+
+    assertThat(service.shouldGenerateSyntheticCreditOrder(summary)).isFalse();
+  }
+
+  @Test
+  void doesNotGenerateSyntheticOrderForNullSummary() {
+    assertThat(service.shouldGenerateSyntheticCreditOrder(null)).isFalse();
+  }
+
   private <T extends com.cardsync.domain.model.AuditableEntityBase> T withId(T entity) {
     entity.setId(UUID.randomUUID());
     return entity;
