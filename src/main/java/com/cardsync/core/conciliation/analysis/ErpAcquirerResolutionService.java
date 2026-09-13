@@ -12,14 +12,19 @@ import com.cardsync.domain.model.BankingDomicileEntity;
 import com.cardsync.domain.model.CompanyEntity;
 import com.cardsync.domain.model.EstablishmentEntity;
 import com.cardsync.domain.model.FlagEntity;
+import com.cardsync.domain.model.InstallmentAcqEntity;
+import com.cardsync.domain.model.InstallmentErpEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
 import com.cardsync.domain.model.TransactionErpEntity;
 import com.cardsync.domain.model.enums.ErpCommercialStatusEnum;
+import com.cardsync.domain.model.enums.StatusInstallmentEnum;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusTransactionEnum;
 import com.cardsync.domain.model.enums.StatusTransactionReasonEnum;
 import com.cardsync.domain.repository.TransactionAcqRepository;
 import com.cardsync.domain.repository.TransactionErpRepository;
+import com.cardsync.core.file.erp.calculator.InstallmentErpGenerator;
 import com.cardsync.core.reconciliation.summary.SalesSummaryTransactionReconciliationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,11 +33,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -42,6 +51,7 @@ public class ErpAcquirerResolutionService {
   private final TransactionErpRepository transactionErpRepository;
   private final TransactionAcqRepository transactionAcqRepository;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
+  private final InstallmentErpGenerator installmentErpGenerator;
 
   @Transactional(readOnly = true)
   public ErpAcquirerComparisonModel compare(UUID erpTransactionId, UUID acquirerTransactionId) {
@@ -203,6 +213,55 @@ public class ErpAcquirerResolutionService {
     erp.setBankingDomicile(resolveBankingDomicile(acq));
 
     applyAcquirerSourceContext(erp, acq);
+    regenerateErpInstallmentsFromAcquirer(erp, acq);
+  }
+
+  /**
+   * Achado real (auditoria 2026-09-13): esta correção substitui um comportamento anterior que
+   * atualizava erp.installment (total) e os valores agregados sem nunca regenerar
+   * cs_installment_erp — uma venda podia passar a dizer "3x" com uma única parcela real,
+   * carregando o valor da venda inteira. Como ACQUIRER é a fonte da verdade aqui, as parcelas
+   * ERP passam a espelhar as parcelas reais da adquirente (valor e, quando o arquivo trouxer,
+   * data prevista) em vez de continuar com o rateio antigo, que já não corresponde ao total.
+   * Sem parcela ACQ nenhuma (ex.: venda antiga sem detalhamento), cai no mesmo gerador
+   * proporcional usado na importação do arquivo ERP.
+   */
+  private void regenerateErpInstallmentsFromAcquirer(TransactionErpEntity erp, TransactionAcqEntity acq) {
+    Map<Integer, LocalDate> previousExpectedPaymentDateByInstallment = erp.getInstallments().stream()
+      .filter(installment -> installment.getInstallment() != null && installment.getExpectedPaymentDate() != null)
+      .collect(Collectors.toMap(InstallmentErpEntity::getInstallment, InstallmentErpEntity::getExpectedPaymentDate, (a, b) -> a));
+
+    erp.getInstallments().clear();
+
+    List<InstallmentAcqEntity> acqInstallments = acq.getInstallments() == null
+      ? List.of()
+      : acq.getInstallments().stream()
+        .filter(installment -> installment.getInstallment() != null)
+        .sorted(Comparator.comparing(InstallmentAcqEntity::getInstallment))
+        .toList();
+
+    if (acqInstallments.isEmpty()) {
+      installmentErpGenerator.generate(erp, null).forEach(erp::addInstallment);
+      return;
+    }
+
+    for (InstallmentAcqEntity acqInstallment : acqInstallments) {
+      InstallmentErpEntity erpInstallment = new InstallmentErpEntity();
+      erpInstallment.setInstallment(acqInstallment.getInstallment());
+      erpInstallment.setGrossValue(acqInstallment.getGrossValue());
+      erpInstallment.setLiquidValue(acqInstallment.getLiquidValue());
+      erpInstallment.setDiscountValue(acqInstallment.getDiscountValue());
+
+      LocalDate expectedPaymentDate = acqInstallment.getExpectedPaymentDate();
+      if (expectedPaymentDate == null) {
+        expectedPaymentDate = previousExpectedPaymentDateByInstallment.get(acqInstallment.getInstallment());
+      }
+      erpInstallment.setExpectedPaymentDate(expectedPaymentDate);
+
+      erpInstallment.setStatusPaymentBank(StatusPaymentBankEnum.PENDING.getCode());
+      erpInstallment.setInstallmentStatus(StatusInstallmentEnum.SCHEDULED.getCode());
+      erp.addInstallment(erpInstallment);
+    }
   }
 
   private void applyAcquirerBusinessContextOnly(TransactionErpEntity erp, TransactionAcqEntity acq) {
