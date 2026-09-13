@@ -409,6 +409,7 @@ public class ProcessCielo03Service {
     adjustment.setRawAdjustmentCode(rawAdjustmentCode);
     adjustment.setAdjustmentDescription(resolveAdjustmentDescription(launchType, rawAdjustmentCode));
     adjustment.setAdjustmentType(resolveAdjustmentType(launchType));
+    adjustment.setDebitType(resolveDebitType(launchType));
 
     if (hasNsu && ("04".equals(launchType) || "08".equals(launchType))) {
       BigDecimal absValue = adjustmentValue.abs();
@@ -440,6 +441,21 @@ public class ProcessCielo03Service {
       case "08" -> "CIELO_CHARGEBACK";
       case "10" -> "CIELO_MACHINE_RENTAL";
       default -> "CIELO_ADJUSTMENT";
+    };
+  }
+
+  /**
+   * Achado real (auditoria 2026-09-13): sem debitType, ajustes de débito da Cielo (ajuste a
+   * débito "04", aluguel de máquina "10") nunca eram deduzidos de nenhuma CreditOrder sintética -
+   * AdjustmentRepository.sumDebitAdjustmentsBySalesSummaryId filtra por debitType = 'D', campo
+   * que só os parsers da Rede preenchiam até agora. "08" (chargeback/contestação) fica de fora
+   * de propósito: já aciona cancelamento total da venda via cancellationValueRequested (Etapa 3)
+   * - somar como débito também arriscaria descontar o mesmo valor duas vezes.
+   */
+  private String resolveDebitType(String launchType) {
+    return switch (launchType) {
+      case "04", "10" -> "D";
+      default -> null;
     };
   }
 

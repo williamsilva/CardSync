@@ -269,6 +269,9 @@ class ProcessCielo03ServiceTest {
     assertThat(adjustment.getAdjustmentDescription())
       .isEqualTo("Cobrança/devolução de multa da bandeira por excesso de retentativas de venda no mesmo cartão");
     assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_DEBIT_ADJUSTMENT");
+    // debitType='D' habilita a dedução deste ajuste numa CreditOrder sintética (Etapa 6),
+    // mesmo mecanismo já usado pelos ajustes de débito da Rede.
+    assertThat(adjustment.getDebitType()).isEqualTo("D");
     // NSU presente + tipo "04" (débito) => candidato a cancelamento (AcquirerSaleCancellationService).
     assertThat(adjustment.getCancellationValueRequested()).isEqualByComparingTo(new BigDecimal("0.74"));
     assertThat(adjustment.getTransactionValue()).isEqualByComparingTo(new BigDecimal("0.74"));
@@ -286,6 +289,8 @@ class ProcessCielo03ServiceTest {
     assertThat(adjustment.getAdjustmentDescription())
       .isEqualTo("Transferência de valores entre estabelecimentos da mesma raiz de CNPJ para compensação de saldo");
     assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_CREDIT_ADJUSTMENT");
+    // Crédito ao estabelecimento não é débito - nunca deduzido de CreditOrder nenhuma.
+    assertThat(adjustment.getDebitType()).isNull();
     // Crédito ao estabelecimento não é cancelamento, mesmo com NSU presente.
     assertThat(adjustment.getCancellationValueRequested()).isNull();
     assertThat(adjustment.getTransactionValue()).isNull();
@@ -303,6 +308,9 @@ class ProcessCielo03ServiceTest {
     assertThat(adjustment.getRawAdjustmentCode()).isEqualTo("0301");
     assertThat(adjustment.getAdjustmentDescription()).isEqualTo("Venda contestada pelo banco a pedido do portador do cartão");
     assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_CHARGEBACK");
+    // Chargeback não vira debitType='D' de propósito: já cancela a venda inteira via
+    // cancellationValueRequested (Etapa 3) - somar como débito também descontaria em dobro.
+    assertThat(adjustment.getDebitType()).isNull();
     assertThat(adjustment.getCancellationValueRequested()).isEqualByComparingTo(new BigDecimal("15.08"));
   }
 
@@ -319,6 +327,9 @@ class ProcessCielo03ServiceTest {
     assertThat(adjustment.getRawAdjustmentCode()).isBlank();
     assertThat(adjustment.getAdjustmentDescription()).isEqualTo("Aluguel de máquina");
     assertThat(adjustment.getAdjustmentType()).isEqualTo("CIELO_MACHINE_RENTAL");
+    // Achado real (auditoria 2026-09-13): sem debitType='D', aluguel de máquina da Cielo nunca
+    // era deduzido de nenhuma CreditOrder sintética - ficava só armazenado, nunca conferido.
+    assertThat(adjustment.getDebitType()).isEqualTo("D");
     assertThat(adjustment.getCancellationValueRequested()).isNull();
   }
 
