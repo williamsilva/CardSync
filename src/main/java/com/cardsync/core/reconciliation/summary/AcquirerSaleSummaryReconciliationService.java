@@ -48,7 +48,7 @@ public class AcquirerSaleSummaryReconciliationService {
   private final SalesSummaryRepository salesSummaryRepository;
 
   /**
-   * Etapa 3 - Venda ADQ x resumo.
+   * Etapa 5 - Venda ADQ x resumo.
 
    * Versão otimizada:
    * - antes: buscava os summaries e depois fazia 1 consulta por summary para carregar transações;
@@ -58,8 +58,8 @@ public class AcquirerSaleSummaryReconciliationService {
    * Elegibilidade considera só statusTransaction — divergência de taxa (feeReconciliationStatus)
    * não bloqueia mais o rollup transactionsStatus. Antes, essa etapa também exigia
    * feeReconciliationStatus elegível, e como ela roda depois da Etapa 1b (SalesSummaryTransactionReconciliationService)
-   * no mesmo pipeline, uma divergência de taxa fazia a Etapa 3 SOBRESCREVER de volta pra PENDING um
-   * resumo que a Etapa 1b já tinha corretamente marcado como conciliado — travando a Etapa 4/7
+   * no mesmo pipeline, uma divergência de taxa fazia esta etapa SOBRESCREVER de volta pra PENDING um
+   * resumo que a Etapa 1b já tinha corretamente marcado como conciliado — travando a Etapa 6/7
    * indefinidamente por causa de algo que não tem relação com o dinheiro ter caído no banco.
    * Divergência de taxa continua rastreada e visível separadamente na tela de auditoria de
    * contrato (cs_contract_audit / ContractAuditWriterService), sem depender deste rollup.
@@ -81,7 +81,7 @@ public class AcquirerSaleSummaryReconciliationService {
     boolean reprocess = reconciliationSettingsService.isReprocessAcquirerSaleSummary();
 
     log.info(
-      "📌 Etapa 3 - Venda ADQ x resumo iniciada. trigger={}, eligibleSaleStatuses={}, updateBatchSize={}, reprocess={}, ignoreLookback={}",
+      "📌 Etapa 5 - Venda ADQ x resumo iniciada. trigger={}, eligibleSaleStatuses={}, updateBatchSize={}, reprocess={}, ignoreLookback={}",
       trigger,
       ELIGIBLE_SALE_STATUSES,
       UPDATE_BATCH_SIZE,
@@ -110,7 +110,7 @@ public class AcquirerSaleSummaryReconciliationService {
     }
 
     log.info(
-      "🔎 Etapa 3 - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
+      "🔎 Etapa 5 - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
       trigger,
       stats.size(),
       Duration.between(queryStartedAt, OffsetDateTime.now()).toSeconds()
@@ -145,7 +145,7 @@ public class AcquirerSaleSummaryReconciliationService {
     }
 
     log.info(
-      "🧮 Etapa 3 - Classificação concluída. trigger={}, summaries={}, reconciled={}, partial={}, pending={}, txAnalisadas={}, txElegiveis={}",
+      "🧮 Etapa 5 - Classificação concluída. trigger={}, summaries={}, reconciled={}, partial={}, pending={}, txAnalisadas={}, txElegiveis={}",
       trigger,
       stats.size(),
       reconciledIds.size(),
@@ -187,7 +187,7 @@ public class AcquirerSaleSummaryReconciliationService {
     AcquirerSaleSummaryReconciliationResult result = counter.toResult(finishedAt);
 
     log.info(
-      "✅ Etapa 3 - Venda ADQ x resumo finalizada. trigger={}, summariesAnalisados={}, conciliados={}, parciais={}, pendentes={}, bloqueados={}, semTransacoes={}, transactionsAnalisadas={}, elegiveis={}, updatesConciliado={}, updatesParcial={}, updatesPendente={}, duraçãoTotal={}s",
+      "✅ Etapa 5 - Venda ADQ x resumo finalizada. trigger={}, summariesAnalisados={}, conciliados={}, parciais={}, pendentes={}, bloqueados={}, semTransacoes={}, transactionsAnalisadas={}, elegiveis={}, updatesConciliado={}, updatesParcial={}, updatesPendente={}, duraçãoTotal={}s",
       result.getTrigger(),
       result.getSummariesAnalyzed(),
       result.getSummariesReconciled(),
@@ -214,7 +214,7 @@ public class AcquirerSaleSummaryReconciliationService {
   ) {
     if (ids.isEmpty()) {
       log.info(
-        "ℹ️ Etapa 3 - Nenhum SalesSummary para atualizar como {}. trigger={}, status={}",
+        "ℹ️ Etapa 5 - Nenhum SalesSummary para atualizar como {}. trigger={}, status={}",
         label,
         trigger,
         status
@@ -227,7 +227,7 @@ public class AcquirerSaleSummaryReconciliationService {
     int totalBatches = (int) Math.ceil(ids.size() / (double) UPDATE_BATCH_SIZE);
 
     log.info(
-      "💾 Etapa 3 - Atualizando SalesSummary como {}. trigger={}, status={}, total={}, batches={}",
+      "💾 Etapa 5 - Atualizando SalesSummary como {}. trigger={}, status={}, total={}, batches={}",
       label,
       trigger,
       status,
@@ -241,7 +241,7 @@ public class AcquirerSaleSummaryReconciliationService {
       updated += batchUpdated;
 
       log.info(
-        "🔄 Etapa 3 - Update batch {}/{} concluído. label={}, ids={}, atualizados={}, totalAtualizados={}",
+        "🔄 Etapa 5 - Update batch {}/{} concluído. label={}, ids={}, atualizados={}, totalAtualizados={}",
         batch,
         totalBatches,
         label,
@@ -252,7 +252,7 @@ public class AcquirerSaleSummaryReconciliationService {
     }
 
     log.info(
-      "✅ Etapa 3 - Updates concluídos para {}. trigger={}, atualizados={}, duração={}s",
+      "✅ Etapa 5 - Updates concluídos para {}. trigger={}, atualizados={}, duração={}s",
       label,
       trigger,
       updated,

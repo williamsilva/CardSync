@@ -1306,7 +1306,7 @@ public class BankReconciliationService {
    * InstallmentAcqEntity → TransactionAcqEntity → SalesSummaryEntity) é o único que sempre roda
    * quando uma parcela é paga, independente de {@link #recomputeSalesSummariesFromCreditOrderIds}
    * conseguir vincular a CreditOrderEntity ao SalesSummaryEntity — vínculo que depende de
-   * rvNumber bater exatamente entre os dois lados (Etapa 4), e que falha sistematicamente pra
+   * rvNumber bater exatamente entre os dois lados (Etapa 6), e que falha sistematicamente pra
    * Cielo porque a "Chave UR" não é única por venda (ver feedback_cielo_chave_ur_not_unique).
    * Sem isto, "Ordem Crédito" ficava presa em PENDING pra sempre mesmo com o pagamento
    * (statusPaymentBank) já confirmado — a tela de Resumo de Vendas mostrava as duas colunas
@@ -1641,7 +1641,7 @@ public class BankReconciliationService {
       idOrNull(order.getAcquirer()),
       null,
       // CreditOrderEntity não tem relação com EstablishmentEntity — pvCentralizer é o
-      // identificador de estabelecimento já usado com esse propósito na Etapa 4
+      // identificador de estabelecimento já usado com esse propósito na Etapa 6
       // (CreditOrderOrphanLinkingService: acquirer + pvCentralizer + rvNumber).
       order.getPvCentralizer(),
       idOrNull(order.getFlag()),

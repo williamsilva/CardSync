@@ -73,7 +73,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
    * (AUTOMATICALLY_RECONCILED/MANUALLY_RECONCILED).
    *
    * Chamada logo após a conciliação ERP x ADQ, antes da etapa de taxas.
-   * A etapa de taxas (Etapa 3) e a conciliação com resumo com gate de taxa (Etapa 4)
+   * A etapa de taxas (Etapa 4) e a conciliação venda ADQ x resumo (Etapa 5)
    * executam depois e podem refinar o status conforme necessário.
    */
   @Query("""
@@ -134,15 +134,17 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
-   * Etapa 3 - Venda ADQ x SalesSummary (gate de taxa).
+   * Etapa 5 - Venda ADQ x SalesSummary.
    *
-   * NÃO filtra por ss.transactionsStatus: a Etapa 1b (SalesSummaryTransactionReconciliationService)
+   * NÃO filtra por ss.transactionsStatus: a Etapa 2 (SalesSummaryTransactionReconciliationService)
    * roda antes desta, no mesmo pipeline, e já promove o resumo para RECONCILED olhando só o
-   * statusTransaction da transação — sem considerar feeReconciliationStatus. Se esta consulta
-   * pulasse resumos com transactionsStatus fora de "pendente", ela nunca reavaliaria um resumo
-   * que a Etapa 1b acabou de marcar como conciliado na mesma execução, e a divergência de taxa
-   * (feeReconciliationStatus) nunca seria detectada no nível do resumo. Por isso reavalia todo
-   * resumo com transação vinculada dentro da janela de lookback, a cada execução.
+   * statusTransaction da transação. Como a Etapa 3 (cancelamentos) e a Etapa 4 (taxas) rodam
+   * depois da Etapa 2 e podem mudar o statusTransaction de uma transação já contabilizada, se
+   * esta consulta pulasse resumos com transactionsStatus fora de "pendente" ela nunca reavaliaria
+   * um resumo que a Etapa 2 acabou de marcar como conciliado na mesma execução, deixando o rollup
+   * desatualizado para a Etapa 6 (SalesSummaryCreditOrderReconciliationService), que usa
+   * transactionsStatus como gate de elegibilidade. Por isso reavalia todo resumo com transação
+   * vinculada dentro da janela de lookback, a cada execução.
    *
    * Consulta otimizada para evitar N+1:
    * - não carrega SalesSummaryEntity;
@@ -240,7 +242,7 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
   );
 
   /**
-   * Etapa 4 - SalesSummary x CreditOrder.
+   * Etapa 6 - SalesSummary x CreditOrder.
 
    * Consulta agregada para evitar N+1:
    * - não carrega entidades;

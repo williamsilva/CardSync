@@ -40,7 +40,7 @@ public class SalesSummaryCreditOrderReconciliationService {
   private static final int ORDER_SUMMARY_PARTIALLY_RECONCILED = StatusReconciliationEnum.PARTIALLY_RECONCILED.getCode();
 
   /**
-   * Etapa 5 - Resumo x ordem de pagamento.
+   * Etapa 6 - Resumo x ordem de pagamento.
    *
    * A conciliação com ordem de crédito é independente do estado das transações ADQ.
    * Um resumo pode ter (ou receber) uma ordem de crédito mesmo que suas transações
@@ -83,7 +83,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     boolean reprocess = reconciliationSettingsService.isReprocessSalesSummaryCreditOrder();
 
     log.info(
-      "📌 Etapa 4 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}, reprocess={}, ignoreLookback={}",
+      "📌 Etapa 6 - Resumo x ordem iniciada. trigger={}, eligibleTransactionStatuses={}, pendingCreditOrderStatuses={}, updateBatchSize={}, generationBatchSize={}, reprocess={}, ignoreLookback={}",
       trigger,
       ELIGIBLE_TRANSACTION_SUMMARY_STATUSES,
       PENDING_SUMMARY_CREDIT_ORDER_STATUSES,
@@ -114,7 +114,7 @@ public class SalesSummaryCreditOrderReconciliationService {
         );
 
     log.info(
-      "🔎 Etapa 4 - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
+      "🔎 Etapa 6 - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
       trigger,
       stats.size(),
       Duration.between(queryStartedAt, OffsetDateTime.now()).toSeconds()
@@ -129,7 +129,7 @@ public class SalesSummaryCreditOrderReconciliationService {
    * (CreditOrder) só vence/libera bem depois do go-live (ver
    * SalesSummaryRepository#findStatsForSalesSummaryCreditOrderReconciliationPreImplantation).
    * Encontrado ao investigar por que milhares de CreditOrder pós go-live nunca ficam elegíveis
-   * pra conciliação bancária (Etapa 6 do matcher): o SalesSummary da venda original (pré-go-live)
+   * pra conciliação bancária (Etapa 7 do matcher): o SalesSummary da venda original (pré-go-live)
    * nunca tem creditOrderStatus recalculado, então a parcela nunca sai de salesSummaryStatus
    * PENDENTE — apesar de ter releaseDate e lançamento bancário compatível disponível.
    * Reaproveita a mesma classificação/geração sintética/atualização em lote de
@@ -144,7 +144,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     LocalDate implantationDate = implantationDateProvider.get();
 
     log.info(
-      "📌 Etapa 4 (backfill pré-implantação) iniciada. trigger={}, implantationDate={}, reprocess={}",
+      "📌 Etapa 6 (backfill pré-implantação) iniciada. trigger={}, implantationDate={}, reprocess={}",
       trigger, implantationDate, reprocess
     );
 
@@ -158,7 +158,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     );
 
     log.info(
-      "🔎 Etapa 4 (backfill pré-implantação) - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
+      "🔎 Etapa 6 (backfill pré-implantação) - Consulta agregada concluída. trigger={}, summariesCandidatos={}, duraçãoConsulta={}s",
       trigger,
       stats.size(),
       Duration.between(queryStartedAt, OffsetDateTime.now()).toSeconds()
@@ -177,11 +177,11 @@ public class SalesSummaryCreditOrderReconciliationService {
     long orphanCreditOrders = creditOrderRepository.countWithoutSalesSummary();
     if (orphanCreditOrders > 0) {
       log.warn(
-        "⚠️ Etapa 4 - Diagnóstico: {} CreditOrder(s) sem salesSummary vinculado. Esses registros não participam da conciliação e podem indicar falha no processamento dos arquivos de ordem de crédito (RV/PV sem match com SalesSummary).",
+        "⚠️ Etapa 6 - Diagnóstico: {} CreditOrder(s) sem salesSummary vinculado. Esses registros não participam da conciliação e podem indicar falha no processamento dos arquivos de ordem de crédito (RV/PV sem match com SalesSummary).",
         orphanCreditOrders
       );
     } else {
-      log.info("✅ Etapa 4 - Diagnóstico: nenhuma CreditOrder órfã (sem salesSummary). trigger={}", trigger);
+      log.info("✅ Etapa 6 - Diagnóstico: nenhuma CreditOrder órfã (sem salesSummary). trigger={}", trigger);
     }
 
     Counter counter = new Counter(trigger, startedAt);
@@ -210,7 +210,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     counter.creditOrdersAnalyzed = safeInt(existingCreditOrders);
 
     log.info(
-      "🧮 Etapa 4 - Classificação inicial concluída. trigger={}, summaries={}, totalmenteConciliados={}, parcialmenteConciliados={}, semOrdens={}, ordensExistentes={}",
+      "🧮 Etapa 6 - Classificação inicial concluída. trigger={}, summaries={}, totalmenteConciliados={}, parcialmenteConciliados={}, semOrdens={}, ordensExistentes={}",
       trigger,
       stats.size(),
       summariesWithOrders.size(),
@@ -257,7 +257,7 @@ public class SalesSummaryCreditOrderReconciliationService {
       : creditOrderRepository.syncSalesSummaryStatusForReconciledSummaries(ORDER_SUMMARY_RECONCILED, lookbackDate);
     if (fixedOrders > 0) {
       log.warn(
-        "⚠️ Etapa 4 - Consistência: {} ordem(ns) de crédito com salesSummaryStatus inconsistente detectada(s) e corrigida(s). trigger={}",
+        "⚠️ Etapa 6 - Consistência: {} ordem(ns) de crédito com salesSummaryStatus inconsistente detectada(s) e corrigida(s). trigger={}",
         fixedOrders,
         trigger
       );
@@ -266,7 +266,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     SalesSummaryCreditOrderReconciliationResult result = counter.toResult(OffsetDateTime.now());
 
     log.info(
-      "✅ Etapa 4 - Resumo x ordem finalizada. trigger={}, summariesAnalisados={}, conciliados={}, parciais={}, pendentes={}, bloqueados={}, semOrdens={}, ordensGeradas={}, ordensAnalisadas={}, duraçãoTotal={}s",
+      "✅ Etapa 6 - Resumo x ordem finalizada. trigger={}, summariesAnalisados={}, conciliados={}, parciais={}, pendentes={}, bloqueados={}, semOrdens={}, ordensGeradas={}, ordensAnalisadas={}, duraçãoTotal={}s",
       result.getTrigger(),
       result.getSummariesAnalyzed(),
       result.getSummariesReconciled(),
@@ -284,7 +284,7 @@ public class SalesSummaryCreditOrderReconciliationService {
 
   private GeneratedOrders generateSyntheticOrders(FinancialReconciliationTriggerType trigger, List<UUID> summariesWithoutOrders) {
     if (summariesWithoutOrders.isEmpty()) {
-      log.info("ℹ️ Etapa 4 - Nenhum SalesSummary sem ordem para avaliar geração sintética. trigger={}", trigger);
+      log.info("ℹ️ Etapa 6 - Nenhum SalesSummary sem ordem para avaliar geração sintética. trigger={}", trigger);
       return new GeneratedOrders(List.of(), List.of(), 0);
     }
 
@@ -296,7 +296,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     int totalBatches = totalBatches(summariesWithoutOrders.size(), GENERATION_BATCH_SIZE);
 
     log.info(
-      "🧾 Etapa 4 - Avaliando geração de ordens sintéticas. trigger={}, summariesSemOrdem={}, batches={}",
+      "🧾 Etapa 6 - Avaliando geração de ordens sintéticas. trigger={}, summariesSemOrdem={}, batches={}",
       trigger,
       summariesWithoutOrders.size(),
       totalBatches
@@ -334,7 +334,7 @@ public class SalesSummaryCreditOrderReconciliationService {
       }
 
       log.info(
-        "🔄 Etapa 4 - Geração sintética batch {}/{} concluída. ids={}, geradas={}, naoGeradas={}, totalGeradas={}, duração={}s",
+        "🔄 Etapa 6 - Geração sintética batch {}/{} concluída. ids={}, geradas={}, naoGeradas={}, totalGeradas={}, duração={}s",
         batchNumber,
         totalBatches,
         batchIds.size(),
@@ -346,7 +346,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     }
 
     log.info(
-      "✅ Etapa 4 - Geração sintética concluída. trigger={}, summariesSemOrdem={}, ordensGeradas={}, summariesSemGeracao={}, duração={}s",
+      "✅ Etapa 6 - Geração sintética concluída. trigger={}, summariesSemOrdem={}, ordensGeradas={}, summariesSemGeracao={}, duração={}s",
       trigger,
       summariesWithoutOrders.size(),
       generatedOrders,
@@ -364,7 +364,7 @@ public class SalesSummaryCreditOrderReconciliationService {
    * Antecipações (Rede EEFI "036" — ver ProcessRedeEeFiService.buildAnticipation) representam
    * parcelas específicas de uma RV adiantadas pelo banco antes do vencimento normal: o valor cai
    * na conta, mas nunca gera CreditOrder nenhuma, então nunca participa da conciliação bancária
-   * (Etapa 6). generatedOrders controla a idempotência — uma vez gerada a ordem sintética, a
+   * (Etapa 7). generatedOrders controla a idempotência — uma vez gerada a ordem sintética, a
    * antecipação não é reavaliada de novo. Independente da geração baseada em SalesSummary acima:
    * uma mesma RV pode ter algumas parcelas antecipadas (aqui) e outras liquidadas normalmente (via
    * CreditOrder real ou sintética por SalesSummary) — não é duplicidade, são parcelas diferentes.
@@ -372,7 +372,7 @@ public class SalesSummaryCreditOrderReconciliationService {
   private int generateSyntheticOrdersFromAnticipations(FinancialReconciliationTriggerType trigger) {
     List<UUID> eligibleIds = anticipationRepository.findIdsEligibleForSyntheticCreditOrderGeneration();
     if (eligibleIds.isEmpty()) {
-      log.info("ℹ️ Etapa 4 - Nenhuma Anticipation elegível para geração sintética. trigger={}", trigger);
+      log.info("ℹ️ Etapa 6 - Nenhuma Anticipation elegível para geração sintética. trigger={}", trigger);
       return 0;
     }
 
@@ -381,7 +381,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     int generatedOrders = 0;
 
     log.info(
-      "🧾 Etapa 4 - Avaliando geração sintética a partir de antecipações. trigger={}, antecipacoesElegiveis={}, batches={}",
+      "🧾 Etapa 6 - Avaliando geração sintética a partir de antecipações. trigger={}, antecipacoesElegiveis={}, batches={}",
       trigger,
       eligibleIds.size(),
       totalBatches
@@ -413,7 +413,7 @@ public class SalesSummaryCreditOrderReconciliationService {
       }
 
       log.info(
-        "🔄 Etapa 4 - Geração sintética (antecipação) batch {}/{} concluída. ids={}, geradas={}, totalGeradas={}, duração={}s",
+        "🔄 Etapa 6 - Geração sintética (antecipação) batch {}/{} concluída. ids={}, geradas={}, totalGeradas={}, duração={}s",
         batchNumber,
         totalBatches,
         batchIds.size(),
@@ -424,7 +424,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     }
 
     log.info(
-      "✅ Etapa 4 - Geração sintética (antecipação) concluída. trigger={}, antecipacoesElegiveis={}, ordensGeradas={}, duração={}s",
+      "✅ Etapa 6 - Geração sintética (antecipação) concluída. trigger={}, antecipacoesElegiveis={}, ordensGeradas={}, duração={}s",
       trigger,
       eligibleIds.size(),
       generatedOrders,
@@ -436,7 +436,7 @@ public class SalesSummaryCreditOrderReconciliationService {
 
   private void bulkUpdateExistingCreditOrders(FinancialReconciliationTriggerType trigger, List<UUID> summariesWithOrders) {
     if (summariesWithOrders.isEmpty()) {
-      log.info("ℹ️ Etapa 4 - Nenhuma ordem existente para atualizar. trigger={}", trigger);
+      log.info("ℹ️ Etapa 6 - Nenhuma ordem existente para atualizar. trigger={}", trigger);
       return;
     }
 
@@ -447,7 +447,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     int totalReconciliationStatusUpdated = 0;
 
     log.info(
-      "💾 Etapa 4 - Atualizando CreditOrder existentes. trigger={}, summariesComOrdens={}, batches={}",
+      "💾 Etapa 6 - Atualizando CreditOrder existentes. trigger={}, summariesComOrdens={}, batches={}",
       trigger,
       summariesWithOrders.size(),
       totalBatches
@@ -476,7 +476,7 @@ public class SalesSummaryCreditOrderReconciliationService {
       totalReconciliationStatusUpdated += reconciliationStatusUpdated;
 
       log.info(
-        "🔄 Etapa 4 - Update CreditOrder batch {}/{} concluído. summaries={}, salesSummaryStatusAtualizados={}, statusPaymentNullAtualizados={}, reconciliationNullAtualizados={}, duração={}s",
+        "🔄 Etapa 6 - Update CreditOrder batch {}/{} concluído. summaries={}, salesSummaryStatusAtualizados={}, statusPaymentNullAtualizados={}, reconciliationNullAtualizados={}, duração={}s",
         batchNumber,
         totalBatches,
         batchIds.size(),
@@ -488,7 +488,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     }
 
     log.info(
-      "✅ Etapa 4 - Updates de CreditOrder concluídos. trigger={}, salesSummaryStatusAtualizados={}, statusPaymentNullAtualizados={}, reconciliationNullAtualizados={}, duração={}s",
+      "✅ Etapa 6 - Updates de CreditOrder concluídos. trigger={}, salesSummaryStatusAtualizados={}, statusPaymentNullAtualizados={}, reconciliationNullAtualizados={}, duração={}s",
       trigger,
       totalSalesSummaryStatusUpdated,
       totalPaymentStatusUpdated,
@@ -504,7 +504,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     Integer status
   ) {
     if (summaryIds.isEmpty()) {
-      log.info("ℹ️ Etapa 4 - Nenhum SalesSummary para atualizar como {}. trigger={}", label, trigger);
+      log.info("ℹ️ Etapa 6 - Nenhum SalesSummary para atualizar como {}. trigger={}", label, trigger);
       return;
     }
 
@@ -513,7 +513,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     int totalUpdated = 0;
 
     log.info(
-      "💾 Etapa 4 - Atualizando SalesSummary como {}. trigger={}, status={}, total={}, batches={}",
+      "💾 Etapa 6 - Atualizando SalesSummary como {}. trigger={}, status={}, total={}, batches={}",
       label,
       trigger,
       status,
@@ -530,7 +530,7 @@ public class SalesSummaryCreditOrderReconciliationService {
       totalUpdated += updated;
 
       log.info(
-        "🔄 Etapa 4 - Update SalesSummary batch {}/{} concluído. label={}, ids={}, atualizados={}, totalAtualizados={}, duração={}s",
+        "🔄 Etapa 6 - Update SalesSummary batch {}/{} concluído. label={}, ids={}, atualizados={}, totalAtualizados={}, duração={}s",
         batchNumber,
         totalBatches,
         label,
@@ -542,7 +542,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     }
 
     log.info(
-      "✅ Etapa 4 - Updates de SalesSummary concluídos para {}. trigger={}, atualizados={}, duração={}s",
+      "✅ Etapa 6 - Updates de SalesSummary concluídos para {}. trigger={}, atualizados={}, duração={}s",
       label,
       trigger,
       totalUpdated,
@@ -565,7 +565,7 @@ public class SalesSummaryCreditOrderReconciliationService {
       totalUpdated += updated;
 
       log.info(
-        "🔄 Etapa 4 - Update manualGenerated batch {}/{} concluído. ids={}, atualizados={}, totalAtualizados={}",
+        "🔄 Etapa 6 - Update manualGenerated batch {}/{} concluído. ids={}, atualizados={}, totalAtualizados={}",
         batchNumber,
         totalBatches,
         batchIds.size(),
@@ -575,7 +575,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     }
 
     log.info(
-      "✅ Etapa 4 - SalesSummary manualGenerated atualizado. trigger={}, total={}",
+      "✅ Etapa 6 - SalesSummary manualGenerated atualizado. trigger={}, total={}",
       trigger,
       totalUpdated
     );
@@ -600,7 +600,7 @@ public class SalesSummaryCreditOrderReconciliationService {
 
     if (orphans.isEmpty()) {
       log.info(
-        "🔍 Etapa 4 - PV Mismatch: nenhuma CreditOrder órfã com acquirer+rvNumber correspondente aos {} SalesSummary pendentes. Os arquivos EEFI para esses RVs provavelmente não foram importados. trigger={}",
+        "🔍 Etapa 6 - PV Mismatch: nenhuma CreditOrder órfã com acquirer+rvNumber correspondente aos {} SalesSummary pendentes. Os arquivos EEFI para esses RVs provavelmente não foram importados. trigger={}",
         summaries.size(), trigger
       );
       return;
@@ -639,7 +639,7 @@ public class SalesSummaryCreditOrderReconciliationService {
 
     if (pvMismatch > 0) {
       log.warn(
-        "⚠️ Etapa 4 - PV Mismatch: {} CreditOrder(s) órfã(s) têm acquirer+rvNumber correspondente mas pvCentralizer diferente do pvNumber do SalesSummary. trigger={}",
+        "⚠️ Etapa 6 - PV Mismatch: {} CreditOrder(s) órfã(s) têm acquirer+rvNumber correspondente mas pvCentralizer diferente do pvNumber do SalesSummary. trigger={}",
         pvMismatch, trigger
       );
       mismatchPatterns.entrySet().stream()
@@ -650,14 +650,14 @@ public class SalesSummaryCreditOrderReconciliationService {
 
     if (pvMatch > 0) {
       log.warn(
-        "⚠️ Etapa 4 - PV Match exacto mas ainda órfã: {} CreditOrder(s) com acquirer+rvNumber+pvCentralizer idêntico ao SalesSummary mas salesSummary=NULL. Pode ser bug na ingestão. trigger={}",
+        "⚠️ Etapa 6 - PV Match exacto mas ainda órfã: {} CreditOrder(s) com acquirer+rvNumber+pvCentralizer idêntico ao SalesSummary mas salesSummary=NULL. Pode ser bug na ingestão. trigger={}",
         pvMatch, trigger
       );
     }
 
     if (pvMismatch == 0 && pvMatch == 0) {
       log.info(
-        "🔍 Etapa 4 - PV Mismatch: {} CreditOrder(s) órfã(s) encontradas por acquirer+rvNumber mas sem cruzamento direto com os SalesSummary pendentes (chaves incompatíveis). trigger={}",
+        "🔍 Etapa 6 - PV Mismatch: {} CreditOrder(s) órfã(s) encontradas por acquirer+rvNumber mas sem cruzamento direto com os SalesSummary pendentes (chaves incompatíveis). trigger={}",
         orphans.size(), trigger
       );
     }
@@ -674,7 +674,7 @@ public class SalesSummaryCreditOrderReconciliationService {
     ));
 
     log.info(
-      "🔍 Etapa 4 - Diagnóstico: {} SalesSummary sem CreditOrder e sem geração sintética. trigger={}, distribuição:",
+      "🔍 Etapa 6 - Diagnóstico: {} SalesSummary sem CreditOrder e sem geração sintética. trigger={}, distribuição:",
       summaries.size(), trigger
     );
     distribution.entrySet().stream()
