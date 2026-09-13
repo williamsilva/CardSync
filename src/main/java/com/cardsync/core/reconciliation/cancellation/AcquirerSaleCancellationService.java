@@ -278,7 +278,19 @@ public class AcquirerSaleCancellationService {
       return true;
     }
 
-    return canceledValue.add(tolerance).compareTo(baseValue) >= 0;
+    if (canceledValue.add(tolerance).compareTo(baseValue) >= 0) {
+      return true;
+    }
+
+    // Achado real (auditoria 2026-09-13): este ajuste sozinho não cobre a venda, mas pode ser
+    // uma entre várias cancelações parciais da mesma venda (ex.: duas de 50%, em ajustes
+    // diferentes) que juntas cobrem 100% - sem agregar, a venda nunca fechava. Só consulta o
+    // agregado quando o ajuste isolado já não bastou, para não pagar essa query no caso comum.
+    if (acq.getId() == null) {
+      return false;
+    }
+    BigDecimal aggregatedCanceledValue = adjustmentRepository.sumCancellationValueRequestedByTransactionId(acq.getId());
+    return aggregatedCanceledValue.add(tolerance).compareTo(baseValue) >= 0;
   }
 
   private boolean cancelAcquirerSale(

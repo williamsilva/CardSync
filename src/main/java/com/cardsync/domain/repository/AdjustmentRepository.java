@@ -88,4 +88,21 @@ public interface AdjustmentRepository extends JpaRepository<AdjustmentEntity, UU
      group by adj.salesSummary.id
   """)
   List<Object[]> sumDebitAdjustmentsBySalesSummaryIdIn(@Param("summaryIds") Collection<UUID> summaryIds);
+
+  /**
+   * Achado real (auditoria 2026-09-13): AcquirerSaleCancellationService avaliava cada ajuste de
+   * cancelamento isoladamente contra o valor total da venda — duas cancelações parciais da mesma
+   * venda (ex.: 50% cada, em ajustes/arquivos diferentes) nunca fechavam 100% juntas, porque
+   * nenhuma delas sozinha cobria o valor. Soma cancellationValueRequested de TODOS os ajustes já
+   * gravados para esta transação (a mesma restrição de cancellationValueRequested populado usada
+   * em findIdsForAcquirerSaleCancellationReconciliation), usada como fallback quando o ajuste
+   * atual sozinho não fecha a venda.
+   */
+  @Query("""
+    select coalesce(sum(abs(adj.cancellationValueRequested)), 0)
+      from AdjustmentEntity adj
+     where adj.transaction.id = :transactionAcqId
+       and adj.cancellationValueRequested is not null
+  """)
+  BigDecimal sumCancellationValueRequestedByTransactionId(@Param("transactionAcqId") UUID transactionAcqId);
 }
