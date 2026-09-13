@@ -1,5 +1,6 @@
 package com.cardsync.core.conciliation.analysis;
 
+import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.cardsync.core.file.erp.calculator.FinancialCalculator;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.model.enums.ContractAuditStatusEnum;
@@ -35,10 +36,10 @@ public class ConciliationFeeAnalysisService {
   private static final BigDecimal ZERO = BigDecimal.ZERO;
   private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
   private static final BigDecimal RATE_TOLERANCE = BigDecimal.valueOf(0.01);
-  private static final BigDecimal VALUE_TOLERANCE = BigDecimal.valueOf(0.05);
 
   private final ContractAuditWriterService contractAuditWriterService;
   private final ContractedAcquirerRateLookupService contractedAcquirerRateLookupService;
+  private final ReconciliationSettingsService reconciliationSettingsService;
 
   private final ThreadLocal<Map<RateLookupKey, List<ContractEntity>>> reconciliationRateCache =
     ThreadLocal.withInitial(HashMap::new);
@@ -539,7 +540,7 @@ public class ConciliationFeeAnalysisService {
 
   private boolean isFeeOk(BigDecimal expectedRate, BigDecimal appliedRate, BigDecimal feeDifference) {
     BigDecimal absFeeDifference = abs(feeDifference);
-    if (absFeeDifference.compareTo(VALUE_TOLERANCE) <= 0) return true;
+    if (absFeeDifference.compareTo(reconciliationSettingsService.getValueTolerance()) <= 0) return true;
     BigDecimal absRateDifference = expectedRate.subtract(nz(appliedRate)).abs();
     return absRateDifference.compareTo(RATE_TOLERANCE) <= 0;
   }
