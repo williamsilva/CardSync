@@ -301,4 +301,21 @@ public interface TransactionAcqRepository extends JpaRepository<TransactionAcqEn
      order by a.nsu, a.saleDate desc, a.id desc
   """)
   List<TransactionAcqEntity> findCandidatesForOtherDivergencePairByNsuIn(@Param("nsus") Collection<Long> nsus);
+
+  /**
+   * Auditoria de consistência (achado real 2026-09-13): nada no sistema validava
+   * installment (total declarado) contra a quantidade real de InstallmentAcqEntity geradas.
+   */
+  @Query("""
+    select count(a) from TransactionAcqEntity a
+     where a.installment is not null and size(a.installments) <> a.installment
+  """)
+  long countWithInstallmentCountMismatch();
+
+  @Query("""
+    select a.id from TransactionAcqEntity a
+     where a.installment is not null and size(a.installments) <> a.installment
+     order by a.saleDate desc
+  """)
+  List<UUID> findIdsWithInstallmentCountMismatch(Pageable pageable);
 }

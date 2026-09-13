@@ -219,4 +219,22 @@ public interface TransactionErpRepository extends JpaRepository<TransactionErpEn
     @Param("establishmentId") UUID establishmentId
   );
 
+  /**
+   * Auditoria de consistência (achado real 2026-09-13): nada no sistema validava
+   * installment (total declarado) contra a quantidade real de InstallmentErpEntity geradas -
+   * ver ErpAcquirerResolutionService, onde essa divergência já foi vista na prática.
+   */
+  @Query("""
+    select count(e) from TransactionErpEntity e
+     where e.installment is not null and size(e.installments) <> e.installment
+  """)
+  long countWithInstallmentCountMismatch();
+
+  @Query("""
+    select e.id from TransactionErpEntity e
+     where e.installment is not null and size(e.installments) <> e.installment
+     order by e.saleDate desc
+  """)
+  List<UUID> findIdsWithInstallmentCountMismatch(Pageable pageable);
+
 }

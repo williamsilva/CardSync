@@ -1,6 +1,8 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.representation.model.conciliation.InstallmentConsistencyAuditResult;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationExecutionLogResponse;
+import com.cardsync.core.conciliation.analysis.InstallmentConsistencyAuditService;
 import com.cardsync.core.reconciliation.BankReconciliationResult;
 import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.pipeline.FinancialReconciliationPipelineResult;
@@ -31,6 +33,7 @@ public class FinancialReconciliationPipelineController {
   private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
   private final BankReconciliationService bankReconciliationService;
+  private final InstallmentConsistencyAuditService installmentConsistencyAuditService;
 
   @GetMapping("/history")
   @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanConsult
@@ -75,5 +78,16 @@ public class FinancialReconciliationPipelineController {
   @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanProcess
   public int repairInstallmentsMissingCreditOrderPropagation() {
     return bankReconciliationService.repairInstallmentsMissingCreditOrderPropagation();
+  }
+
+  /**
+   * Achado real 2026-09-13 (ver InstallmentConsistencyAuditService): compara o total de
+   * parcelas declarado por venda com a quantidade real de parcelas geradas. Só leitura/alerta -
+   * corrigir uma venda específica continua sendo uma decisão manual caso a caso.
+   */
+  @GetMapping("/audit/installment-consistency")
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanConsult
+  public InstallmentConsistencyAuditResult auditInstallmentConsistency() {
+    return installmentConsistencyAuditService.audit();
   }
 }
