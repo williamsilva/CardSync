@@ -4,6 +4,7 @@ import com.cardsync.core.conciliation.ReconciliationSettingsService;
 import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
+import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.repository.CreditOrderRepository;
 import com.cardsync.domain.repository.ReleasesBankRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
@@ -61,6 +62,25 @@ class ManualBankReconciliationServiceTest {
     assertThat(result.divergenceValue()).isNull();
     assertThat(release.getDivergenceValue()).isNull();
     assertThat(release.getDivergenceReason()).isNull();
+  }
+
+  @Test
+  void rejectsReconcilingAReleaseThatIsAlreadyPaid() {
+    // Achado real (Etapa 7): sem essa checagem, uma segunda chamada pra um lançamento já
+    // conciliado calculava divergência só sobre as ordens desta chamada, ignorando as já
+    // vinculadas antes - podendo vincular ordens extras sem detectar a divergência acumulada.
+    UUID releaseId = UUID.randomUUID();
+    ReleasesBankEntity release = new ReleasesBankEntity();
+    release.setId(releaseId);
+    release.setReleaseValue(new BigDecimal("100.00"));
+    release.setReconciliationStatus(StatusPaymentBankEnum.PAID);
+    when(releasesBankRepository.findById(releaseId)).thenReturn(Optional.of(release));
+    when(creditOrderRepository.findPendingZeroValueOrders(any(), any())).thenReturn(List.of());
+
+    UUID orderId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> service.reconcile(releaseId, List.of(orderId), null))
+      .isInstanceOf(BusinessException.class);
   }
 
   @Test

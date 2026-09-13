@@ -39,6 +39,16 @@ public class ManualBankReconciliationService {
         ReleasesBankEntity release = releasesBankRepository.findById(releaseBankId)
                 .orElseThrow(() -> BusinessException.notFound(ErrorCode.NOT_FOUND, "bank.release.not.found: " + releaseBankId));
 
+        // Achado real (Etapa 7, 2026-09-13): sem esta checagem, uma segunda chamada pra um
+        // lançamento já conciliado (ex.: duplo clique, ou tentativa de "completar" o vínculo
+        // depois) calculava a divergência só sobre as ordens desta chamada - ignorando as ordens
+        // já vinculadas em uma chamada anterior - podendo aceitar (e vincular fisicamente) ordens
+        // extras sem detectar a divergência real acumulada. Uma vez PAID, é preciso desfazer a
+        // conciliação antes de vincular novas ordens a este lançamento.
+        if (release.getReconciliationStatus() == StatusPaymentBankEnum.PAID) {
+            throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "manual.reconciliation.release.already.reconciled");
+        }
+
         List<CreditOrderEntity> orders = creditOrderRepository.findAllById(creditOrderIds);
 
         if (orders.size() != creditOrderIds.size()) {

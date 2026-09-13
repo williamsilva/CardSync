@@ -135,6 +135,46 @@ class BankReconciliationServiceResilienceTest {
   }
 
   @Test
+  void releaseMissingRequiredContextIsCountedAndNotSilentlyDropped() {
+    // Achado real (Etapa 7, 2026-09-13): antes, um release sem contexto obrigatório (aqui, sem
+    // bank) era descartado do filtro de validReleases sem log e sem contar nem releaseAnalyzed()
+    // nem releaseSkippedMissingContext() - diferente do tratamento já dado ao filtro equivalente
+    // de ordens (log.warn) e ao caminho por parcelas (markReleaseNotReconciledWhenExpired +
+    // releaseSkippedMissingContext). No modo CREDIT_ORDER_ONLY isso deixava o release invisível
+    // em qualquer métrica do resultado.
+    when(settingsService.isReprocessBankAcquirer()).thenReturn(false);
+    when(settingsService.getValueTolerance()).thenReturn(new BigDecimal("0.05"));
+    when(settingsService.getDateToleranceDaysBefore()).thenReturn(0);
+    when(settingsService.getDateToleranceDaysAfter()).thenReturn(0);
+    when(settingsService.getBankMarkNotReconciledAfterDays()).thenReturn(0);
+
+    CompanyEntity company = withId(new CompanyEntity());
+    ReleasesBankEntity releaseWithoutBank = new ReleasesBankEntity();
+    releaseWithoutBank.setId(UUID.randomUUID());
+    releaseWithoutBank.setCompany(company);
+    releaseWithoutBank.setReleaseDate(LocalDate.of(2026, 1, 10));
+    releaseWithoutBank.setReleaseValue(new BigDecimal("100.00"));
+    // bank propositalmente não setado — hasRequiredContext(ReleasesBankEntity) deve reprovar.
+
+    var counter = BankReconciliationResult.counter(BankReconciliationTriggerType.MANUAL, BankReconciliationMode.CREDIT_ORDER_ONLY);
+
+    service.reconcileEligibleCreditOrders(
+      List.of(),
+      List.of(releaseWithoutBank),
+      new HashSet<>(),
+      new HashSet<>(),
+      new FileProcessingProperties.Reconciliation(),
+      ReconciliationMatchContext.MatchStrictness.NONE,
+      counter
+    );
+
+    BankReconciliationResult result = counter.toResult();
+    assertThat(result.releasesAnalyzed()).isEqualTo(1);
+    assertThat(result.releasesSkippedMissingContext()).isEqualTo(1);
+    assertThat(releaseWithoutBank.getReconciliationStatus()).isEqualTo(StatusPaymentBankEnum.NOT_PAID);
+  }
+
+  @Test
   void markReleaseNotReconciledWhenExpiredUsesNotPaidInsteadOfPaid() {
     // NOT_PAID (BankReconciliationStatus.NOT_RECONCILED) — antes usava PAID, o mesmo status de
     // match real, mascarando um lançamento sem nenhuma ordem/parcela vinculada como conciliado.

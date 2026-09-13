@@ -35,12 +35,28 @@ class BankReconciliationMatcher {
 
     if (sorted.isEmpty()) return MatchResult.notMatched();
 
-    // 1) Match por candidato único.
+    // 1) Match por candidato único: entre os que caem dentro da tolerância, escolhe o mais
+    // PRÓXIMO do alvo (menor diferença absoluta) - não o primeiro em ordem ascendente de valor.
+    // Antes retornava o primeiro que batesse, inconsistente com os passos 3/4 abaixo, que
+    // explicitamente buscam a combinação de menor diferença; com duas candidatas dentro da
+    // janela de tolerância (ex.: alvo 100,00, candidatas 99,98 e 100,01), a mais distante podia
+    // "ganhar" só por vir primeiro na ordenação por valor.
+    T bestSingle = null;
+    BigDecimal bestSingleValue = null;
+    BigDecimal bestSingleDiff = null;
     for (T candidate : sorted) {
       BigDecimal value = extractor.value(candidate);
-      if (sameAmount(value, targetValue, safeTolerance)) {
-        return MatchResult.matched(List.of(candidate), value, false);
+      if (!sameAmount(value, targetValue, safeTolerance)) continue;
+      BigDecimal diff = value.subtract(targetValue).abs();
+      if (bestSingleDiff == null || diff.compareTo(bestSingleDiff) < 0) {
+        bestSingle = candidate;
+        bestSingleValue = value;
+        bestSingleDiff = diff;
+        if (diff.signum() == 0) break;
       }
+    }
+    if (bestSingle != null) {
+      return MatchResult.matched(List.of(bestSingle), bestSingleValue, false);
     }
 
     // 2) Match pela soma total de todos os candidatos.

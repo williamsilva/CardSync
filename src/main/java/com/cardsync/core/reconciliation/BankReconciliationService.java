@@ -318,9 +318,26 @@ public class BankReconciliationService {
       })
       .toList();
 
-    List<ReleasesBankEntity> validReleases = candidateReleases.stream()
-      .filter(this::hasRequiredContext)
-      .toList();
+    // Achado real (Etapa 7, 2026-09-13): diferente do filtro equivalente de ordens (acima) e do
+    // caminho por parcelas (reconcilePendingReleasesByInstallments), este filtro descartava
+    // silenciosamente releases sem contexto obrigatório - sem log, sem contar releaseAnalyzed()
+    // nem releaseSkippedMissingContext(). No modo CREDIT_ORDER_FIRST (o configurado em produção)
+    // isso ficava mascarado porque o caminho por parcelas reprocessava o mesmo release do zero
+    // depois e contabilizava corretamente - mas no modo CREDIT_ORDER_ONLY esses releases ficavam
+    // invisíveis em qualquer métrica do resultado. Corrigido para espelhar o tratamento já usado
+    // no caminho por parcelas (markReleaseNotReconciledWhenExpired + releaseSkippedMissingContext).
+    List<ReleasesBankEntity> validReleases = new java.util.ArrayList<>();
+    for (ReleasesBankEntity release : candidateReleases) {
+      if (release.getId() != null && analyzedReleaseIds.add(release.getId())) {
+        result.releaseAnalyzed();
+      }
+      if (hasRequiredContext(release)) {
+        validReleases.add(release);
+        continue;
+      }
+      markReleaseNotReconciledWhenExpired(release, config, "contexto bancário obrigatório ausente", result);
+      result.releaseSkippedMissingContext();
+    }
 
     // Pré-calcula contexto e banco de cada ordem uma única vez (O(ordens)) em vez de
     // recomputar dentro do laço de releases — antes isso rodava O(releases × ordens) vezes,

@@ -44,6 +44,32 @@ class BankReconciliationMatcherTest {
   }
 
   @Test
+  void picksTheClosestSingleCandidateWhenMoreThanOneFallsWithinTolerance() {
+    // Achado da Etapa 7 (2026-09-13): com duas candidatas dentro da tolerância, o match por
+    // candidato único escolhia a primeira em ordem ascendente de valor (99.98), não a mais
+    // próxima do alvo (100.01) - inconsistente com os passos 3/4, que buscam menor diferença.
+    var result = matcher.selectByValue(
+      List.of("99.98", "100.01"), BigDecimal::new, new BigDecimal("100.00"),
+      new BigDecimal("0.05"), SAFE_CAP_CENTS, SUBSET_DP_MAX_CENTS
+    );
+
+    assertThat(result.matched()).isTrue();
+    assertThat(result.itemsMatched()).isEqualTo(1);
+    assertThat(result.<String>typedItems()).containsExactly("100.01");
+  }
+
+  @Test
+  void picksTheClosestSingleCandidateRegardlessOfListOrder() {
+    var result = matcher.selectByValue(
+      List.of("100.01", "99.98"), BigDecimal::new, new BigDecimal("100.00"),
+      new BigDecimal("0.05"), SAFE_CAP_CENTS, SUBSET_DP_MAX_CENTS
+    );
+
+    assertThat(result.matched()).isTrue();
+    assertThat(result.<String>typedItems()).containsExactly("100.01");
+  }
+
+  @Test
   void doesNotMatchSingleCandidateOutsideTolerance() {
     var result = matcher.selectByValue(
       List.of("100.10"), BigDecimal::new, new BigDecimal("100.00"),
