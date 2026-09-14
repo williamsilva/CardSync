@@ -7,6 +7,7 @@ import com.cardsync.core.file.util.MoveFileService;
 import com.cardsync.domain.model.*;
 import com.cardsync.domain.repository.AnticipationRepository;
 import com.cardsync.domain.repository.ProcessedFileRepository;
+import com.cardsync.domain.repository.SalesSummaryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -46,8 +47,9 @@ class ProcessCielo15ServiceTest {
 
   private final FileLookupService lookupService = mock(FileLookupService.class);
   private final BankingDomicileResolver bankingDomicileResolver = mock(BankingDomicileResolver.class);
+  private final SalesSummaryRepository salesSummaryRepository = mock(SalesSummaryRepository.class);
   private final ProcessCielo15Service service =
-    new ProcessCielo15Service(lookupService, bankingDomicileResolver, null, null, null);
+    new ProcessCielo15Service(lookupService, bankingDomicileResolver, null, null, null, salesSummaryRepository);
 
   @Test
   void mapsAnticipationFieldsFromRegistroB() {
@@ -65,6 +67,22 @@ class ProcessCielo15ServiceTest {
     assertThat(anticipation.getDiscountRateValue()).isEqualByComparingTo(new BigDecimal("0.52"));
     assertThat(anticipation.getReleaseDate()).isEqualTo(LocalDate.of(2026, 2, 18));
     assertThat(anticipation.getNumberRvCorresponding()).isEqualTo(FileParserUtils.deriveConciliationKey("02026021801077952119"));
+  }
+
+  @Test
+  void linksSalesSummaryByAcquirerPvNumberAndRvNumber() {
+    stubLookups(1234567890, "007", "Sorocred");
+    SalesSummaryEntity summary = new SalesSummaryEntity();
+    summary.setId(UUID.randomUUID());
+    Integer expectedRvNumber = FileParserUtils.deriveConciliationKey("02026021801077952119");
+    when(salesSummaryRepository.findFirstByAcquirer_IdAndPvNumberAndRvNumberOrderByRvDateDesc(
+      any(), eq(1234567890), eq(expectedRvNumber)
+    )).thenReturn(Optional.of(summary));
+
+    ProcessCielo15Service.RegistroA registroA = new ProcessCielo15Service.RegistroA(LocalDate.of(2026, 2, 18), "02026021801077952119");
+    AnticipationEntity anticipation = service.buildAnticipation(REGISTRO_B, 1, new ProcessedFileEntity(), registroA);
+
+    assertThat(anticipation.getSalesSummary()).isSameAs(summary);
   }
 
   @Test
@@ -106,7 +124,7 @@ class ProcessCielo15ServiceTest {
     ProcessedFileRepository processedFileRepository = mock(ProcessedFileRepository.class);
     MoveFileService moveFileService = mock(MoveFileService.class);
     ProcessCielo15Service fileLevelService = new ProcessCielo15Service(
-      lookupService, bankingDomicileResolver, moveFileService, anticipationRepository, processedFileRepository
+      lookupService, bankingDomicileResolver, moveFileService, anticipationRepository, processedFileRepository, salesSummaryRepository
     );
 
     fileLevelService.processFile(file, new FileProcessingProperties.FilePaths(), "test-hash");

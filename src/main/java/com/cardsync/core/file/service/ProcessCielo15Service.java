@@ -35,8 +35,12 @@ import java.util.*;
  * todo histórico de CIELO15 é só Header+Trailer) — layout conferido contra o arquivo de teste
  * oficial da Cielo (ArquivoTeste_ExtratoEletronico/CIELO15D_...TXT).
  *
- * Sem InstallmentAcqEntity/SalesSummaryEntity (mesmo padrão do Rede pra antecipação) e sem vínculo
- * com CIELO03 (isso dependeria do tipo de lançamento "11" no CIELO03, ainda não implementado).
+ * Sem InstallmentAcqEntity (mesmo padrão do Rede pra antecipação) e sem vínculo com CIELO03 (isso
+ * dependeria do tipo de lançamento "11" no CIELO03, ainda não implementado). O vínculo com
+ * SalesSummaryEntity (achado real, auditoria 2026-09-13: faltava aqui, mesmo já existindo em
+ * ProcessRedeEeFiService#buildAnticipation) foi adicionado por acquirer+pvNumber+rvNumber - sem
+ * ele, a tela de antecipações não mostrava numberCvNsu/transactionsStatus pra antecipação Cielo,
+ * e a CreditOrder sintética gerada na Etapa 6 nascia com salesSummary=null.
  */
 @Slf4j
 @Service
@@ -50,6 +54,7 @@ public class ProcessCielo15Service {
   private final MoveFileService moveFileService;
   private final AnticipationRepository anticipationRepository;
   private final ProcessedFileRepository processedFileRepository;
+  private final SalesSummaryRepository salesSummaryRepository;
 
   @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
   public void processFile(Path file, FileProcessingProperties.FilePaths paths, String contentHash) {
@@ -199,7 +204,16 @@ public class ProcessCielo15Service {
     anticipation.setAcquirer(acquirer);
     anticipation.setFlag(safeFlag(acquirer, flagCode));
     anticipation.setProcessedFile(processedFile);
+    anticipation.setSalesSummary(safeSalesSummary(acquirer, pvNumber, anticipation.getNumberRvCorresponding()));
     return anticipation;
+  }
+
+  /** Mesmo lookup usado por ProcessRedeEeFiService#safeSalesSummary pro mesmo conceito no Rede. */
+  private SalesSummaryEntity safeSalesSummary(AcquirerEntity acquirer, Integer pvNumber, Integer rvNumber) {
+    if (acquirer == null || acquirer.getId() == null || pvNumber == null || rvNumber == null) return null;
+    return salesSummaryRepository
+      .findFirstByAcquirer_IdAndPvNumberAndRvNumberOrderByRvDateDesc(acquirer.getId(), pvNumber, rvNumber)
+      .orElse(null);
   }
 
   private void applyBankingDomicile(String line, int lineNumber, List<AnticipationEntity> pendingGroup) {
