@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProcessRedeEeVdServiceTest {
 
   private final ProcessRedeEeVdService service = new ProcessRedeEeVdService(
-    null, null, null, null, null, null, null, null, null, null, null, null, null, null
+    null, null, null, null, null, null, null, null, null, null, null, null, null, null, null
   );
 
   @Test

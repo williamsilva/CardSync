@@ -51,6 +51,7 @@ public class ProcessRedeEeVdService {
   private final FileLookupService lookupService;
   private final MoveFileService moveFileService;
   private final AdjustmentTransactionLinkService adjustmentTransactionLinkService;
+  private final InstallmentUnschedulingLinkingService installmentUnschedulingLinkingService;
 
   private final AdjustmentRepository adjustmentRepository;
   private final SalesSummaryRepository salesSummaryRepository;
@@ -183,6 +184,14 @@ public class ProcessRedeEeVdService {
         adjustmentLinkResult.linkedBySalesSummaryOnly()
       );
       installmentUnschedulingRepository.saveAll(unschedulings);
+      InstallmentUnschedulingLinkingService.LinkResult unschedulingLinkResult =
+        installmentUnschedulingLinkingService.linkSavedUnschedulings(unschedulings);
+      log.info(
+        "🔗 Vínculo de desagendamentos EEVD com parcelas: analisados={}, canceladas={}, ambíguos={}",
+        unschedulingLinkResult.analyzed(),
+        unschedulingLinkResult.canceled(),
+        unschedulingLinkResult.ambiguous()
+      );
       redeEeVdTotalizerRepository.saveAll(totalizers);
       redeNegotiatedTransactionRepository.saveAll(negotiatedTransactions);
       redeIcPlusTransactionRepository.saveAll(icPlusTransactions);

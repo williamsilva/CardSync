@@ -95,4 +95,19 @@ public interface InstallmentAcqRepository extends JpaRepository<InstallmentAcqEn
     @Param("dateTo") LocalDate dateTo,
     @Param("reprocess") boolean reprocess
   );
+
+  /**
+   * Usada por InstallmentUnschedulingLinkingService pra correlacionar um desagendamento (Rede
+   * EEVD registro "08") com a parcela real que ele afeta - débito à vista sempre tem exatamente
+   * 1 parcela, então acquirer+nsu já identifica a venda sem precisar do número da parcela.
+   */
+  @Query("""
+    select ia from InstallmentAcqEntity ia
+    join fetch ia.transaction tx
+    where tx.acquirer.id = :acquirerId and tx.nsu = :nsu
+  """)
+  List<InstallmentAcqEntity> findByAcquirerIdAndTransactionNsu(
+    @Param("acquirerId") UUID acquirerId,
+    @Param("nsu") Long nsu
+  );
 }
