@@ -772,7 +772,8 @@ public class ProcessRedeEeVcService {
     return value;
   }
 
-  private List<InstallmentAcqEntity> buildInstallments(List<TransactionAcqEntity> transactions, List<EeVcRvInstallment> layoutInstallments) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  List<InstallmentAcqEntity> buildInstallments(List<TransactionAcqEntity> transactions, List<EeVcRvInstallment> layoutInstallments) {
     List<InstallmentAcqEntity> result = new ArrayList<>();
     Map<String, List<EeVcRvInstallment>> bySummary = new HashMap<>();
 
@@ -1333,7 +1334,8 @@ public class ProcessRedeEeVcService {
     return value == null || value.trim().isBlank();
   }
 
-  private record EeVcRvInstallment(
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  record EeVcRvInstallment(
     String recordType,
     int lineNumber,
     Integer pvNumber,
