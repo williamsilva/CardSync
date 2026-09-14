@@ -339,7 +339,8 @@ public class ContractService {
     }
   }
 
-  private void validateRates(UUID flagId, List<ContractRateInput> rates) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void validateRates(UUID flagId, List<ContractRateInput> rates) {
     if (rates == null || rates.isEmpty()) {
       return;
     }
@@ -363,8 +364,17 @@ public class ContractService {
 
       validateNonNegative(rateInput.rate(), "rate");
       validateNonNegative(rateInput.rateEcommerce(), "rateEcommerce");
-      validateNonNegative(rateInput.paymentTermDays(), "paymentTermDays");
-      validateNonNegative(rateInput.paymentTermDaysEcommerce(), "paymentTermDaysEcommerce");
+      // Achado real (auditoria 2026-09-13): payment_term_days é NOT NULL no banco, mas 0 sempre
+      // passava como "válido" (validateNonNegative só rejeitava negativo) - nenhum contrato real
+      // hoje tem prazo 0 (o mínimo cadastrado é D+1, débito à vista), então 0 aqui é praticamente
+      // sempre um campo esquecido no formulário, não um prazo contratual de verdade. Sem essa
+      // guarda, InstallmentErpGenerator vencia a parcela no próprio dia da venda, silenciosamente.
+      // paymentTermDaysEcommerce só é exigido positivo quando informado - null significa "usa o
+      // mesmo prazo do presencial" (ver syncRates), e continua sendo um valor válido.
+      validatePositive(rateInput.paymentTermDays(), "paymentTermDays");
+      if (rateInput.paymentTermDaysEcommerce() != null) {
+        validatePositive(rateInput.paymentTermDaysEcommerce(), "paymentTermDaysEcommerce");
+      }
     }
   }
 
@@ -382,6 +392,15 @@ public class ContractService {
       throw BusinessException.badRequest(
         ErrorCode.VALIDATION_ERROR,
         "The field '%s' must be greater than or equal to zero.".formatted(field)
+      );
+    }
+  }
+
+  private void validatePositive(Integer value, String field) {
+    if (value == null || value <= 0) {
+      throw BusinessException.badRequest(
+        ErrorCode.VALIDATION_ERROR,
+        "The field '%s' must be greater than zero.".formatted(field)
       );
     }
   }
@@ -513,7 +532,8 @@ public class ContractService {
     }
   }
 
-  private void syncRates(ContractFlagEntity contractFlag, List<ContractRateInput> inputs) {
+  /** Visibilidade de pacote (não private) para permitir teste unitário direto sem contexto Spring. */
+  void syncRates(ContractFlagEntity contractFlag, List<ContractRateInput> inputs) {
     contractFlag.getContractRates().clear();
 
     if (inputs == null || inputs.isEmpty()) {
@@ -526,8 +546,18 @@ public class ContractService {
       rate.setModality(input.modality());
       rate.setRate(input.rate());
       rate.setPaymentTermDays(input.paymentTermDays());
-      rate.setRateEcommerce(input.rateEcommerce() != null ? input.rateEcommerce() : BigDecimal.ZERO);
-      rate.setPaymentTermDaysEcommerce(input.paymentTermDaysEcommerce() != null ? input.paymentTermDaysEcommerce() : 0);
+      // Achado real (auditoria 2026-09-13): rate_ecommerce/payment_term_days_ecommerce são
+      // NOT NULL no banco, e por isso nunca podiam ficar null pra acionar o fallback "sem valor
+      // específico de e-commerce, usa o presencial" já escrito em
+      // Contracted{Erp,Acquirer}RateLookupService (que só cai pro valor principal quando o campo
+      // ecommerce é null). Defaultar pra ZERO/0 quando não informado tornava esse fallback morto:
+      // toda venda e-commerce de um contrato sem taxa/prazo e-commerce explícitos saía com MDR
+      // 0% e vencimento no dia da venda, em vez de herdar a taxa/prazo contratados de verdade.
+      // Agora o default é copiar o valor principal, igual ao que os seeds de contrato (SQL) já
+      // fazem manualmente ("rate_ecommerce/payment_term_days_ecommerce recebem a mesma taxa/
+      // prazo da planilha").
+      rate.setRateEcommerce(input.rateEcommerce() != null ? input.rateEcommerce() : input.rate());
+      rate.setPaymentTermDaysEcommerce(input.paymentTermDaysEcommerce() != null ? input.paymentTermDaysEcommerce() : input.paymentTermDays());
       contractFlag.getContractRates().add(rate);
     }
   }
