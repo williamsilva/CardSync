@@ -1,10 +1,12 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.representation.model.conciliation.AnticipationConsistencyAuditResult;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.InstallmentConsistencyAuditResult;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.ReconciliationExecutionLogResponse;
 import com.cardsync.core.conciliation.analysis.InstallmentConsistencyAuditService;
 import com.cardsync.core.reconciliation.BankReconciliationResult;
 import com.cardsync.core.reconciliation.BankReconciliationService;
+import com.cardsync.core.reconciliation.summary.AnticipationConsistencyAuditService;
 import com.cardsync.core.reconciliation.pipeline.FinancialReconciliationPipelineResult;
 import com.cardsync.core.reconciliation.pipeline.FinancialReconciliationPipelineService;
 import com.cardsync.core.reconciliation.pipeline.ReconciliationExecutionLogService;
@@ -34,6 +36,7 @@ public class FinancialReconciliationPipelineController {
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
   private final BankReconciliationService bankReconciliationService;
   private final InstallmentConsistencyAuditService installmentConsistencyAuditService;
+  private final AnticipationConsistencyAuditService anticipationConsistencyAuditService;
 
   @GetMapping("/history")
   @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanConsult
@@ -89,5 +92,15 @@ public class FinancialReconciliationPipelineController {
   @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanConsult
   public InstallmentConsistencyAuditResult auditInstallmentConsistency() {
     return installmentConsistencyAuditService.audit();
+  }
+
+  /**
+   * Achado real 2026-09-13 (ver AnticipationConsistencyAuditService): antecipações sem domicílio
+   * bancário resolvido nunca conciliam com o extrato bancário. Só leitura/alerta.
+   */
+  @GetMapping("/audit/anticipation-missing-banking-domicile")
+  @CheckSecurity.Reconciliation.FinancialReconciliationPipeline.CanConsult
+  public AnticipationConsistencyAuditResult auditAnticipationMissingBankingDomicile() {
+    return anticipationConsistencyAuditService.audit();
   }
 }

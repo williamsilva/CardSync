@@ -1,6 +1,7 @@
 package com.cardsync.domain.repository;
 
 import com.cardsync.domain.model.AnticipationEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -40,4 +41,28 @@ public interface AnticipationRepository extends JpaRepository<AnticipationEntity
      where a.id in :ids
   """)
   List<AnticipationEntity> findBatchForSyntheticCreditOrderGeneration(@Param("ids") Collection<UUID> ids);
+
+  /**
+   * Achado real (auditoria 2026-09-13): quando o parser não resolve o domicílio bancário
+   * (agência/conta não cadastrados), a antecipação - e a CreditOrder sintética gerada a partir
+   * dela - nunca concilia com o extrato bancário. Antes, o único sinal disso era um log.warn no
+   * momento da importação, sem nenhuma forma de encontrar depois quais antecipações ficaram
+   * travadas assim.
+   */
+  @Query("""
+    select count(a) from AnticipationEntity a
+     where a.bankingDomicile is null
+       and a.releaseValue is not null
+       and a.releaseValue <> 0
+  """)
+  long countMissingBankingDomicile();
+
+  @Query("""
+    select a.id from AnticipationEntity a
+     where a.bankingDomicile is null
+       and a.releaseValue is not null
+       and a.releaseValue <> 0
+     order by a.releaseDate desc
+  """)
+  List<UUID> findIdsMissingBankingDomicile(Pageable pageable);
 }
