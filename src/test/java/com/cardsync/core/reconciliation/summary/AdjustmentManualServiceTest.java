@@ -3,9 +3,11 @@ package com.cardsync.core.reconciliation.summary;
 import com.cardsync.bff.controller.v1.representation.input.AdjustmentManualInput;
 import com.cardsync.core.file.service.FileLookupService;
 import com.cardsync.domain.model.AcquirerEntity;
+import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.ReleasesBankEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.AdjustmentStatusEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.domain.repository.AdjustmentRepository;
@@ -165,5 +167,45 @@ class AdjustmentManualServiceTest {
     service.create(input(acquirerId, 82730892, 74705318, "C", new BigDecimal("9.77")));
 
     verify(creditOrderRepository, never()).findBySalesSummary_Id(any());
+  }
+
+  /**
+   * Achado real (auditoria 2026-09-13): não existia nenhum endpoint pra registrar a decisão
+   * humana sobre um ajuste (ANALYSIS/FAVORED_CLIENT/FAVORED_COMPANY nunca tinham via de escrita).
+   */
+  @Test
+  void updatesAdjustmentStatusToAHumanDecidedValue() {
+    UUID adjustmentId = UUID.randomUUID();
+    AdjustmentEntity adjustment = new AdjustmentEntity();
+    adjustment.setId(adjustmentId);
+    adjustment.setAdjustmentStatus(AdjustmentStatusEnum.ANALYSIS);
+
+    when(adjustmentRepository.findById(adjustmentId)).thenReturn(java.util.Optional.of(adjustment));
+    when(adjustmentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+    AdjustmentEntity saved = service.updateStatus(adjustmentId, AdjustmentStatusEnum.FAVORED_CLIENT);
+
+    assertThat(saved.getAdjustmentStatus()).isEqualTo(AdjustmentStatusEnum.FAVORED_CLIENT);
+  }
+
+  @Test
+  void rejectsUpdatingStatusToNull() {
+    UUID adjustmentId = UUID.randomUUID();
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+      () -> service.updateStatus(adjustmentId, AdjustmentStatusEnum.NULL)
+    ).isInstanceOf(com.nimbussystems.commons.legacy.exceptionhandler.BusinessException.class);
+
+    verify(adjustmentRepository, never()).findById(any());
+  }
+
+  @Test
+  void rejectsUpdatingStatusOfAnAdjustmentThatDoesNotExist() {
+    UUID adjustmentId = UUID.randomUUID();
+    when(adjustmentRepository.findById(adjustmentId)).thenReturn(java.util.Optional.empty());
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+      () -> service.updateStatus(adjustmentId, AdjustmentStatusEnum.ADJUSTED)
+    ).isInstanceOf(com.nimbussystems.commons.legacy.exceptionhandler.BusinessException.class);
   }
 }

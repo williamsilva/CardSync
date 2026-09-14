@@ -11,6 +11,7 @@ import com.nimbussystems.commons.legacy.exceptionhandler.BusinessException;
 import com.cardsync.domain.exception.ErrorCode;
 import com.cardsync.domain.model.CreditOrderEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
+import com.cardsync.domain.model.enums.AdjustmentStatusEnum;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.repository.AcquirerRepository;
 import com.cardsync.domain.repository.AdjustmentRepository;
@@ -87,6 +88,33 @@ public class AdjustmentManualService {
       saved.getId(), saved.getPvNumber(), saved.getRvNumberOriginal(), saved.getAdjustmentDate(),
       saved.getAdjustmentValue(), salesSummary != null
     );
+
+    return saved;
+  }
+
+  /**
+   * Achado real (auditoria 2026-09-13): não existia nenhum endpoint pra registrar a decisão
+   * humana sobre um ajuste (ANALYSIS = em análise, FAVORED_CLIENT/FAVORED_COMPANY = resultado de
+   * uma contestação/chargeback decidida a favor do cliente ou da empresa - ver rótulos "Favoreceu
+   * Cliente"/"Favoreceu Empresa" já existentes no frontend). ADJUSTED e NOT_LOCATED_ERP_ACQ
+   * também podem ser corrigidos manualmente aqui, mas o caminho normal pra eles é automático
+   * (ver AcquirerSaleCancellationService e AdjustmentTransactionLinkService). NULL nunca é um
+   * status válido pra atribuir manualmente - só existe como "não decidido ainda".
+   */
+  @Transactional
+  public AdjustmentEntity updateStatus(UUID adjustmentId, AdjustmentStatusEnum newStatus) {
+    if (newStatus == null || newStatus == AdjustmentStatusEnum.NULL) {
+      throw BusinessException.badRequest(ErrorCode.VALIDATION_ERROR, "O status informado é inválido.");
+    }
+
+    AdjustmentEntity adjustment = adjustmentRepository.findById(adjustmentId)
+      .orElseThrow(() -> BusinessException.notFound(ErrorCode.NOT_FOUND, "Ajuste não encontrado: " + adjustmentId));
+
+    AdjustmentStatusEnum previousStatus = adjustment.getAdjustmentStatus();
+    adjustment.setAdjustmentStatus(newStatus);
+    AdjustmentEntity saved = adjustmentRepository.save(adjustment);
+
+    log.info("🔧 Status do ajuste atualizado manualmente: id={}, de={}, para={}", adjustmentId, previousStatus, newStatus);
 
     return saved;
   }

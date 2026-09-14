@@ -1,6 +1,7 @@
 package com.cardsync.core.file.service;
 
 import com.cardsync.domain.model.AdjustmentEntity;
+import com.cardsync.domain.model.enums.AdjustmentStatusEnum;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -45,6 +46,9 @@ class ProcessRedeEeVdServiceTest {
     assertThat(adjustment.getTransactionValue()).isEqualByComparingTo(new BigDecimal("150.00"));
     assertThat(adjustment.getCancellationValueRequested()).isEqualByComparingTo(new BigDecimal("150.00"));
     assertThat(adjustment.getEcommerce()).isTrue();
+    // Achado real (auditoria 2026-09-13): baseAdjustment era o único dos 4 pontos de importação
+    // que não setava adjustmentStatus - ficava com o campo cru NULL no banco, nem PENDING.
+    assertThat(adjustment.getAdjustmentStatus()).isEqualTo(AdjustmentStatusEnum.PENDING);
   }
 
   /**

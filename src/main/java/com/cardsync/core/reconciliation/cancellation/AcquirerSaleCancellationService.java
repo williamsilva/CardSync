@@ -150,6 +150,7 @@ public class AcquirerSaleCancellationService {
 
     Map<UUID, TransactionAcqEntity> acquirerSalesToSave = new LinkedHashMap<>();
     Map<UUID, TransactionErpEntity> erpSalesToSave = new LinkedHashMap<>();
+    Map<UUID, AdjustmentEntity> adjustmentsToSave = new LinkedHashMap<>();
     Map<UUID, TransactionErpEntity> erpByAcquirerId = findErpSalesByAcquirerId(adjustments);
 
     for (AdjustmentEntity adjustment : adjustments) {
@@ -187,7 +188,8 @@ public class AcquirerSaleCancellationService {
       boolean acqWasManuallyReconciled = isManuallyReconciled(acq.getStatusTransaction().getCode());
       boolean erpWasManuallyReconciled = erp != null && isManuallyReconciled(StatusTransactionEnum.toCode(erp.getStatusTransaction()));
 
-      if (cancelAcquirerSale(acq, adjustment, cancellationReason, cancellationDate, now, reprocess)) {
+      boolean acqCancelled = cancelAcquirerSale(acq, adjustment, cancellationReason, cancellationDate, now, reprocess);
+      if (acqCancelled) {
         result.acquirerSalesCanceled++;
         result.acquirerInstallmentsCanceled += cancelAcquirerInstallments(acq, cancellationDate);
         acquirerSalesToSave.put(acq.getId(), acq);
@@ -205,7 +207,8 @@ public class AcquirerSaleCancellationService {
         }
       }
 
-      if (erp != null && cancelErpSale(erp, adjustment, cancellationReason, cancellationDate, now, reprocess)) {
+      boolean erpCancelled = erp != null && cancelErpSale(erp, adjustment, cancellationReason, cancellationDate, now, reprocess);
+      if (erpCancelled) {
         result.erpSalesCanceled++;
         result.erpInstallmentsCanceled += cancelErpInstallments(erp, cancellationDate);
         erpSalesToSave.put(erp.getId(), erp);
@@ -224,6 +227,15 @@ public class AcquirerSaleCancellationService {
           );
         }
       }
+
+      // Achado real (auditoria 2026-09-13): AdjustmentStatusEnum.ADJUSTED existia mas nunca era
+      // atribuído por nada - o ajuste que efetivamente cancelou uma venda ficava PENDING pra
+      // sempre. Só marca quando o status ainda está indefinido (PENDING/NULL), pra nunca
+      // sobrescrever uma decisão manual (ANALYSIS/FAVORED_CLIENT/FAVORED_COMPANY) já registrada.
+      if ((acqCancelled || erpCancelled) && isUndecided(adjustment) && adjustment.getId() != null) {
+        adjustment.setAdjustmentStatus(AdjustmentStatusEnum.ADJUSTED);
+        adjustmentsToSave.put(adjustment.getId(), adjustment);
+      }
     }
 
     if (!acquirerSalesToSave.isEmpty()) {
@@ -234,7 +246,17 @@ public class AcquirerSaleCancellationService {
       transactionErpRepository.saveAll(erpSalesToSave.values());
     }
 
+    if (!adjustmentsToSave.isEmpty()) {
+      adjustmentRepository.saveAll(adjustmentsToSave.values());
+    }
+
     return result;
+  }
+
+  /** Só true pra PENDING/NULL - nunca sobrescreve ADJUSTED/ANALYSIS/FAVORED_CLIENT/FAVORED_COMPANY já decididos manualmente. */
+  private boolean isUndecided(AdjustmentEntity adjustment) {
+    AdjustmentStatusEnum status = adjustment.getAdjustmentStatus();
+    return status == AdjustmentStatusEnum.NULL || status == AdjustmentStatusEnum.PENDING;
   }
 
   private Map<UUID, TransactionErpEntity> findErpSalesByAcquirerId(List<AdjustmentEntity> adjustments) {

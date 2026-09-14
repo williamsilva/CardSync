@@ -1,6 +1,7 @@
 package com.cardsync.bff.controller.v1;
 
 import com.cardsync.bff.controller.v1.representation.input.AdjustmentManualInput;
+import com.cardsync.bff.controller.v1.representation.input.AdjustmentStatusUpdateInput;
 import com.cardsync.bff.controller.v1.representation.model.transactions.AdjustmentMinimalModel;
 import com.cardsync.core.reconciliation.summary.AdjustmentManualService;
 import com.cardsync.core.security.CheckSecurity;
@@ -8,11 +9,15 @@ import com.cardsync.domain.model.AdjustmentEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -26,6 +31,24 @@ public class AdjustmentManualController {
   @CheckSecurity.FileProcessing.CanProcess
   public AdjustmentMinimalModel createManual(@Valid @RequestBody AdjustmentManualInput body) {
     AdjustmentEntity saved = adjustmentManualService.create(body);
+
+    return AdjustmentMinimalModel.builder()
+      .id(saved.getId())
+      .rvNumberOriginal(saved.getRvNumberOriginal())
+      .adjustmentValue(saved.getAdjustmentValue())
+      .creditDate(saved.getCreditDate())
+      .build();
+  }
+
+  /**
+   * Registra a decisão humana sobre um ajuste (ver AdjustmentManualService#updateStatus) -
+   * ANALYSIS/FAVORED_CLIENT/FAVORED_COMPANY não tinham, até esta correção, nenhuma via de
+   * escrita em todo o sistema.
+   */
+  @PutMapping("/{id}/status")
+  @CheckSecurity.FileProcessing.CanProcess
+  public AdjustmentMinimalModel updateStatus(@PathVariable UUID id, @Valid @RequestBody AdjustmentStatusUpdateInput body) {
+    AdjustmentEntity saved = adjustmentManualService.updateStatus(id, body.status());
 
     return AdjustmentMinimalModel.builder()
       .id(saved.getId())

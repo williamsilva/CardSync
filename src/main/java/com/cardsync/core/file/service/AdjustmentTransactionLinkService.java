@@ -3,6 +3,7 @@ package com.cardsync.core.file.service;
 import com.cardsync.domain.model.AdjustmentEntity;
 import com.cardsync.domain.model.SalesSummaryEntity;
 import com.cardsync.domain.model.TransactionAcqEntity;
+import com.cardsync.domain.model.enums.AdjustmentStatusEnum;
 import com.cardsync.domain.repository.AdjustmentRepository;
 import com.cardsync.domain.repository.SalesSummaryRepository;
 import com.cardsync.domain.repository.TransactionAcqRepository;
@@ -65,6 +66,17 @@ public class AdjustmentTransactionLinkService {
           }
           linkedBySalesSummaryOnly++;
           continue;
+        }
+
+        // Achado real (auditoria 2026-09-13): órfão de verdade - nem transação nem resumo de
+        // vendas encontrados - é exatamente o que AdjustmentStatusEnum.NOT_LOCATED_ERP_ACQ
+        // ("Não Localizada" no frontend) descreve. Antes, esse enum existia mas nunca era
+        // atribuído por nada; todo ajuste ficava PENDING pra sempre, mesmo quando o sistema já
+        // sabia, no momento da importação, que nunca vai achar a venda correspondente. Só marca
+        // quando o status ainda está indefinido, pra nunca sobrescrever uma decisão manual.
+        if (isUndecided(adjustment) && adjustment.getId() != null) {
+          adjustment.setAdjustmentStatus(AdjustmentStatusEnum.NOT_LOCATED_ERP_ACQ);
+          adjustmentsToUpdate.put(adjustment.getId(), adjustment);
         }
 
         log.debug(
@@ -265,6 +277,12 @@ public class AdjustmentTransactionLinkService {
       pvNumber,
       rvNumber
     );
+  }
+
+  /** Só true pra PENDING/NULL - nunca sobrescreve ADJUSTED/ANALYSIS/FAVORED_CLIENT/FAVORED_COMPANY já decididos manualmente. */
+  private boolean isUndecided(AdjustmentEntity adjustment) {
+    AdjustmentStatusEnum status = adjustment.getAdjustmentStatus();
+    return status == AdjustmentStatusEnum.NULL || status == AdjustmentStatusEnum.PENDING;
   }
 
   private String normalizeAuthorization(String authorization) {

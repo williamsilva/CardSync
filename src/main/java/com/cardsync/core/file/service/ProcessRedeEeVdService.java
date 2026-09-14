@@ -459,6 +459,11 @@ public class ProcessRedeEeVdService {
     adjustment.setCompany(establishment != null ? establishment.getCompany() : null);
     adjustment.setSalesSummary(summary);
     adjustment.setProcessedFile(processedFile);
+    // Achado real (auditoria 2026-09-13): este era o único dos 4 pontos de importação de
+    // ajuste que não setava adjustmentStatus - o registro ficava com o campo cru NULL no banco
+    // (nem PENDING), diferente de Cielo03/04 e Rede EEVC/EEFI. Qualquer filtro/consulta por
+    // adjustmentStatus = PENDING nunca pegava os ajustes do EEVD.
+    adjustment.setAdjustmentStatus(AdjustmentStatusEnum.PENDING);
     return adjustment;
   }
 
