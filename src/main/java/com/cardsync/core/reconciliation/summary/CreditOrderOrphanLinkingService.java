@@ -41,6 +41,17 @@ import java.util.*;
  * a mesma parcela — ambas elegíveis para a Etapa 7, com risco de conciliação bancária em
  * duplicidade (ou uma delas nunca ser paga, mascarando o resumo como parcialmente pago). Agora só
  * vincula quando o resumo candidato ainda não tem nenhuma CreditOrder para aquele installmentNumber.</p>
+ *
+ * <p><b>Achado real (venda parcelada num lote ambíguo, 2026-09-14):</b> quando o lote (mesma chave)
+ * tem 2+ SalesSummary candidatas, {@link #selectByValue} nunca resolve uma CreditOrder de venda
+ * parcelada (installmentTotal &gt; 1) — o releaseValue de UMA parcela isolada nunca bate com o
+ * liquidValue TOTAL do resumo (confirmado com dado real: 687 resumos Cielo pós-implantação
+ * pendentes, 43% caíam exatamente nesse caso). A correção soma o grupo COMPLETO de parcelas da
+ * mesma venda (mesmo installmentTotal, installmentNumber 1..N sem duplicata) e compara a soma com
+ * o liquidValue — vincula todas de uma vez quando a soma bate com exatamente uma candidata. Grupo
+ * incompleto, ou 2+ vendas com o mesmo installmentTotal no mesmo lote (installmentNumber
+ * duplicado), não é desambiguado — mesma cautela do selectByValue, deixa órfã em vez de arriscar
+ * somar parcelas de vendas diferentes.</p>
  */
 @Slf4j
 @Service
@@ -127,7 +138,16 @@ public class CreditOrderOrphanLinkingService {
 
       Map<UUID, Set<Integer>> existingInstallmentsBySummaryId = existingInstallmentNumbersFor(candidates);
 
+      Map<String, List<CreditOrderEntity>> orphansByKey = new HashMap<>();
+      for (CreditOrderEntity co : orphans) {
+        if (co.getAcquirer() == null || co.getPvCentralizer() == null || co.getRvNumber() == null) continue;
+        String key = co.getAcquirer().getId() + ":" + co.getPvCentralizer() + ":" + co.getRvNumber();
+        orphansByKey.computeIfAbsent(key, k -> new ArrayList<>()).add(co);
+      }
+
       List<CreditOrderEntity> toSave = new ArrayList<>();
+      Set<UUID> individuallyMatchedIds = new HashSet<>();
+      Set<UUID> eligibleIds = new HashSet<>();
       int batchLinked = 0;
       int batchAmbiguous = 0;
       int batchSkippedDuplicateInstallment = 0;
@@ -137,11 +157,11 @@ public class CreditOrderOrphanLinkingService {
         String key = co.getAcquirer().getId() + ":" + co.getPvCentralizer() + ":" + co.getRvNumber();
         List<SalesSummaryEntity> keyCandidates = summaryMap.get(key);
         if (keyCandidates == null || keyCandidates.isEmpty()) continue;
+        eligibleIds.add(co.getId());
 
         SalesSummaryEntity match = keyCandidates.size() == 1 ? keyCandidates.get(0) : selectByValue(keyCandidates, co);
         if (match == null) {
-          batchAmbiguous++;
-          continue;
+          continue; // tentativa final via resolveInstallmentGroups, abaixo
         }
 
         // Resumo pode já ter uma CreditOrder (real ou sintética) para essa mesma parcela — ex.:
@@ -160,13 +180,48 @@ public class CreditOrderOrphanLinkingService {
           co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
         }
         toSave.add(co);
+        individuallyMatchedIds.add(co.getId());
         batchLinked++;
+      }
+
+      // Fallback para venda parcelada num lote ambíguo (2+ SalesSummary candidatas): nenhuma
+      // parcela isolada bate sozinha com o liquidValue total, mas o grupo completo de parcelas da
+      // mesma venda pode bater somado (ver javadoc da classe).
+      int batchLinkedByInstallmentGroup = 0;
+      for (Map.Entry<String, List<CreditOrderEntity>> entry : orphansByKey.entrySet()) {
+        List<SalesSummaryEntity> keyCandidates = summaryMap.get(entry.getKey());
+        if (keyCandidates == null || keyCandidates.size() < 2) continue;
+
+        List<CreditOrderEntity> stillOrphan = entry.getValue().stream()
+          .filter(co -> !individuallyMatchedIds.contains(co.getId()))
+          .toList();
+        if (stillOrphan.isEmpty()) continue;
+
+        List<CreditOrderEntity> linkedByGroup =
+          resolveInstallmentGroups(stillOrphan, keyCandidates, existingInstallmentsBySummaryId);
+        toSave.addAll(linkedByGroup);
+        individuallyMatchedIds.addAll(linkedByGroup.stream().map(CreditOrderEntity::getId).toList());
+        batchLinkedByInstallmentGroup += linkedByGroup.size();
+      }
+      batchLinked += batchLinkedByInstallmentGroup;
+
+      for (UUID id : eligibleIds) {
+        if (!individuallyMatchedIds.contains(id)) {
+          batchAmbiguous++;
+        }
       }
 
       if (batchAmbiguous > 0) {
         log.warn(
-          "⚠️ Pré-vinculação batch {}/{}: {} CreditOrder(s) com acquirer+pv+rv correspondendo a mais de uma SalesSummary do mesmo lote, sem bater por valor com nenhuma (ou batendo com mais de uma) — deixadas órfãs.",
+          "⚠️ Pré-vinculação batch {}/{}: {} CreditOrder(s) com acquirer+pv+rv correspondendo a mais de uma SalesSummary do mesmo lote, sem bater por valor com nenhuma (ou batendo com mais de uma), isolada ou em grupo de parcelas — deixadas órfãs.",
           batchNumber, totalBatches, batchAmbiguous
+        );
+      }
+
+      if (batchLinkedByInstallmentGroup > 0) {
+        log.info(
+          "🔗 Pré-vinculação batch {}/{}: {} CreditOrder(s) vinculada(s) por soma de grupo de parcelas (venda parcelada em lote ambíguo).",
+          batchNumber, totalBatches, batchLinkedByInstallmentGroup
         );
       }
 
@@ -304,5 +359,76 @@ public class CreditOrderOrphanLinkingService {
 
   private boolean valuesMatch(BigDecimal a, BigDecimal b) {
     return a != null && b != null && a.subtract(b).abs().compareTo(VALUE_TOLERANCE) <= 0;
+  }
+
+  /**
+   * Fallback de {@link #selectByValue} para venda parcelada num lote com 2+ SalesSummary
+   * candidatas: agrupa as órfãs restantes por installmentTotal e, quando o grupo tem o conjunto
+   * COMPLETO de parcelas da mesma venda (installmentNumber 1..N, sem duplicata — duplicata indica
+   * 2+ vendas com o mesmo installmentTotal no lote, não desambiguado aqui), soma o releaseValue e
+   * compara com o liquidValue de cada candidata. Só vincula (o grupo inteiro, de uma vez) quando a
+   * soma bate com exatamente uma candidata — mesmo critério de segurança do selectByValue.
+   */
+  private List<CreditOrderEntity> resolveInstallmentGroups(
+    List<CreditOrderEntity> orphans,
+    List<SalesSummaryEntity> keyCandidates,
+    Map<UUID, Set<Integer>> existingInstallmentsBySummaryId
+  ) {
+    Map<Integer, List<CreditOrderEntity>> byInstallmentTotal = new HashMap<>();
+    for (CreditOrderEntity co : orphans) {
+      if (co.getInstallmentTotal() == null || co.getInstallmentTotal() <= 1) continue;
+      if (co.getInstallmentNumber() == null || co.getReleaseValue() == null) continue;
+      byInstallmentTotal.computeIfAbsent(co.getInstallmentTotal(), k -> new ArrayList<>()).add(co);
+    }
+
+    List<CreditOrderEntity> linked = new ArrayList<>();
+
+    for (Map.Entry<Integer, List<CreditOrderEntity>> group : byInstallmentTotal.entrySet()) {
+      int installmentTotal = group.getKey();
+      List<CreditOrderEntity> members = group.getValue();
+      if (members.size() != installmentTotal) continue;
+
+      Set<Integer> installmentNumbers = new HashSet<>();
+      boolean duplicate = false;
+      for (CreditOrderEntity co : members) {
+        if (!installmentNumbers.add(co.getInstallmentNumber())) {
+          duplicate = true;
+          break;
+        }
+      }
+      if (duplicate) continue;
+
+      boolean complete = true;
+      for (int n = 1; n <= installmentTotal; n++) {
+        if (!installmentNumbers.contains(n)) {
+          complete = false;
+          break;
+        }
+      }
+      if (!complete) continue;
+
+      BigDecimal sum = members.stream()
+        .map(CreditOrderEntity::getReleaseValue)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+      List<SalesSummaryEntity> sumMatches = keyCandidates.stream()
+        .filter(ss -> valuesMatch(ss.getLiquidValue(), sum))
+        .toList();
+      if (sumMatches.size() != 1) continue;
+
+      SalesSummaryEntity match = sumMatches.get(0);
+      Set<Integer> alreadyOnSummary = existingInstallmentsBySummaryId.getOrDefault(match.getId(), Set.of());
+      if (installmentNumbers.stream().anyMatch(alreadyOnSummary::contains)) continue;
+
+      for (CreditOrderEntity co : members) {
+        co.setSalesSummary(match);
+        if (match.getCreditOrderStatus() == StatusReconciliationEnum.RECONCILED) {
+          co.setSalesSummaryStatus(StatusReconciliationEnum.RECONCILED);
+        }
+        linked.add(co);
+      }
+    }
+
+    return linked;
   }
 }

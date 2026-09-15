@@ -129,6 +129,116 @@ class CreditOrderOrphanLinkingServiceTest {
   }
 
   @Test
+  void linksCompleteInstallmentGroupBySumWhenBatchKeyIsAmbiguous() {
+    // Achado real: venda parcelada num lote com 2+ SalesSummary — nenhuma parcela isolada bate
+    // sozinha com o liquidValue total (44.47 nunca bate com 78.90 nem com 71.95, por exemplo),
+    // mas o grupo COMPLETO de parcelas da mesma venda soma o valor total do resumo certo.
+    AcquirerEntity acquirer = acquirer();
+    SalesSummaryEntity installmentSummary = summary(acquirer, 1051583117, 556767019, "300.00");
+    SalesSummaryEntity otherSummary = summary(acquirer, 1051583117, 556767019, "71.95");
+    CreditOrderEntity installment1 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 1, 3);
+    CreditOrderEntity installment2 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 2, 3);
+    CreditOrderEntity installment3 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 3, 3);
+
+    stubImplantationAndLookback();
+    List<CreditOrderEntity> orphans = List.of(installment1, installment2, installment3);
+    when(creditOrderRepository.findOrphanedIdsWithinDateRange(any(), any()))
+      .thenReturn(orphans.stream().map(CreditOrderEntity::getId).toList());
+    when(creditOrderRepository.findOrphanedByIds(anyList())).thenReturn(orphans);
+    when(salesSummaryRepository.findCandidatesForCreditOrderLinking(any(), any(), any()))
+      .thenReturn(List.of(installmentSummary, otherSummary));
+
+    int linked = service.linkOrphanedCreditOrders();
+
+    assertThat(linked).isEqualTo(3);
+    assertThat(installment1.getSalesSummary()).isSameAs(installmentSummary);
+    assertThat(installment2.getSalesSummary()).isSameAs(installmentSummary);
+    assertThat(installment3.getSalesSummary()).isSameAs(installmentSummary);
+    assertThat(otherSummary.getCreditOrders()).isEmpty();
+  }
+
+  @Test
+  void doesNotLinkIncompleteInstallmentGroup() {
+    // Só chegaram 2 das 3 parcelas até agora — o grupo fica órfão em vez de vincular parcial.
+    AcquirerEntity acquirer = acquirer();
+    SalesSummaryEntity installmentSummary = summary(acquirer, 1051583117, 556767019, "300.00");
+    SalesSummaryEntity otherSummary = summary(acquirer, 1051583117, 556767019, "71.95");
+    CreditOrderEntity installment1 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 1, 3);
+    CreditOrderEntity installment2 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 2, 3);
+
+    stubImplantationAndLookback();
+    List<CreditOrderEntity> orphans = List.of(installment1, installment2);
+    when(creditOrderRepository.findOrphanedIdsWithinDateRange(any(), any()))
+      .thenReturn(orphans.stream().map(CreditOrderEntity::getId).toList());
+    when(creditOrderRepository.findOrphanedByIds(anyList())).thenReturn(orphans);
+    when(salesSummaryRepository.findCandidatesForCreditOrderLinking(any(), any(), any()))
+      .thenReturn(List.of(installmentSummary, otherSummary));
+
+    int linked = service.linkOrphanedCreditOrders();
+
+    assertThat(linked).isZero();
+    assertThat(installment1.getSalesSummary()).isNull();
+    assertThat(installment2.getSalesSummary()).isNull();
+  }
+
+  @Test
+  void doesNotLinkInstallmentGroupWhenTwoSalesShareTheSameInstallmentTotalInTheBatch() {
+    // 2 vendas parceladas diferentes, mesmo installmentTotal, no mesmo lote — installmentNumber
+    // duplicado (1,2,3,1,2,3), não dá pra saber qual parcela pertence a qual venda.
+    AcquirerEntity acquirer = acquirer();
+    SalesSummaryEntity summaryA = summary(acquirer, 1051583117, 556767019, "300.00");
+    SalesSummaryEntity summaryB = summary(acquirer, 1051583117, 556767019, "150.00");
+    CreditOrderEntity a1 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 1, 3);
+    CreditOrderEntity a2 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 2, 3);
+    CreditOrderEntity a3 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 3, 3);
+    CreditOrderEntity b1 = installmentOrder(acquirer, 1051583117, 556767019, "50.00", 1, 3);
+    CreditOrderEntity b2 = installmentOrder(acquirer, 1051583117, 556767019, "50.00", 2, 3);
+    CreditOrderEntity b3 = installmentOrder(acquirer, 1051583117, 556767019, "50.00", 3, 3);
+
+    stubImplantationAndLookback();
+    List<CreditOrderEntity> orphans = List.of(a1, a2, a3, b1, b2, b3);
+    when(creditOrderRepository.findOrphanedIdsWithinDateRange(any(), any()))
+      .thenReturn(orphans.stream().map(CreditOrderEntity::getId).toList());
+    when(creditOrderRepository.findOrphanedByIds(anyList())).thenReturn(orphans);
+    when(salesSummaryRepository.findCandidatesForCreditOrderLinking(any(), any(), any()))
+      .thenReturn(List.of(summaryA, summaryB));
+
+    int linked = service.linkOrphanedCreditOrders();
+
+    assertThat(linked).isZero();
+    for (CreditOrderEntity co : orphans) {
+      assertThat(co.getSalesSummary()).isNull();
+    }
+  }
+
+  @Test
+  void doesNotLinkInstallmentGroupWhenCandidateAlreadyHasCreditOrderForOneOfItsInstallments() {
+    AcquirerEntity acquirer = acquirer();
+    SalesSummaryEntity installmentSummary = summary(acquirer, 1051583117, 556767019, "300.00");
+    SalesSummaryEntity otherSummary = summary(acquirer, 1051583117, 556767019, "71.95");
+    CreditOrderEntity installment1 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 1, 3);
+    CreditOrderEntity installment2 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 2, 3);
+    CreditOrderEntity installment3 = installmentOrder(acquirer, 1051583117, 556767019, "100.00", 3, 3);
+
+    stubImplantationAndLookback();
+    List<CreditOrderEntity> orphans = List.of(installment1, installment2, installment3);
+    when(creditOrderRepository.findOrphanedIdsWithinDateRange(any(), any()))
+      .thenReturn(orphans.stream().map(CreditOrderEntity::getId).toList());
+    when(creditOrderRepository.findOrphanedByIds(anyList())).thenReturn(orphans);
+    when(salesSummaryRepository.findCandidatesForCreditOrderLinking(any(), any(), any()))
+      .thenReturn(List.of(installmentSummary, otherSummary));
+    when(creditOrderRepository.findInstallmentNumbersBySalesSummaryIdIn(anyList()))
+      .thenReturn(List.<Object[]>of(new Object[]{installmentSummary.getId(), 2}));
+
+    int linked = service.linkOrphanedCreditOrders();
+
+    assertThat(linked).isZero();
+    assertThat(installment1.getSalesSummary()).isNull();
+    assertThat(installment2.getSalesSummary()).isNull();
+    assertThat(installment3.getSalesSummary()).isNull();
+  }
+
+  @Test
   void directLinkingForManualSummaryOnlyClaimsOrdersMatchingItsOwnValue() {
     AcquirerEntity acquirer = acquirer();
     SalesSummaryEntity summary = summary(acquirer, 1051583117, 361022950, "112.98");
@@ -217,6 +327,16 @@ class CreditOrderOrphanLinkingServiceTest {
     order.setPvCentralizer(pvCentralizer);
     order.setRvNumber(rvNumber);
     order.setReleaseValue(new BigDecimal(releaseValue));
+    return order;
+  }
+
+  private CreditOrderEntity installmentOrder(
+    AcquirerEntity acquirer, int pvCentralizer, int rvNumber, String releaseValue,
+    int installmentNumber, int installmentTotal
+  ) {
+    CreditOrderEntity order = orphanOrder(acquirer, pvCentralizer, rvNumber, releaseValue);
+    order.setInstallmentNumber(installmentNumber);
+    order.setInstallmentTotal(installmentTotal);
     return order;
   }
 }
