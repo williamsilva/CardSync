@@ -251,6 +251,30 @@ public class SecurityConfig implements EnvironmentAware {
   }
 
   // ---------------------------
+  // 0.2) INTERNAL EMAIL LOG CHAIN (/internal/email-log/**) - machine-to-machine, chamada pelo
+  // NimbusAuth pra federar a tela central de Auditoria de E-mail. Mesmo padrão exato das 2 chains
+  // internas acima (mesmo secret, mesmo filtro genérico InternalBackupSecretFilter, nenhuma env
+  // var nova) - só o securityMatcher muda.
+  // ---------------------------
+  @Bean
+  @Order(7)
+  public SecurityFilterChain internalEmailLogChain(
+    HttpSecurity http, NimbusAuthClientProperties nimbusAuthClientProperties
+  ) throws Exception {
+
+    http.securityMatcher("/internal/email-log/**");
+    http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+    http.csrf(AbstractHttpConfigurer::disable);
+    http.cors(AbstractHttpConfigurer::disable);
+    http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+    http.addFilterBefore(
+      new InternalBackupSecretFilter(nimbusAuthClientProperties.getInternalApiSecret()),
+      HeaderWriterFilter.class
+    );
+    return http.build();
+  }
+
+  // ---------------------------
   // 1) API CHAIN (/api/**) STATELESS
   // ---------------------------
   @Bean

@@ -1,7 +1,5 @@
 package com.cardsync.domain.service;
 
-import com.cardsync.domain.filter.EmailLogFilter;
-import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.EmailLogEntity;
 import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
 import com.nimbussystems.commons.legacy.model.enums.EmailLogStatusEnum;
@@ -12,31 +10,21 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
-import com.cardsync.infrastructure.repository.spec.EmailLogSpecs;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Implementa EmailDeliveryLogger (contrato mínimo exigido por EmailSenderServiceRouter/Brevo-
- *  Smtp-FakeEmailSenderService da lib compartilhada) em cima do EmailLogService/cs_email_log já
- *  existentes - só um adapter de assinatura, a tela de auditoria e o resto deste service não
- *  mudam em nada (ver plano da Fase 4: log NÃO foi migrado pra tabela/entidade compartilhada). */
+ *  Smtp-FakeEmailSenderService da lib compartilhada) em cima do cs_email_log - grava envio/erro. A
+ *  listagem/busca (antes exposta em EmailLogController/EmailLogModel/EmailLogSpecs, BFF) foi
+ *  removida junto com a tela local `/audit` (Fase 5 da consolidação de Segurança) - a auditoria de
+ *  e-mail agora é federada e centralizada no NimbusAuthWeb (ver InternalEmailLogController). */
 @Service
 @RequiredArgsConstructor
 public class EmailLogService implements EmailDeliveryLogger {
 
-  private final EmailLogSpecs emailLogSpecs;
   private final EmailLogRepository repository;
-
-  @Transactional(readOnly = true)
-  public Page<EmailLogEntity> list(Pageable pageable, ListQueryDto<EmailLogFilter> query) {
-    Specification<EmailLogEntity> spec = emailLogSpecs.fromQuery(query);
-    return repository.findAll(spec, pageable);
-  }
 
   @Transactional
   public void logSent(EmailLogEventTypeEnum eventType, String recipient, String subject,
