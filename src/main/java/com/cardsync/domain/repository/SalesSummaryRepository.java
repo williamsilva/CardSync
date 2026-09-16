@@ -379,6 +379,30 @@ public interface SalesSummaryRepository extends JpaRepository<SalesSummaryEntity
     @Param("rvNumbers") Collection<Integer> rvNumbers
   );
 
+  /**
+   * Chaves (acquirer+pvNumber+rvNumber) com 2+ SalesSummary candidatas e pelo menos uma
+   * CreditOrder órfã (sales_summary_id nulo) compartilhando a mesma chave — o resíduo que
+   * CreditOrderOrphanLinkingService.selectByValue não resolve com segurança (2+ candidatas
+   * batendo com o mesmo valor dentro do mesmo lote de liquidação da Cielo — "achado real" no
+   * javadoc daquela classe). Candidato a vínculo manual via AmbiguousCreditOrderLinkingService.
+   * Retorna [acquirerId, pvNumber, rvNumber, quantidade de SalesSummary] por linha.
+   */
+  @Query("""
+    select ss.acquirer.id, ss.pvNumber, ss.rvNumber, count(ss)
+    from SalesSummaryEntity ss
+    where exists (
+      select 1 from CreditOrderEntity co
+      where co.salesSummary is null
+        and co.acquirer = ss.acquirer
+        and co.pvCentralizer = ss.pvNumber
+        and co.rvNumber = ss.rvNumber
+    )
+    group by ss.acquirer.id, ss.pvNumber, ss.rvNumber
+    having count(ss) >= 2
+    order by count(ss) desc
+  """)
+  List<Object[]> findAmbiguousBatchKeys();
+
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query("""
     update SalesSummaryEntity ss

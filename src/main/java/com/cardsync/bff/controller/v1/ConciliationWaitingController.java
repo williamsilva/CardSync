@@ -1,5 +1,6 @@
 package com.cardsync.bff.controller.v1;
 
+import com.cardsync.bff.controller.v1.representation.input.ManualCreditOrderLinkInput;
 import com.cardsync.bff.controller.v1.representation.model.conciliation.*;
 import com.cardsync.bff.controller.v1.representation.model.transactions.TransactionTotalsModel;
 import com.cardsync.core.conciliation.analysis.ConciliationAnalysisService;
@@ -10,6 +11,8 @@ import com.cardsync.core.reconciliation.BankReconciliationService;
 import com.cardsync.core.reconciliation.cancellation.ErpCancellationReprocessService;
 import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationResult;
 import com.cardsync.core.reconciliation.summary.AcquirerSaleSummaryReconciliationService;
+import com.cardsync.core.reconciliation.summary.AmbiguousCreditOrderBatch;
+import com.cardsync.core.reconciliation.summary.AmbiguousCreditOrderLinkingService;
 import com.cardsync.core.reconciliation.summary.CreditOrderOrphanLinkingService;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationResult;
 import com.cardsync.core.reconciliation.summary.SalesSummaryCreditOrderReconciliationService;
@@ -29,6 +32,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.hateoas.PagedModel;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -43,6 +47,7 @@ public class ConciliationWaitingController {
   private final ErpCancellationReprocessService erpCancellationReprocessService;
   private final AcquirerSaleSummaryReconciliationService acquirerSaleSummaryReconciliationService;
   private final CreditOrderOrphanLinkingService creditOrderOrphanLinkingService;
+  private final AmbiguousCreditOrderLinkingService ambiguousCreditOrderLinkingService;
   private final ConciliationManualSwapReconciliationService conciliationManualSwapReconciliationService;
   private final SalesSummaryTransactionReconciliationService salesSummaryTransactionReconciliationService;
   private final SalesSummaryCreditOrderReconciliationService salesSummaryCreditOrderReconciliationService;
@@ -228,6 +233,24 @@ public class ConciliationWaitingController {
   ) {
     creditOrderOrphanLinkingService.linkOrphanedCreditOrders(ignoreLookback);
     return salesSummaryCreditOrderReconciliationService.reconcilePending(FinancialReconciliationTriggerType.MANUAL, ignoreLookback);
+  }
+
+  /**
+   * Lotes de liquidação (Cielo "Chave UR") onde 2+ SalesSummary têm o mesmo liquidValue — a
+   * vinculação automática (CreditOrderOrphanLinkingService) nunca resolve esses com segurança,
+   * fica pra revisão humana (ver AmbiguousCreditOrderLinkingService).
+   */
+  @GetMapping("/sales-summary-credit-order/ambiguous-batches")
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanConsult
+  public List<AmbiguousCreditOrderBatch> listAmbiguousCreditOrderBatches() {
+    return ambiguousCreditOrderLinkingService.listAmbiguousBatches();
+  }
+
+  /** Aplica o vínculo CreditOrder→SalesSummary escolhido manualmente pelo operador. */
+  @PostMapping("/sales-summary-credit-order/ambiguous-batches/link")
+  @CheckSecurity.Reconciliation.ConciliationWaiting.CanProcess
+  public void linkAmbiguousCreditOrder(@RequestBody @Valid ManualCreditOrderLinkInput input) {
+    ambiguousCreditOrderLinkingService.linkManually(input.creditOrderId(), input.salesSummaryId());
   }
 
   /**
