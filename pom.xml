@@ -30,6 +30,13 @@
       <id>github</id>
       <url>https://maven.pkg.github.com/williamsilva/nimbuscommonslegacy</url>
     </repository>
+    <!-- id diferente do de cima de propósito - Maven não aceita 2 <repository> com o mesmo id
+         apontando pra URLs diferentes. Mesmo GITHUB_ACTOR/GITHUB_TOKEN (ver Dockerfile), só um
+         2º <server> no settings.xml gerado com este id. -->
+    <repository>
+      <id>github-commons-server</id>
+      <url>https://maven.pkg.github.com/williamsilva/NimbusCommonsServer</url>
+    </repository>
   </repositories>
 
   <dependencies>
@@ -39,6 +46,17 @@
       <groupId>com.nimbussystems</groupId>
       <artifactId>nimbus-commons-legacy</artifactId>
       <version>0.3.0</version>
+    </dependency>
+
+    <!-- Sender/config de e-mail compartilhado (EmailSenderServiceRouter/EmailSettingsService) -
+         mesma lib já usada por NimbusFlow/NimbusDesk/NimbusNovax/NimbusAuth. Migração 2026-09-15:
+         substitui core.config.EmailSenderServiceRouter/EmailProperties/domain.service.
+         EmailSenderService/infrastructure.mail.* (removidos) - chargebackRecipients (sem
+         equivalente na lib) preservado à parte via ChargebackRecipientsRepository (JDBC direto). -->
+    <dependency>
+      <groupId>com.nimbussystems</groupId>
+      <artifactId>nimbus-commons-server</artifactId>
+      <version>0.5.1</version>
     </dependency>
 
     <!-- Starters (preferenciais) -->

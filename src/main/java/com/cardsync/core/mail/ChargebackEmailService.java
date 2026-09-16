@@ -1,6 +1,6 @@
 package com.cardsync.core.mail;
 
-import com.cardsync.core.config.EmailProperties;
+import com.nimbussystems.commons.notification.mail.EmailProperties;
 import com.cardsync.core.conciliation.analysis.ConciliationDebitChargebackClassifier;
 import com.cardsync.core.config.EmailSettingsService;
 import com.cardsync.domain.model.AdjustmentEntity;
@@ -8,7 +8,7 @@ import com.cardsync.domain.model.InstallmentUnschedulingEntity;
 import com.cardsync.domain.model.PendingDebtEntity;
 import com.cardsync.domain.model.SettledDebtEntity;
 import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
-import com.cardsync.domain.service.EmailSenderService;
+import com.nimbussystems.commons.notification.mail.EmailSenderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -112,7 +112,7 @@ public class ChargebackEmailService {
       var builder = EmailSenderService.Message.builder()
         .subject("CardSync – " + chargebacks.size() + " chargeback(s) detectado(s) em " + fileName)
         .template("mail/chargeback-mail.html")
-        .eventType(EmailLogEventTypeEnum.CHARGEBACK_DETECTED)
+        .eventType(EmailLogEventTypeEnum.CHARGEBACK_DETECTED.name())
         .data("chargebacks", chargebacks)
         .data("fileName", fileName)
         .data("totalCount", chargebacks.size())

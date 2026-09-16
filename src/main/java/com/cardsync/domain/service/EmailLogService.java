@@ -5,6 +5,8 @@ import com.nimbussystems.commons.legacy.filter.query.ListQueryDto;
 import com.cardsync.domain.model.EmailLogEntity;
 import com.nimbussystems.commons.legacy.model.enums.EmailLogEventTypeEnum;
 import com.nimbussystems.commons.legacy.model.enums.EmailLogStatusEnum;
+import com.nimbussystems.commons.notification.mail.EmailDeliveryLogger;
+import com.nimbussystems.commons.notification.mail.EmailSenderService;
 import com.cardsync.domain.repository.EmailLogRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -19,9 +21,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Implementa EmailDeliveryLogger (contrato mínimo exigido por EmailSenderServiceRouter/Brevo-
+ *  Smtp-FakeEmailSenderService da lib compartilhada) em cima do EmailLogService/cs_email_log já
+ *  existentes - só um adapter de assinatura, a tela de auditoria e o resto deste service não
+ *  mudam em nada (ver plano da Fase 4: log NÃO foi migrado pra tabela/entidade compartilhada). */
 @Service
 @RequiredArgsConstructor
-public class EmailLogService {
+public class EmailLogService implements EmailDeliveryLogger {
 
   private final EmailLogSpecs emailLogSpecs;
   private final EmailLogRepository repository;
@@ -70,5 +76,23 @@ public class EmailLogService {
   private String truncate(String value, int max) {
     if (value == null) return null;
     return value.length() <= max ? value : value.substring(0, max);
+  }
+
+  @Override
+  public void logSent(EmailSenderService.Message message, String body) {
+    logSent(EmailLogEventTypeEnum.valueOf(message.getEventType()),
+        String.join(", ", message.getRecipients()), message.getSubject(), message.getTemplate(),
+        toUuidOrNull(message.getRequestedById()));
+  }
+
+  @Override
+  public void logError(EmailSenderService.Message message, String body, Exception ex) {
+    logError(EmailLogEventTypeEnum.valueOf(message.getEventType()),
+        String.join(", ", message.getRecipients()), message.getSubject(), message.getTemplate(),
+        toUuidOrNull(message.getRequestedById()), ex);
+  }
+
+  private UUID toUuidOrNull(String id) {
+    return (id == null || id.isBlank()) ? null : UUID.fromString(id);
   }
 }
