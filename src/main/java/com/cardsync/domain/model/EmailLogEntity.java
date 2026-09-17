@@ -15,7 +15,13 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Getter
 @Setter
-@Entity
+// name="CardsyncEmailLogEntity": o @EntityScan agora também cobre
+// com.nimbussystems.commons.notification.mail (Fase 4, migração do sender de e-mail), que tem seu
+// PRÓPRIO EmailLogEntity (não usado aqui - ver EmailLogService, log continua 100% local/cs_email_log)
+// - sem esse name explícito, os dois colidiam no nome de entidade JPA "EmailLogEntity" (nome JPA
+// interno, não afeta @Table nem nenhuma query - este repositório não usa JPQL por nome de
+// entidade, só Specification/Criteria).
+@Entity(name = "CardsyncEmailLogEntity")
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "cs_email_log")
 public class EmailLogEntity {

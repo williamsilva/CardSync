@@ -67,9 +67,6 @@ public abstract class CsPermissions {
   /* Permission for Anticipation */
   protected static final String PERM_ANTICIPATION_CONSULT = "PERM_ANTICIPATION_CONSULT";
 
-  /* Permission for Audit */
-  protected static final String PERM_AUDIT_MAIL_CONSULT = "PERM_AUDIT_MAIL_CONSULT";
-
   /* Permission for Banking Domicile */
   protected static final String PERM_BANKING_DOMICILE_CONSULT = "PERM_BANKING_DOMICILE_CONSULT";
   protected static final String PERM_BANKING_DOMICILE_CREATE = "PERM_BANKING_DOMICILE_CREATE";

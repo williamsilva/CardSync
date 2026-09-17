@@ -461,14 +461,4 @@ public @interface CheckSecurity {
     @interface CanReprocess {}
   }
 
-  @interface Audit {
-
-    @interface Mail {
-
-      @Target(METHOD)
-      @Retention(RUNTIME)
-      @PreAuthorize("@csSecurity.canConsultAuditMail()")
-      @interface CanConsultAuditMail{ }
-    }
-  }
 }

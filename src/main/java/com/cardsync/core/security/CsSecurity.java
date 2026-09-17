@@ -13,10 +13,6 @@ public class CsSecurity extends CsDefaultSecurityMethod {
     return true;
   }
 
-  public boolean canConsultAuditMail() {
-    return hasAllReadScope() && hasAuthority(PERM_AUDIT_MAIL_CONSULT);
-  }
-
   /* Companies */
   public boolean canConsultCompanies() {
     return hasAllReadScope() && hasAuthority(PERM_COMPANIES_CONSULT);

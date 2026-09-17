@@ -9,7 +9,7 @@ WORKDIR /app
 ARG GITHUB_ACTOR
 ARG GITHUB_TOKEN
 RUN mkdir -p /root/.m2 && \
-    echo "<settings><servers><server><id>github</id><username>${GITHUB_ACTOR}</username><password>${GITHUB_TOKEN}</password></server></servers></settings>" > /root/.m2/settings.xml
+    echo "<settings><servers><server><id>github</id><username>${GITHUB_ACTOR}</username><password>${GITHUB_TOKEN}</password></server><server><id>github-commons-server</id><username>${GITHUB_ACTOR}</username><password>${GITHUB_TOKEN}</password></server></servers></settings>" > /root/.m2/settings.xml
 
 COPY pom.xml ./
 RUN mvn -DskipTests dependency:go-offline --no-transfer-progress
