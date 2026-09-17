@@ -100,7 +100,11 @@ public class InternalEmailLogController {
   }
 
   private static Sort resolveSort(String sortField, String sortOrder) {
-    String property = SORTABLE_FIELDS.get(sortField);
+    // SORTABLE_FIELDS.get(null) lanca NullPointerException (Map.of() nao aceita chave nula,
+    // diferente de HashMap) - achado real em producao: sortField vem null na carga inicial da
+    // tela (antes do usuario clicar numa coluna), derrubando a busca inteira com 500, nao so a
+    // ordenacao. Ver mesmo fix em NimbusDeskServer/NimbusNovaxServer.
+    String property = sortField == null ? null : SORTABLE_FIELDS.get(sortField);
     if (property == null) {
       return Sort.by(Sort.Direction.DESC, "sentAt");
     }
