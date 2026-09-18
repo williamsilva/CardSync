@@ -118,7 +118,7 @@ cardsync:
     impl: ${CARDSYNC_EMAIL_IMPL}
     from-name: ${CARDSYNC_EMAIL_FROM_NAME}
     from-email: ${CARDSYNC_EMAIL_FROM_EMAIL}
-    public-base-url: ${CARDSYNC_API_PUBLIC_BASE_URL:https://api.cardsync.com.br}
+    public-base-url: ${CARDSYNC_API_PUBLIC_BASE_URL:https://cardsync-api.nimbussystems.com.br}
     brevo:
       base-url: ${BREVO_BASE_URL}
       api-key: ${BREVO_API_KEY}
@@ -139,9 +139,9 @@ cardsync:
       audience: ${CARDSYNC_RESOURCE_SERVER_AUDIENCE:cardsync-api}
 
     web:
-      spa-base-url: ${CARDSYNC_SPA_BASE_URL:https://cardsync.com.br}
+      spa-base-url: ${CARDSYNC_SPA_BASE_URL:https://cardsync.nimbussystems.com.br}
       allowed-origins:
-        - ${CARDSYNC_ALLOWED_ORIGIN:https://cardsync.com.br}
+        - ${CARDSYNC_ALLOWED_ORIGIN:https://cardsync.nimbussystems.com.br}
 
 # API interna (machine-to-machine) do NimbusCore
 nimbus-core:

@@ -5,8 +5,9 @@ public final class CookieBuilder {
 
   /**
    * @param includeDomain precisa bater com o escopo do cookie que está sendo limpo: o
-   * XSRF-TOKEN é setado cross-subdomain (Domain=cardsync.com.br, pra o JS da SPA ler), mas o
-   * SESSION é host-only (Spring Session não seta Domain nenhum, escopo só de api.cardsync.com.br).
+   * XSRF-TOKEN é setado cross-subdomain (Domain=nimbussystems.com.br, pra o JS da SPA ler), mas o
+   * SESSION é host-only (Spring Session não seta Domain nenhum, escopo só de
+   * cardsync-api.nimbussystems.com.br).
    * Um Set-Cookie com Domain diferente do original não apaga o cookie - o navegador trata como
    * um cookie diferente, e o cookie de sessão inválido continua sendo enviado pra sempre.
    */
