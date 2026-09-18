@@ -33,7 +33,7 @@ services:
       # Docker Desktop. Vale pras chamadas servidor-a-servidor (token/jwks/userinfo, todas
       # derivadas de cardsync.security.issuer) e pra API interna do NimbusAuth.
       CARDSYNC_ISSUER: ${CARDSYNC_ISSUER:-http://host.docker.internal:9090}
-      NIMBUS_AUTH_BASE_URL: ${NIMBUS_AUTH_BASE_URL:-http://host.docker.internal:9090}
+      NIMBUS_CORE_BASE_URL: ${NIMBUS_CORE_BASE_URL:-http://host.docker.internal:9090}
       NIMBUS_INTERNAL_API_SECRET: ${NIMBUS_INTERNAL_API_SECRET:-dev-internal-secret-change-me}
       # Excessão: authorization-uri é pra ONDE O NAVEGADOR é redirecionado (302), não uma chamada
       # do backend - o navegador não resolve host.docker.internal (isso só existe de dentro de
@@ -46,12 +46,14 @@ services:
       # também é redirect de navegador, não chamada servidor-a-servidor (ver
       # CardsyncSecurityProperties#browserIssuer).
       CARDSYNC_BROWSER_ISSUER: ${CARDSYNC_BROWSER_ISSUER:-http://localhost:9090}
-      # Overrides opcionais - "cardsync-bff" é um dos 4 clients legados migrados direto pra
-      # nb_apps em 2026-08-26 com o secret fixo "changeit-dev" (mesmo default do
+      # Overrides opcionais - "nimbuscardsync-bff" (renomeado de "cardsync-bff" em 2026-09-18,
+      # junto com o app_key nb_apps/oauth2_registered_client - ver
+      # BffUserProvisioningService#CARDSYNC_APP_KEY) é um dos 4 clients legados migrados direto
+      # pra nb_apps em 2026-08-26 com o secret fixo "changeit-dev" (mesmo default do
       # application-dev.yml), então normalmente não precisa setar nada aqui. Só sete no .env se o
-      # secret real desse client no NimbusAuth tiver sido rotacionado (padronizado com o mesmo
+      # secret real desse client no NimbusCore tiver sido rotacionado (padronizado com o mesmo
       # mecanismo do NimbusDeskServer, que registrou seu client pela tela e por isso exige isto).
-      CARDSYNC_BFF_CLIENT_ID: ${CARDSYNC_BFF_CLIENT_ID:-cardsync-bff}
+      CARDSYNC_BFF_CLIENT_ID: ${CARDSYNC_BFF_CLIENT_ID:-nimbuscardsync-bff}
       CARDSYNC_BFF_CLIENT_SECRET: ${CARDSYNC_BFF_CLIENT_SECRET:-changeit-dev}
       # file-processing.base-path: sem isto, cai no default local do application.yml
       # (C:/cardsync/files) - dentro do container (Linux) "C:" não é drive nenhum, vira nome de
