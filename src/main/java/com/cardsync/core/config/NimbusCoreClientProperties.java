@@ -13,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
 @Data
 @Component
 @Validated
-@ConfigurationProperties(prefix = "nimbus-auth")
+@ConfigurationProperties(prefix = "nimbus-core")
 public class NimbusCoreClientProperties {
 
   @NotNull

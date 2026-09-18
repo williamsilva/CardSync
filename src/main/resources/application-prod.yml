@@ -144,6 +144,6 @@ cardsync:
         - ${CARDSYNC_ALLOWED_ORIGIN:https://cardsync.com.br}
 
 # API interna (machine-to-machine) do NimbusCore
-nimbus-auth:
-  base-url: ${NIMBUS_AUTH_BASE_URL}
+nimbus-core:
+  base-url: ${NIMBUS_CORE_BASE_URL}
   internal-api-secret: ${NIMBUS_INTERNAL_API_SECRET}

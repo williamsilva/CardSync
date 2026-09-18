@@ -126,6 +126,6 @@ cardsync:
         - "http://localhost:4201"
 
 # API interna (machine-to-machine) do NimbusCore
-nimbus-auth:
-  base-url: ${NIMBUS_AUTH_BASE_URL:http://localhost:9090}
+nimbus-core:
+  base-url: ${NIMBUS_CORE_BASE_URL:http://localhost:9090}
   internal-api-secret: ${NIMBUS_INTERNAL_API_SECRET:dev-internal-secret-change-me}
