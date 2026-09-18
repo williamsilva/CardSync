@@ -36,8 +36,18 @@ public class AnticipationSpecs extends BaseSpecificationSupport<AnticipationEnti
   }
 
   public Specification<AnticipationEntity> fromQuery(ListQueryDto<AnticipationFilter> query) {
-    Specification<AnticipationEntity> spec = baseFilters(query)
-      .and(fetchListAssociations());
+    // fetch ANTES do filtro (não o contrário) — achado real 2026-09-11: alguns campos de
+    // AnticipationTableFields (numberCvNsu/transactionsStatus/statusPaymentBank) filtram via
+    // join em "salesSummary", a MESMA associação que fetchListAssociations() traz junto no
+    // SELECT. Com o filtro rodando primeiro, seu join ficava "solto" e o fetch (aplicado depois
+    // por fetchIfNotFetched, que só verifica fetches já existentes, não joins) sempre abria um
+    // SEGUNDO alias — o ORDER BY (que já reaproveitava esse join solto com segurança, ver
+    // orderByTableSort) então referenciava um alias que nunca aparecia no SELECT DISTINCT,
+    // quebrando no Postgres. Com o fetch primeiro, o filtro (agora via
+    // BaseSpecificationSupport.reuseOrJoin, ver AnticipationTableFields) encontra e reaproveita
+    // esse fetch como o MESMO alias.
+    Specification<AnticipationEntity> spec = fetchListAssociations()
+      .and(baseFilters(query));
 
     return spec.and(orderByTableSort(query == null ? null : query.sort()));
   }
@@ -107,7 +117,12 @@ public class AnticipationSpecs extends BaseSpecificationSupport<AnticipationEnti
       Map.entry("bank",               sortJoin("bankingDomicile", "bank", "name")),
       Map.entry("numberCvNsu",        sortJoin("salesSummary", "numberCvNsu")),
       Map.entry("transactionsStatus", sortJoin("salesSummary", "transactionsStatus")),
-      Map.entry("statusPaymentBank",  sortJoin("salesSummary", "statusPaymentBank"))
+      Map.entry("statusPaymentBank",  sortJoin("salesSummary", "statusPaymentBank")),
+
+      // advanceDiscountValue não é coluna própria (ver AnticipationTableFields/
+      // AnticipationAdvancedFields) - é originalCreditValue - releaseValue, calculado sob
+      // demanda. sortDiff (não sortField) porque o valor não existe como Path direto.
+      Map.entry("advanceDiscountValue", sortDiff("originalCreditValue", "releaseValue"))
     ));
   }
 }

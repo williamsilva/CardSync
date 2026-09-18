@@ -221,12 +221,19 @@ public abstract class BaseSpecificationSupport<T> {
     }
 
     return (root, query, cb) -> {
+      // join(from, attribute), não from.join(attribute, LEFT) direto — achado real 2026-09-11
+      // (AnticipationAdvancedFields#filter em salesSummary.statusPaymentBank/transactionsStatus):
+      // quando "path[i]" é a mesma associação já trazida via fetch em alguma Specs#fetchXxx desta
+      // entidade, um join solto aqui abria um SEGUNDO alias, e ordenar por ele (via sortJoin, que
+      // já reaproveita esse join solto) quebrava no Postgres porque esse alias nunca aparece no
+      // SELECT DISTINCT (só o do fetch aparece). Reaproveitar o fetch/join já existente evita o
+      // segundo alias por completo.
       From<?, ?> join = null;
 
       for (int i = 0; i < path.length - 1; i++) {
         join = (join == null)
-          ? root.join(path[i], JoinType.LEFT)
-          : join.join(path[i], JoinType.LEFT);
+          ? join(root, path[i])
+          : join(join, path[i]);
       }
 
       Path<?> leaf = (join == null)
@@ -879,6 +886,37 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
+  /**
+   * Mesmo range de {@link #currencyRangeValue}, mas para um valor CALCULADO (diferença entre
+   * dois campos), não uma coluna própria da entidade — usado por campos derivados que nunca são
+   * persistidos (ex.: AnticipationEntity não tem "advanceDiscountValue" como coluna própria; o
+   * valor é originalCreditValue - releaseValue, calculado sob demanda tanto aqui quanto no
+   * assembler que monta a resposta da API).
+   */
+  protected Specification<T> currencyRangeDiff(
+    String fieldMinuend, String fieldSubtrahend, BigDecimal start, BigDecimal end
+  ) {
+    if (start == null && end == null) {
+      return alwaysTrue();
+    }
+
+    return (root, query, cb) -> {
+      Path<BigDecimal> minuend = root.get(fieldMinuend);
+      Path<BigDecimal> subtrahend = root.get(fieldSubtrahend);
+      Expression<BigDecimal> diff = cb.diff(minuend, subtrahend);
+
+      if (start != null && end != null) {
+        return cb.between(diff, start, end);
+      }
+
+      if (start != null) {
+        return cb.greaterThanOrEqualTo(diff, start);
+      }
+
+      return cb.lessThanOrEqualTo(diff, end);
+    };
+  }
+
   protected Specification<T> currencyRangeValuePath(BigDecimal start, BigDecimal end, String... path) {
     if (start == null && end == null) {
       return alwaysTrue();
@@ -1049,7 +1087,7 @@ public abstract class BaseSpecificationSupport<T> {
     };
   }
 
-  protected Join<?, ?> join(From<?, ?> from, String attribute) {
+  protected static Join<?, ?> join(From<?, ?> from, String attribute) {
     for (Join<?, ?> join : from.getJoins()) {
       if (join.getAttribute().getName().equals(attribute) && join.getJoinType().equals(JoinType.LEFT)) {
         return join;
@@ -1070,6 +1108,21 @@ public abstract class BaseSpecificationSupport<T> {
     }
 
     return from.join(attribute, JoinType.LEFT);
+  }
+
+  /**
+   * Mesma lógica do {@code join(From, String)} acima (reaproveita join/fetch já aberto pra
+   * associação em vez de abrir um segundo, quebrando SELECT DISTINCT + ORDER BY no Postgres),
+   * exposta como utilitário estático público para uso em classes de filtro (ex.:
+   * *TableFields.java) que não estendem esta base — achado real 2026-09-11:
+   * AnticipationTableFields#table() filtrava salesSummary.statusPaymentBank via
+   * {@code root.join("salesSummary", LEFT)} direto, sem reaproveitar o fetch já aberto por
+   * AnticipationSpecs#fetchListAssociations() para a mesma associação, e o sort (que já usava o
+   * reaproveitamento seguro) acabava herdando esse join "solto" em vez do fetch, gerando um
+   * segundo alias pra cs_sales_summary que nunca aparecia no SELECT DISTINCT.
+   */
+  public static Join<?, ?> reuseOrJoin(From<?, ?> from, String attribute) {
+    return join(from, attribute);
   }
 
   protected <V> Path<V> resolvePath(Root<T> root, String... path) {
@@ -1249,6 +1302,15 @@ public abstract class BaseSpecificationSupport<T> {
   /** Atalho para alias simples sem join: root.get(physicalField) */
   protected SortField<T> sortField(String physicalField) {
     return (root, query, cb, descending) -> root.get(physicalField);
+  }
+
+  /** Atalho para ordenar por um valor CALCULADO (diferença entre dois campos) — ver {@link #currencyRangeDiff}. */
+  protected SortField<T> sortDiff(String fieldMinuend, String fieldSubtrahend) {
+    return (root, query, cb, descending) -> {
+      Path<BigDecimal> minuend = root.get(fieldMinuend);
+      Path<BigDecimal> subtrahend = root.get(fieldSubtrahend);
+      return cb.diff(minuend, subtrahend);
+    };
   }
 
   /**

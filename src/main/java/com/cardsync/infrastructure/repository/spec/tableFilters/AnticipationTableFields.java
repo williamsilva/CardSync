@@ -3,6 +3,7 @@ package com.cardsync.infrastructure.repository.spec.tableFilters;
 import com.cardsync.domain.model.AnticipationEntity;
 import com.cardsync.domain.model.enums.StatusPaymentBankEnum;
 import com.cardsync.domain.model.enums.StatusReconciliationEnum;
+import com.cardsync.infrastructure.repository.spec.config.BaseSpecificationSupport;
 import com.nimbussystems.commons.legacy.filter.spec.DateFilterService;
 import com.nimbussystems.commons.legacy.filter.spec.FieldSpec;
 import jakarta.persistence.criteria.JoinType;
@@ -81,22 +82,29 @@ public class AnticipationTableFields {
       // "numberCvNsu"/"transactionsStatus"/"statusPaymentBank" não são colunas próprias — vêm do
       // resumo de vendas vinculado (mesmo path de AnticipationAdvancedFields e do que a tela
       // realmente exibe: row.salesSummary?.numberCvNsu, ver anticipation-list.component.html).
+      // reuseOrJoin (não root.join direto) — achado real 2026-09-11: "salesSummary" é a mesma
+      // associação trazida via fetch em AnticipationSpecs#fetchListAssociations(); um join solto
+      // aqui abria um SEGUNDO alias pra cs_sales_summary, e ordenar por ele (ver
+      // AnticipationSpecs#orderByTableSort) quebrava com "para SELECT DISTINCT, expressões ORDER
+      // BY devem aparecer na lista de seleção" porque esse alias nunca aparecia no SELECT (só o
+      // do fetch aparece). reuseOrJoin reaproveita o fetch já aberto (AnticipationSpecs aplica o
+      // fetch ANTES dos filtros, exatamente para isto funcionar) em vez de abrir um novo.
       Map.entry("numberCvNsu",
         FieldSpec.integer(
           "numberCvNsu",
-          (root, query) -> root.join("salesSummary", JoinType.LEFT).get("numberCvNsu")
+          (root, query) -> BaseSpecificationSupport.reuseOrJoin(root, "salesSummary").get("numberCvNsu")
         )),
 
       Map.entry("transactionsStatus",
         FieldSpec.enumAsIntegerCode(
           "transactionsStatus", StatusReconciliationEnum.class, StatusReconciliationEnum::getCode,
-          (root, query) -> root.join("salesSummary", JoinType.LEFT).get("transactionsStatus")
+          (root, query) -> BaseSpecificationSupport.reuseOrJoin(root, "salesSummary").get("transactionsStatus")
         )),
 
       Map.entry("statusPaymentBank",
         FieldSpec.enumAsIntegerCode(
           "statusPaymentBank", StatusPaymentBankEnum.class, StatusPaymentBankEnum::getCode,
-          (root, query) -> root.join("salesSummary", JoinType.LEFT).get("statusPaymentBank")
+          (root, query) -> BaseSpecificationSupport.reuseOrJoin(root, "salesSummary").get("statusPaymentBank")
         ))
 
       // "advanceDiscountValue" (coluna + filtro existem no frontend) foi deixado de fora: não

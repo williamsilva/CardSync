@@ -35,7 +35,15 @@ public class AnticipationAdvancedFields extends BaseSpecificationSupport<Anticip
     spec = spec.and(currencyRangeValue("releaseValue", filter.releaseValueStart(), filter.releaseValueEnd()));
     spec = spec.and(currencyRangeValue("discountRateValue", filter.discountRateValueStart(), filter.discountRateValueEnd()));
     spec = spec.and(currencyRangeValue("originalCreditValue", filter.originalCreditValueStart(), filter.originalCreditValueEnd()));
-    spec = spec.and(currencyRangeValue("advanceDiscountValue", filter.advanceDiscountValueStart(), filter.advanceDiscountValueEnd()));
+    // advanceDiscountValue não é coluna própria de AnticipationEntity — é o custo da antecipação
+    // (originalCreditValue - releaseValue: o que a venda renderia na data normal menos o que foi
+    // de fato antecipado), calculado sob demanda aqui e no assembler que monta a resposta da API
+    // (achado real 2026-09-11: nunca tinha sido calculado em lugar nenhum, a coluna sempre
+    // aparecia vazia em produção). currencyRangeDiff, não currencyRangeValue - esse último exige
+    // root.get(field) apontar pra uma coluna real.
+    spec = spec.and(currencyRangeDiff(
+      "originalCreditValue", "releaseValue", filter.advanceDiscountValueStart(), filter.advanceDiscountValueEnd()
+    ));
 
     return spec;
   }

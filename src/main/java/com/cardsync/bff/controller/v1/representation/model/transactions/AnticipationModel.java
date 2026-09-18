@@ -34,6 +34,12 @@ public class AnticipationModel extends RepresentationModel<@NonNull Anticipation
   private BigDecimal discountRateValue;
   private BigDecimal originalCreditValue;
 
+  // Não é coluna própria de AnticipationEntity - é o custo da antecipação (originalCreditValue -
+  // releaseValue: o que a venda renderia na data normal menos o que foi de fato antecipado),
+  // calculado no assembler (ver AnticipationModelAssembler). Achado real 2026-09-11: nunca tinha
+  // sido calculado em lugar nenhum, a coluna sempre aparecia vazia em produção.
+  private BigDecimal advanceDiscountValue;
+
   // Status de pagamento da CreditOrder sintética gerada a partir DESTA Antecipação (Etapa 4) -
   // não confundir com salesSummary.statusPaymentBank (status do resumo de vendas inteiro, que
   // pode ter várias parcelas/antecipações com situações diferentes). Null enquanto a ordem ainda

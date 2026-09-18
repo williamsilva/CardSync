@@ -38,6 +38,15 @@ public class AnticipationModelAssembler extends RepresentationModelAssemblerSupp
     model.setReleaseValue(entity.getReleaseValue());
     model.setDiscountRateValue(entity.getDiscountRateValue());
     model.setOriginalCreditValue(entity.getOriginalCreditValue());
+    // Custo da antecipação: o que a venda renderia na data normal (originalCreditValue) menos o
+    // que foi de fato antecipado (releaseValue) - não é coluna própria da entidade, ver comentário
+    // em AnticipationModel#advanceDiscountValue. Mesma fórmula usada no filtro/ordenação
+    // (AnticipationAdvancedFields#currencyRangeDiff, AnticipationSpecs#sortDiff).
+    model.setAdvanceDiscountValue(
+      entity.getOriginalCreditValue() != null && entity.getReleaseValue() != null
+        ? entity.getOriginalCreditValue().subtract(entity.getReleaseValue())
+        : null
+    );
 
     model.setFlag(toFlag(entity.getFlag()));
     model.setCompany(toCompany(entity.getCompany()));
