@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  *  Smtp-FakeEmailSenderService da lib compartilhada) em cima do cs_email_log - grava envio/erro. A
  *  listagem/busca (antes exposta em EmailLogController/EmailLogModel/EmailLogSpecs, BFF) foi
  *  removida junto com a tela local `/audit` (Fase 5 da consolidação de Segurança) - a auditoria de
- *  e-mail agora é federada e centralizada no NimbusAuthWeb (ver InternalEmailLogController). */
+ *  e-mail agora é federada e centralizada no NimbusCoreWeb (ver InternalEmailLogController). */
 @Service
 @RequiredArgsConstructor
 public class EmailLogService implements EmailDeliveryLogger {

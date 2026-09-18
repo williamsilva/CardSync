@@ -10,9 +10,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * Cache local (read-only) do id/nome/username de usuários do NimbusAuth, usado só para
+ * Cache local (read-only) do id/nome/username de usuários do NimbusCore, usado só para
  * exibir "criado por"/"alterado por" nas respostas da API sem bater na rede a cada request.
- * Sem FK: o id aqui é o id do usuário no NimbusAuth, um sistema/banco separado.
+ * Sem FK: o id aqui é o id do usuário no NimbusCore, um sistema/banco separado.
  */
 @Getter
 @Setter

@@ -1,6 +1,6 @@
 package com.cardsync.bff.service;
 
-import com.cardsync.infrastructure.nimbusauth.NimbusAuthInternalClient;
+import com.cardsync.infrastructure.nimbuscore.NimbusCoreInternalClient;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +21,7 @@ public class BffAccessTokenService {
   public static final String REGISTRATION_ID = "cardsync-bff";
 
   private final OAuth2AuthorizedClientManager clientManager;
-  private final NimbusAuthInternalClient nimbusAuthClient;
+  private final NimbusCoreInternalClient nimbusAuthClient;
   private final OAuth2AuthorizedClientRepository authorizedClientRepository;
 
   /**

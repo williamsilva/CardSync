@@ -14,7 +14,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * O usuario autenticado no Cardsync sempre vem do NimbusAuth (Jwt no Resource Server,
+ * O usuario autenticado no Cardsync sempre vem do NimbusCore (Jwt no Resource Server,
  * OidcUser no BFF) - nunca ha um UserEntity local. O auditor eh so o UUID do usuario.
  */
 @Component

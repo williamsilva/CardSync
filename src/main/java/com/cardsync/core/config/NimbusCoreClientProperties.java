@@ -7,14 +7,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuração do cliente HTTP interno usado pelo Cardsync para chamar o NimbusAuth
+ * Configuração do cliente HTTP interno usado pelo Cardsync para chamar o NimbusCore
  * (resolver nome de usuário em /internal/users, revogar autorização em /internal/oauth2/revoke).
  */
 @Data
 @Component
 @Validated
 @ConfigurationProperties(prefix = "nimbus-auth")
-public class NimbusAuthClientProperties {
+public class NimbusCoreClientProperties {
 
   @NotNull
   private String baseUrl;

@@ -1,6 +1,6 @@
 package com.cardsync.core.backup;
 
-import com.cardsync.infrastructure.nimbusauth.NimbusAuthInternalClient;
+import com.cardsync.infrastructure.nimbuscore.NimbusCoreInternalClient;
 import com.nimbussystems.commons.legacy.backup.PgDumpRunner;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -29,9 +29,9 @@ class BackupServiceTest {
 
   private final PgDumpRunner pgDumpRunner = mock(PgDumpRunner.class);
   private final FileVolumeZipper fileVolumeZipper = mock(FileVolumeZipper.class);
-  private final NimbusAuthInternalClient nimbusAuthInternalClient = mock(NimbusAuthInternalClient.class);
+  private final NimbusCoreInternalClient nimbusCoreInternalClient = mock(NimbusCoreInternalClient.class);
 
-  private final BackupService service = new BackupService(pgDumpRunner, fileVolumeZipper, nimbusAuthInternalClient);
+  private final BackupService service = new BackupService(pgDumpRunner, fileVolumeZipper, nimbusCoreInternalClient);
 
   @Test
   void onlyRunsRequestedTargets() throws IOException {
@@ -42,15 +42,15 @@ class BackupServiceTest {
     Map<String, byte[]> entries = readZipEntries(zip);
     assertThat(entries).containsKey("cardsync.dump");
     assertThat(entries).doesNotContainKeys("nimbusauth.dump", "erros.txt");
-    verify(nimbusAuthInternalClient, never()).fetchDatabaseBackup();
+    verify(nimbusCoreInternalClient, never()).fetchDatabaseBackup();
     verify(fileVolumeZipper, never()).zipInto(any(), any());
   }
 
   @Test
   void aFailingTargetDoesNotPreventTheOthersFromSucceeding() throws IOException {
     when(pgDumpRunner.dump()).thenReturn("cardsync-dump".getBytes(StandardCharsets.UTF_8));
-    doThrow(new IllegalStateException("NimbusAuth indisponível"))
-      .when(nimbusAuthInternalClient).fetchDatabaseBackup();
+    doThrow(new IllegalStateException("NimbusCore indisponível"))
+      .when(nimbusCoreInternalClient).fetchDatabaseBackup();
 
     byte[] zip = service.execute(List.of(BackupTarget.CARDSYNC_DB, BackupTarget.NIMBUSAUTH_DB));
 
@@ -58,13 +58,13 @@ class BackupServiceTest {
     assertThat(entries).containsKey("cardsync.dump");
     assertThat(entries).doesNotContainKey("nimbusauth.dump");
     assertThat(new String(entries.get("erros.txt"), StandardCharsets.UTF_8))
-      .contains("NimbusAuth indisponível");
+      .contains("NimbusCore indisponível");
   }
 
   @Test
   void allThreeTargetsProduceTheirOwnEntries() throws IOException {
     when(pgDumpRunner.dump()).thenReturn("cardsync-dump".getBytes(StandardCharsets.UTF_8));
-    when(nimbusAuthInternalClient.fetchDatabaseBackup()).thenReturn("nimbusauth-dump".getBytes(StandardCharsets.UTF_8));
+    when(nimbusCoreInternalClient.fetchDatabaseBackup()).thenReturn("nimbusauth-dump".getBytes(StandardCharsets.UTF_8));
 
     byte[] zip = service.execute(List.of(BackupTarget.CARDSYNC_DB, BackupTarget.NIMBUSAUTH_DB, BackupTarget.FILES));
 

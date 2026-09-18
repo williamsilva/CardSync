@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API interna machine-to-machine (rota /internal/email-log/**, ver InternalBackupSecretFilter/
- *  internalEmailLogChain em SecurityConfig) - consumida pelo NimbusAuth pra federar a tela central
+ *  internalEmailLogChain em SecurityConfig) - consumida pelo NimbusCore pra federar a tela central
  *  de Auditoria de E-mail.
  *
  * <p>Deliberadamente NÃO reaproveita EmailLogService.list/EmailLogSpecs.fromQuery (o caminho que
@@ -40,7 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalEmailLogController {
 
   /** Allow-list de ordenação (sortField do request -> propriedade real da entidade) - os únicos
-   *  campos que o painel "Auditoria dos Apps" do NimbusAuthWeb expõe pra sort. Campo ausente ou
+   *  campos que o painel "Auditoria dos Apps" do NimbusCoreWeb expõe pra sort. Campo ausente ou
    *  desconhecido cai no fallback (sentAt desc), mesmo comportamento de antes desta feature. */
   private static final Map<String, String> SORTABLE_FIELDS = Map.of(
       "recipient", "recipient",

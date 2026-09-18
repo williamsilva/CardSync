@@ -1,6 +1,6 @@
 package com.cardsync.core.backup;
 
-import com.cardsync.infrastructure.nimbusauth.NimbusAuthInternalClient;
+import com.cardsync.infrastructure.nimbuscore.NimbusCoreInternalClient;
 import com.nimbussystems.commons.legacy.backup.PgDumpRunner;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -28,7 +28,7 @@ public class BackupService {
 
   private final PgDumpRunner pgDumpRunner;
   private final FileVolumeZipper fileVolumeZipper;
-  private final NimbusAuthInternalClient nimbusAuthInternalClient;
+  private final NimbusCoreInternalClient nimbusCoreInternalClient;
 
   public byte[] execute(List<BackupTarget> targets) {
     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -39,7 +39,7 @@ public class BackupService {
         addEntry(zipOut, "cardsync.dump", "banco cardsync", pgDumpRunner::dump, errors);
       }
       if (targets.contains(BackupTarget.NIMBUSAUTH_DB)) {
-        addEntry(zipOut, "nimbusauth.dump", "banco nimbusauth", nimbusAuthInternalClient::fetchDatabaseBackup, errors);
+        addEntry(zipOut, "nimbusauth.dump", "banco nimbusauth", nimbusCoreInternalClient::fetchDatabaseBackup, errors);
       }
       if (targets.contains(BackupTarget.FILES)) {
         try {

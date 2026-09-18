@@ -5,7 +5,7 @@ import com.cardsync.core.security.CardsyncSecurityProperties;
 import com.cardsync.core.security.web.CookieBuilder;
 import com.cardsync.core.security.web.CookieProps;
 import com.cardsync.core.security.web.SpaRedirectSupport;
-import com.cardsync.infrastructure.nimbusauth.NimbusAuthInternalClient;
+import com.cardsync.infrastructure.nimbuscore.NimbusCoreInternalClient;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -41,13 +41,13 @@ public class BffLogoutController {
   private final CookieProps cookieProps;
   private final CardsyncSecurityProperties props;
   private final SpaRedirectSupport spaRedirectSupport;
-  private final NimbusAuthInternalClient nimbusAuthClient;
+  private final NimbusCoreInternalClient nimbusAuthClient;
   private final OAuth2AuthorizedClientRepository authorizedClientRepository;
   private final RestClient.Builder restClientBuilder;
 
   @PostMapping("/bff/logout")
   public ResponseEntity<LogoutResponse> logout(Authentication auth, HttpServletRequest request, HttpServletResponse response) {
-    // Fallback: se não for possível montar o RP-Initiated Logout do NimbusAuth (ex: sessão
+    // Fallback: se não for possível montar o RP-Initiated Logout do NimbusCore (ex: sessão
     // já sem OidcUser), pelo menos volta pra SPA com a sessão local já encerrada.
     String logoutUrl = spaRedirectSupport.defaultSpaTarget();
 
@@ -55,7 +55,7 @@ public class BffLogoutController {
       OAuth2AuthorizedClient authorizedClient = authorizedClientRepository.loadAuthorizedClient(
         BffAccessTokenService.REGISTRATION_ID, auth, request);
 
-      // RP-Initiated Logout (OIDC): sem isso, o NimbusAuth mantém sua própria sessão de
+      // RP-Initiated Logout (OIDC): sem isso, o NimbusCore mantém sua própria sessão de
       // login válida e o próximo /oauth2/authorize reautentica via SSO silenciosamente -
       // ou seja, o usuário nunca sai de fato, só a sessão do BFF era encerrada.
       String idTokenHint = resolveIdTokenHint(auth, authorizedClient);
@@ -65,9 +65,9 @@ public class BffLogoutController {
           + "?id_token_hint=" + URLEncoder.encode(idTokenHint, StandardCharsets.UTF_8)
           + "&post_logout_redirect_uri=" + URLEncoder.encode(spaRedirectSupport.defaultSpaTarget(), StandardCharsets.UTF_8);
 
-        // NÃO revoga a autorização aqui: o /connect/logout do NimbusAuth precisa achar o
+        // NÃO revoga a autorização aqui: o /connect/logout do NimbusCore precisa achar o
         // id_token_hint na tabela de autorizações pra validar o pedido (findByToken) - revogar
-        // antes apaga esse registro e o NimbusAuth rejeita com "invalid_token" (400). É o
+        // antes apaga esse registro e o NimbusCore rejeita com "invalid_token" (400). É o
         // próprio /connect/logout quem encerra a autorização e a sessão de login de lá.
       } else {
         // Sem id_token válido (nem o da sessão, nem foi possível obter um fresco via refresh) -
@@ -97,9 +97,9 @@ public class BffLogoutController {
   /**
    * O id_token guardado na sessão (OidcUser, fixado no login original) fica órfão rápido: cada
    * refresh silencioso do access_token (automático, a cada poucos minutos - ver access-token-ttl
-   * no NimbusAuth) SUBSTITUI o id_token daquela authorization no NimbusAuth, e o /connect/logout
+   * no NimbusCore) SUBSTITUI o id_token daquela authorization no NimbusCore, e o /connect/logout
    * rejeita com invalid_token qualquer id_token_hint que não bata com o que está lá agora (ver
-   * OidcLogoutAuthenticationProvider no NimbusAuth) - sem um id_token válido, a revogação de
+   * OidcLogoutAuthenticationProvider no NimbusCore) - sem um id_token válido, a revogação de
    * tokens no logout nunca chega a rodar (mesmo bug encontrado e corrigido no NimbusFlowServer,
    * arquitetura de BFF idêntica a esta).
    *

@@ -10,9 +10,9 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * No Cardsync a identidade sempre chega via NimbusAuth: Jwt (Resource Server, /api/**)
- * ou OidcUser (BFF, oauth2Login contra o NimbusAuth). Não existe mais login local
- * (form login / CardSyncUserDetails) - isso agora vive só no NimbusAuth.
+ * No Cardsync a identidade sempre chega via NimbusCore: Jwt (Resource Server, /api/**)
+ * ou OidcUser (BFF, oauth2Login contra o NimbusCore). Não existe mais login local
+ * (form login / CardSyncUserDetails) - isso agora vive só no NimbusCore.
  */
 public abstract class CsDefaultSecurityMethod extends CsPermissions {
 

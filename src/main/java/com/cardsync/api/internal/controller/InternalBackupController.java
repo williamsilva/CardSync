@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API interna machine-to-machine (rota /internal/backup/**, ver InternalBackupSecretFilter) -
- *  consumida pelo NimbusAuth pra compor o backup centralizado do ecossistema Nimbus. Espelha
- *  exatamente o InternalBackupController já existente no NimbusAuthServer (que os satélites
- *  consomem hoje pra incluir o banco do NimbusAuth no próprio zip via
- *  BackupController/BackupService/NimbusAuthInternalClient) - agora na direção inversa. */
+ *  consumida pelo NimbusCore pra compor o backup centralizado do ecossistema Nimbus. Espelha
+ *  exatamente o InternalBackupController já existente no NimbusCoreServer (que os satélites
+ *  consomem hoje pra incluir o banco do NimbusCore no próprio zip via
+ *  BackupController/BackupService/NimbusCoreInternalClient) - agora na direção inversa. */
 @Slf4j
 @RestController
 @RequiredArgsConstructor

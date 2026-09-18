@@ -1,6 +1,6 @@
-package com.cardsync.infrastructure.nimbusauth;
+package com.cardsync.infrastructure.nimbuscore;
 
-import com.cardsync.core.config.NimbusAuthClientProperties;
+import com.cardsync.core.config.NimbusCoreClientProperties;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -10,18 +10,18 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /**
- * Cliente HTTP para a API interna (machine-to-machine) do NimbusAuth.
+ * Cliente HTTP para a API interna (machine-to-machine) do NimbusCore.
  * Usado para resolver nome/username de usuários (auditoria) e para revogar a
  * cadeia de autorização OAuth2 de um usuário (logout forçado / refresh inválido).
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class NimbusAuthInternalClient {
+public class NimbusCoreInternalClient {
 
   public record UserSummary(UUID id, String username, String name) {}
 
-  private final NimbusAuthClientProperties props;
+  private final NimbusCoreClientProperties props;
   private final RestClient.Builder restClientBuilder;
 
   private RestClient client() {
@@ -46,13 +46,13 @@ public class NimbusAuthInternalClient {
 
       return result != null ? List.of(result) : List.of();
     } catch (Exception e) {
-      log.warn("Falha ao resolver usuários no NimbusAuth: {}", e.getMessage());
+      log.warn("Falha ao resolver usuários no NimbusCore: {}", e.getMessage());
       return List.of();
     }
   }
 
   /**
-   * Pede ao NimbusAuth um dump (pg_dump formato custom) do próprio banco dele. Diferente dos
+   * Pede ao NimbusCore um dump (pg_dump formato custom) do próprio banco dele. Diferente dos
    * demais métodos desta classe, NÃO degrada silenciosamente em caso de falha — o chamador
    * (BackupService) precisa saber que este alvo específico falhou para reportar no zip final,
    * em vez de produzir um backup incompleto sem avisar.
@@ -64,7 +64,7 @@ public class NimbusAuthInternalClient {
       .body(byte[].class);
 
     if (result == null || result.length == 0) {
-      throw new IllegalStateException("NimbusAuth retornou um backup vazio");
+      throw new IllegalStateException("NimbusCore retornou um backup vazio");
     }
     return result;
   }
@@ -79,7 +79,7 @@ public class NimbusAuthInternalClient {
 
       return result != null ? result.revokedCount() : 0;
     } catch (Exception e) {
-      log.warn("Falha ao revogar autorização no NimbusAuth: {}", e.getMessage());
+      log.warn("Falha ao revogar autorização no NimbusCore: {}", e.getMessage());
       return 0;
     }
   }

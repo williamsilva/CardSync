@@ -68,7 +68,7 @@ public class BffMeController {
         .plusSeconds(session.getMaxInactiveInterval());
     }
 
-    // Se for OIDC (BFF via oauth2Login contra o NimbusAuth), enriquece com claims do id_token
+    // Se for OIDC (BFF via oauth2Login contra o NimbusCore), enriquece com claims do id_token
     if (auth != null && auth.getPrincipal() instanceof OidcUser oidc) {
       OidcIdToken idToken = oidc.getIdToken();
       if (idToken != null) {

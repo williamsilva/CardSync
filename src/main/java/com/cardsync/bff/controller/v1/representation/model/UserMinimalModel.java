@@ -9,7 +9,7 @@ import java.util.UUID;
 
 /**
  * Resumo de usuário (id/nome/username) resolvido via UserDirectoryService (cache local
- * sincronizado sob demanda com o NimbusAuth) - usado só para exibir "criado por"/"alterado por".
+ * sincronizado sob demanda com o NimbusCore) - usado só para exibir "criado por"/"alterado por".
  */
 @Getter
 @Setter

@@ -37,7 +37,7 @@ public class BffApiClient {
   /**
    * Encaminha a requisição atual (método, corpo, query string) para outro serviço,
    * trocando o prefixo do path e anexando o access token do usuário logado (Bearer).
-   * Usado para expor no Cardsync (via sessão/CSRF) endpoints que agora vivem no NimbusAuth
+   * Usado para expor no Cardsync (via sessão/CSRF) endpoints que agora vivem no NimbusCore
    * (users/groups/permissions, troca de senha) sem nunca expor o token ao browser.
    */
   public ResponseEntity<byte[]> forwardAuthenticated(
@@ -49,7 +49,7 @@ public class BffApiClient {
   }
 
   /**
-   * Mesma coisa, mas para endpoints públicos do NimbusAuth (ex: política de senha) -
+   * Mesma coisa, mas para endpoints públicos do NimbusCore (ex: política de senha) -
    * não exige sessão autenticada nem anexa token.
    */
   public ResponseEntity<byte[]> forwardPublic(

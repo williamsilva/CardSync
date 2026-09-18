@@ -27,7 +27,7 @@ import java.util.Locale;
 public class ChargebackEmailService {
 
   // Logo referenciada por URL HTTPS pública, não mais embutida via cid:/multipart inline (mesmo
-  // ajuste feito no NimbusAuth - com o sender ativo em produção sendo API_KEY/Brevo, o anexo
+  // ajuste feito no NimbusCore - com o sender ativo em produção sendo API_KEY/Brevo, o anexo
   // inline via MimeMessage nem chegava a passar pela API HTTP do Brevo do jeito esperado).
   private static final String LOGO_ASSET_PATH = "/assets/cardsync-logo.png";
 

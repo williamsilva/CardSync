@@ -124,7 +124,7 @@ cardsync:
       api-key: ${BREVO_API_KEY}
 
   security:
-    # Issuer do NimbusAuth (não é mais o próprio CardSync).
+    # Issuer do NimbusCore (não é mais o próprio CardSync).
     issuer: ${CARDSYNC_ISSUER}
 
     session-timeout: ${CARDSYNC_SESSION_TIMEOUT:PT30M}
@@ -143,7 +143,7 @@ cardsync:
       allowed-origins:
         - ${CARDSYNC_ALLOWED_ORIGIN:https://cardsync.com.br}
 
-# API interna (machine-to-machine) do NimbusAuth
+# API interna (machine-to-machine) do NimbusCore
 nimbus-auth:
   base-url: ${NIMBUS_AUTH_BASE_URL}
   internal-api-secret: ${NIMBUS_INTERNAL_API_SECRET}

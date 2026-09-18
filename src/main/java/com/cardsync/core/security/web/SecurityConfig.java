@@ -10,7 +10,7 @@ import com.nimbussystems.commons.legacy.security.web.SpaCsrfTokenRequestHandler;
 import com.nimbussystems.commons.legacy.security.web.SpaRequestMatcher;
 import com.nimbussystems.commons.legacy.security.web.Spa403AccessDeniedHandler;
 import com.nimbussystems.commons.legacy.security.web.Spa401EntryPoint;
-import com.cardsync.core.config.NimbusAuthClientProperties;
+import com.cardsync.core.config.NimbusCoreClientProperties;
 import com.cardsync.core.security.CardsyncSecurityProperties;
 import com.cardsync.core.security.resourceserver.ResourceServerJwtBeans;
 import com.nimbussystems.commons.legacy.security.web.headers.ConditionalHstsHeaderWriter;
@@ -64,9 +64,9 @@ import java.time.Clock;
 import java.util.LinkedHashSet;
 
 /**
- * Segurança do Cardsync após o split com o NimbusAuth: não há mais Authorization Server
- * nem login local aqui - só o BFF (sessão/cookies/CSRF, oauth2Login contra o NimbusAuth)
- * e o Resource Server (/api/**, valida JWT emitido pelo NimbusAuth via JWKS remoto).
+ * Segurança do Cardsync após o split com o NimbusCore: não há mais Authorization Server
+ * nem login local aqui - só o BFF (sessão/cookies/CSRF, oauth2Login contra o NimbusCore)
+ * e o Resource Server (/api/**, valida JWT emitido pelo NimbusCore via JWKS remoto).
  */
 @Configuration
 @EnableMethodSecurity
@@ -106,10 +106,10 @@ public class SecurityConfig implements EnvironmentAware {
   }
 
   /**
-   * JWKS remoto do NimbusAuth: os tokens são emitidos lá, não pelo Cardsync.
+   * JWKS remoto do NimbusCore: os tokens são emitidos lá, não pelo Cardsync.
    * Usa withJwkSetUri (carregamento preguiçoso, só na primeira validação de token) em vez de
    * withIssuerLocation (faria discovery via rede aqui mesmo, no boot do Cardsync, exigindo que
-   * o NimbusAuth já esteja no ar nesse instante).
+   * o NimbusCore já esteja no ar nesse instante).
    */
   @Bean
   public JwtDecoder jwtDecoder() {
@@ -150,7 +150,7 @@ public class SecurityConfig implements EnvironmentAware {
    * PKCE no fluxo authorization_code — mesmo sendo um client confidential (client_secret_basic),
    * o BFF roda num processo separado da Authorization Server (Railway), então o code_verifier
    * ainda protege contra um authorization code interceptado em trânsito. Combina com
-   * requireProofKey(true) no RegisteredClient do lado do NimbusAuth.
+   * requireProofKey(true) no RegisteredClient do lado do NimbusCore.
    */
   @Bean
   public OAuth2AuthorizationRequestResolver pkceAuthorizationRequestResolver(
@@ -201,17 +201,17 @@ public class SecurityConfig implements EnvironmentAware {
   }
 
   // ---------------------------
-  // 0) INTERNAL BACKUP CHAIN (/internal/backup/**) - machine-to-machine, chamada pelo NimbusAuth
+  // 0) INTERNAL BACKUP CHAIN (/internal/backup/**) - machine-to-machine, chamada pelo NimbusCore
   // pra puxar o backup deste servidor (banco + arquivos), autenticado por secret compartilhado
   // (ver InternalBackupSecretFilter), não por sessão/JWT. Reaproveita o MESMO secret já
-  // configurado em NimbusAuthClientProperties (NIMBUS_INTERNAL_API_SECRET) - nenhuma env var
+  // configurado em NimbusCoreClientProperties (NIMBUS_INTERNAL_API_SECRET) - nenhuma env var
   // nova. @Order menor que apiChain (10) e bffChain (20) pra ser avaliada primeiro - o
   // securityMatcher restrito a /internal/backup/** garante que ela nunca interfere nas outras.
   // ---------------------------
   @Bean
   @Order(5)
   public SecurityFilterChain internalBackupChain(
-    HttpSecurity http, NimbusAuthClientProperties nimbusAuthClientProperties
+    HttpSecurity http, NimbusCoreClientProperties nimbusCoreClientProperties
   ) throws Exception {
 
     http.securityMatcher("/internal/backup/**");
@@ -220,7 +220,7 @@ public class SecurityConfig implements EnvironmentAware {
     http.cors(AbstractHttpConfigurer::disable);
     http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
     http.addFilterBefore(
-      new InternalBackupSecretFilter(nimbusAuthClientProperties.getInternalApiSecret()),
+      new InternalBackupSecretFilter(nimbusCoreClientProperties.getInternalApiSecret()),
       HeaderWriterFilter.class
     );
     return http.build();
@@ -228,14 +228,14 @@ public class SecurityConfig implements EnvironmentAware {
 
   // ---------------------------
   // 0.1) INTERNAL EMAIL SETTINGS CHAIN (/internal/email-settings/**) - machine-to-machine, chamada
-  // pelo NimbusAuth pra centralizar a tela "E-mail dos Apps". Mesmo padrão exato da chain de
+  // pelo NimbusCore pra centralizar a tela "E-mail dos Apps". Mesmo padrão exato da chain de
   // backup acima (mesmo secret, mesmo filtro genérico InternalBackupSecretFilter, nenhuma env var
   // nova) - só o securityMatcher muda.
   // ---------------------------
   @Bean
   @Order(6)
   public SecurityFilterChain internalEmailSettingsChain(
-    HttpSecurity http, NimbusAuthClientProperties nimbusAuthClientProperties
+    HttpSecurity http, NimbusCoreClientProperties nimbusCoreClientProperties
   ) throws Exception {
 
     http.securityMatcher("/internal/email-settings/**");
@@ -244,7 +244,7 @@ public class SecurityConfig implements EnvironmentAware {
     http.cors(AbstractHttpConfigurer::disable);
     http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
     http.addFilterBefore(
-      new InternalBackupSecretFilter(nimbusAuthClientProperties.getInternalApiSecret()),
+      new InternalBackupSecretFilter(nimbusCoreClientProperties.getInternalApiSecret()),
       HeaderWriterFilter.class
     );
     return http.build();
@@ -252,14 +252,14 @@ public class SecurityConfig implements EnvironmentAware {
 
   // ---------------------------
   // 0.2) INTERNAL EMAIL LOG CHAIN (/internal/email-log/**) - machine-to-machine, chamada pelo
-  // NimbusAuth pra federar a tela central de Auditoria de E-mail. Mesmo padrão exato das 2 chains
+  // NimbusCore pra federar a tela central de Auditoria de E-mail. Mesmo padrão exato das 2 chains
   // internas acima (mesmo secret, mesmo filtro genérico InternalBackupSecretFilter, nenhuma env
   // var nova) - só o securityMatcher muda.
   // ---------------------------
   @Bean
   @Order(7)
   public SecurityFilterChain internalEmailLogChain(
-    HttpSecurity http, NimbusAuthClientProperties nimbusAuthClientProperties
+    HttpSecurity http, NimbusCoreClientProperties nimbusCoreClientProperties
   ) throws Exception {
 
     http.securityMatcher("/internal/email-log/**");
@@ -268,7 +268,7 @@ public class SecurityConfig implements EnvironmentAware {
     http.cors(AbstractHttpConfigurer::disable);
     http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
     http.addFilterBefore(
-      new InternalBackupSecretFilter(nimbusAuthClientProperties.getInternalApiSecret()),
+      new InternalBackupSecretFilter(nimbusCoreClientProperties.getInternalApiSecret()),
       HeaderWriterFilter.class
     );
     return http.build();
@@ -295,7 +295,7 @@ public class SecurityConfig implements EnvironmentAware {
     http.authorizeHttpRequests(auth -> auth
       .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
       .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
-      // política de senha: proxy público para o NimbusAuth (ver PasswordPolicyProxyController)
+      // política de senha: proxy público para o NimbusCore (ver PasswordPolicyProxyController)
       .requestMatchers(HttpMethod.GET, "/api/password/policy").permitAll()
       .requestMatchers(HttpMethod.POST, "/api/password/policy/check").permitAll()
       .anyRequest().authenticated()

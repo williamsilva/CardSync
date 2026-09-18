@@ -16,7 +16,7 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
  * o fragmento _layout - esse é dead code no CardsyncServer, nada o referencia). Sem Spring
  * context (Testcontainers não é necessário aqui, é só resolução de template) - mesma
  * configuração default do Spring Boot (classpath:/templates/, sufixo .html). Espelha
- * MailLayoutTemplateTest do NimbusAuth (mesma origem de template, mesmo ajuste de tema claro).
+ * MailLayoutTemplateTest do NimbusCore (mesma origem de template, mesmo ajuste de tema claro).
  */
 class ChargebackMailTemplateTest {
 

@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuração de segurança do Cardsync após o split com o NimbusAuth: o Cardsync não
- * emite mais tokens nem faz login local - só valida JWTs emitidos pelo NimbusAuth
+ * Configuração de segurança do Cardsync após o split com o NimbusCore: o Cardsync não
+ * emite mais tokens nem faz login local - só valida JWTs emitidos pelo NimbusCore
  * (issuer/JWKS remotos) e mantém sua própria sessão de BFF (cookies/CORS).
  */
 @Data
@@ -20,7 +20,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "cardsync.security")
 public class CardsyncSecurityProperties {
 
-  /** Issuer do NimbusAuth (usado para validar o JWT e para resolver o JWKS remoto, token-uri,
+  /** Issuer do NimbusCore (usado para validar o JWT e para resolver o JWKS remoto, token-uri,
    *  user-info-uri - tudo chamada servidor-a-servidor). */
   @NotNull
   private String issuer;
@@ -28,7 +28,7 @@ public class CardsyncSecurityProperties {
   /**
    * Issuer visível ao NAVEGADOR, usado só para montar a URL de RP-Initiated Logout
    * (/connect/logout, ver BffLogoutController) - normalmente igual a `issuer`, mas diverge
-   * rodando em Docker: o container chama o NimbusAuth via host.docker.internal (issuer), só que
+   * rodando em Docker: o container chama o NimbusCore via host.docker.internal (issuer), só que
    * isso não resolve no navegador do usuário, que precisa de localhost. Se não configurado, cai
    * no valor de `issuer` (comportamento de sempre, fora do Docker).
    */
@@ -41,7 +41,7 @@ public class CardsyncSecurityProperties {
   @NotNull
   private Cookies cookies;
 
-  /** Tempo de inatividade até expirar a sessão HTTP do BFF (Cardsync, não do NimbusAuth). */
+  /** Tempo de inatividade até expirar a sessão HTTP do BFF (Cardsync, não do NimbusCore). */
   private Duration sessionTimeout = Duration.ofHours(2);
 
   private Web web = new Web();

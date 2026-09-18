@@ -1,7 +1,7 @@
 package com.cardsync.api.v1.controller;
 
 import com.cardsync.bff.service.BffApiClient;
-import com.cardsync.core.config.NimbusAuthClientProperties;
+import com.cardsync.core.config.NimbusCoreClientProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Proxy público (sem sessão/token) para a política de senha, que agora vive no NimbusAuth.
+ * Proxy público (sem sessão/token) para a política de senha, que agora vive no NimbusCore.
  * O SPA continua chamando /api/password/policy e /api/password/policy/check normalmente.
  */
 @RestController
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PasswordPolicyProxyController {
 
   private final BffApiClient api;
-  private final NimbusAuthClientProperties nimbusAuthProps;
+  private final NimbusCoreClientProperties nimbusAuthProps;
 
   @RequestMapping("/api/password/policy")
   public ResponseEntity<byte[]> policy(HttpServletRequest req) {

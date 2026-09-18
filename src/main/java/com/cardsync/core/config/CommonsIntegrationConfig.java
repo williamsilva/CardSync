@@ -16,14 +16,14 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * EmailSettingsService da Fase 4) sozinho - precisa listar o pacote explicitamente.
  *
  * <p>Escaneia os 2 SUBPACOTES específicos (legacy + notification.mail), NÃO o pacote pai
- * com.nimbussystems.commons inteiro - mesmo achado do NimbusAuthServer: escanear o pai também traz
+ * com.nimbussystems.commons inteiro - mesmo achado do NimbusCoreServer: escanear o pai também traz
  * com.nimbussystems.commons.audit.AuditService, cujo bean-name default colide com uma classe local
  * homônima sem relação nenhuma.
  *
  * <p>excludeFilters: BffEmailSettingsController exige CurrentUserProvider (sessão OIDC de app
- * CLIENTE do NimbusAuth - não se aplica aqui, mesmo raciocínio) e InternalEmailSettingsController
+ * CLIENTE do NimbusCore - não se aplica aqui, mesmo raciocínio) e InternalEmailSettingsController
  * da lib colidiria por bean-name com o InternalEmailSettingsController PRÓPRIO do CardSync
- * (com.cardsync.api.internal.controller, criado na Fase 2 pra ser chamado PELO NimbusAuth) -
+ * (com.cardsync.api.internal.controller, criado na Fase 2 pra ser chamado PELO NimbusCore) -
  * CardSync mantém os dois controllers locais, rota/contrato inalterados.
  *
  * <p>@EntityScan/@EnableJpaRepositories novos (2026-09-15): com.nimbussystems.commons.

@@ -1,6 +1,6 @@
 package com.cardsync.bff.service;
 
-import com.cardsync.core.config.NimbusAuthClientProperties;
+import com.cardsync.core.config.NimbusCoreClientProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -27,7 +27,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Usuário é global no NimbusAuth (sem app_key próprio) - "cadastrar usuário" na tela de Usuários
+ * Usuário é global no NimbusCore (sem app_key próprio) - "cadastrar usuário" na tela de Usuários
  * pode, na prática, ser "conceder acesso ao Cardsync a um usuário que já existe" (criado por
  * outro app Nimbus, ex.: NimbusFlow). O proxy genérico (BffApiClient/BffAdminProxyController)
  * simplesmente repassaria as chamadas cruas, e:
@@ -38,7 +38,7 @@ import tools.jackson.databind.node.ObjectNode;
  *       outro app Nimbus que o usuário já tivesse (o multiselect do CardSyncWeb só lista grupos
  *       com appKey=cardsync, ver GroupsApiService.getAll);</li>
  *   <li>as listagens (options/options-filter/search/get-by-id) exporiam o diretório global de
- *       usuários (de qualquer app Nimbus), já que o NimbusAuth não filtra usuário por app_key -
+ *       usuários (de qualquer app Nimbus), já que o NimbusCore não filtra usuário por app_key -
  *       só grupo tem app_key.</li>
  * </ul>
  * Intercepta esses caminhos pra resolver os três problemas - mesmo princípio do
@@ -55,7 +55,7 @@ public class BffUserProvisioningService {
   private static final String CARDSYNC_APP_KEY = "cardsync";
 
   private final BffAccessTokenService accessTokenService;
-  private final NimbusAuthClientProperties nimbusAuthProps;
+  private final NimbusCoreClientProperties nimbusAuthProps;
   private final ObjectMapper objectMapper;
 
   private final RestClient rest = RestClient.create();
@@ -80,7 +80,7 @@ public class BffUserProvisioningService {
 
   /**
    * PUT /api/v1/users/{id} faz replace total dos grupos do usuário (ver UserService.update no
-   * NimbusAuth) - busca o estado atual, preserva os grupos de fora do Cardsync intactos, funde com
+   * NimbusCore) - busca o estado atual, preserva os grupos de fora do Cardsync intactos, funde com
    * a nova seleção (só grupos Cardsync, vindos do formulário).
    */
   public ResponseEntity<byte[]> updatePreservingOtherAppGroups(
@@ -91,7 +91,7 @@ public class BffUserProvisioningService {
 
     JsonNode current = fetchUserById(token, id);
     if (current == null) {
-      // usuário não encontrado (ou falha ao consultar) - deixa o PUT original seguir e o NimbusAuth
+      // usuário não encontrado (ou falha ao consultar) - deixa o PUT original seguir e o NimbusCore
       // devolver o 404/erro real, em vez de mascarar com um comportamento diferente aqui.
       return sendJson(HttpMethod.PUT, "/api/v1/users/" + id, token, requestBody);
     }
@@ -160,9 +160,9 @@ public class BffUserProvisioningService {
 
   /**
    * POST /bff/v1/users/search - injeta "advanced.groupAppKey=cardsync" no corpo antes de repassar,
-   * pra o próprio NimbusAuth filtrar por app_key na specification (ver UserSpecs.groupAppKeyEquals)
+   * pra o próprio NimbusCore filtrar por app_key na specification (ver UserSpecs.groupAppKeyEquals)
    * e paginar/ordenar já só sobre os usuários do Cardsync. Antes disso a paginação vinha do
-   * NimbusAuth sem esse recorte (base compartilhada por todos os apps Nimbus) e o filtro por app
+   * NimbusCore sem esse recorte (base compartilhada por todos os apps Nimbus) e o filtro por app
    * era aplicado depois, na página já pronta - com poucos usuários do Cardsync frente ao total
    * global, a página filtrada podia vir vazia mesmo havendo usuários do Cardsync fora dela.
    */
@@ -216,7 +216,7 @@ public class BffUserProvisioningService {
       }
       return items;
     } catch (Exception e) {
-      log.warn("Falha ao buscar usuários no NimbusAuth: {}", e.getMessage());
+      log.warn("Falha ao buscar usuários no NimbusCore: {}", e.getMessage());
       return List.of();
     }
   }
@@ -238,7 +238,7 @@ public class BffUserProvisioningService {
           .body(String.class);
       return parse(responseBody == null ? new byte[0] : responseBody.getBytes(StandardCharsets.UTF_8));
     } catch (Exception e) {
-      log.warn("Falha ao buscar usuário {} no NimbusAuth antes de editar: {}", id, e.getMessage());
+      log.warn("Falha ao buscar usuário {} no NimbusCore antes de editar: {}", id, e.getMessage());
       return null;
     }
   }

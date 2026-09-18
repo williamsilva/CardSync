@@ -2,7 +2,7 @@ package com.cardsync.bff.controller;
 
 import com.cardsync.bff.service.BffApiClient;
 import com.cardsync.bff.service.BffUserProvisioningService;
-import com.cardsync.core.config.NimbusAuthClientProperties;
+import com.cardsync.core.config.NimbusCoreClientProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Proxy do BFF para as telas administrativas (Users/Groups/Permissions) e para a troca da
- * própria senha, que agora vivem no NimbusAuth. O SPA continua chamando exatamente as mesmas
+ * própria senha, que agora vivem no NimbusCore. O SPA continua chamando exatamente as mesmas
  * URLs de sempre (/bff/v1/users, /bff/v1/groups, /bff/v1/permissions, /bff/v1/me/password/change);
  * aqui só trocamos o prefixo e anexamos o access token que fica guardado no servidor - o
  * token nunca chega ao browser.
@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class BffAdminProxyController {
 
   private final BffApiClient api;
-  private final NimbusAuthClientProperties nimbusAuthProps;
+  private final NimbusCoreClientProperties nimbusAuthProps;
   private final BffUserProvisioningService userProvisioning;
 
   /**
@@ -55,7 +55,7 @@ public class BffAdminProxyController {
   }
 
   /**
-   * Mapeamentos exatos - o NimbusAuth não filtra usuário por app_key (só grupo tem app_key), então
+   * Mapeamentos exatos - o NimbusCore não filtra usuário por app_key (só grupo tem app_key), então
    * a listagem crua traria usuários de qualquer app Nimbus (ex.: NimbusFlow) sem nenhum grupo do
    * Cardsync. Escopadas em BffUserProvisioningService, mesmo recorte de AdminUserService no
    * NimbusFlowServer.

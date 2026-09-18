@@ -69,7 +69,7 @@ springdoc:
     enabled: true
 
 # Título exibido no Swagger UI (com.nimbussystems.commons.legacy.config.OpenApiConfig, extraído em
-# Fase 2 da extração de código compartilhado - só o título divergia entre CardSync/NimbusAuth).
+# Fase 2 da extração de código compartilhado - só o título divergia entre CardSync/NimbusCore).
 openapi:
   title: CardSync API
 
@@ -102,7 +102,7 @@ cardsync:
       ssl: ${MAIL_SMTP_SSL:false}
 
   security:
-    # Issuer do NimbusAuth (não é mais o próprio CardSync).
+    # Issuer do NimbusCore (não é mais o próprio CardSync).
     issuer: ${CARDSYNC_ISSUER:http://localhost:9090}
     # Issuer como o NAVEGADOR resolve (RP-Initiated Logout) - só diverge de CARDSYNC_ISSUER
     # rodando em Docker (ver CardsyncSecurityProperties#getBrowserIssuer). Mesmo default de
@@ -125,7 +125,7 @@ cardsync:
       allowed-origins:
         - "http://localhost:4201"
 
-# API interna (machine-to-machine) do NimbusAuth
+# API interna (machine-to-machine) do NimbusCore
 nimbus-auth:
   base-url: ${NIMBUS_AUTH_BASE_URL:http://localhost:9090}
   internal-api-secret: ${NIMBUS_INTERNAL_API_SECRET:dev-internal-secret-change-me}

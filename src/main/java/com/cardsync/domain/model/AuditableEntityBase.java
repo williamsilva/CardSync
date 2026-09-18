@@ -12,8 +12,8 @@ import org.springframework.data.annotation.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
- * createdBy/updatedBy sao o UUID do usuario no NimbusAuth (dono de UserEntity apos o split
- * Cardsync/NimbusAuth) - sem FK local, ja que cs_users nao existe mais neste schema.
+ * createdBy/updatedBy sao o UUID do usuario no NimbusCore (dono de UserEntity apos o split
+ * Cardsync/NimbusCore) - sem FK local, ja que cs_users nao existe mais neste schema.
  * Para exibir nome/username, ver UserDirectoryService.
  */
 @Getter
