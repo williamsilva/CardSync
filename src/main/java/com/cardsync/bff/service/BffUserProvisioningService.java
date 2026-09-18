@@ -52,7 +52,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class BffUserProvisioningService {
 
-  private static final String CARDSYNC_APP_KEY = "cardsync";
+  private static final String CARDSYNC_APP_KEY = "nimbuscardsync";
 
   private final BffAccessTokenService accessTokenService;
   private final NimbusCoreClientProperties nimbusAuthProps;

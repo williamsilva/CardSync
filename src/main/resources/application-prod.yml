@@ -48,7 +48,7 @@ spring:
         registration:
           cardsync-bff:
             provider: cardsync-as
-            client-id: ${CARDSYNC_BFF_CLIENT_ID:cardsync-bff}
+            client-id: ${CARDSYNC_BFF_CLIENT_ID:nimbuscardsync-bff}
             client-secret: ${CARDSYNC_BFF_CLIENT_SECRET}
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
